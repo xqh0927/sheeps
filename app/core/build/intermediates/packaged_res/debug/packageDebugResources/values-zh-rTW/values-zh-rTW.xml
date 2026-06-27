@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="btn_back">返回</string>
+    <string name="btn_cancel">取消</string>
+    <string name="btn_claim">領取</string>
+    <string name="btn_claimed">已領取</string>
+    <string name="btn_confirm">確定</string>
+    <string name="btn_exchange">兌換</string>
+    <string name="btn_login">登錄</string>
+    <string name="btn_logout">退出登錄</string>
+    <string name="btn_send_code">發送驗證碼</string>
+    <string name="btn_sign_in">每日簽到</string>
+    <string name="btn_signed">已簽到</string>
+    <string name="btn_start_game">開啟試驗</string>
+    <string name="carry_items_title">備戰包道具選擇</string>
+    <string name="dialog_conflict_desc">我們檢測到您的本地存檔與雲端不一致，請選擇要保留的存檔數據</string>
+    <string name="dialog_conflict_title">存檔同步衝突</string>
+    <string name="hint_code">請輸入6位驗證碼</string>
+    <string name="hint_phone">請輸入11位手機號</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_tw">繁體中文</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="language_settings">語言設置</string>
+    <string name="leaderboard_title">水墨排行榜</string>
+    <string name="no_net_warn">當前無網絡，功能受限。點擊前往系統設置</string>
+    <string name="points_balance">積分餘額: %d</string>
+    <string name="save_cloud">雲端存檔</string>
+    <string name="save_level">關卡: 第 %d 關</string>
+    <string name="save_local">本地存檔</string>
+    <string name="save_points">積分: %d</string>
+    <string name="stock_prefix">庫存: %d</string>
+    <string name="tab_game">遊玩</string>
+    <string name="tab_me">個人</string>
+    <string name="tab_shop">商城</string>
+    <string name="task_title">每日任務</string>
+    <string name="unlock_level">解鎖第 %1$d 關 (消耗 %2$d 積分)</string>
+</resources>

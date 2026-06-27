@@ -1,0 +1,30 @@
+[
+  {
+    "path": "/splash/entry",
+    "className": "com.example.sheeps.splash.SplashActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/main",
+    "className": "com.example.sheeps.menu.MenuActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/leaderboard/show",
+    "className": "com.example.sheeps.leaderboard.LeaderboardActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/game/play",
+    "className": "com.example.sheeps.game.GameActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  }
+]

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="btn_back">戻る</string>
+    <string name="btn_cancel">キャンセル</string>
+    <string name="btn_claim">受取</string>
+    <string name="btn_claimed">受取済み</string>
+    <string name="btn_confirm">確定</string>
+    <string name="btn_exchange">交換</string>
+    <string name="btn_login">ログイン</string>
+    <string name="btn_logout">ログアウト</string>
+    <string name="btn_send_code">コード送信</string>
+    <string name="btn_sign_in">ログインチェック</string>
+    <string name="btn_signed">チェック済み</string>
+    <string name="btn_start_game">试练開始</string>
+    <string name="carry_items_title">装備アイテム選択</string>
+    <string name="dialog_conflict_desc">ローカルセーブとクラウドセーブが一致しません。保持するセーブデータを選択してください。</string>
+    <string name="dialog_conflict_title">セーブデータの競合</string>
+    <string name="hint_code">6桁の認証コードを入力</string>
+    <string name="hint_phone">11桁の携帯番号を入力</string>
+    <string name="lang_en">English</string>
+    <string name="lang_ja">日本語</string>
+    <string name="lang_ko">한국어</string>
+    <string name="lang_tw">繁體中文</string>
+    <string name="lang_zh">简体中文</string>
+    <string name="language_settings">言語設定</string>
+    <string name="leaderboard_title">水墨ランキング</string>
+    <string name="no_net_warn">オフライン状態です。機能制限あり。タップして設定を開く</string>
+    <string name="points_balance">ポイント残高: %d</string>
+    <string name="save_cloud">クラウドデータ</string>
+    <string name="save_level">レベル: %d</string>
+    <string name="save_local">ローカルデータ</string>
+    <string name="save_points">ポイント: %d</string>
+    <string name="stock_prefix">在庫: %d</string>
+    <string name="tab_game">プレイ</string>
+    <string name="tab_me">マイページ</string>
+    <string name="tab_shop">ショップ</string>
+    <string name="task_title">デイリー任務</string>
+    <string name="unlock_level">レベル %1$d 解放 (%2$d ポイント消費)</string>
+</resources>

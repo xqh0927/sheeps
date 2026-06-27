@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="true"
+        android:icon="@drawable/app_icon"
+        android:label="国风消消乐"
+        android:roundIcon="@drawable/app_icon"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+        android:usesCleartextTraffic="true">
+
+        <!-- Activities will be merged from feature modules manifests -->
+
+        <!-- App Startup: auto-init chain via Initializers -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="com.example.sheeps.core.startup.MmkvInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="com.example.sheeps.core.startup.LogcatInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="com.example.sheeps.core.startup.ToasterInitializer"
+                android:value="androidx.startup" />
+            <meta-data
+                android:name="com.example.sheeps.core.startup.TheRouterInitializer"
+                android:value="androidx.startup" />
+        </provider>
+
+        <!-- WorkManager: use Hilt-injected WorkerFactory -->
+        <provider
+            android:name="androidx.work.impl.WorkManagerInitializer"
+            android:authorities="${applicationId}.workmanager-init"
+            android:exported="false"
+            tools:node="remove" />
+
+    </application>
+
+</manifest>
+

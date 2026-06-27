@@ -1,0 +1,29 @@
+-- Merging decision tree log ---
+manifest
+ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:2:1-13:12
+INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:2:1-13:12
+	package
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:3:5-38
+		INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:2:11-69
+application
+ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:5:5-11:19
+activity#com.example.sheeps.game.GameActivity
+ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:6:9-10:78
+	android:screenOrientation
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:9:13-49
+	android:exported
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:8:13-37
+	android:theme
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:10:13-75
+	android:name
+		ADDED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml:7:13-41
+uses-sdk
+INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml
+INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from C:\Users\15613\Documents\file\app\feature_game\src\main\AndroidManifest.xml
