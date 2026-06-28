@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS levels;
 DROP TABLE IF EXISTS user_task;
 DROP TABLE IF EXISTS task;
 DROP TABLE IF EXISTS sign_record;
@@ -152,6 +153,13 @@ CREATE TABLE leaderboard (
     clear_time_ms INTEGER NOT NULL,
     achieved_at INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+CREATE TABLE levels (
+    level_id INTEGER PRIMARY KEY,
+    difficulty INTEGER,
+    layout_data TEXT NOT NULL,
+    created_at INTEGER NOT NULL
 );
 
 CREATE TABLE backup_save_log (

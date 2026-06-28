@@ -1,2 +1,0 @@
-com.example.sheeps.leaderboard
-raw auspicious_loading

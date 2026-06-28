@@ -38,7 +38,7 @@ async function verifyJWT(token: string): Promise<any | null> {
     new TextEncoder().encode(JWT_SECRET),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['verify']
+    ['sign']
   );
   const expectedSigBuffer = await crypto.subtle.sign(
     'HMAC',

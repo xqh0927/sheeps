@@ -73,9 +73,12 @@ dependencies {
 
     // Retrofit & Serialization
     api(libs.retrofit)
+    api(libs.okhttp)
+    api(libs.okhttp.logging)
     api(libs.retrofit.converter.serialization)
     api(libs.kotlinx.serialization.json)
     api(libs.xxpermissions)
+    api(libs.logutils.pengwei)
 
     // Hilt DI
     api(libs.hilt.android)
