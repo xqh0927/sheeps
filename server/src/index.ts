@@ -2,6 +2,133 @@ export interface Env {
   DB: D1Database;
 }
 
+const GITHUB_RELEASES_API = 'https://api.github.com/repos/xqh0927/sheeps-releases/releases/latest';
+const GITHUB_RELEASE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+type GitHubReleaseAsset = {
+  name?: string;
+  browser_download_url?: string;
+};
+
+type GitHubRelease = {
+  tag_name?: string;
+  name?: string;
+  body?: string;
+  draft?: boolean;
+  prerelease?: boolean;
+  assets?: GitHubReleaseAsset[];
+};
+
+type AppUpdatePayload = {
+  has_update: boolean;
+  version_name?: string;
+  apk_url?: string;
+  update_log?: string;
+  force_update?: boolean;
+};
+
+let githubReleaseCache: { expiresAt: number; release: GitHubRelease | null } | null = null;
+
+export function parseReleaseVersionCode(tagName?: string): number | null {
+  if (!tagName) return null;
+
+  const semanticMatch = tagName.match(/v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
+  if (!semanticMatch) return null;
+
+  const major = Number.parseInt(semanticMatch[1], 10);
+  const minor = semanticMatch[2] ? Number.parseInt(semanticMatch[2], 10) : 0;
+  const patch = semanticMatch[3] ? Number.parseInt(semanticMatch[3], 10) : 0;
+
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(patch)) {
+    return null;
+  }
+
+  if (minor === 0 && patch === 0) {
+    return major;
+  }
+
+  return major * 10000 + minor * 100 + patch;
+}
+
+export function findApkAsset(assets?: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
+  return assets?.find(asset =>
+    Boolean(asset.browser_download_url) && Boolean(asset.name?.toLowerCase().endsWith('.apk'))
+  ) ?? null;
+}
+
+export function isForceUpdateRelease(body?: string): boolean {
+  if (!body) return false;
+  return /\[(force|force_update|强制更新|強制更新)\]|force_update\s*[:=]\s*true/i.test(body);
+}
+
+export function mapGitHubReleaseToUpdate(release: GitHubRelease, currentCode: number): AppUpdatePayload | null {
+  if (release.draft) return null;
+
+  const versionCode = parseReleaseVersionCode(release.tag_name);
+  const apkAsset = findApkAsset(release.assets);
+  if (!versionCode || !apkAsset?.browser_download_url || versionCode <= currentCode) {
+    return { has_update: false };
+  }
+
+  return {
+    has_update: true,
+    version_name: release.name || release.tag_name,
+    apk_url: apkAsset.browser_download_url,
+    update_log: release.body || '发现新版本，建议更新以获得更好的游戏体验。',
+    force_update: isForceUpdateRelease(release.body)
+  };
+}
+
+async function fetchLatestGitHubRelease(): Promise<GitHubRelease | null> {
+  const now = Date.now();
+  if (githubReleaseCache && githubReleaseCache.expiresAt > now) {
+    return githubReleaseCache.release;
+  }
+
+  const response = await fetch(GITHUB_RELEASES_API, {
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'sheeps-update-checker'
+    }
+  });
+
+  if (!response.ok) {
+    githubReleaseCache = { expiresAt: now + 30 * 1000, release: null };
+    return null;
+  }
+
+  const release = await response.json<GitHubRelease>();
+  githubReleaseCache = { expiresAt: now + GITHUB_RELEASE_CACHE_TTL_MS, release };
+  return release;
+}
+
+async function getGitHubAppUpdate(currentCode: number): Promise<AppUpdatePayload | null> {
+  try {
+    const release = await fetchLatestGitHubRelease();
+    return release ? mapGitHubReleaseToUpdate(release, currentCode) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getDatabaseAppUpdate(env: Env, currentCode: number): Promise<AppUpdatePayload> {
+  const latest = await env.DB.prepare(
+    'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version ORDER BY version_code DESC LIMIT 1'
+  ).first<{ version_code: number; version_name: string; apk_url: string; update_log: string; is_force_update: number }>();
+
+  if (latest && latest.version_code > currentCode) {
+    return {
+      has_update: true,
+      version_name: latest.version_name,
+      apk_url: latest.apk_url,
+      update_log: latest.update_log,
+      force_update: latest.is_force_update === 1
+    };
+  }
+
+  return { has_update: false };
+}
+
 // 声明机房常驻内存缓存，用于缓存已生成的关卡数据
 const CACHE_STAGE_CONFIG = new Map<number, string>();
 
@@ -1013,21 +1140,13 @@ export default {
         const currentCodeStr = url.searchParams.get('version_code');
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
 
-        const latest = await env.DB.prepare(
-          'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version ORDER BY version_code DESC LIMIT 1'
-        ).first<{ version_code: number; version_name: string; apk_url: string; update_log: string; is_force_update: number }>();
-
-        if (latest && latest.version_code > currentCode) {
-          return new Response(JSON.stringify({
-            has_update: true,
-            version_name: latest.version_name,
-            apk_url: latest.apk_url,
-            update_log: latest.update_log,
-            force_update: latest.is_force_update === 1
-          }), { headers: corsHeaders });
+        const githubUpdate = await getGitHubAppUpdate(currentCode);
+        if (githubUpdate?.has_update) {
+          return new Response(JSON.stringify(githubUpdate), { headers: corsHeaders });
         }
 
-        return new Response(JSON.stringify({ has_update: false }), { headers: corsHeaders });
+        const databaseUpdate = await getDatabaseAppUpdate(env, currentCode);
+        return new Response(JSON.stringify(databaseUpdate), { headers: corsHeaders });
       }
 
       // Original User Rename endpoint

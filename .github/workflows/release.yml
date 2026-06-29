@@ -1,29 +1,42 @@
 name: Auto Release
+
 on:
   push:
-    branches: [ "main" ] 
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            app/**/*.gradle*
+            app/gradle/wrapper/gradle-wrapper.properties
+            app/gradle/libs.versions.toml
+
       - name: Build APK
+        working-directory: app
         run: |
-          cd app
           chmod +x gradlew
-          ./gradlew assembleRelease
-          
+          ./gradlew assembleRelease --no-daemon
+
+      - name: List APK outputs
+        run: ls -la app/app/build/outputs/apk/release/
+
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           repository: xqh0927/sheeps-releases
           token: ${{ secrets.MY_PAT }}
-          # 强制使用一个带时间戳的 tag，彻底绕过版本号读取失败的问题
           tag_name: v1.0.${{ github.run_number }}
           name: Release v1.0.${{ github.run_number }}
-          # 这里用通配符确保能找到文件，如果还找不到，说明它在根目录
-          files: |
-            app/build/outputs/apk/release/*.apk
-            build/outputs/apk/release/*.apk
+          files: app/app/build/outputs/apk/release/*.apk
+          fail_on_unmatched_files: true

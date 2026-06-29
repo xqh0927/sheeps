@@ -1,9 +1,11 @@
 /sheeps
 .wrangler
+server/.tmp-test/
 
 # Android Studio & Gradle
 .idea/
 .gradle/
+**/.kotlin/
 **/build/
 *.iml
 local.properties

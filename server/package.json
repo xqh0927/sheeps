@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsc src/index.ts --target ES2022 --module commonjs --types @cloudflare/workers-types --skipLibCheck --outDir .tmp-test && node --test test/update.test.js"
   },
   "keywords": [],
   "author": "",
