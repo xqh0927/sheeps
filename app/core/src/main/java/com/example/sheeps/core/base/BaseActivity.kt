@@ -3,6 +3,7 @@ package com.example.sheeps.core.base
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import com.blankj.utilcode.util.LogUtils
 
 abstract class BaseActivity : ComponentActivity() {
@@ -12,6 +13,9 @@ abstract class BaseActivity : ComponentActivity() {
             setTheme(com.example.sheeps.theme.ThemeManager.getThemeResId())
         }
         super.onCreate(savedInstanceState)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true // 或根据主题判断
+        }
         LogUtils.d("${javaClass.simpleName} onCreate")
         enableEdgeToEdge()
         initView(savedInstanceState)
