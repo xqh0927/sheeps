@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -844,14 +845,6 @@ fun ShopTabContent(
                     id = -1,
                     name = "经典国风 (卡牌皮肤)",
                     description = "默认解锁的古典朱红金边卡牌样式",
-                    name_en = "Classic Folk",
-                    description_en = "Default classic crimson gold cards",
-                    name_tw = "經典國風",
-                    description_tw = "默認解鎖的古典朱紅金邊卡牌樣式",
-                    name_ja = "古典的な国風",
-                    description_ja = "デフォルト古典的な朱赤のゴールドカード",
-                    name_ko = "클래식 국풍",
-                    description_ko = "기본 클래식 크림슨 골드 카드",
                     image_url = "",
                     item_type = "CLASSIC",
                     points_price = 0,

@@ -91,7 +91,7 @@ fun ItemAnimationIcon(
 
             when (itemType.uppercase()) {
                 "UNDO" -> { // 乾坤符：慢速旋转的太极图
-                    rotate(rotation, cx, cy) {
+                    rotate(rotation, pivot = Offset(cx, cy)) {
                         // 绘制阴阳底盘
                         drawArc(
                             color = Color(0xFFCBAA6A),
@@ -180,7 +180,7 @@ fun ItemAnimationIcon(
                     )
                     // 颤动的指针
                     val shake = rotation * 2.5f
-                    rotate(shake, cx, cy) {
+                    rotate(shake, pivot = Offset(cx, cy)) {
                         drawLine(
                             color = CrimsonRed,
                             start = Offset(cx, cy + radius * 0.2f),
@@ -292,7 +292,7 @@ fun ItemAnimationIcon(
                     )
                 }
                 "JOKER" -> { // 太极牌：流光溢彩的炫彩太极星盘
-                    rotate(-rotation * 1.5f, cx, cy) {
+                    rotate(-rotation * 1.5f, pivot = Offset(cx, cy)) {
                         val brush = Brush.sweepGradient(
                             colors = listOf(
                                 Color(0xFFFF2A6D),
@@ -343,7 +343,7 @@ fun ItemAnimationIcon(
                     }
                 }
                 "SKIN_CYBER" -> { // 赛博霓虹：炫光集成芯片网格
-                    rotate(rotation * 0.5f, cx, cy) {
+                    rotate(rotation * 0.5f, pivot = Offset(cx, cy)) {
                         val rectSize = radius * 0.5f
                         drawRect(
                             color = Color(0xFF00F2FE),
@@ -353,7 +353,7 @@ fun ItemAnimationIcon(
                         )
                         for (i in 0 until 4) {
                             val angle = i * 90f
-                            rotate(angle, cx, cy) {
+                            rotate(angle, pivot = Offset(cx, cy)) {
                                 drawLine(
                                     color = Color(0xFF05D9E8).copy(alpha = flashAlpha),
                                     start = Offset(cx, cy - rectSize / 2f),
