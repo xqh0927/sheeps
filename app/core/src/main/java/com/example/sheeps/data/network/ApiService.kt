@@ -1,13 +1,37 @@
 package com.example.sheeps.data.network
 
-import com.example.sheeps.data.model.*
-import kotlinx.serialization.json.Json
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
-import retrofit2.http.*
-import java.util.concurrent.TimeUnit
+import com.example.sheeps.data.model.AppUpdateResponse
+import com.example.sheeps.data.model.DailyTask
+import com.example.sheeps.data.model.ExchangeRecord
+import com.example.sheeps.data.model.ExchangeRequest
+import com.example.sheeps.data.model.ExchangeResponse
+import com.example.sheeps.data.model.GenericResponse
+import com.example.sheeps.data.model.LeaderboardResponse
+import com.example.sheeps.data.model.LoginRequest
+import com.example.sheeps.data.model.LoginResponse
+import com.example.sheeps.data.model.Notice
+import com.example.sheeps.data.model.PointRecord
+import com.example.sheeps.data.model.RefreshResponse
+import com.example.sheeps.data.model.RegisterRequest
+import com.example.sheeps.data.model.RenameRequest
+import com.example.sheeps.data.model.ScoreRequest
+import com.example.sheeps.data.model.SendCodeRequest
+import com.example.sheeps.data.model.SendCodeResponse
+import com.example.sheeps.data.model.ShopItem
+import com.example.sheeps.data.model.SignResponse
+import com.example.sheeps.data.model.SyncRequest
+import com.example.sheeps.data.model.SyncResponse
+import com.example.sheeps.data.model.TaskClaimRequest
+import com.example.sheeps.data.model.TaskClaimResponse
+import com.example.sheeps.data.model.Tile
+import com.example.sheeps.data.model.UnlockLevelRequest
+import com.example.sheeps.data.model.UnlockLevelResponse
+import com.example.sheeps.data.model.UserProfileResponse
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface ApiService {
 
@@ -31,8 +55,6 @@ interface ApiService {
         @Query("level_id") levelId: Int,
         @Query("limit") limit: Int = 50
     ): LeaderboardResponse
-
-    // --- New APIs ---
 
     @POST("/api/auth/send-code")
     suspend fun sendCode(@Body request: SendCodeRequest): SendCodeResponse

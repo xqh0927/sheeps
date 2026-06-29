@@ -8,12 +8,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      # 1. 提取版本号的关键逻辑
       - name: Extract version
         id: get_version
         run: |
-          # 从 app/build.gradle.kts 提取 versionName，去除双引号和空格
-          VERSION=$(grep "versionName" app/build.gradle.kts | cut -d'"' -f2)
+          # 提取 versionName 并清理所有引号和空格
+          VERSION=$(grep "versionName" app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       
       - name: Build APK
@@ -27,7 +26,6 @@ jobs:
         with:
           repository: xqh0927/sheeps-releases
           token: ${{ secrets.MY_PAT }}
-          # 直接使用刚才提取出来的变量
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
           files: app/build/outputs/apk/release/sheeps_*.apk
