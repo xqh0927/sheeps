@@ -6,3 +6,12 @@
 -dontwarn com.google.api.client.**
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn org.joda.time.**
+
+# 3. WorkManager & Room Database
+-keep class * extends androidx.room.RoomDatabase {
+    public <init>(...);
+}
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    public <init>(...);
+}
+-dontwarn androidx.work.impl.**

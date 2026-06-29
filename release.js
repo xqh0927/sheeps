@@ -56,7 +56,6 @@ function run() {
                 console.log(`\n准备执行以下发布动作:`);
                 console.log(`1. 更新 build.gradle.kts ➔ versionCode = ${newCode}, versionName = "${newName}"`);
                 console.log(`2. 自动生成云端 D1 数据库 SQL 记录并执行插入`);
-                console.log(`3. 自动 Git Commit 并 Push 提交到 GitHub 触发 CI 发布`);
                 
                 rl.question(`\n确认开始发布？(y/n): `, (confirm) => {
                     if (confirm.toLowerCase() !== 'y' && confirm.toLowerCase() !== 'yes') {
@@ -86,12 +85,11 @@ function run() {
                         execSync(`npx wrangler d1 execute my-app-db --remote --command="${sql}"`, { cwd: serverDir, stdio: 'inherit' });
                         console.log("➔ D1 数据库记录写入成功！");
 
-                        // 3. 执行 Git 提交与 Push
-                        console.log("➔ 正在提交代码到 Git 远程仓库...");
-                        execSync('git add app/app/build.gradle.kts .github/workflows/release.yml', { cwd: __dirname, stdio: 'inherit' });
-                        execSync(`git commit -m "chore(release): bump version to v${newName} and update release info"`, { cwd: __dirname, stdio: 'inherit' });
-                        execSync('git push origin main', { cwd: __dirname, stdio: 'inherit' });
-                        console.log("➔ 代码已成功推送到远程 main 分支，正在触发 GitHub Actions 编译发布...");
+                        // 3. 提示 Git 提交操作
+                        console.log("\n➔ 自动代码提交已禁用。请在本地核对并测试无误后，手动执行以下命令推送触发 GitHub 自动构建：");
+                        console.log(`   git add .`);
+                        console.log(`   git commit -m "chore(release): bump version to v${newName}"`);
+                        console.log(`   git push origin main`);
 
                         console.log(`\n🎉 发布流程执行完毕！`);
                         console.log(`Tag 版本: v${newName}`);
