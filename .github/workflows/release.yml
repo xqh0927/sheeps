@@ -38,5 +38,7 @@ jobs:
           token: ${{ secrets.MY_PAT }}
           tag_name: v1.0.${{ github.run_number }}
           name: Release v1.0.${{ github.run_number }}
+          # 修正路径：如果执行是在 app 目录下，APK 就在 app/build/outputs/...
+          # 也就是相对于根目录的 app/build/outputs/...
           files: app/app/build/outputs/apk/release/*.apk
           fail_on_unmatched_files: true
