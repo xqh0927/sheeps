@@ -582,6 +582,15 @@ function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: str
 
         // Record defeat to DB leaderboard
         try {
+          // Verify user exists in users table to prevent FOREIGN KEY constraint failure
+          const userExists = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(opponent.playerId).first();
+          if (!userExists) {
+            const defaultUsername = `联机玩家_${opponent.playerId.slice(-4)}`;
+            await env.DB.prepare(
+              'INSERT OR IGNORE INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+            ).bind(opponent.playerId, null, defaultUsername, null, 0, Date.now()).run();
+          }
+
           await env.DB.prepare(
             'INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)'
           ).bind(opponent.playerId, 0, 9999, 99999, Date.now()).run();
@@ -627,6 +636,123 @@ export default {
         webSocket: client,
         headers: corsHeaders
       });
+    }
+
+    // ========== Matchmaking Queue ==========
+    // In-memory matchmaking queue (works within single CF Worker instance)
+    interface MatchEntry {
+      playerId: string;
+      joinedAt: number;
+      matchedGameId?: string;
+      matchedOpponent?: string;
+    }
+
+    // Use module-level storage to persist across requests in the same isolate
+    if (!(globalThis as any).__matchQueue) {
+      (globalThis as any).__matchQueue = new Map<string, MatchEntry>();
+    }
+    const matchQueue: Map<string, MatchEntry> = (globalThis as any).__matchQueue;
+
+    // Clean up stale entries (older than 30 seconds)
+    const now = Date.now();
+    for (const [pid, entry] of matchQueue) {
+      if (now - entry.joinedAt > 30000 && !entry.matchedGameId) {
+        matchQueue.delete(pid);
+      }
+    }
+
+    // Match Join: POST /api/match/join  body: { playerId }
+    if (path === '/api/match/join' && request.method === 'POST') {
+      const body: { playerId: string } = await request.json();
+      if (!body.playerId) {
+        return new Response(JSON.stringify({ error: 'Missing playerId' }), { status: 400, headers: corsHeaders });
+      }
+
+      const playerId = body.playerId;
+
+      // Check if already in queue and matched
+      const existing = matchQueue.get(playerId);
+      if (existing && existing.matchedGameId) {
+        return new Response(JSON.stringify({
+          status: 'matched',
+          gameId: existing.matchedGameId,
+          opponentId: existing.matchedOpponent
+        }), { headers: corsHeaders });
+      }
+
+      // Try to find an opponent in the queue
+      let opponent: MatchEntry | null = null;
+      let opponentId: string | null = null;
+      for (const [pid, entry] of matchQueue) {
+        if (pid !== playerId && !entry.matchedGameId) {
+          opponent = entry;
+          opponentId = pid;
+          break;
+        }
+      }
+
+      if (opponent && opponentId) {
+        // Found a match! Generate a gameId
+        const gameId = `duel_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        
+        // Update both entries
+        opponent.matchedGameId = gameId;
+        opponent.matchedOpponent = playerId;
+
+        const myEntry: MatchEntry = {
+          playerId,
+          joinedAt: Date.now(),
+          matchedGameId: gameId,
+          matchedOpponent: opponentId
+        };
+        matchQueue.set(playerId, myEntry);
+
+        return new Response(JSON.stringify({
+          status: 'matched',
+          gameId,
+          opponentId
+        }), { headers: corsHeaders });
+      } else {
+        // No opponent yet, add to queue
+        matchQueue.set(playerId, { playerId, joinedAt: Date.now() });
+
+        return new Response(JSON.stringify({
+          status: 'waiting',
+          message: 'Waiting for opponent'
+        }), { headers: corsHeaders });
+      }
+    }
+
+    // Match Status: GET /api/match/status?playerId=xxx
+    if (path === '/api/match/status' && request.method === 'GET') {
+      const playerId = url.searchParams.get('playerId');
+      if (!playerId) {
+        return new Response(JSON.stringify({ error: 'Missing playerId' }), { status: 400, headers: corsHeaders });
+      }
+
+      const entry = matchQueue.get(playerId);
+      if (!entry) {
+        return new Response(JSON.stringify({ status: 'not_in_queue' }), { headers: corsHeaders });
+      }
+
+      if (entry.matchedGameId) {
+        return new Response(JSON.stringify({
+          status: 'matched',
+          gameId: entry.matchedGameId,
+          opponentId: entry.matchedOpponent
+        }), { headers: corsHeaders });
+      }
+
+      return new Response(JSON.stringify({ status: 'waiting' }), { headers: corsHeaders });
+    }
+
+    // Match Leave: POST /api/match/leave  body: { playerId }
+    if (path === '/api/match/leave' && request.method === 'POST') {
+      const body: { playerId: string } = await request.json();
+      if (body.playerId) {
+        matchQueue.delete(body.playerId);
+      }
+      return new Response(JSON.stringify({ status: 'left' }), { headers: corsHeaders });
     }
 
     try {
@@ -722,6 +848,12 @@ export default {
             // 4. Delete guest progress
             await env.DB.prepare('DELETE FROM level_unlock WHERE user_id = ?').bind(body.device_uuid).run();
             await env.DB.prepare('DELETE FROM user_items WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM leaderboard WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM point_record WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM exchange_record WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM sign_record WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM user_task WHERE user_id = ?').bind(body.device_uuid).run();
+            await env.DB.prepare('DELETE FROM backup_save_log WHERE user_id = ?').bind(body.device_uuid).run();
             await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(body.device_uuid).run();
           }
         }

@@ -9,6 +9,8 @@ import com.example.sheeps.data.model.GenericResponse
 import com.example.sheeps.data.model.LeaderboardResponse
 import com.example.sheeps.data.model.LoginRequest
 import com.example.sheeps.data.model.LoginResponse
+import com.example.sheeps.data.model.MatchJoinRequest
+import com.example.sheeps.data.model.MatchStatusResponse
 import com.example.sheeps.data.model.Notice
 import com.example.sheeps.data.model.PointRecord
 import com.example.sheeps.data.model.RefreshResponse
@@ -132,4 +134,13 @@ interface ApiService {
     suspend fun checkUpdate(
         @Query("version_code") versionCode: Int
     ): AppUpdateResponse
+
+    @POST("/api/match/join")
+    suspend fun joinMatch(@Body request: MatchJoinRequest): MatchStatusResponse
+
+    @GET("/api/match/status")
+    suspend fun getMatchStatus(@Query("playerId") playerId: String): MatchStatusResponse
+
+    @POST("/api/match/leave")
+    suspend fun leaveMatch(@Body request: MatchJoinRequest): GenericResponse
 }

@@ -34,7 +34,19 @@ data class MenuViewState(
 
     // App Update
     val appUpdateInfo: AppUpdateResponse? = null,
-    val currentSkin: String = "classic"
+    val currentSkin: String = "classic",
+
+    // Matchmaking
+    val matchStatus: String = "none", // none, searching, matched, error
+    val matchedGameId: String? = null,
+    val matchedOpponentId: String? = null
+)
+
+data class ConflictInfo(
+    val localPoints: Int,
+    val localLevel: Int,
+    val cloudPoints: Int,
+    val cloudLevel: Int
 )
 
 sealed interface MenuViewIntent {
@@ -53,6 +65,11 @@ sealed interface MenuViewIntent {
     data class ChangeLanguage(val lang: String) : MenuViewIntent
     object DismissUpdate : MenuViewIntent
     data class ChangeSkin(val skin: String) : MenuViewIntent
+    
+    // Matchmaking
+    data class JoinMatch(val playerId: String) : MenuViewIntent
+    data class LeaveMatch(val playerId: String) : MenuViewIntent
+    object ResetMatchStatus : MenuViewIntent
 }
 
 sealed interface MenuViewEffect {

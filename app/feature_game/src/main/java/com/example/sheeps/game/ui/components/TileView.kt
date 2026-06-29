@@ -103,11 +103,11 @@ fun TileView(
                 currentSkin = currentSkin,
                 size      = tileSize
             )
-            // 封印叠加层（在此也设为透明不可见，使其表现为空白卡）
+            // 封印叠加层（设置为透明度 0.65f 可见，使其表现为符合 README 规范的封印卡）
             if (isSealed) {
                 SealedOverlayCanvas(
                     size  = tileSize,
-                    alpha = 0f
+                    alpha = 1f
                 )
             }
         }
@@ -172,7 +172,7 @@ private fun TileCanvas(
                 else -> Color(0xFFCBAA6A)
             }
         }
-        val finalBorderColor = if (isSealed) borderColor.copy(alpha = 0f) else borderColor
+        val finalBorderColor = if (isSealed) borderColor.copy(alpha = 0.4f) else borderColor
         
         // 赛博霓虹边框发光特殊绘制（双边框效果）
         if (currentSkin == "cyber" && !isBlocked && !isSealed) {
@@ -229,7 +229,7 @@ private fun TileCanvas(
                 else -> getTileIconColor(type)
             }
         }
-        val finalIconColor = if (isSealed) iconColor.copy(alpha = 0f) else iconColor
+        val finalIconColor = if (isSealed) iconColor.copy(alpha = 0.4f) else iconColor
         val cx = w / 2f
         val cy = h / 2f
         val iconSize = w * 0.45f
@@ -304,9 +304,9 @@ private fun SealedOverlayCanvas(size: Dp, alpha: Float) {
         // 金色封印叠加（渐变透明）
         val sealBrush = Brush.radialGradient(
             colors = listOf(
-                Color(0xFFE6A23C).copy(alpha = 0.7f),
-                Color(0xFFE6A23C).copy(alpha = 0.3f),
-                Color(0xFFE6A23C).copy(alpha = 0.05f)
+                Color(0xFFE6A23C).copy(alpha = 1f),
+                Color(0xFFE6A23C).copy(alpha = 0.5f),
+                Color(0xFFE6A23C).copy(alpha = 0.1f)
             ),
             center = Offset(w / 2f, h / 2f),
             radius = w * 0.7f
@@ -510,7 +510,7 @@ private fun DrawScope.drawRuyi(size: Float, color: Color) {
 
 // --- 葫芦（两个圆+连接线）---
 private fun DrawScope.drawGourd(size: Float, color: Color) {
-    val stroke = size * 0.11f
+    val stroke = 2.dp.toPx()
     // 上圆（小）
     drawCircle(color, radius = size * 0.2f, center = Offset(size * 0.5f, size * 0.28f), style = Stroke(width = stroke))
     // 下圆（大）
@@ -524,7 +524,7 @@ private fun DrawScope.drawGourd(size: Float, color: Color) {
 
 // --- 符（符文简化：方框+横线纹路）---
 private fun DrawScope.drawTalisman(size: Float, color: Color) {
-    val stroke = size * 0.1f
+    val stroke = 2.dp.toPx()
     // 外框
     drawRoundRect(color, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f), topLeft = Offset(size * 0.15f, size * 0.1f),
         size = Size(size * 0.7f, size * 0.85f), style = Stroke(width = stroke * 0.8f))
@@ -541,7 +541,7 @@ private fun DrawScope.drawTalisman(size: Float, color: Color) {
 
 // --- 剑（直线+护手）---
 private fun DrawScope.drawSword(size: Float, color: Color) {
-    val stroke = size * 0.11f
+    val stroke = 2.dp.toPx()
     // 剑身
     val blade = Path().apply {
         moveTo(size * 0.5f, size * 0.05f)

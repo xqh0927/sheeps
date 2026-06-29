@@ -48,7 +48,8 @@ fun GameScreen(
     onUseDouble: () -> Unit,
     onRestart: () -> Unit,
     onBack: () -> Unit,
-    onNextLevel: () -> Unit
+    onNextLevel: () -> Unit,
+    onShowLeaderboard: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -230,7 +231,13 @@ fun GameScreen(
             enter   = fadeIn(tween(400)) + scaleIn(initialScale = 0.85f),
             exit    = fadeOut(tween(300))
         ) {
-            GameResultOverlay(won = true, state = state, onBack = onBack, onNextLevel = onNextLevel)
+            GameResultOverlay(
+                won = true,
+                state = state,
+                onBack = onBack,
+                onNextLevel = onNextLevel,
+                onShowLeaderboard = onShowLeaderboard
+            )
         }
 
         // 失败覆盖层
@@ -442,7 +449,8 @@ private fun GameResultOverlay(
     onBack: () -> Unit,
     onRestart: () -> Unit = {},
     onRevive: () -> Unit = {},
-    onNextLevel: () -> Unit = {}
+    onNextLevel: () -> Unit = {},
+    onShowLeaderboard: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -478,7 +486,12 @@ private fun GameResultOverlay(
             ) {
                 if (won) {
                     // 胜利视觉
-                    WonContent(state = state, onBack = onBack, onNextLevel = onNextLevel)
+                    WonContent(
+                        state = state,
+                        onBack = onBack,
+                        onNextLevel = onNextLevel,
+                        onShowLeaderboard = onShowLeaderboard
+                    )
                 } else {
                     // 失败视觉
                     LostContent(
@@ -494,7 +507,12 @@ private fun GameResultOverlay(
 }
 
 @Composable
-private fun WonContent(state: GameViewState, onBack: () -> Unit, onNextLevel: () -> Unit) {
+private fun WonContent(
+    state: GameViewState,
+    onBack: () -> Unit,
+    onNextLevel: () -> Unit,
+    onShowLeaderboard: () -> Unit
+) {
     // 动态光晕
     val infiniteTransition = rememberInfiniteTransition(label = "won")
     val glowAlpha by infiniteTransition.animateFloat(
@@ -563,17 +581,22 @@ private fun WonContent(state: GameViewState, onBack: () -> Unit, onNextLevel: ()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SecondaryButton(
-            text     = "返回主页",
+            text     = "英雄榜",
+            onClick  = onShowLeaderboard,
+            modifier = Modifier.weight(1f)
+        )
+        SecondaryButton(
+            text     = "主页",
             onClick  = onBack,
             modifier = Modifier.weight(1f)
         )
         PrimaryButton(
             text     = "下一关",
             onClick  = onNextLevel,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1.2f)
         )
     }
 }

@@ -1,0 +1,146 @@
+package com.example.sheeps.menu.ui.dialogs
+
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.theme.CrimsonRed
+import kotlinx.coroutines.delay
+
+@Composable
+fun DuelMatchDialog(
+    state: MenuViewState,
+    onJoin: () -> Unit,
+    onLeave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "taichiSpin")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing)
+        ),
+        label = "taichiRotation"
+    )
+
+    var dotCount by remember { mutableIntStateOf(0) }
+
+    // Start matching on enter
+    LaunchedEffect(Unit) {
+        onJoin()
+    }
+
+    // Dot animation
+    LaunchedEffect(state.matchStatus) {
+        while (state.matchStatus == "searching") {
+            delay(500)
+            dotCount = (dotCount + 1) % 4
+        }
+    }
+
+    // Leave queue on dismiss
+    DisposableEffect(Unit) {
+        onDispose {
+            onLeave()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            if (state.matchStatus == "error") {
+                Button(
+                    onClick = { onJoin() },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("重新匹配", color = Color.White)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("退出", color = Color.Gray)
+            }
+        },
+        title = {
+            Text(
+                "天命对决",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = CrimsonRed,
+                fontFamily = FontFamily.Serif
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Canvas(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .graphicsLayer { rotationZ = rotation }
+                ) {
+                    val r = size.width / 2f
+                    drawCircle(color = CrimsonRed, radius = r, style = Stroke(width = 2.dp.toPx()))
+                    drawArc(color = CrimsonRed, startAngle = -90f, sweepAngle = 180f, useCenter = true, size = size)
+                    drawCircle(color = Color.White, radius = r * 0.22f, center = Offset(size.width / 2f, size.height * 0.25f))
+                    drawCircle(color = CrimsonRed, radius = r * 0.22f, center = Offset(size.width / 2f, size.height * 0.75f))
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                val dots = ".".repeat(dotCount)
+                Text(
+                    text = when (state.matchStatus) {
+                        "searching" -> "正在寻找对手$dots"
+                        "matched" -> "匹配成功！对手: ${state.matchedOpponentId?.takeLast(4) ?: "???"}"
+                        "error" -> "暂无匹配对手，请稍后再试"
+                        else -> "匹配中..."
+                    },
+                    fontSize = 14.sp,
+                    color = when (state.matchStatus) {
+                        "matched" -> Color(0xFF2E7D32)
+                        "error" -> Color.Gray
+                        else -> CrimsonRed.copy(alpha = 0.8f)
+                    },
+                    fontFamily = FontFamily.Serif
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "修士: ${state.phone}",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+
+                if (state.matchStatus == "matched" && state.matchedGameId != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "对局号: ${state.matchedGameId.takeLast(10)}",
+                        fontSize = 10.sp,
+                        color = Color.Gray.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(16.dp)
+    )
+}

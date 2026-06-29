@@ -26,5 +26,12 @@
     "action": "",
     "description": "",
     "params": {}
+  },
+  {
+    "path": "/game/duel",
+    "className": "com.example.sheeps.game.DuelActivity",
+    "action": "",
+    "description": "",
+    "params": {}
   }
 ]

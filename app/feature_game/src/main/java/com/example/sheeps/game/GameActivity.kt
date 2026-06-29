@@ -51,6 +51,11 @@ class GameActivity : BaseActivity() {
                         onBack = { finish() },
                         onNextLevel = {
                             viewModel.sendIntent(GameViewIntent.LoadLevel(state.currentLevelId + 1, null))
+                        },
+                        onShowLeaderboard = {
+                            com.therouter.TheRouter.build("/leaderboard/show")
+                                .withInt("levelId", state.currentLevelId)
+                                .navigation()
                         }
                     )
                 }

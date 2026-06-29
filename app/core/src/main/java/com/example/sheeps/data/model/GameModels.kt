@@ -246,3 +246,15 @@ data class AppUpdateResponse(
     val update_log: String? = null,
     val force_update: Boolean = false
 )
+
+@Serializable
+data class MatchJoinRequest(
+    val playerId: String
+)
+
+@Serializable
+data class MatchStatusResponse(
+    val status: String, // searching, matched, error
+    val gameId: String? = null,
+    val opponentId: String? = null
+)

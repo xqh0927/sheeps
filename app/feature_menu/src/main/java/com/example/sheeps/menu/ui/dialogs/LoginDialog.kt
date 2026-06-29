@@ -1,0 +1,104 @@
+package com.example.sheeps.menu.ui.dialogs
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.example.sheeps.theme.CrimsonRed
+import com.hjq.toast.Toaster
+import kotlinx.coroutines.delay
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LoginDialog(
+    onDismiss: () -> Unit,
+    onSendCode: (String) -> Unit,
+    onLogin: (String, String) -> Unit
+) {
+    var phone by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var countdown by remember { mutableStateOf(0) }
+
+    LaunchedEffect(countdown) {
+        if (countdown > 0) {
+            delay(1000)
+            countdown--
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "玄门登录验证",
+                fontWeight = FontWeight.Bold,
+                color = CrimsonRed,
+                fontFamily = FontFamily.Serif
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { phone = it },
+                    label = { Text("手机号") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        label = { Text("验证码") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (phone.length == 11) {
+                                onSendCode(phone)
+                                countdown = 60
+                            } else {
+                                Toaster.show("请输入11位手机号")
+                            }
+                        },
+                        enabled = countdown == 0,
+                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Text(
+                            text = if (countdown > 0) "${countdown}s" else "获取",
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onLogin(phone, code) },
+                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed)
+            ) {
+                Text("验证登录", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消", color = Color.Gray)
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
+}

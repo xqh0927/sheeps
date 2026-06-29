@@ -11,6 +11,7 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.state.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -96,6 +97,58 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.ChangeLanguage -> handleChangeLanguage(intent.lang)
             is MenuViewIntent.DismissUpdate -> updateState { copy(appUpdateInfo = null) }
             is MenuViewIntent.ChangeSkin -> handleChangeSkin(intent.skin)
+            is MenuViewIntent.JoinMatch -> handleJoinMatch(intent.playerId)
+            is MenuViewIntent.LeaveMatch -> handleLeaveMatch(intent.playerId)
+            is MenuViewIntent.ResetMatchStatus -> updateState { copy(matchStatus = "none") }
+        }
+    }
+
+    private fun handleJoinMatch(playerId: String) {
+        updateState { copy(matchStatus = "searching", matchedGameId = null, matchedOpponentId = null) }
+        viewModelScope.launch {
+            try {
+                val joinResponse = apiService.joinMatch(MatchJoinRequest(playerId))
+                if (joinResponse.status == "matched") {
+                    updateState { 
+                        copy(
+                            matchStatus = "matched",
+                            matchedGameId = joinResponse.gameId,
+                            matchedOpponentId = joinResponse.opponentId
+                        )
+                    }
+                } else {
+                    // Poll status
+                    repeat(20) {
+                        delay(1500)
+                        if (currentState.matchStatus != "searching") return@launch
+                        
+                        val statusResponse = apiService.getMatchStatus(playerId)
+                        if (statusResponse.status == "matched") {
+                            updateState {
+                                copy(
+                                    matchStatus = "matched",
+                                    matchedGameId = statusResponse.gameId,
+                                    matchedOpponentId = statusResponse.opponentId
+                                )
+                            }
+                            return@launch
+                        }
+                    }
+                    updateState { copy(matchStatus = "error") }
+                }
+            } catch (e: Exception) {
+                updateState { copy(matchStatus = "error") }
+            }
+        }
+    }
+
+    private fun handleLeaveMatch(playerId: String) {
+        viewModelScope.launch {
+            try {
+                apiService.leaveMatch(MatchJoinRequest(playerId))
+            } catch (e: Exception) {
+                // ignore
+            }
         }
     }
 
