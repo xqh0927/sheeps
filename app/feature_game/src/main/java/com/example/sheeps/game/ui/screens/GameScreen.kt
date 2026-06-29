@@ -176,6 +176,7 @@ fun GameScreen(
                                     TileView(
                                         tile     = tile,
                                         onClick  = { onTileClick(tile) },
+                                        currentSkin = state.currentSkin,
                                         tileSize = 52.dp,
                                         modifier = Modifier
                                             .offset(
@@ -201,7 +202,7 @@ fun GameScreen(
 
                 // 移出置物架
                 if (state.movedOutTiles.isNotEmpty()) {
-                    MovedOutTray(tiles = state.movedOutTiles, onTileClick = onTileClick)
+                    MovedOutTray(tiles = state.movedOutTiles, currentSkin = state.currentSkin, onTileClick = onTileClick)
                 }
 
                 // 消除槽
@@ -310,6 +311,7 @@ private fun GameStatusBar(state: GameViewState) {
 @Composable
 private fun MovedOutTray(
     tiles: List<Tile>,
+    currentSkin: String,
     onTileClick: (Tile) -> Unit
 ) {
     Column(
@@ -334,6 +336,7 @@ private fun MovedOutTray(
                 TileView(
                     tile    = tile,
                     onClick = { onTileClick(tile) },
+                    currentSkin = currentSkin,
                     tileSize = 46.dp
                 )
             }
@@ -382,6 +385,7 @@ private fun MatchingSlot(state: GameViewState) {
                     TileView(
                         tile    = state.slotTiles[i],
                         onClick = {},
+                        currentSkin = state.currentSkin,
                         tileSize = 40.dp
                     )
                 }

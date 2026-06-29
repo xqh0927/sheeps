@@ -36,6 +36,7 @@ import kotlin.math.*
 fun TileView(
     tile: Tile,
     onClick: () -> Unit,
+    currentSkin: String = "classic",
     modifier: Modifier = Modifier,
     tileSize: Dp = 52.dp
 ) {
@@ -99,6 +100,7 @@ fun TileView(
                 type      = tile.type,
                 isBlocked = isBlocked,
                 isSealed  = isSealed,
+                currentSkin = currentSkin,
                 size      = tileSize
             )
             // 封印叠加层（在此也设为透明不可见，使其表现为空白卡）
@@ -121,6 +123,7 @@ private fun TileCanvas(
     type: Int,
     isBlocked: Boolean,
     isSealed: Boolean,
+    currentSkin: String,
     size: Dp
 ) {
     val bgAlpha = if (isBlocked) 0.45f else 1f
@@ -130,37 +133,73 @@ private fun TileCanvas(
         val h = this.size.height
         val r = 10.dp.toPx()
 
-        // --- 卡牌底色（羊皮纸渐变）---
-        val bgBrush = Brush.linearGradient(
-            colors = if (isBlocked) {
-                listOf(
-                    Color(0xFF2A2D3A),
-                    Color(0xFF1E2130)
+        // --- 卡牌底色（根据皮肤选择）---
+        val bgBrush = if (isBlocked) {
+            Brush.linearGradient(
+                colors = if (currentSkin == "cyber") listOf(Color(0xFF1F2535), Color(0xFF161A26))
+                         else listOf(Color(0xFF2A2D3A), Color(0xFF1E2130)),
+                start = Offset(0f, 0f),
+                end = Offset(w, h)
+            )
+        } else {
+            when (currentSkin) {
+                "ink" -> Brush.linearGradient(
+                    colors = listOf(Color(0xFFFAF8F5), Color(0xFFF3EFE6)),
+                    start = Offset(0f, 0f),
+                    end = Offset(w, h)
                 )
-            } else {
-                listOf(
-                    Color(0xFFF5E6C8),
-                    Color(0xFFEDD9A3),
-                    Color(0xFFE5CC8A)
+                "cyber" -> Brush.linearGradient(
+                    colors = listOf(Color(0xFF121824), Color(0xFF090D16)),
+                    start = Offset(0f, 0f),
+                    end = Offset(w, h)
                 )
-            },
-            start = Offset(0f, 0f),
-            end   = Offset(w, h)
-        )
+                else -> Brush.linearGradient(
+                    colors = listOf(Color(0xFFF5E6C8), Color(0xFFEDD9A3), Color(0xFFE5CC8A)),
+                    start = Offset(0f, 0f),
+                    end = Offset(w, h)
+                )
+            }
+        }
         drawRoundRect(brush = bgBrush, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r))
 
-        // --- 卡牌边框 ---
-        val borderColor = if (isBlocked) Color(0xFF3A4050) else Color(0xFFCBAA6A)
+        // --- 卡牌边框（根据皮肤选择）---
+        val borderColor = if (isBlocked) {
+            if (currentSkin == "cyber") Color(0xFF2B3346) else Color(0xFF3A4050)
+        } else {
+            when (currentSkin) {
+                "ink" -> Color(0xFF4C4942)
+                "cyber" -> Color(0xFF00D2FF)
+                else -> Color(0xFFCBAA6A)
+            }
+        }
         val finalBorderColor = if (isSealed) borderColor.copy(alpha = 0f) else borderColor
+        
+        // 赛博霓虹边框发光特殊绘制（双边框效果）
+        if (currentSkin == "cyber" && !isBlocked && !isSealed) {
+            drawRoundRect(
+                color       = Color(0xFF00F2FE).copy(alpha = 0.3f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
+                style       = Stroke(width = 3.5f)
+            )
+        }
+        
         drawRoundRect(
             color       = finalBorderColor,
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
             style       = Stroke(width = 1.5f)
         )
 
-        // --- 内框装饰线（国风卡片四角纹）---
+        // --- 内框装饰线（根据皮肤选择，水墨款较暗，赛博款为荧光绿）---
         val inset = 4f
-        val lineColor = if (isBlocked) Color(0xFF4A5060) else Color(0xFFDEC07A)
+        val lineColor = if (isBlocked) {
+            if (currentSkin == "cyber") Color(0xFF374158) else Color(0xFF4A5060)
+        } else {
+            when (currentSkin) {
+                "ink" -> Color(0xFF8C867A)
+                "cyber" -> Color(0xFF05D9E8).copy(alpha = 0.4f)
+                else -> Color(0xFFDEC07A)
+            }
+        }
         val lineAlpha = if (isSealed) 0f else (if (isBlocked) 0.3f else 0.5f)
         withTransform({ /* 内框 */ }) {
             // 四个角的短线装饰
@@ -181,7 +220,15 @@ private fun TileCanvas(
         }
 
         // --- 中心图案 ---
-        val iconColor = if (isBlocked) Color(0xFF5A6070) else getTileIconColor(type)
+        val iconColor = if (isBlocked) {
+            if (currentSkin == "cyber") Color(0xFF47526E) else Color(0xFF5A6070)
+        } else {
+            when (currentSkin) {
+                "ink" -> Color(0xFF2E3133)
+                "cyber" -> getCyberIconColor(type)
+                else -> getTileIconColor(type)
+            }
+        }
         val finalIconColor = if (isSealed) iconColor.copy(alpha = 0f) else iconColor
         val cx = w / 2f
         val cy = h / 2f
@@ -580,3 +627,19 @@ private fun DrawScope.drawDefaultCircle(size: Float, color: Color) {
 
 // 向后兼容函数
 fun getWebpDrawableForTileType(type: Int): Int = 0 // 不再使用，由 Canvas 自绘替代
+
+fun getCyberIconColor(type: Int): Color = when (type) {
+    1  -> Color(0xFFFF2A6D)  // 龙 - 荧光红
+    2  -> Color(0xFFFF5E00)  // 凤 - 荧光橙
+    3  -> Color(0xFFFF007F)  // 莲 - 荧光粉
+    4  -> Color(0xFF05D9E8)  // 鹤 - 荧光青
+    5  -> Color(0xFFFF9F00)  // 锦鲤 - 荧光黄
+    6  -> Color(0xFFBF5AF2)  // 如意 - 荧光紫
+    7  -> Color(0xFF30D158)  // 葫芦 - 荧光绿
+    8  -> Color(0xFF64D2FF)  // 符 - 荧光蓝
+    9  -> Color(0xFFE5E5EA)  // 剑 - 银白
+    10 -> Color(0xFFFFD60A)  // 扇 - 荧光金
+    11 -> Color(0xFFAED8F2)  // 琴 - 浅靛
+    12 -> Color(0xFF007AFF)  // 棋 - 炫蓝
+    else -> Color(0xFF05D9E8)
+}
