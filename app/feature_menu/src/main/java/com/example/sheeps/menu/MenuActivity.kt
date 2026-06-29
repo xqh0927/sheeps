@@ -188,6 +188,9 @@ class MenuActivity : BaseActivity() {
                                     onLoginClick = { showLoginDialog = true },
                                     onExchangeClick = { itemId, count ->
                                         viewModel.sendIntent(MenuViewIntent.ExchangeShopItem(itemId, count))
+                                    },
+                                    onChangeSkin = { skin ->
+                                        viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin))
                                     }
                                 )
                                 "me" -> PersonalTabContent(
@@ -826,8 +829,40 @@ fun LevelItemRow(
 fun ShopTabContent(
     state: MenuViewState,
     onLoginClick: () -> Unit,
-    onExchangeClick: (Int, Int) -> Unit
+    onExchangeClick: (Int, Int) -> Unit,
+    onChangeSkin: (String) -> Unit
 ) {
+    var selectedSubTab by remember { mutableStateOf(0) }
+
+    val displayItems = remember(selectedSubTab, state.shopItems) {
+        if (selectedSubTab == 0) {
+            state.shopItems.filter { !it.item_type.startsWith("SKIN_") }
+        } else {
+            val skins = mutableListOf<ShopItem>()
+            skins.add(
+                ShopItem(
+                    id = -1,
+                    name = "经典国风 (卡牌皮肤)",
+                    description = "默认解锁的古典朱红金边卡牌样式",
+                    name_en = "Classic Folk",
+                    description_en = "Default classic crimson gold cards",
+                    name_tw = "經典國風",
+                    description_tw = "默認解鎖的古典朱紅金邊卡牌樣式",
+                    name_ja = "古典的な国風",
+                    description_ja = "デフォルト古典的な朱赤のゴールドカード",
+                    name_ko = "클래식 국풍",
+                    description_ko = "기본 클래식 크림슨 골드 카드",
+                    image_url = "",
+                    item_type = "CLASSIC",
+                    points_price = 0,
+                    stock = 9999
+                )
+            )
+            skins.addAll(state.shopItems.filter { it.item_type.startsWith("SKIN_") })
+            skins
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -857,7 +892,26 @@ fun ShopTabContent(
                 )
             }
 
-            if (state.shopItems.isEmpty()) {
+            // 二级分类页签
+            TabRow(
+                selectedTabIndex = selectedSubTab,
+                containerColor = Color.Transparent,
+                contentColor = CrimsonRed,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Tab(
+                    selected = selectedSubTab == 0,
+                    onClick = { selectedSubTab = 0 },
+                    text = { Text("法宝神器", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = selectedSubTab == 1,
+                    onClick = { selectedSubTab = 1 },
+                    text = { Text("奇门皮肤", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                )
+            }
+
+            if (state.shopItems.isEmpty() && selectedSubTab == 0) {
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -871,10 +925,23 @@ fun ShopTabContent(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(state.shopItems) { item ->
-                        ShopItemCard(item = item, onExchange = { count ->
-                            onExchangeClick(item.id, count)
-                        })
+                    items(displayItems) { item ->
+                        val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
+                        val backpackCount = if (item.item_type == "CLASSIC") 1 else {
+                            state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+                        }
+
+                        ShopItemCard(
+                            item = item,
+                            backpackCount = backpackCount,
+                            currentSkin = state.currentSkin,
+                            onExchange = { count ->
+                                onExchangeClick(item.id, count)
+                            },
+                            onApplySkin = { skin ->
+                                onChangeSkin(skin)
+                            }
+                        )
                     }
                 }
             }
@@ -939,8 +1006,22 @@ fun ShopTabContent(
 @Composable
 fun ShopItemCard(
     item: ShopItem,
-    onExchange: (Int) -> Unit
+    backpackCount: Int,
+    currentSkin: String,
+    onExchange: (Int) -> Unit,
+    onApplySkin: (String) -> Unit
 ) {
+    val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
+    val isUnlocked = if (item.item_type == "CLASSIC") true else backpackCount >= 1
+    
+    val skinKey = when (item.item_type) {
+        "SKIN_INK" -> "ink"
+        "SKIN_CYBER" -> "cyber"
+        "CLASSIC" -> "classic"
+        else -> "classic"
+    }
+    val isCurrentlyApplied = isSkin && currentSkin == skinKey
+
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -951,31 +1032,11 @@ fun ShopItemCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Mock graphic representation using Canvas
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF9F5EF)),
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(modifier = Modifier.size(36.dp)) {
-                    val p = Path().apply {
-                        moveTo(size.width / 2, 0f)
-                        lineTo(size.width, size.height / 2)
-                        lineTo(size.width / 2, size.height)
-                        lineTo(0f, size.height / 2)
-                        close()
-                    }
-                    drawPath(p, color = CrimsonRed, style = Stroke(width = 3f))
-                }
-                Text(
-                    text = item.item_type.take(3),
-                    fontSize = 10.sp,
-                    color = CrimsonRed,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            // 调用高清 Canvas 动画图标
+            com.example.sheeps.menu.components.ItemAnimationIcon(
+                itemType = item.item_type,
+                size = 64.dp
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1003,30 +1064,55 @@ fun ShopItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "${item.points_price} 积分",
+                    text = if (isSkin && isUnlocked) "已解锁" else "${item.points_price} 积分",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = CrimsonRed
                 )
-                Text(
-                    text = "存: ${item.stock}",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
+                if (!isSkin) {
+                    Text(
+                        text = "存: ${item.stock}",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
-                onClick = { onExchange(1) },
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(30.dp)
-            ) {
-                Text("兑换", fontSize = 11.sp, color = Color.White)
+            if (isSkin && isUnlocked) {
+                Button(
+                    onClick = { onApplySkin(skinKey) },
+                    enabled = !isCurrentlyApplied,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isCurrentlyApplied) Color.Gray else CrimsonRed,
+                        disabledContainerColor = Color(0xFFE0E0E0),
+                        disabledContentColor = Color.Gray
+                    ),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(30.dp)
+                ) {
+                    Text(
+                        text = if (isCurrentlyApplied) "已启用" else "启用",
+                        fontSize = 11.sp,
+                        color = if (isCurrentlyApplied) Color.DarkGray else Color.White
+                    )
+                }
+            } else {
+                Button(
+                    onClick = { onExchange(1) },
+                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(30.dp)
+                ) {
+                    Text("兑换", fontSize = 11.sp, color = Color.White)
+                }
             }
         }
     }
