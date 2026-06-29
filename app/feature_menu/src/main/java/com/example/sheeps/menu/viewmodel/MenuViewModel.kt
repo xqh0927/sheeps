@@ -2,14 +2,27 @@ package com.example.sheeps.menu.viewmodel
 
 import androidx.lifecycle.viewModelScope
 import com.example.sheeps.core.base.BaseMviViewModel
+import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.utils.NetworkMonitor
-import com.example.sheeps.core.utils.NetworkStatus
-import com.example.sheeps.data.local.*
-import com.example.sheeps.data.model.*
+import com.example.sheeps.data.local.BackpackItemEntity
+import com.example.sheeps.data.local.LocalDao
+import com.example.sheeps.data.local.UserProfileEntity
+import com.example.sheeps.data.local.UserProgressEntity
+import com.example.sheeps.data.model.ExchangeRequest
+import com.example.sheeps.data.model.LoginRequest
+import com.example.sheeps.data.model.LoginResponse
+import com.example.sheeps.data.model.MatchJoinRequest
+import com.example.sheeps.data.model.SendCodeRequest
+import com.example.sheeps.data.model.ShopItem
+import com.example.sheeps.data.model.TaskClaimRequest
+import com.example.sheeps.data.model.UnlockLevelRequest
+import com.example.sheeps.data.model.UserItem
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
-import com.example.sheeps.menu.state.*
+import com.example.sheeps.menu.state.MenuViewEffect
+import com.example.sheeps.menu.state.MenuViewIntent
+import com.example.sheeps.menu.state.MenuViewState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -20,7 +33,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MenuViewModel @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext
+    private val context: android.content.Context,
     private val apiService: ApiService,
     private val prefs: UserPreferences,
     private val json: Json,
@@ -70,11 +84,11 @@ class MenuViewModel @Inject constructor(
         }
 
         // Initial data loading
-        updateState { 
+        updateState {
             copy(
                 language = prefs.getLanguage(),
                 currentSkin = prefs.getCurrentSkin()
-            ) 
+            )
         }
         sendIntent(MenuViewIntent.LoadData)
         checkAppUpdateOnce()
@@ -87,10 +101,18 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.LoginWithCode -> handleLoginWithCode(intent.phone, intent.code)
             is MenuViewIntent.Logout -> handleLogout()
             is MenuViewIntent.SignIn -> handleSignIn()
-            is MenuViewIntent.ExchangeShopItem -> handleExchangeShopItem(intent.shopItemId, intent.count)
+            is MenuViewIntent.ExchangeShopItem -> handleExchangeShopItem(
+                intent.shopItemId,
+                intent.count
+            )
+
             is MenuViewIntent.ClaimTask -> handleClaimTask(intent.taskId)
             is MenuViewIntent.UnlockLevelWithPoints -> handleUnlockLevelWithPoints(intent.levelId)
-            is MenuViewIntent.UpdateCarryItem -> handleUpdateCarryItem(intent.itemType, intent.change)
+            is MenuViewIntent.UpdateCarryItem -> handleUpdateCarryItem(
+                intent.itemType,
+                intent.change
+            )
+
             is MenuViewIntent.ClearCarryItems -> handleClearCarryItems()
             is MenuViewIntent.GoToGame -> handleGoToGame(intent.levelId, intent.carryItemsJson)
             is MenuViewIntent.ResolveConflict -> handleResolveConflict(intent.useLocal)
@@ -104,12 +126,20 @@ class MenuViewModel @Inject constructor(
     }
 
     private fun handleJoinMatch(playerId: String) {
-        updateState { copy(matchStatus = "searching", matchedGameId = null, matchedOpponentId = null, duelLevel = 2, gameSeed = 0) }
+        updateState {
+            copy(
+                matchStatus = "searching",
+                matchedGameId = null,
+                matchedOpponentId = null,
+                duelLevel = 2,
+                gameSeed = 0
+            )
+        }
         viewModelScope.launch {
             try {
                 val joinResponse = apiService.joinMatch(MatchJoinRequest(playerId))
                 if (joinResponse.status == "matched") {
-                    updateState { 
+                    updateState {
                         copy(
                             matchStatus = "matched",
                             matchedGameId = joinResponse.gameId,
@@ -123,7 +153,7 @@ class MenuViewModel @Inject constructor(
                     repeat(20) {
                         delay(1500)
                         if (currentState.matchStatus != "searching") return@launch
-                        
+
                         val statusResponse = apiService.getMatchStatus(playerId)
                         if (statusResponse.status == "matched") {
                             updateState {
@@ -166,12 +196,13 @@ class MenuViewModel @Inject constructor(
             try {
                 if (networkMonitor.isOnline()) {
                     val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                        packageInfo.longVersionCode.toInt()
-                    } else {
-                        @Suppress("DEPRECATION")
-                        packageInfo.versionCode
-                    }
+                    val versionCode =
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            packageInfo.longVersionCode.toInt()
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageInfo.versionCode
+                        }
                     val appUpdate = apiService.checkUpdate(versionCode)
                     updateState { copy(appUpdateInfo = appUpdate) }
                 }
@@ -198,28 +229,15 @@ class MenuViewModel @Inject constructor(
                 // Fetch public shop items & notices
                 val shopItems = try {
                     val remoteItems = apiService.getShopItems()
-                    
-                    // 动态注入 34 个省份美食皮肤
-                    val provinces = listOf(
-                        "北京", "天津", "河北", "山西", "内蒙古", "辽宁", "吉林", "黑龙江", "上海", "江苏",
-                        "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "广东", "广西",
-                        "海南", "重庆", "四川", "贵州", "云南", "西藏", "陕西", "甘肃", "青海", "宁夏",
-                        "新疆", "香港", "澳门", "台湾"
-                    )
-                    val provinceIds = listOf(
-                        "beijing", "tianjin", "hebei", "shanxi", "inner_mongolia", "liaoning", "jilin", "heilongjiang", "shanghai", "jiangsu",
-                        "zhejiang", "anhui", "fujian", "jiangxi", "shandong", "henan", "hubei", "hunan", "guangdong", "guangxi",
-                        "hainan", "chongqing", "sichuan", "guizhou", "yunnan", "tibet", "shaanxi", "gansu", "qinghai", "ningxia",
-                        "xinjiang", "hongkong", "macau", "taiwan"
-                    )
 
-                    val gourmetSkins = provinces.mapIndexed { index, name ->
+                    // 动态注入 34 个省份美食皮肤 (从 SkinConstants 获取)
+                    val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
                         ShopItem(
                             id = 1000 + index,
-                            name = "$name·省味",
-                            description = "解锁${name}省特色美食图标皮肤",
+                            name = "${province.name}·省味",
+                            description = "解锁${province.name}省特色美食图标皮肤",
                             image_url = "",
-                            item_type = "SKIN_${provinceIds[index].uppercase()}",
+                            item_type = "SKIN_${province.id.uppercase()}",
                             points_price = 200,
                             stock = 9999
                         )
@@ -239,10 +257,10 @@ class MenuViewModel @Inject constructor(
 
                 if (isLoggedIn && networkMonitor.isOnline()) {
                     val authHeader = "Bearer ${prefs.getToken()}"
-                    
+
                     // 1. 先将本地离线脏进度推到云端
                     syncRepository.syncDirtyData()
-                    
+
                     // 2. 再拉取最新的云端进度覆盖本地，防止拉取过快覆盖导致本地关卡解锁丢失
                     syncRepository.pullCloudProfile()
 
@@ -326,7 +344,8 @@ class MenuViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // Pass guest Device UUID for backend merging
-                val response = apiService.login(LoginRequest(phone, code, device_uuid = prefs.getUserId()))
+                val response =
+                    apiService.login(LoginRequest(phone, code, device_uuid = prefs.getUserId()))
                 if (response.success) {
                     val localPoints = prefs.getPoints()
                     val localLevel = prefs.getUnlockedLevel()
@@ -337,12 +356,14 @@ class MenuViewModel @Inject constructor(
                     if ((localPoints > 0 || localLevel > 1) && (localPoints != cloudPoints || localLevel != cloudLevel)) {
                         pendingLoginResponse = response
                         updateState { copy(isLoading = false) }
-                        setEffect(MenuViewEffect.ShowConflictDialog(
-                            localPoints = localPoints,
-                            localLevel = localLevel,
-                            cloudPoints = cloudPoints,
-                            cloudLevel = cloudLevel
-                        ))
+                        setEffect(
+                            MenuViewEffect.ShowConflictDialog(
+                                localPoints = localPoints,
+                                localLevel = localLevel,
+                                cloudPoints = cloudPoints,
+                                cloudLevel = cloudLevel
+                            )
+                        )
                     } else {
                         // Directly resolve login
                         saveLoginData(response)
@@ -376,28 +397,42 @@ class MenuViewModel @Inject constructor(
                     val localProfile = localDao.getProfile()
                     localDao.deleteProfile() // 删掉旧游客 Profile
                     if (localProfile != null) {
-                        localDao.insertProfile(UserProfileEntity(
-                            userId = response.user.id,
-                            username = localProfile.username,
-                            points = localProfile.points,
-                            isDirty = true,
-                            updateTimestamp = now
-                        ))
+                        localDao.insertProfile(
+                            UserProfileEntity(
+                                userId = response.user.id,
+                                username = localProfile.username,
+                                points = localProfile.points,
+                                isDirty = true,
+                                updateTimestamp = now
+                            )
+                        )
                     } else {
-                        localDao.insertProfile(UserProfileEntity(
-                            userId = response.user.id,
-                            username = prefs.getUsername(),
-                            points = prefs.getPoints(),
-                            isDirty = true,
-                            updateTimestamp = now
-                        ))
+                        localDao.insertProfile(
+                            UserProfileEntity(
+                                userId = response.user.id,
+                                username = prefs.getUsername(),
+                                points = prefs.getPoints(),
+                                isDirty = true,
+                                updateTimestamp = now
+                            )
+                        )
                     }
 
                     val localProgress = localDao.getAllProgress()
-                    localDao.insertProgressList(localProgress.map { it.copy(isDirty = true, updateTimestamp = now) })
+                    localDao.insertProgressList(localProgress.map {
+                        it.copy(
+                            isDirty = true,
+                            updateTimestamp = now
+                        )
+                    })
 
                     val localItems = localDao.getAllItems()
-                    localDao.insertItemList(localItems.map { it.copy(isDirty = true, updateTimestamp = now) })
+                    localDao.insertItemList(localItems.map {
+                        it.copy(
+                            isDirty = true,
+                            updateTimestamp = now
+                        )
+                    })
 
                     // Trigger immediate silent sync upload
                     syncRepository.syncDirtyData()
@@ -406,24 +441,37 @@ class MenuViewModel @Inject constructor(
                     // Load and write Cloud progress directly, clearing local differences
                     prefs.setUsername(response.user.username)
                     prefs.setPoints(response.user.points)
-                    
+
                     localDao.deleteProfile() // 删掉旧游客 Profile
-                    localDao.insertProfile(UserProfileEntity(
-                        userId = response.user.id,
-                        username = response.user.username,
-                        points = response.user.points,
-                        isDirty = false,
-                        updateTimestamp = now
-                    ))
+                    localDao.insertProfile(
+                        UserProfileEntity(
+                            userId = response.user.id,
+                            username = response.user.username,
+                            points = response.user.points,
+                            isDirty = false,
+                            updateTimestamp = now
+                        )
+                    )
 
                     localDao.deleteAllProgress()
                     localDao.insertProgressList(response.unlocked_levels.map {
-                        UserProgressEntity(levelId = it, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
+                        UserProgressEntity(
+                            levelId = it,
+                            score = 0,
+                            clearTime = 0,
+                            isDirty = false,
+                            updateTimestamp = now
+                        )
                     })
 
                     localDao.deleteAllItems()
                     localDao.insertItemList(response.items.map {
-                        BackpackItemEntity(itemType = it.item_type, count = it.count, isDirty = false, updateTimestamp = now)
+                        BackpackItemEntity(
+                            itemType = it.item_type,
+                            count = it.count,
+                            isDirty = false,
+                            updateTimestamp = now
+                        )
                     })
 
                     setEffect(MenuViewEffect.ShowToast("已成功加载云端存档进度！"))
@@ -448,22 +496,35 @@ class MenuViewModel @Inject constructor(
 
         val now = System.currentTimeMillis()
         localDao.deleteProfile() // 删掉旧游客 Profile
-        localDao.insertProfile(UserProfileEntity(
-            userId = response.user.id,
-            username = response.user.username,
-            points = response.user.points,
-            isDirty = false,
-            updateTimestamp = now
-        ))
+        localDao.insertProfile(
+            UserProfileEntity(
+                userId = response.user.id,
+                username = response.user.username,
+                points = response.user.points,
+                isDirty = false,
+                updateTimestamp = now
+            )
+        )
 
         localDao.deleteAllProgress()
         localDao.insertProgressList(response.unlocked_levels.map {
-            UserProgressEntity(levelId = it, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
+            UserProgressEntity(
+                levelId = it,
+                score = 0,
+                clearTime = 0,
+                isDirty = false,
+                updateTimestamp = now
+            )
         })
 
         localDao.deleteAllItems()
         localDao.insertItemList(response.items.map {
-            BackpackItemEntity(itemType = it.item_type, count = it.count, isDirty = false, updateTimestamp = now)
+            BackpackItemEntity(
+                itemType = it.item_type,
+                count = it.count,
+                isDirty = false,
+                updateTimestamp = now
+            )
         })
 
         handleLoadData()
@@ -479,14 +540,24 @@ class MenuViewModel @Inject constructor(
 
             // Initialize default local state in database
             val now = System.currentTimeMillis()
-            localDao.insertProfile(UserProfileEntity(
-                userId = prefs.getUserId(),
-                username = prefs.getUsername(),
-                points = 0,
-                isDirty = false,
-                updateTimestamp = now
-            ))
-            localDao.insertProgress(UserProgressEntity(levelId = 1, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now))
+            localDao.insertProfile(
+                UserProfileEntity(
+                    userId = prefs.getUserId(),
+                    username = prefs.getUsername(),
+                    points = 0,
+                    isDirty = false,
+                    updateTimestamp = now
+                )
+            )
+            localDao.insertProgress(
+                UserProgressEntity(
+                    levelId = 1,
+                    score = 0,
+                    clearTime = 0,
+                    isDirty = false,
+                    updateTimestamp = now
+                )
+            )
 
             setEffect(MenuViewEffect.ShowToast("已退出登录，清除本地缓存"))
             handleLoadData()
@@ -504,28 +575,32 @@ class MenuViewModel @Inject constructor(
             try {
                 // 1. Locally update first
                 val currentPoints = prefs.getPoints() + 20 // Estimate default daily rewards 20
-                localDao.insertProfile(UserProfileEntity(
-                    userId = prefs.getUserId(),
-                    username = prefs.getUsername(),
-                    points = currentPoints,
-                    isDirty = true,
-                    updateTimestamp = System.currentTimeMillis()
-                ))
+                localDao.insertProfile(
+                    UserProfileEntity(
+                        userId = prefs.getUserId(),
+                        username = prefs.getUsername(),
+                        points = currentPoints,
+                        isDirty = true,
+                        updateTimestamp = System.currentTimeMillis()
+                    )
+                )
                 prefs.setPoints(currentPoints)
 
                 // 2. Network request in background
                 val response = apiService.signIn("Bearer $token")
                 if (response.success) {
                     setEffect(MenuViewEffect.ShowToast("签到成功！连续签到第 ${response.streak} 天，获得 ${response.reward_points} 积分！"))
-                    
+
                     // Overwrite with actual points returned by server
-                    localDao.insertProfile(UserProfileEntity(
-                        userId = prefs.getUserId(),
-                        username = prefs.getUsername(),
-                        points = response.current_points,
-                        isDirty = false,
-                        updateTimestamp = System.currentTimeMillis()
-                    ))
+                    localDao.insertProfile(
+                        UserProfileEntity(
+                            userId = prefs.getUserId(),
+                            username = prefs.getUsername(),
+                            points = response.current_points,
+                            isDirty = false,
+                            updateTimestamp = System.currentTimeMillis()
+                        )
+                    )
                     prefs.setPoints(response.current_points)
                 } else {
                     setEffect(MenuViewEffect.ShowToast("签到失败"))
@@ -565,23 +640,28 @@ class MenuViewModel @Inject constructor(
 
                 val localItem = localDao.getAllItems().find { it.itemType == item.item_type }
                 val newCount = (localItem?.count ?: 0) + count
-                
-                localDao.insertProfile(UserProfileEntity(
-                    userId = prefs.getUserId(),
-                    username = prefs.getUsername(),
-                    points = currentPoints,
-                    isDirty = true,
-                    updateTimestamp = System.currentTimeMillis()
-                ))
-                localDao.insertItem(BackpackItemEntity(
-                    itemType = item.item_type,
-                    count = newCount,
-                    isDirty = true,
-                    updateTimestamp = System.currentTimeMillis()
-                ))
+
+                localDao.insertProfile(
+                    UserProfileEntity(
+                        userId = prefs.getUserId(),
+                        username = prefs.getUsername(),
+                        points = currentPoints,
+                        isDirty = true,
+                        updateTimestamp = System.currentTimeMillis()
+                    )
+                )
+                localDao.insertItem(
+                    BackpackItemEntity(
+                        itemType = item.item_type,
+                        count = newCount,
+                        isDirty = true,
+                        updateTimestamp = System.currentTimeMillis()
+                    )
+                )
 
                 // 2. Sync to cloud in background
-                val response = apiService.exchangeItem("Bearer $token", ExchangeRequest(shopItemId, count))
+                val response =
+                    apiService.exchangeItem("Bearer $token", ExchangeRequest(shopItemId, count))
                 if (response.success) {
                     setEffect(MenuViewEffect.ShowToast("兑换成功，已加入背包！"))
                     // Mark as clean on success
@@ -613,13 +693,15 @@ class MenuViewModel @Inject constructor(
                 val currentPoints = prefs.getPoints() + task.points_reward
                 prefs.setPoints(currentPoints)
 
-                localDao.insertProfile(UserProfileEntity(
-                    userId = prefs.getUserId(),
-                    username = prefs.getUsername(),
-                    points = currentPoints,
-                    isDirty = true,
-                    updateTimestamp = System.currentTimeMillis()
-                ))
+                localDao.insertProfile(
+                    UserProfileEntity(
+                        userId = prefs.getUserId(),
+                        username = prefs.getUsername(),
+                        points = currentPoints,
+                        isDirty = true,
+                        updateTimestamp = System.currentTimeMillis()
+                    )
+                )
 
                 val response = apiService.claimTaskReward("Bearer $token", TaskClaimRequest(taskId))
                 if (response.success) {
@@ -657,21 +739,25 @@ class MenuViewModel @Inject constructor(
                 prefs.setUnlockedLevel(max(prefs.getUnlockedLevel(), levelId))
 
                 val now = System.currentTimeMillis()
-                localDao.insertProfile(UserProfileEntity(
-                    userId = prefs.getUserId(),
-                    username = prefs.getUsername(),
-                    points = currentPoints,
-                    isDirty = true,
-                    updateTimestamp = now
-                ))
+                localDao.insertProfile(
+                    UserProfileEntity(
+                        userId = prefs.getUserId(),
+                        username = prefs.getUsername(),
+                        points = currentPoints,
+                        isDirty = true,
+                        updateTimestamp = now
+                    )
+                )
 
-                localDao.insertProgress(UserProgressEntity(
-                    levelId = levelId,
-                    score = 0,
-                    clearTime = 0,
-                    isDirty = true,
-                    updateTimestamp = now
-                ))
+                localDao.insertProgress(
+                    UserProgressEntity(
+                        levelId = levelId,
+                        score = 0,
+                        clearTime = 0,
+                        isDirty = true,
+                        updateTimestamp = now
+                    )
+                )
 
                 val response = apiService.unlockLevel("Bearer $token", UnlockLevelRequest(levelId))
                 if (response.success) {

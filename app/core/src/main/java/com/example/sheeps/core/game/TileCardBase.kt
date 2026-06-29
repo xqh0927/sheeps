@@ -1,4 +1,4 @@
-package com.example.sheeps.game.ui.components
+package com.example.sheeps.core.game
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -66,7 +66,7 @@ fun TileCardBase(
                 // 右下
                 drawLine(decorColor, Offset(w - decorLen, h), Offset(w, h), strokeWidth)
                 drawLine(decorColor, Offset(w, h), Offset(w, h - decorLen), strokeWidth)
-            } else if (normalizedSkin == "cyber") {
+            } else {
                 // 赛博风格装饰：霓虹渐变线
                 drawLine(
                     brush = Brush.linearGradient(listOf(Color(0xFF00F2FE), Color(0xFFFF2A6D))),

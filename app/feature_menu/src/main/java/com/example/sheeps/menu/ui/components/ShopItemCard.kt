@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.theme.CrimsonRed
+import com.example.sheeps.ui.components.ItemAnimationIcon
 
 @Composable
 fun ShopItemCard(
@@ -64,7 +65,8 @@ fun ShopItemCard(
                 )
             } else {
                 // 调用高清 Canvas 动画图标 (针对道具)
-                com.example.sheeps.menu.components.ItemAnimationIcon(
+
+                ItemAnimationIcon(
                     itemType = item.item_type,
                     size = 64.dp
                 )

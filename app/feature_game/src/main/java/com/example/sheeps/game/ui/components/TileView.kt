@@ -87,18 +87,18 @@ fun TileView(
                     painter = painterResource(id = iconResId),
                     contentDescription = "Tile Icon",
                     modifier = Modifier
-                        .size(tileSize * 0.7f)
+                        .size(tileSize * 0.9f)
                         .alpha(if (isBlocked) 0.45f else 1f)
                 )
 
                 // 封印叠加层
                 if (isSealed) {
                     Image(
-                        painter = painterResource(id = R.drawable.tile_sealed_overlay),
+                        painter = painterResource(id = R.drawable.tile_back),
                         contentDescription = "Sealed Overlay",
                         modifier = Modifier
                             .fillMaxSize()
-                            .alpha(0.8f)
+                            .alpha(1f)
                     )
                 }
             }

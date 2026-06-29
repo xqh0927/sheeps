@@ -26,6 +26,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.theme.GoldenBronze
+import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.hjq.toast.Toaster
 
 @Composable
@@ -66,7 +67,9 @@ fun PrepareGameDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
             Card(
@@ -77,9 +80,14 @@ fun PrepareGameDialog(
                         scaleY = scale,
                         alpha = alpha
                     )
-                    .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { /* Block click propagation */ },
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }) { /* Block click propagation */ },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
-                border = BorderStroke(2.dp, Brush.linearGradient(listOf(GoldenBronze, Color(0xFFEDD9A3), GoldenBronze))),
+                border = BorderStroke(
+                    2.dp,
+                    Brush.linearGradient(listOf(GoldenBronze, Color(0xFFEDD9A3), GoldenBronze))
+                ),
                 shape = RoundedCornerShape(20.dp)
             ) {
                 Column(
@@ -157,7 +165,9 @@ fun PrepareGameDialog(
                                     .verticalScroll(rememberScrollState())
                             ) {
                                 itemTypes.forEach { (type, name) ->
-                                    val stock = state.backpackItems.find { it.item_type == type }?.count ?: 0
+                                    val stock =
+                                        state.backpackItems.find { it.item_type == type }?.count
+                                            ?: 0
                                     val selected = state.selectedCarryItems[type] ?: 0
 
                                     Row(
@@ -165,7 +175,11 @@ fun PrepareGameDialog(
                                             .fillMaxWidth()
                                             .padding(vertical = 4.dp)
                                             .background(Color(0xFFFCFAF6), RoundedCornerShape(8.dp))
-                                            .border(0.5.dp, Color(0xFFE5DDD3), RoundedCornerShape(8.dp))
+                                            .border(
+                                                0.5.dp,
+                                                Color(0xFFE5DDD3),
+                                                RoundedCornerShape(8.dp)
+                                            )
                                             .padding(8.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
@@ -175,7 +189,7 @@ fun PrepareGameDialog(
                                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
                                             // Call new high definition Canvas vector animation icon
-                                            com.example.sheeps.menu.components.ItemAnimationIcon(
+                                            ItemAnimationIcon(
                                                 itemType = type,
                                                 size = 40.dp
                                             )
@@ -186,7 +200,11 @@ fun PrepareGameDialog(
                                                     fontWeight = FontWeight.Bold,
                                                     color = Color.DarkGray
                                                 )
-                                                Text("库存: $stock", fontSize = 11.sp, color = Color.Gray)
+                                                Text(
+                                                    "库存: $stock",
+                                                    fontSize = 11.sp,
+                                                    color = Color.Gray
+                                                )
                                             }
                                         }
 
@@ -198,7 +216,11 @@ fun PrepareGameDialog(
                                                 enabled = selected > 0,
                                                 modifier = Modifier
                                                     .size(28.dp)
-                                                    .background(if (selected > 0) Color(0xFFFFF0EC) else Color(0xFFF5F5F5), CircleShape)
+                                                    .background(
+                                                        if (selected > 0) Color(0xFFFFF0EC) else Color(
+                                                            0xFFF5F5F5
+                                                        ), CircleShape
+                                                    )
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.KeyboardArrowDown,
@@ -207,7 +229,7 @@ fun PrepareGameDialog(
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
-                                            
+
                                             // Number change spring scale feedback
                                             val textScale by animateFloatAsState(
                                                 targetValue = if (selected > 0) 1.15f else 1f,
@@ -218,7 +240,10 @@ fun PrepareGameDialog(
                                                 text = selected.toString(),
                                                 modifier = Modifier
                                                     .padding(horizontal = 10.dp)
-                                                    .graphicsLayer(scaleX = textScale, scaleY = textScale),
+                                                    .graphicsLayer(
+                                                        scaleX = textScale,
+                                                        scaleY = textScale
+                                                    ),
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (selected > 0) CrimsonRed else Color.DarkGray
@@ -228,7 +253,11 @@ fun PrepareGameDialog(
                                                 enabled = selected < stock,
                                                 modifier = Modifier
                                                     .size(28.dp)
-                                                    .background(if (selected < stock) Color(0xFFFFF0EC) else Color(0xFFF5F5F5), CircleShape)
+                                                    .background(
+                                                        if (selected < stock) Color(
+                                                            0xFFFFF0EC
+                                                        ) else Color(0xFFF5F5F5), CircleShape
+                                                    )
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.KeyboardArrowUp,
@@ -258,7 +287,11 @@ fun PrepareGameDialog(
                                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("启程破阵", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "启程破阵",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
