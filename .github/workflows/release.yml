@@ -1,22 +1,33 @@
 name: Auto Release
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" ] 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      
+      # 1. 提取版本号的关键逻辑
+      - name: Extract version
+        id: get_version
+        run: |
+          # 从 app/build.gradle.kts 提取 versionName，去除双引号和空格
+          VERSION=$(grep "versionName" app/build.gradle.kts | cut -d'"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
       - name: Build APK
         run: |
           cd app
           chmod +x gradlew
           ./gradlew assembleRelease
+          
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          # 关键：指定你要上传到的【目标仓库】
           repository: xqh0927/sheeps-releases
-          # 关键：带上刚才配置的跨库通行证
           token: ${{ secrets.MY_PAT }}
+          # 直接使用刚才提取出来的变量
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
           files: app/build/outputs/apk/release/sheeps_*.apk
