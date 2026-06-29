@@ -24,9 +24,13 @@ jobs:
 
       - name: Build APK
         working-directory: app
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          VERSION_CODE=$((10000 + RUN_NUMBER))
+          VERSION_NAME="1.0.${RUN_NUMBER}"
+          ./gradlew assembleRelease -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME --no-daemon
 
       - name: List APK outputs
         run: ls -la app/app/build/outputs/apk/release/
@@ -40,4 +44,4 @@ jobs:
           gh release create $TAG --repo xqh0927/sheeps-releases --title "Release $TAG" --notes "自动构建发布" || echo "Release 已存在"
           
           # 2. 强制上传，使用 --clobber 覆盖旧文件（避免因为版本冲突报错）
-          gh release upload $TAG app/build/outputs/apk/release/*.apk --repo xqh0927/sheeps-releases --clobber
+          gh release upload $TAG app/app/build/outputs/apk/release/*.apk --repo xqh0927/sheeps-releases --clobber
