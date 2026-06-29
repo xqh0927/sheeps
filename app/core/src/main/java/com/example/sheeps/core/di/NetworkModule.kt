@@ -132,7 +132,7 @@ object NetworkModule {
                             }
                         }
                     } catch (e: Exception) {
-                        LogUtils.e("TokenRefresh", "Failed to refresh token", e)
+                        LogUtils.e( "Failed to refresh token", e)
                     }
 
                     // If refresh failed, perform logout

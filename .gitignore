@@ -1,2 +1,12 @@
-sheeps
+/sheeps
 .wrangler
+
+# Android Studio & Gradle
+.idea/
+.gradle/
+**/build/
+*.iml
+local.properties
+*.bak
+*.tmp
+
