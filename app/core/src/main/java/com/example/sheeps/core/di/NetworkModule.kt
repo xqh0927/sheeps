@@ -99,7 +99,11 @@ object NetworkModule {
                     }
 
                     // Call refresh API synchronously
-                    val client = OkHttpClient()
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
                     val mediaType = "application/json".toMediaType()
                     val requestBody =
                         "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
@@ -180,6 +184,7 @@ object NetworkModule {
         return OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
             .addInterceptor(languageInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(tokenRefreshInterceptor)

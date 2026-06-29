@@ -24,13 +24,10 @@ jobs:
 
       - name: Build APK
         working-directory: app
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
         run: |
           chmod +x gradlew
-          VERSION_CODE=$((10000 + RUN_NUMBER))
-          VERSION_NAME="1.0.${RUN_NUMBER}"
-          ./gradlew assembleRelease -PversionCode=$VERSION_CODE -PversionName=$VERSION_NAME --no-daemon
+          ./gradlew assembleRelease --no-daemon
+
 
       - name: List APK outputs
         run: ls -la app/app/build/outputs/apk/release/
