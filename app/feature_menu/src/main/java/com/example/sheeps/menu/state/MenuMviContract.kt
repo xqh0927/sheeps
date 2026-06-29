@@ -30,7 +30,10 @@ data class MenuViewState(
     val networkStatus: com.example.sheeps.core.utils.NetworkStatus = com.example.sheeps.core.utils.NetworkStatus.ONLINE,
 
     // Selected Language
-    val language: String = ""
+    val language: String = "",
+
+    // App Update
+    val appUpdateInfo: AppUpdateResponse? = null
 )
 
 sealed interface MenuViewIntent {
@@ -47,6 +50,7 @@ sealed interface MenuViewIntent {
     data class GoToGame(val levelId: Int, val carryItemsJson: String) : MenuViewIntent
     data class ResolveConflict(val useLocal: Boolean) : MenuViewIntent
     data class ChangeLanguage(val lang: String) : MenuViewIntent
+    object DismissUpdate : MenuViewIntent
 }
 
 sealed interface MenuViewEffect {

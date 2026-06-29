@@ -10,6 +10,7 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.game.state.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -559,7 +560,8 @@ class GameViewModel @Inject constructor(
 
         val finalScore = if (currentState.isDoublePointsActive) gameScore * 2 else gameScore
 
-        viewModelScope.launch {
+        // 使用全局协程生命周期 scope 提交，防止 Activity.finish 时被 viewModelScope 取消导致云端没记录
+        CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Local-First: Save clearing progress and reward points to Room
                 val currentProgress = localDao.getAllProgress().find { it.levelId == levelId && it.score > 0 }
@@ -608,11 +610,7 @@ class GameViewModel @Inject constructor(
     }
 
     private fun generateSolvableLevelLocal(levelId: Int): List<Tile> {
-        val numTypes = when (levelId) {
-            1 -> 3
-            2 -> 6
-            else -> minOf(12, 6 + levelId / 2)
-        }
+        val numTypes = if (levelId == 1) 3 else minOf(16, (3 + 3 * Math.log(levelId.toDouble())).toInt())
 
         val coordinates = mutableListOf<Point3D>()
         if (levelId == 1) {
@@ -624,12 +622,13 @@ class GameViewModel @Inject constructor(
                 Point3D(2.0f, 2.0f, 2)
             ))
         } else {
-            val maxCards = if (levelId == 2) 36 else minOf(144, 72 + (levelId - 3) * 12)
+            val maxCards = if (levelId == 2) 36 else 36 + (levelId - 2) * 12
             val possible = mutableListOf<Point3D>()
-            val layers = if (levelId == 2) 4 else minOf(8, 4 + levelId / 2)
+            val layersCount = if (levelId == 2) 4 else minOf(12, (12 - 8 / Math.sqrt((levelId - 1).toDouble())).toInt())
 
-            for (z in 0 until layers) {
-                val size = 6 - z / 2
+            val baseSize = 6 + levelId / 20
+            for (z in 0 until layersCount) {
+                val size = maxOf(3, baseSize - z / 3)
                 val offset = if (z % 2 == 0) 0.0f else 0.5f
                 for (r in 0 until size) {
                     for (c in 0 until size) {
@@ -705,10 +704,12 @@ class GameViewModel @Inject constructor(
 
             if (levelId >= 2) {
                 val r = randProps()
-                if (r < 0.15) {
-                    isBlind = true
-                } else if (r < 0.30) {
-                    sealed = 1
+                if (levelId % 10 == 0) {
+                    if (r < 0.15) {
+                        isBlind = true
+                    } else if (r < 0.30) {
+                        sealed = 1
+                    }
                 }
             }
 

@@ -195,3 +195,15 @@ INSERT INTO config (key, value) VALUES
 ('level_3_unlock_points', '100'),
 ('level_4_unlock_points', '200'),
 ('sign_rewards', '20,20,30,30,40,50,100');
+
+CREATE TABLE IF NOT EXISTS app_version (
+    version_code INTEGER PRIMARY KEY,
+    version_name TEXT NOT NULL,
+    apk_url TEXT NOT NULL,
+    update_log TEXT,
+    is_force_update INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+
+INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES
+(1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 0, 1720000000000);

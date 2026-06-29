@@ -7,5 +7,5 @@ object AppConfig {
     /**
      * 后端服务接口的基础请求地址
      */
-    const val BASE_URL = "http://xqh.cc.cd/"
+    const val BASE_URL = "https://xqh.cc.cd/"
 }

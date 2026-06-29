@@ -48,7 +48,10 @@ class GameActivity : BaseActivity() {
                         onUseJoker = { viewModel.sendIntent(GameViewIntent.UseJoker) },
                         onUseDouble = { viewModel.sendIntent(GameViewIntent.UseDoublePoints) },
                         onRestart = { viewModel.sendIntent(GameViewIntent.RestartLevel) },
-                        onBack = { finish() }
+                        onBack = { finish() },
+                        onNextLevel = {
+                            viewModel.sendIntent(GameViewIntent.LoadLevel(state.currentLevelId + 1, null))
+                        }
                     )
                 }
             }

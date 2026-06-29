@@ -68,7 +68,7 @@ fun SheepsDialog(
                 modifier = modifier
                     .fillMaxWidth(0.92f)
                     .clip(ShapeLarge)
-                    .background(MoYe_Surface)
+                    .background(MaterialTheme.colorScheme.surface)
                     .then(
                         Modifier.padding(1.dp) // 金色细边框效果（通过外层 padding+内层 background 模拟）
                     )
@@ -90,10 +90,10 @@ fun SheepsDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(ShapeLarge)
-                        .background(MoYe_Surface)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(1.5.dp)
                         .clip(ShapeLarge)
-                        .background(MoYe_SurfaceVariant)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(24.dp)
                 ) {
                     // 标题

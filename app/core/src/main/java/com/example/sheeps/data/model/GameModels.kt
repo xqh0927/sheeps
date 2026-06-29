@@ -237,3 +237,12 @@ data class RefreshResponse(
     val refreshToken: String? = null,
     val error: String? = null
 )
+
+@Serializable
+data class AppUpdateResponse(
+    val has_update: Boolean = false,
+    val version_name: String? = null,
+    val apk_url: String? = null,
+    val update_log: String? = null,
+    val force_update: Boolean = false
+)

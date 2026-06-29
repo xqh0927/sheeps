@@ -58,7 +58,7 @@ fun SheepsLoading(
 
     val primaryColor = Crimson_Primary
     val accentColor  = Gold_Primary
-    val bgColor      = MoYe_SurfaceContainer
+    val bgColor      = MaterialTheme.colorScheme.surfaceContainer
 
     Canvas(
         modifier = modifier
@@ -122,7 +122,7 @@ fun FullScreenLoading(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .size(96.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MoYe_Surface.copy(alpha = 0.9f)),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
             contentAlignment = Alignment.Center
         ) {
             SheepsLoading(size = 48.dp)
@@ -151,11 +151,11 @@ fun ShimmerBox(
     )
 
     val shimmerColors = listOf(
-        MoYe_SurfaceVariant,
-        MoYe_SurfaceContainer,
+        MaterialTheme.colorScheme.surfaceVariant,
+        MaterialTheme.colorScheme.surfaceContainer,
         Gold_Primary.copy(alpha = 0.06f),
-        MoYe_SurfaceContainer,
-        MoYe_SurfaceVariant
+        MaterialTheme.colorScheme.surfaceContainer,
+        MaterialTheme.colorScheme.surfaceVariant
     )
 
     val brush = Brush.horizontalGradient(
@@ -180,7 +180,7 @@ fun ShimmerCard(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MoYe_Surface)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {

@@ -98,13 +98,14 @@ fun TileView(
             TileCanvas(
                 type      = tile.type,
                 isBlocked = isBlocked,
+                isSealed  = isSealed,
                 size      = tileSize
             )
-            // 封印叠加层
+            // 封印叠加层（在此也设为透明不可见，使其表现为空白卡）
             if (isSealed) {
                 SealedOverlayCanvas(
                     size  = tileSize,
-                    alpha = sealAlpha
+                    alpha = 0f
                 )
             }
         }
@@ -119,6 +120,7 @@ fun TileView(
 private fun TileCanvas(
     type: Int,
     isBlocked: Boolean,
+    isSealed: Boolean,
     size: Dp
 ) {
     val bgAlpha = if (isBlocked) 0.45f else 1f
@@ -149,8 +151,9 @@ private fun TileCanvas(
 
         // --- 卡牌边框 ---
         val borderColor = if (isBlocked) Color(0xFF3A4050) else Color(0xFFCBAA6A)
+        val finalBorderColor = if (isSealed) borderColor.copy(alpha = 0f) else borderColor
         drawRoundRect(
-            color       = borderColor,
+            color       = finalBorderColor,
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
             style       = Stroke(width = 1.5f)
         )
@@ -158,7 +161,7 @@ private fun TileCanvas(
         // --- 内框装饰线（国风卡片四角纹）---
         val inset = 4f
         val lineColor = if (isBlocked) Color(0xFF4A5060) else Color(0xFFDEC07A)
-        val lineAlpha = if (isBlocked) 0.3f else 0.5f
+        val lineAlpha = if (isSealed) 0f else (if (isBlocked) 0.3f else 0.5f)
         withTransform({ /* 内框 */ }) {
             // 四个角的短线装饰
             val c = 8f
@@ -179,12 +182,13 @@ private fun TileCanvas(
 
         // --- 中心图案 ---
         val iconColor = if (isBlocked) Color(0xFF5A6070) else getTileIconColor(type)
+        val finalIconColor = if (isSealed) iconColor.copy(alpha = 0f) else iconColor
         val cx = w / 2f
         val cy = h / 2f
         val iconSize = w * 0.45f
 
         translate(cx - iconSize / 2f, cy - iconSize / 2f) {
-            drawTileIcon(type = type, size = iconSize, color = iconColor, isBlocked = isBlocked)
+            drawTileIcon(type = type, size = iconSize, color = finalIconColor, isBlocked = isBlocked)
         }
     }
 }
@@ -204,21 +208,21 @@ private fun BlindTileCanvas(size: Dp) {
         )
         drawRoundRect(brush = bgBrush, cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r))
 
-        // 紫色神秘边框
+        // 隐藏的神秘边框（透明度设为 0f）
         drawRoundRect(
-            color        = Color(0xFF7B5EA7),
+            color        = Color(0xFF7B5EA7).copy(alpha = 0f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(r, r),
             style        = Stroke(width = 1.5f)
         )
 
-        // 问号（用路径绘制简化版）
+        // 问号（用路径绘制简化版，透明度设为 0f 使其不可见）
         val cx = w / 2f
         val cy = h / 2f
         val qSize = w * 0.35f
 
         // 问号上半圆弧
         drawArc(
-            color      = Color(0xFF9B7ED4),
+            color      = Color(0xFF9B7ED4).copy(alpha = 0f),
             startAngle = 200f,
             sweepAngle = 220f,
             useCenter  = false,
@@ -228,7 +232,7 @@ private fun BlindTileCanvas(size: Dp) {
         )
         // 问号竖线
         drawLine(
-            color       = Color(0xFF9B7ED4),
+            color       = Color(0xFF9B7ED4).copy(alpha = 0f),
             start       = Offset(cx, cy - qSize * 0.05f),
             end         = Offset(cx, cy + qSize * 0.18f),
             strokeWidth = qSize * 0.18f,
@@ -236,7 +240,7 @@ private fun BlindTileCanvas(size: Dp) {
         )
         // 问号下点
         drawCircle(
-            color  = Color(0xFF9B7ED4),
+            color  = Color(0xFF9B7ED4).copy(alpha = 0f),
             radius = qSize * 0.1f,
             center = Offset(cx, cy + qSize * 0.38f)
         )

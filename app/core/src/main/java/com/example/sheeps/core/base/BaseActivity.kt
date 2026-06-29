@@ -8,6 +8,9 @@ import com.blankj.utilcode.util.LogUtils
 abstract class BaseActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (javaClass.simpleName != "SplashActivity") {
+            setTheme(com.example.sheeps.theme.ThemeManager.getThemeResId())
+        }
         super.onCreate(savedInstanceState)
         LogUtils.d("${javaClass.simpleName} onCreate")
         enableEdgeToEdge()

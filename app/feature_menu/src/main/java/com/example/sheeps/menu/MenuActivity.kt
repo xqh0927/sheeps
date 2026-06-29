@@ -2,6 +2,7 @@ package com.example.sheeps.menu
 
 import android.os.Bundle
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import com.example.sheeps.core.R
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -10,6 +11,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -154,9 +156,9 @@ class MenuActivity : BaseActivity() {
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        MoYe_Background,
-                                        MoYe_Surface,
-                                        MoYe_SurfaceVariant
+                                        MaterialTheme.colorScheme.background,
+                                        MaterialTheme.colorScheme.surface,
+                                        MaterialTheme.colorScheme.surfaceVariant
                                     )
                                 )
                             )
@@ -194,7 +196,8 @@ class MenuActivity : BaseActivity() {
                                      onLogoutClick = { viewModel.sendIntent(MenuViewIntent.Logout) },
                                      onSignInClick = { viewModel.sendIntent(MenuViewIntent.SignIn) },
                                      onClaimTask = { taskId -> viewModel.sendIntent(MenuViewIntent.ClaimTask(taskId)) },
-                                     onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) }
+                                     onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) },
+                                     onThemeChange = { recreate() }
                                  )
                             }
                         }
@@ -248,6 +251,18 @@ class MenuActivity : BaseActivity() {
                             )
                         }
 
+                        // 检查 App 版本更新并显示弹窗
+                        state.appUpdateInfo?.let { updateInfo ->
+                            if (updateInfo.has_update) {
+                                AppUpdateDialog(
+                                    updateInfo = updateInfo,
+                                    onDismiss = {
+                                        viewModel.sendIntent(MenuViewIntent.DismissUpdate)
+                                    }
+                                )
+                            }
+                        }
+
                         if (state.isLoading) {
                             Box(
                                 modifier = Modifier
@@ -259,7 +274,7 @@ class MenuActivity : BaseActivity() {
                                     modifier = Modifier
                                         .size(80.dp)
                                         .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                                        .background(MoYe_Surface.copy(alpha = 0.92f)),
+                                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     SheepsLoading(size = 44.dp)
@@ -290,16 +305,16 @@ fun MenuBottomNavigation(
     onTabSelected: (String) -> Unit
 ) {
     val navItems = listOf(
-        Triple("game", "消除", Icons.Default.GridOn),
-        Triple("shop", "商城", Icons.Default.Storefront),
-        Triple("me",   "我的", Icons.Default.AccountCircle)
+        Triple("game", "消除", com.example.sheeps.core.R.drawable.ic_nav_game),
+        Triple("shop", "商城", com.example.sheeps.core.R.drawable.ic_nav_shop),
+        Triple("me",   "我的", com.example.sheeps.core.R.drawable.ic_nav_profile)
     )
 
     NavigationBar(
-        containerColor = MoYe_Surface,
+        containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
         modifier = Modifier
-            .border(width = 0.5.dp, color = MoYe_Outline)
+            .border(width = 0.5.dp, color = MaterialTheme.colorScheme.outline)
             .shadow(elevation = 8.dp)
     ) {
         navItems.forEach { (tab, label, icon) ->
@@ -317,7 +332,7 @@ fun MenuBottomNavigation(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            imageVector = icon,
+                            painter = painterResource(id = icon),
                             contentDescription = label,
                             modifier = Modifier.scale(iconScale)
                         )
@@ -338,8 +353,8 @@ fun MenuBottomNavigation(
                     selectedIconColor   = Gold_Primary,
                     selectedTextColor   = Gold_Primary,
                     indicatorColor      = Crimson_PrimaryContainer.copy(alpha = 0.4f),
-                    unselectedIconColor = Text_Secondary_Dark,
-                    unselectedTextColor = Text_Secondary_Dark
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
         }
@@ -360,10 +375,7 @@ fun GameHomeTabContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 豪华用户信息卡
-        UserMiniProfileHeader(state = state, onLoginClick = onLoginClick)
 
-        Spacer(modifier = Modifier.height(14.dp))
 
         // 公告轮播
         AnnouncementsBanner(notices = state.notices)
@@ -406,8 +418,18 @@ fun GameHomeTabContent(
         }
 
         // 关卡列表
-        val levels = remember { (1..20).toList() }
+        val levels = remember(state.unlockedLevel) { (1..maxOf(20, state.unlockedLevel + 5)).toList() }
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(state.unlockedLevel) {
+            val targetIndex = maxOf(0, state.unlockedLevel - 1)
+            if (targetIndex < levels.size) {
+                listState.scrollToItem(targetIndex)
+            }
+        }
+
         LazyColumn(
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
@@ -449,8 +471,8 @@ fun UserMiniProfileHeader(
                 Brush.linearGradient(
                     colors = listOf(
                         Gold_Subtle.copy(alpha = 0.12f),
-                        MoYe_SurfaceVariant,
-                        MoYe_SurfaceContainer
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        MaterialTheme.colorScheme.surfaceContainer
                     )
                 )
             )
@@ -560,9 +582,9 @@ fun AnnouncementsBanner(notices: List<Notice>) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(ShapeMedium)
-            .background(MoYe_SurfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .border(
-                BorderStroke(0.5.dp, MoYe_Outline),
+                BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                 shape = ShapeMedium
             )
             .padding(12.dp)
@@ -592,7 +614,7 @@ fun AnnouncementsBanner(notices: List<Notice>) {
                 Text(
                     text  = "凡尘清静，暂无公告发布。",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Text_Secondary_Dark
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 val scrollState = rememberScrollState()
@@ -607,22 +629,22 @@ fun AnnouncementsBanner(notices: List<Notice>) {
                                 .width(280.dp)
                                 .padding(end = 10.dp)
                                 .clip(ShapeSmall)
-                                .background(MoYe_SurfaceContainer)
-                                .border(0.5.dp, MoYe_Outline, ShapeSmall)
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .border(0.5.dp, MaterialTheme.colorScheme.outline, ShapeSmall)
                                 .padding(10.dp)
                         ) {
                             Column {
                                 Text(
                                     text = n.title,
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = Text_Primary_Dark,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = n.content,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Text_Secondary_Dark,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.padding(top = 4.dp)
@@ -670,13 +692,13 @@ fun LevelItemRow(
                 if (isUnlocked) {
                     Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF1E2535),
-                            Color(0xFF252D3D)
+                            MaterialTheme.colorScheme.surfaceVariant,
+                            MaterialTheme.colorScheme.surfaceContainer
                         )
                     )
                 } else {
                     Brush.linearGradient(
-                        colors = listOf(MoYe_SurfaceContainer, MoYe_SurfaceVariant)
+                        colors = listOf(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.surfaceVariant)
                     )
                 }
             )
@@ -692,7 +714,7 @@ fun LevelItemRow(
                     )
                 } else {
                     Brush.linearGradient(
-                        colors = listOf(MoYe_Outline, MoYe_Outline)
+                        colors = listOf(MaterialTheme.colorScheme.outline, MaterialTheme.colorScheme.outline)
                     )
                 },
                 shape = ShapeLarge
@@ -717,7 +739,7 @@ fun LevelItemRow(
                         .size(40.dp)
                         .background(
                             if (isUnlocked) Crimson_PrimaryContainer.copy(alpha = 0.5f)
-                            else MoYe_SurfaceContainer,
+                            else MaterialTheme.colorScheme.surfaceContainer,
                             shape = ShapeMedium
                         ),
                     contentAlignment = Alignment.Center
@@ -734,7 +756,7 @@ fun LevelItemRow(
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
-                            tint = Text_Disabled_Dark,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -1018,7 +1040,8 @@ fun PersonalTabContent(
     onLogoutClick: () -> Unit,
     onSignInClick: () -> Unit,
     onClaimTask: (String) -> Unit,
-    onChangeLanguage: (String) -> Unit
+    onChangeLanguage: (String) -> Unit,
+    onThemeChange: () -> Unit
 ) {
     var showPointHistory by remember { mutableStateOf(false) }
     var showExchangeHistory by remember { mutableStateOf(false) }
@@ -1033,8 +1056,8 @@ fun PersonalTabContent(
         item {
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
-                border = BorderStroke(1.dp, GoldenBronze),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -1121,8 +1144,8 @@ fun PersonalTabContent(
             item {
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(0.5.dp, Color(0xFFE5DDD3)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -1188,8 +1211,8 @@ fun PersonalTabContent(
             item {
                 Card(
                     shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    border = BorderStroke(0.5.dp, Color(0xFFE5DDD3)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -1210,7 +1233,7 @@ fun PersonalTabContent(
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
-                                        .background(Color(0xFFFBF9F6), RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                                         .padding(8.dp)
                                         .width(72.dp)
                                 ) {
@@ -1238,8 +1261,8 @@ fun PersonalTabContent(
         item {
             Card(
                 shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(0.5.dp, Color(0xFFE5DDD3)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -1270,7 +1293,7 @@ fun PersonalTabContent(
                                 modifier = Modifier
                                     .weight(1f)
                                     .background(
-                                        color = if (isSelected) CrimsonRed else Color(0xFFFBF9F6),
+                                        color = if (isSelected) CrimsonRed else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(6.dp)
                                     )
                                     .clickable {
@@ -1281,7 +1304,67 @@ fun PersonalTabContent(
                             ) {
                                 Text(
                                     text = name,
-                                    color = if (isSelected) Color.White else Color.DarkGray,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Theme settings item
+        item {
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "主题设置",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = CrimsonRed,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                        fontFamily = FontFamily.Serif
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val currentTheme = ThemeManager.currentTheme.collectAsState().value
+                        val themes = listOf(
+                            AppTheme.QING_RI_CHUN to "清日春(浅色)",
+                            AppTheme.MO_YE_GOLD to "墨夜金(金黑)",
+                            AppTheme.DARK_MODE to "暗黑(深黑)"
+                        )
+                        
+                        themes.forEach { (theme, name) ->
+                            val isSelected = currentTheme == theme
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        color = if (isSelected) CrimsonRed else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable {
+                                        if (currentTheme != theme) {
+                                            ThemeManager.setTheme(theme)
+                                            onThemeChange()
+                                        }
+                                    }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = name,
+                                    color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -1298,7 +1381,7 @@ fun PersonalTabContent(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { showPointHistory = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(0.5.dp, CrimsonRed),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
@@ -1308,7 +1391,7 @@ fun PersonalTabContent(
 
                     Button(
                         onClick = { showExchangeHistory = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(0.5.dp, CrimsonRed),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
@@ -1787,6 +1870,128 @@ fun OfflineWarnBanner() {
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+fun AppUpdateDialog(
+    updateInfo: com.example.sheeps.data.model.AppUpdateResponse,
+    onDismiss: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = { if (!updateInfo.force_update) onDismiss() },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = !updateInfo.force_update,
+            dismissOnClickOutside = !updateInfo.force_update
+        )
+    ) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.5.dp, Color(0xFFCBAA6A)), // 黄金边框
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(Color(0xFFE9D0A3).copy(alpha = 0.2f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowUpward,
+                        contentDescription = "Upgrade",
+                        tint = Color(0xFFCBAA6A),
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "发现新版本 ${updateInfo.version_name ?: ""}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontFamily = FontFamily.Serif
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "更新日志：",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = updateInfo.update_log ?: "全新版本，优化游戏操作体验。",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (!updateInfo.force_update) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(text = "稍后更新", fontSize = 14.sp)
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val apkUrl = updateInfo.apk_url
+                            if (!apkUrl.isNullOrEmpty()) {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(apkUrl)).apply {
+                                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    com.hjq.toast.Toaster.show("无法唤起浏览器下载，请检查链接配置")
+                                }
+                            }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF9E1F1F),
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(text = "立即更新", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }

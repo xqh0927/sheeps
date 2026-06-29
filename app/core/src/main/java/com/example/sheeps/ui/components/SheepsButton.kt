@@ -60,7 +60,7 @@ fun PrimaryButton(
         colors = ButtonDefaults.buttonColors(
             containerColor      = Crimson_Primary,
             contentColor        = Text_OnPrimary,
-            disabledContainerColor = MoYe_SurfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor   = Text_Disabled_Dark
         ),
         shape = ShapeMedium,
@@ -226,7 +226,7 @@ fun ToolItemButton(
         label = "toolButtonScale"
     )
 
-    val containerColor = if (enabled) Crimson_Primary else MoYe_SurfaceVariant
+    val containerColor = if (enabled) Crimson_Primary else MaterialTheme.colorScheme.surfaceVariant
     val contentColor   = if (enabled) Gold_Primary else Text_Disabled_Dark
 
     Button(
@@ -239,7 +239,7 @@ fun ToolItemButton(
         colors = ButtonDefaults.buttonColors(
             containerColor      = containerColor,
             contentColor        = contentColor,
-            disabledContainerColor = MoYe_SurfaceVariant,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor   = Text_Disabled_Dark
         ),
         shape = ShapeSmall,

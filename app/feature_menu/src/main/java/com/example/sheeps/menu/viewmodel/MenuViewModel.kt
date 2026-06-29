@@ -19,6 +19,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MenuViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val apiService: ApiService,
     private val prefs: UserPreferences,
     private val json: Json,
@@ -87,6 +88,7 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.GoToGame -> handleGoToGame(intent.levelId, intent.carryItemsJson)
             is MenuViewIntent.ResolveConflict -> handleResolveConflict(intent.useLocal)
             is MenuViewIntent.ChangeLanguage -> handleChangeLanguage(intent.lang)
+            is MenuViewIntent.DismissUpdate -> updateState { copy(appUpdateInfo = null) }
         }
     }
 
@@ -117,10 +119,31 @@ class MenuViewModel @Inject constructor(
                     currentState.notices.ifEmpty { emptyList() }
                 }
 
+                // Check app updates from Cloudflare
+                val appUpdate = try {
+                    if (networkMonitor.isOnline()) {
+                        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                            packageInfo.longVersionCode.toInt()
+                        } else {
+                            @Suppress("DEPRECATION")
+                            packageInfo.versionCode
+                        }
+                        apiService.checkUpdate(versionCode)
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+
                 if (isLoggedIn && networkMonitor.isOnline()) {
                     val authHeader = "Bearer ${prefs.getToken()}"
                     
-                    // Sync with cloud using pullCloudProfile
+                    // 1. 先将本地离线脏进度推到云端
+                    syncRepository.syncDirtyData()
+                    
+                    // 2. 再拉取最新的云端进度覆盖本地，防止拉取过快覆盖导致本地关卡解锁丢失
                     syncRepository.pullCloudProfile()
 
                     val dailyTasks = try {
@@ -150,7 +173,8 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = dailyTasks,
                             pointsHistory = pointsHistory,
-                            exchangeHistory = exchangeHistory
+                            exchangeHistory = exchangeHistory,
+                            appUpdateInfo = appUpdate
                         )
                     }
                 } else {
@@ -164,7 +188,8 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = emptyList(),
                             pointsHistory = emptyList(),
-                            exchangeHistory = emptyList()
+                            exchangeHistory = emptyList(),
+                            appUpdateInfo = appUpdate
                         )
                     }
                 }
@@ -251,8 +276,15 @@ class MenuViewModel @Inject constructor(
                 if (useLocal) {
                     // Mark existing local Room data as dirty to sync up
                     val localProfile = localDao.getProfile()
+                    localDao.deleteProfile() // 删掉旧游客 Profile
                     if (localProfile != null) {
-                        localDao.insertProfile(localProfile.copy(isDirty = true, updateTimestamp = now))
+                        localDao.insertProfile(UserProfileEntity(
+                            userId = response.user.id,
+                            username = localProfile.username,
+                            points = localProfile.points,
+                            isDirty = true,
+                            updateTimestamp = now
+                        ))
                     } else {
                         localDao.insertProfile(UserProfileEntity(
                             userId = response.user.id,
@@ -277,6 +309,7 @@ class MenuViewModel @Inject constructor(
                     prefs.setUsername(response.user.username)
                     prefs.setPoints(response.user.points)
                     
+                    localDao.deleteProfile() // 删掉旧游客 Profile
                     localDao.insertProfile(UserProfileEntity(
                         userId = response.user.id,
                         username = response.user.username,
@@ -316,6 +349,7 @@ class MenuViewModel @Inject constructor(
         prefs.setPoints(response.user.points)
 
         val now = System.currentTimeMillis()
+        localDao.deleteProfile() // 删掉旧游客 Profile
         localDao.insertProfile(UserProfileEntity(
             userId = response.user.id,
             username = response.user.username,

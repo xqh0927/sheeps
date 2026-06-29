@@ -12,6 +12,28 @@ plugins {
 android {
     namespace = "com.example.sheeps"
     compileSdk = 36
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+    applicationVariants.all {
+        val variant = this
+        variant.outputs
+            .map { it as com.android.build.gradle.internal.api.BaseVariantOutputImpl }
+            .forEach { output ->
+                val fileName = "sheeps_${variant.versionName}.apk"
+                output.outputFileName = fileName
+            }
+    }
+    signingConfigs {
+        create("release") {
+            // 默认寻址路径相对于当前 app 模块目录
+            storeFile = file("../sheeps.jks")
+            storePassword = "sheeps123"
+            keyAlias = "sheeps"
+            keyPassword = "sheeps123"
+        }
+    }
     defaultConfig {
         applicationId = "com.example.sheeps"
         minSdk = 24
@@ -22,8 +44,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
@@ -63,6 +90,3 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
-
-
-

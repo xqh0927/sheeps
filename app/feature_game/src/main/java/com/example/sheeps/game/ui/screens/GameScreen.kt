@@ -47,14 +47,19 @@ fun GameScreen(
     onUseJoker: () -> Unit,
     onUseDouble: () -> Unit,
     onRestart: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNextLevel: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(MoYe_Background, MoYe_Surface, MoYe_SurfaceVariant)
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surfaceVariant
+                    )
                 )
             )
     ) {
@@ -78,10 +83,10 @@ fun GameScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MoYe_Surface.copy(alpha = 0.85f))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                         .border(
                             width = 0.5.dp,
-                            color = MoYe_Outline,
+                            color = MaterialTheme.colorScheme.outline,
                             shape = RoundedCornerShape(0.dp)
                         )
                         .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -139,12 +144,12 @@ fun GameScreen(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    MoYe_SurfaceContainer,
-                                    MoYe_SurfaceVariant
+                                    MaterialTheme.colorScheme.surfaceContainer,
+                                    MaterialTheme.colorScheme.surfaceVariant
                                 )
                             )
                         )
-                        .border(1.dp, MoYe_Outline, RoundedCornerShape(16.dp)),
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
@@ -224,7 +229,7 @@ fun GameScreen(
             enter   = fadeIn(tween(400)) + scaleIn(initialScale = 0.85f),
             exit    = fadeOut(tween(300))
         ) {
-            GameResultOverlay(won = true, state = state, onBack = onBack)
+            GameResultOverlay(won = true, state = state, onBack = onBack, onNextLevel = onNextLevel)
         }
 
         // 失败覆盖层
@@ -321,7 +326,7 @@ private fun MovedOutTray(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))
-                .background(MoYe_SurfaceContainer)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
                 .border(1.dp, Gold_Subtle.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                 .padding(8.dp)
         ) {
@@ -354,7 +359,7 @@ private fun MatchingSlot(state: GameViewState) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(MoYe_SurfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(
                 width = 1.5.dp,
                 color = Crimson_Primary.copy(alpha = slotBorderAlpha),
@@ -369,8 +374,8 @@ private fun MatchingSlot(state: GameViewState) {
                     .weight(1f)
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(MoYe_SurfaceVariant.copy(alpha = 0.5f))
-                    .border(0.5.dp, MoYe_Outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 if (i < state.slotTiles.size) {
@@ -432,7 +437,8 @@ private fun GameResultOverlay(
     state: GameViewState,
     onBack: () -> Unit,
     onRestart: () -> Unit = {},
-    onRevive: () -> Unit = {}
+    onRevive: () -> Unit = {},
+    onNextLevel: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -445,7 +451,7 @@ private fun GameResultOverlay(
             modifier = Modifier
                 .fillMaxWidth(0.88f)
                 .clip(ShapeLarge)
-                .background(MoYe_Surface)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             // 金边渐变
             Box(
@@ -468,7 +474,7 @@ private fun GameResultOverlay(
             ) {
                 if (won) {
                     // 胜利视觉
-                    WonContent(state = state, onBack = onBack)
+                    WonContent(state = state, onBack = onBack, onNextLevel = onNextLevel)
                 } else {
                     // 失败视觉
                     LostContent(
@@ -484,7 +490,7 @@ private fun GameResultOverlay(
 }
 
 @Composable
-private fun WonContent(state: GameViewState, onBack: () -> Unit) {
+private fun WonContent(state: GameViewState, onBack: () -> Unit, onNextLevel: () -> Unit) {
     // 动态光晕
     val infiniteTransition = rememberInfiniteTransition(label = "won")
     val glowAlpha by infiniteTransition.animateFloat(
@@ -522,7 +528,7 @@ private fun WonContent(state: GameViewState, onBack: () -> Unit) {
     Text(
         text  = "名扬四海，金榜题名！",
         style = MaterialTheme.typography.bodyLarge,
-        color = Text_Secondary_Dark,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 20.dp)
     )
 
@@ -531,7 +537,7 @@ private fun WonContent(state: GameViewState, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(ShapeMedium)
-            .background(MoYe_SurfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(1.dp, Gold_Subtle.copy(alpha = 0.3f), ShapeMedium)
             .padding(16.dp),
         contentAlignment = Alignment.Center
@@ -540,7 +546,7 @@ private fun WonContent(state: GameViewState, onBack: () -> Unit) {
             Text(
                 text  = "本次积分",
                 style = MaterialTheme.typography.labelMedium,
-                color = Text_Secondary_Dark
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             AnimatedCounter(
                 count = if (state.isDoublePointsActive) state.score * 2 else state.score,
@@ -551,11 +557,21 @@ private fun WonContent(state: GameViewState, onBack: () -> Unit) {
 
     Spacer(Modifier.height(20.dp))
 
-    PrimaryButton(
-        text     = "返回菜单",
-        onClick  = onBack,
-        modifier = Modifier.fillMaxWidth()
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SecondaryButton(
+            text     = "返回主页",
+            onClick  = onBack,
+            modifier = Modifier.weight(1f)
+        )
+        PrimaryButton(
+            text     = "下一关",
+            onClick  = onNextLevel,
+            modifier = Modifier.weight(1f)
+        )
+    }
 }
 
 @Composable

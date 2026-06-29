@@ -2,6 +2,9 @@ export interface Env {
   DB: D1Database;
 }
 
+// 声明机房常驻内存缓存，用于缓存已生成的关卡数据
+const CACHE_STAGE_CONFIG = new Map<number, string>();
+
 // HMAC-SHA256 JWT Implementation using Web Crypto API
 const JWT_SECRET = 'antigravity_secret_key';
 
@@ -257,7 +260,7 @@ function generateSolvableLevel(levelId: number): TileData[] {
 
     if (levelId >= 2) {
       const r = randProps();
-      if (r < 0.15) {
+      if (levelId % 10 === 0 && r < 0.15) {
         isBlind = true;
       } else if (r < 0.30) {
         sealedCount = 1;
@@ -964,7 +967,7 @@ export default {
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
       }
 
-      // Default fallback to old Level API
+      // Default fallback to old Level API (with in-memory cache)
       if (path === '/api/level' && request.method === 'GET') {
         const levelIdStr = url.searchParams.get('id');
         if (!levelIdStr) {
@@ -975,12 +978,19 @@ export default {
           return new Response(JSON.stringify({ error: 'Invalid level ID' }), { status: 400, headers: corsHeaders });
         }
 
-        // Check level_unlock to prevent unauthorized level access
+        // 1. 内存中存在？直接秒回
+        if (CACHE_STAGE_CONFIG.has(levelId)) {
+          return new Response(CACHE_STAGE_CONFIG.get(levelId)!, { headers: corsHeaders });
+        }
+
+        // 2. 内存没有？从 D1 数据库查询
         const levelRow = await env.DB.prepare(
           'SELECT layout_data FROM levels WHERE level_id = ?'
         ).bind(levelId).first<{ layout_data: string }>();
 
         if (levelRow) {
+          // 写入内存，以便下次直接返回
+          CACHE_STAGE_CONFIG.set(levelId, levelRow.layout_data);
           return new Response(levelRow.layout_data, { headers: corsHeaders });
         }
 
@@ -992,7 +1002,32 @@ export default {
           'INSERT OR IGNORE INTO levels (level_id, difficulty, layout_data, created_at) VALUES (?, ?, ?, ?)'
         ).bind(levelId, getDifficultyForLevel(levelId), layoutJson, Date.now()).run();
 
+        // 写入内存
+        CACHE_STAGE_CONFIG.set(levelId, layoutJson);
+
         return new Response(layoutJson, { headers: corsHeaders });
+      }
+
+      // App Update Check endpoint
+      if (path === '/api/app/check-update' && request.method === 'GET') {
+        const currentCodeStr = url.searchParams.get('version_code');
+        const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
+
+        const latest = await env.DB.prepare(
+          'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version ORDER BY version_code DESC LIMIT 1'
+        ).first<{ version_code: number; version_name: string; apk_url: string; update_log: string; is_force_update: number }>();
+
+        if (latest && latest.version_code > currentCode) {
+          return new Response(JSON.stringify({
+            has_update: true,
+            version_name: latest.version_name,
+            apk_url: latest.apk_url,
+            update_log: latest.update_log,
+            force_update: latest.is_force_update === 1
+          }), { headers: corsHeaders });
+        }
+
+        return new Response(JSON.stringify({ has_update: false }), { headers: corsHeaders });
       }
 
       // Original User Rename endpoint

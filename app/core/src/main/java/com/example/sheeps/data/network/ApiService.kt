@@ -105,4 +105,9 @@ interface ApiService {
         @Query("page") page: Int,
         @Query("limit") limit: Int = 20
     ): LeaderboardResponse
+
+    @GET("/api/app/check-update")
+    suspend fun checkUpdate(
+        @Query("version_code") versionCode: Int
+    ): AppUpdateResponse
 }
