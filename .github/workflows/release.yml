@@ -32,13 +32,12 @@ jobs:
         run: ls -la app/app/build/outputs/apk/release/
 
       - name: Release
-        uses: softprops/action-gh-release@v3
-        with:
-          repository: xqh0927/sheeps-releases
-          token: ${{ secrets.MY_PAT }}
-          tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
-          # 修正路径：如果执行是在 app 目录下，APK 就在 app/build/outputs/...
-          # 也就是相对于根目录的 app/build/outputs/...
-          files: app/app/build/outputs/apk/release/*.apk
-          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_PAT }}
+          TAG: v1.0.${{ github.run_number }}
+        run: |
+          # 1. 尝试创建 release，如果已存在则忽略错误
+          gh release create $TAG --repo xqh0927/sheeps-releases --title "Release $TAG" --notes "自动构建发布" || echo "Release 已存在"
+          
+          # 2. 强制上传，使用 --clobber 覆盖旧文件（避免因为版本冲突报错）
+          gh release upload $TAG app/build/outputs/apk/release/*.apk --repo xqh0927/sheeps-releases --clobber
