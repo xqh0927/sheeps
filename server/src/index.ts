@@ -43,10 +43,6 @@ export function parseReleaseVersionCode(tagName?: string): number | null {
     return null;
   }
 
-  if (minor === 0 && patch === 0) {
-    return major;
-  }
-
   return major * 10000 + minor * 100 + patch;
 }
 

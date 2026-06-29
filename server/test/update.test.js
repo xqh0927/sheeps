@@ -9,12 +9,12 @@ const {
 } = require('../.tmp-test/index.js');
 
 test('parses numeric release tags as Android version codes', () => {
-  assert.equal(parseReleaseVersionCode('v2'), 2);
-  assert.equal(parseReleaseVersionCode('release-12'), 12);
+  assert.equal(parseReleaseVersionCode('v2'), 20000);
+  assert.equal(parseReleaseVersionCode('release-12'), 120000);
 });
 
 test('parses semantic release tags without treating v1.0.0 as newer than code 1', () => {
-  assert.equal(parseReleaseVersionCode('v1.0.0'), 1);
+  assert.equal(parseReleaseVersionCode('v1.0.0'), 10000);
   assert.equal(parseReleaseVersionCode('v1.2.3'), 10203);
 });
 
@@ -59,5 +59,5 @@ test('does not report an update when the latest release is not newer', () => {
     assets: [
       { name: 'sheeps_1.0.0.apk', browser_download_url: 'https://example.com/sheeps.apk' },
     ],
-  }, 1), { has_update: false });
+  }, 10000), { has_update: false });
 });
