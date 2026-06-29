@@ -73,7 +73,7 @@ function run() {
                         console.log("➔ build.gradle.kts 更新成功！");
 
                         // 2. 执行远程 D1 数据库插入
-                        const apkUrl = `https://github.com/xqh0927/sheeps-releases/releases/download/v${newName}/app-release.apk`;
+                        const apkUrl = `https://github.com/xqh0927/sheeps-releases/releases/download/v${newName}/sheeps_${newName}.apk`;
                         const now = Date.now();
                         // 避免 SQL 语句因单引号报错
                         const escapedLog = updateLog.replace(/'/g, "''");
