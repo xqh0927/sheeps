@@ -172,7 +172,8 @@ class GameViewModel @Inject constructor(
                         isDoublePointsActive = false,
                         highlightedTileIds = emptySet(),
                         score = 0,
-                        gameStatus = GameStatus.PLAYING
+                        gameStatus = GameStatus.PLAYING,
+                        currentSkin = prefs.getCurrentSkin()
                     )
                 }
             } catch (e: Exception) {
@@ -196,7 +197,8 @@ class GameViewModel @Inject constructor(
                         isDoublePointsActive = false,
                         highlightedTileIds = emptySet(),
                         score = 0,
-                        gameStatus = GameStatus.PLAYING
+                        gameStatus = GameStatus.PLAYING,
+                        currentSkin = prefs.getCurrentSkin()
                     )
                 }
                 setEffect(GameViewEffect.ShowToast("网络加载失败，已切换至单机模式"))

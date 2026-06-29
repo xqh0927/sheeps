@@ -117,4 +117,12 @@ class UserPreferences @Inject constructor(
         kv.encode("unlocked_level", 1)
         kv.removeValueForKey("username")
     }
+
+    fun getCurrentSkin(): String {
+        return kv.decodeString("current_skin", "classic") ?: "classic"
+    }
+
+    fun setCurrentSkin(skin: String) {
+        kv.encode("current_skin", skin)
+    }
 }
