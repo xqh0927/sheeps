@@ -60,7 +60,7 @@
 ## ⚙️ 全局统一配置规范
 
 为了避免多处散落、硬编码相同全局信息（如服务器接口根地址 `BASE_URL`），项目在 `:core` 模块根包名 `com.example.sheeps.core` 下建立并封装了 **`AppConfig`** 对象：
-- **`AppConfig`** ([AppConfig.kt](file:///c:/Users/15613/Documents/file/app/core/src/main/java/com/example/sheeps/core/AppConfig.kt))：作为应用唯一的全局配置入口，所有的环境常量、协议配置以及未来的功能开关都会统一收拢到该对象中。
+- **`AppConfig`** ([AppConfig.kt](/file/app/core/src/main/java/com/example/sheeps/core/AppConfig.kt))：作为应用唯一的全局配置入口，所有的环境常量、协议配置以及未来的功能开关都会统一收拢到该对象中。
 - 移除了原有的 `ApiService.Companion.create` 冗余代码，使整个网络的配置点实现一处声明、全局消费。
 
 ---

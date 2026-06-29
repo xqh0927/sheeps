@@ -148,12 +148,16 @@ function generateSolvableLevel(levelId: number): TileData[] {
       { x: 2.0, y: 2.0, z: 2 }
     ];
   } else {
-    const maxCards = levelId === 2 ? 36 : Math.min(144, 72 + (levelId - 3) * 12);
+    // x = levelId. Total cards N linearly increases: N = 36 + (x - 2) * 12
+    const maxCards = levelId === 2 ? 36 : 36 + (levelId - 2) * 12;
     const possibleCoords: Point3D[] = [];
-    const layersCount = levelId === 2 ? 4 : Math.min(8, 4 + Math.floor(levelId / 2));
     
+    // Layers count L converges with square root: L = 12 - 8 / sqrt(x - 1), capped at 12
+    const layersCount = levelId === 2 ? 4 : Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
+    
+    const baseSize = 6 + Math.floor(levelId / 20);
     for (let z = 0; z < layersCount; z++) {
-      const size = 6 - Math.floor(z / 2);
+      const size = Math.max(3, baseSize - Math.floor(z / 3));
       const offset = (z % 2 === 0) ? 0 : 0.5;
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
@@ -182,7 +186,9 @@ function generateSolvableLevel(levelId: number): TileData[] {
 
   const W = 1.0;
   const H = 1.0;
-  const numTypes = levelId === 1 ? 3 : (levelId === 2 ? 6 : Math.min(12, 6 + Math.floor(levelId / 2)));
+  
+  // Card types T increases logarithmically: T = 3 + 3 * ln(x), capped at 16
+  const numTypes = levelId === 1 ? 3 : Math.min(16, Math.floor(3 + 3 * Math.log(levelId)));
 
   interface Node {
     index: number;
@@ -582,15 +588,22 @@ export default {
         const authUser = await getAuthenticatedUser(request, env);
         const resolvedUserId = authUser ? authUser.userId : body.user_id;
 
-        // If guest mode, we do NOT write to database leaderboard or sync
-        if (resolvedUserId.startsWith('uuid-') && !authUser) {
-          return new Response(JSON.stringify({ success: true, guest: true }), { headers: corsHeaders });
-        }
-
-        // Check if user exists
-        const userExists = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(resolvedUserId).first<{ points: number }>();
+        // Check if user exists, if not, create a guest/new user and unlock first 3 levels automatically
+        let userExists = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(resolvedUserId).first<{ points: number }>();
         if (!userExists) {
-          return new Response(JSON.stringify({ error: 'User not found' }), { status: 400, headers: corsHeaders });
+          const defaultUsername = resolvedUserId.startsWith('uuid-') ? `游客_${resolvedUserId.slice(-4)}` : `玩家_${resolvedUserId.slice(-4)}`;
+          await env.DB.prepare(
+            'INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(resolvedUserId, null, defaultUsername, null, 0, Date.now()).run();
+
+          // Automatically unlock the first 3 levels for new guest/offline users so they can play them directly
+          for (const lvl of [1, 2, 3]) {
+            await env.DB.prepare(
+              'INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)'
+            ).bind(resolvedUserId, lvl, Date.now()).run();
+          }
+
+          userExists = { points: 0 };
         }
 
         // Check if first clear of this level
@@ -617,7 +630,7 @@ export default {
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         for (const tid of ['PLAY_3_GAMES', 'PLAY_5_GAMES']) {
           const taskProgress = await env.DB.prepare(
-            'SELECT progress, target_count, is_completed FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?'
+            'SELECT ut.progress, t.target_count, ut.is_completed FROM user_task ut JOIN task t ON ut.task_id = t.id WHERE ut.user_id = ? AND ut.task_id = ? AND ut.task_date = ?'
           ).bind(resolvedUserId, tid, chinaToday).first<{ progress: number; target_count: number; is_completed: number }>();
 
           if (!taskProgress) {
