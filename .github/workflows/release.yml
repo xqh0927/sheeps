@@ -27,7 +27,11 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-
+      - name: Extract Version Name
+        run: |
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/app/build.gradle.kts)
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "Extracted Version: $VERSION_NAME"
 
       - name: List APK outputs
         run: ls -la app/app/build/outputs/apk/release/
@@ -35,7 +39,7 @@ jobs:
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.MY_PAT }}
-          TAG: v1.0.${{ github.run_number }}
+          TAG: v${{ env.VERSION_NAME }}
         run: |
           # 1. 检查 release 是否已存在，如果不存在则创建它
           gh release view $TAG --repo xqh0927/sheeps-releases >/dev/null 2>&1 || \
