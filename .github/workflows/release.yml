@@ -40,8 +40,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.MY_PAT }}
           TAG: v1.0.${{ github.run_number }}
         run: |
-          # 1. 尝试创建 release，如果已存在则忽略错误
-          gh release create $TAG --repo xqh0927/sheeps-releases --title "Release $TAG" --notes "自动构建发布" || echo "Release 已存在"
+          # 1. 检查 release 是否已存在，如果不存在则创建它
+          gh release view $TAG --repo xqh0927/sheeps-releases >/dev/null 2>&1 || \
+            gh release create $TAG --repo xqh0927/sheeps-releases --title "Release $TAG" --notes "自动构建发布"
           
           # 2. 强制上传，使用 --clobber 覆盖旧文件（避免因为版本冲突报错）
           gh release upload $TAG app/app/build/outputs/apk/release/*.apk --repo xqh0927/sheeps-releases --clobber
