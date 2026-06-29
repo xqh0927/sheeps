@@ -25,6 +25,15 @@
 5. **社交与日常功能**：
    - 支持手机号验证码注册/登录、用户中心、每日签到（连签奖励）、每日任务、公告系统。
 
+6. **多主题皮肤自绘系统**：
+   - 包含经典国风、水墨江山、赛博霓虹三种独特界面主题。根据首选项自动切换，卡牌底色及 12 种游戏图案全部在 Compose Canvas 中通过图形学计算重绘（水墨黑灰写意色、霓虹特制电子荧光色）。
+
+7. **法宝高清 Canvas 矢量自绘动画**：
+   - 局内/备战 8 种道具卡（阴阳乾坤鱼、缩地祥云、天命星盘、还魂金丹、太极天眼镜、震天炸弹、炫彩八卦罗盘、双叠铜钱）及 3 种皮肤卡片全部废弃静态 Placeholder，改为纯 Canvas 像素级矢量自绘，搭载自转、漂浮、呼吸闪烁动效。
+
+8. **智能发布流水线与一键对齐系统**：
+   - 包含一键发布脚本 `release.js`，自动实现版本升级、向 D1 数据库写入记录并向 main 分支提交推送；GitHub Actions 自动解析 versionName 并与发布 Tag 对齐，彻底规避版本冲突死循环。
+
 ---
 
 ## 🛠️ 核心框架技术与实现方式
@@ -42,9 +51,13 @@
 * **解耦多模块路由 (TheRouter)**：
   - 选用阿里开源的现代 Compose 路由框架 `TheRouter`，各个模块之间通过注册 URI（如 `/game/play`，`/menu/main`）实现页面间完全解耦跳转。
 * **网络请求与日志拦截 (Retrofit 2 & OkHttp 3 & LogUtils)**：
-  - 采用行业标准的 `Retrofit 2` 作为网络访问接口层，结合 `Kotlinx.serialization` 进行类型安全的 JSON 数据解析。
-  - 底层使用 `OkHttp 3` 客户端进行连接管理、超时配置。同时配置了四大拦截器：语言国际化拦截器、Bearer Token 身份认证拦截器、带锁防并发的双 Token 静默刷新拦截器、以及弱网自动指数退避重试拦截器。
-  - **网络与系统日志分析**：集成流行日志库 `pengwei1024/LogUtils` (`com.apkfuns.logutils:library`)，配合 `HttpLoggingInterceptor` 拦截网络请求，整包聚合并以无 Tag（利用其自动调用类名堆栈追踪定位机制）的方式输出结构化调试日志，极大地方便了端云联合调试。
+   - 采用行业标准的 `Retrofit 2` 作为网络访问接口层，结合 `Kotlinx.serialization` 进行类型安全的 JSON 数据解析。
+   - 底层使用 `OkHttp 3` 客户端进行连接管理、超时配置。同时配置了四大拦截器：语言国际化拦截器、Bearer Token 身份认证拦截器、带锁防并发的双 Token 静默刷新拦截器、以及弱网自动指数退避重试拦截器。
+   - **网络与系统日志分析**：集成流行日志库 `pengwei1024/LogUtils` (`com.apkfuns.logutils:library`)，配合 `HttpLoggingInterceptor` 拦截网络请求，整包聚聚合以无 Tag（利用其自动调用类名堆栈追踪定位机制）的方式输出结构化调试日志，极大地方便了端云联合调试。
+* **Canvas 纯矢量高清自绘与微交互动画**：
+  - 局内卡牌渲染与 8 种道具卡全部基于 Compose Canvas 矢量图形学绘制，彻底摆脱传统位图占用，并结合 `InfiniteTransition` 实现自转、漂浮、呼吸闪烁动效。
+* **自定义 Q弹 Spring 物理动效 (Compose Transition)**：
+  - 自定义封装 PrepareGameDialog 弹窗，利用 `animateFloatAsState` 实现具有物理惯性的弹性入场（Q弹）与淡入淡出动画，显著提升操作质感。
 
 
 ### ☁️ 后端服务 (Backend Service)
@@ -137,7 +150,19 @@
    npm run deploy
    ```
 
-### 2. Android 客户端编译与运行
+### 2. 一键版本发布与 D1/CI 自动化同步脚本 (release.js)
+为了彻底规避客户端与云端版本不一致导致的“无限循环提示更新”死循环，项目在根目录下集成了高度自动化的发布系统：
+
+1. **工作原理**：
+   - 当需要打包发布新版本时，在根目录下运行 `node release.js` 交互式命令。
+   - 脚本自动解析 `build.gradle.kts` 当前版本并自动建议下个版本。您只需输入“更新说明日志”。
+   - 脚本自动修改本地版本配置，动态生成 SQL 并执行 `wrangler d1 execute` 插入到云端 D1 数据库中。
+   - 随后，脚本自动完成 Git Commit 并 Push 提交到 main 分支。
+2. **精细化 CI 触发过滤**：
+   - GitHub Actions 的 build 打包任务配置了消息过滤：`if: contains(github.event.head_commit.message, 'chore(release):')`。
+   - 任何日常手动 `git push`（不包含 `chore(release):` 的常规开发）都**不会触发**耗时的 App 构建；只有通过 `release.js` 发布的提交，才会精准触发 Actions 进行 Release 编译并以 `v${versionName}` 自动生成 Release Tag。
+
+### 3. Android 客户端编译与运行
 在 `app` 目录下：
 
 1. 确认配置：
