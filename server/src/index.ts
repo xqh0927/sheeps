@@ -402,6 +402,200 @@ function generateSolvableLevel(levelId: number): TileData[] {
   });
 }
 
+interface PlayerSession {
+  playerId: string;
+  socket: WebSocket;
+  lastActionTime: number;
+  status: 'ACTIVE' | 'DISCONNECTED';
+  disconnectTimer?: any;
+}
+
+interface GameSession {
+  gameId: string;
+  playerA?: PlayerSession;
+  playerB?: PlayerSession;
+}
+
+const gameSessions = new Map<string, GameSession>();
+
+function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: string, env: Env) {
+  let game = gameSessions.get(gameId);
+  if (!game) {
+    game = { gameId };
+    gameSessions.set(gameId, game);
+  }
+
+  const session: PlayerSession = {
+    playerId,
+    socket,
+    lastActionTime: 0,
+    status: 'ACTIVE'
+  };
+
+  // Assign Player A or Player B
+  if (!game.playerA) {
+    game.playerA = session;
+  } else if (game.playerA.playerId === playerId) {
+    if (game.playerA.disconnectTimer) {
+      clearTimeout(game.playerA.disconnectTimer);
+      game.playerA.disconnectTimer = undefined;
+    }
+    game.playerA.socket = socket;
+    game.playerA.status = 'ACTIVE';
+    // Broadcast reconnect notify to B
+    if (game.playerB && game.playerB.status === 'ACTIVE') {
+      game.playerB.socket.send(JSON.stringify({
+        gameId,
+        seqId: 0,
+        timestamp: Date.now(),
+        senderId: 'SYSTEM',
+        type: 'SYSTEM_EVENT',
+        payload: {
+          systemMessage: 'PLAYER_RECONNECTED',
+          targetPlayerId: playerId
+        }
+      }));
+    }
+  } else if (!game.playerB) {
+    game.playerB = session;
+  } else if (game.playerB.playerId === playerId) {
+    if (game.playerB.disconnectTimer) {
+      clearTimeout(game.playerB.disconnectTimer);
+      game.playerB.disconnectTimer = undefined;
+    }
+    game.playerB.socket = socket;
+    game.playerB.status = 'ACTIVE';
+    // Broadcast reconnect notify to A
+    if (game.playerA && game.playerA.status === 'ACTIVE') {
+      game.playerA.socket.send(JSON.stringify({
+        gameId,
+        seqId: 0,
+        timestamp: Date.now(),
+        senderId: 'SYSTEM',
+        type: 'SYSTEM_EVENT',
+        payload: {
+          systemMessage: 'PLAYER_RECONNECTED',
+          targetPlayerId: playerId
+        }
+      }));
+    }
+  } else {
+    // Room is full
+    socket.close(1008, 'Room Full');
+    return;
+  }
+
+  socket.addEventListener('message', async (event) => {
+    try {
+      const text = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
+      const command = JSON.parse(text);
+
+      const now = Date.now();
+      // 1. Sliding window rate limit (100ms)
+      if (now - session.lastActionTime < 100) {
+        socket.send(JSON.stringify({
+          gameId,
+          seqId: command.seqId,
+          timestamp: now,
+          senderId: 'SYSTEM',
+          type: 'SYSTEM_EVENT',
+          payload: { systemMessage: 'RATE_LIMIT_EXCEEDED' }
+        }));
+        return;
+      }
+      session.lastActionTime = now;
+
+      // 2. Eliminate validation mock
+      if (command.type === 'ELIMINATE') {
+        const payload = command.payload;
+        if (!payload.tilesEliminated || payload.tilesEliminated.length !== 3) {
+          socket.send(JSON.stringify({
+            gameId,
+            seqId: command.seqId,
+            timestamp: now,
+            senderId: 'SYSTEM',
+            type: 'SYSTEM_EVENT',
+            payload: { systemMessage: 'INVALID_ELIMINATE_COMMAND' }
+          }));
+          return;
+        }
+      }
+
+      // 3. Nonlinear damage recalculation and verification
+      if (command.type === 'ATTACK') {
+        const combo = command.payload.comboCount || 1;
+        const attackPower = 10.0 * (1.0 + Math.log(combo));
+        command.payload.attackPower = attackPower; // Recalculated by server to prevent tampering
+      }
+
+      // Forward message to the opponent
+      const opponent = (session === game.playerA) ? game.playerB : game.playerA;
+      if (opponent && opponent.status === 'ACTIVE') {
+        opponent.socket.send(JSON.stringify(command));
+      }
+    } catch (e) {
+      console.error('WebSocket Message forward error', e);
+    }
+  });
+
+  const handleDisconnect = () => {
+    session.status = 'DISCONNECTED';
+    const opponent = (session === game.playerA) ? game.playerB : game.playerA;
+
+    if (!opponent || opponent.status === 'DISCONNECTED') {
+      gameSessions.delete(gameId);
+      return;
+    }
+
+    if (opponent.status === 'ACTIVE') {
+      opponent.socket.send(JSON.stringify({
+        gameId,
+        seqId: 0,
+        timestamp: Date.now(),
+        senderId: 'SYSTEM',
+        type: 'SYSTEM_EVENT',
+        payload: {
+          systemMessage: 'PLAYER_DISCONNECTED',
+          targetPlayerId: playerId
+        }
+      }));
+    }
+
+    // Start 15s reconnection grace period
+    session.disconnectTimer = setTimeout(async () => {
+      if (session.status === 'DISCONNECTED') {
+        if (opponent && opponent.status === 'ACTIVE') {
+          opponent.socket.send(JSON.stringify({
+            gameId,
+            seqId: 0,
+            timestamp: Date.now(),
+            senderId: 'SYSTEM',
+            type: 'SYSTEM_EVENT',
+            payload: {
+              systemMessage: 'GAME_OVER_DISCONNECT_WIN',
+              targetPlayerId: opponent.playerId
+            }
+          }));
+          opponent.socket.close(1000, 'Game Over');
+        }
+        gameSessions.delete(gameId);
+
+        // Record defeat to DB leaderboard
+        try {
+          await env.DB.prepare(
+            'INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)'
+          ).bind(opponent.playerId, 0, 9999, 99999, Date.now()).run();
+        } catch (err) {
+          console.error('Failed to write db game result on disconnect timeout', err);
+        }
+      }
+    }, 15000);
+  };
+
+  socket.addEventListener('close', handleDisconnect);
+  socket.addEventListener('error', handleDisconnect);
+}
+
 // Router Implementation
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -414,6 +608,26 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const lang = getLangSuffix(request);
+
+    // WebSocket matching & upgrade routing
+    if (path === '/api/ws' || request.headers.get('Upgrade') === 'websocket') {
+      const gameId = url.searchParams.get('gameId');
+      const playerId = url.searchParams.get('playerId');
+      if (!gameId || !playerId) {
+        return new Response('Missing gameId or playerId', { status: 400 });
+      }
+
+      const [client, server] = Object.values(new WebSocketPair());
+      server.accept();
+
+      handleWebSocketSession(server, gameId, playerId, env);
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+        headers: corsHeaders
+      });
+    }
 
     try {
       // 1. Send SMS Code simulation
@@ -1135,11 +1349,6 @@ export default {
       if (path === '/api/app/check-update' && request.method === 'GET') {
         const currentCodeStr = url.searchParams.get('version_code');
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
-
-        const githubUpdate = await getGitHubAppUpdate(currentCode);
-        if (githubUpdate?.has_update) {
-          return new Response(JSON.stringify(githubUpdate), { headers: corsHeaders });
-        }
 
         const databaseUpdate = await getDatabaseAppUpdate(env, currentCode);
         return new Response(JSON.stringify(databaseUpdate), { headers: corsHeaders });
