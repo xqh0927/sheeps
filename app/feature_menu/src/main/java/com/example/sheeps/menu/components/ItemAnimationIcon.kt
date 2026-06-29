@@ -316,6 +316,73 @@ fun ItemAnimationIcon(
                         drawCoin(cx + radius * 0.25f, cy - radius * 0.15f, radius * 0.65f, scale, 1.0f)
                     }
                 }
+                "SKIN_INK" -> { // 水墨江山：写意墨松与群山
+                    translate(top = floatOffset * 0.4f) {
+                        // 远山
+                        val mountain1 = Path().apply {
+                            moveTo(cx - radius * 0.9f, cy + radius * 0.5f)
+                            lineTo(cx - radius * 0.4f, cy - radius * 0.3f)
+                            lineTo(cx + radius * 0.2f, cy + radius * 0.5f)
+                            close()
+                        }
+                        val mountain2 = Path().apply {
+                            moveTo(cx - radius * 0.2f, cy + radius * 0.5f)
+                            lineTo(cx + radius * 0.3f, cy - radius * 0.5f)
+                            lineTo(cx + radius * 0.9f, cy + radius * 0.5f)
+                            close()
+                        }
+                        drawPath(mountain1, color = Color(0xFF5A6065))
+                        drawPath(mountain2, color = Color(0xFF2C2F31))
+                        
+                        // 金乌红日
+                        drawCircle(
+                            color = Color(0xFFCBAA6A).copy(alpha = flashAlpha),
+                            radius = radius * 0.25f,
+                            center = Offset(cx - radius * 0.3f, cy - radius * 0.4f)
+                        )
+                    }
+                }
+                "SKIN_CYBER" -> { // 赛博霓虹：炫光集成芯片网格
+                    rotate(rotation * 0.5f, cx, cy) {
+                        val rectSize = radius * 0.5f
+                        drawRect(
+                            color = Color(0xFF00F2FE),
+                            topLeft = Offset(cx - rectSize / 2f, cy - rectSize / 2f),
+                            size = Size(rectSize, rectSize),
+                            style = Stroke(width = 3.5f)
+                        )
+                        for (i in 0 until 4) {
+                            val angle = i * 90f
+                            rotate(angle, cx, cy) {
+                                drawLine(
+                                    color = Color(0xFF05D9E8).copy(alpha = flashAlpha),
+                                    start = Offset(cx, cy - rectSize / 2f),
+                                    end = Offset(cx, cy - radius * 0.95f),
+                                    strokeWidth = 3f
+                                )
+                                drawCircle(
+                                    color = Color(0xFFFF2A6D).copy(alpha = flashAlpha),
+                                    radius = radius * 0.08f,
+                                    center = Offset(cx, cy - radius * 0.95f)
+                                )
+                            }
+                        }
+                    }
+                }
+                "CLASSIC" -> { // 经典国风：红金大灯笼
+                    val lampPath = Path().apply {
+                        moveTo(cx - radius * 0.4f, cy - radius * 0.5f)
+                        lineTo(cx + radius * 0.4f, cy - radius * 0.5f)
+                        quadraticTo(cx + radius * 0.6f, cy, cx + radius * 0.4f, cy + radius * 0.5f)
+                        lineTo(cx - radius * 0.4f, cy + radius * 0.5f)
+                        quadraticTo(cx - radius * 0.6f, cy, cx - radius * 0.4f, cy - radius * 0.5f)
+                        close()
+                    }
+                    drawPath(lampPath, color = CrimsonRed)
+                    drawPath(lampPath, color = Color(0xFFCBAA6A), style = Stroke(width = 3f))
+                    drawLine(Color(0xFFCBAA6A), Offset(cx, cy - radius * 0.8f), Offset(cx, cy - radius * 0.5f), strokeWidth = 3f)
+                    drawLine(CrimsonRed, Offset(cx, cy + radius * 0.5f), Offset(cx, cy + radius * 0.85f), strokeWidth = 4f)
+                }
                 else -> { // 默认显示红色圆环
                     drawCircle(
                         color = CrimsonRed,

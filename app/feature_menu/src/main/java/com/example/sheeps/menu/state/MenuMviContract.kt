@@ -33,7 +33,8 @@ data class MenuViewState(
     val language: String = "",
 
     // App Update
-    val appUpdateInfo: AppUpdateResponse? = null
+    val appUpdateInfo: AppUpdateResponse? = null,
+    val currentSkin: String = "classic"
 )
 
 sealed interface MenuViewIntent {
@@ -51,6 +52,7 @@ sealed interface MenuViewIntent {
     data class ResolveConflict(val useLocal: Boolean) : MenuViewIntent
     data class ChangeLanguage(val lang: String) : MenuViewIntent
     object DismissUpdate : MenuViewIntent
+    data class ChangeSkin(val skin: String) : MenuViewIntent
 }
 
 sealed interface MenuViewEffect {

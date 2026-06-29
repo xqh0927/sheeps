@@ -69,7 +69,12 @@ class MenuViewModel @Inject constructor(
         }
 
         // Initial data loading
-        updateState { copy(language = prefs.getLanguage()) }
+        updateState { 
+            copy(
+                language = prefs.getLanguage(),
+                currentSkin = prefs.getCurrentSkin()
+            ) 
+        }
         sendIntent(MenuViewIntent.LoadData)
     }
 
@@ -89,7 +94,13 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.ResolveConflict -> handleResolveConflict(intent.useLocal)
             is MenuViewIntent.ChangeLanguage -> handleChangeLanguage(intent.lang)
             is MenuViewIntent.DismissUpdate -> updateState { copy(appUpdateInfo = null) }
+            is MenuViewIntent.ChangeSkin -> handleChangeSkin(intent.skin)
         }
+    }
+
+    private fun handleChangeSkin(skin: String) {
+        prefs.setCurrentSkin(skin)
+        updateState { copy(currentSkin = skin) }
     }
 
     private fun handleChangeLanguage(lang: String) {
