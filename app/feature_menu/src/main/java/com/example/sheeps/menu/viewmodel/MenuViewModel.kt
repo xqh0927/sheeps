@@ -76,6 +76,7 @@ class MenuViewModel @Inject constructor(
             ) 
         }
         sendIntent(MenuViewIntent.LoadData)
+        checkAppUpdateOnce()
     }
 
     override fun handleIntent(intent: MenuViewIntent) {
@@ -101,6 +102,26 @@ class MenuViewModel @Inject constructor(
     private fun handleChangeSkin(skin: String) {
         prefs.setCurrentSkin(skin)
         updateState { copy(currentSkin = skin) }
+    }
+
+    private fun checkAppUpdateOnce() {
+        viewModelScope.launch {
+            try {
+                if (networkMonitor.isOnline()) {
+                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                    val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        packageInfo.longVersionCode.toInt()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        packageInfo.versionCode
+                    }
+                    val appUpdate = apiService.checkUpdate(versionCode)
+                    updateState { copy(appUpdateInfo = appUpdate) }
+                }
+            } catch (e: Exception) {
+                // Ignore update fetch errors silently
+            }
+        }
     }
 
     private fun handleChangeLanguage(lang: String) {
@@ -130,23 +151,7 @@ class MenuViewModel @Inject constructor(
                     currentState.notices.ifEmpty { emptyList() }
                 }
 
-                // Check app updates from Cloudflare
-                val appUpdate = try {
-                    if (networkMonitor.isOnline()) {
-                        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                            packageInfo.longVersionCode.toInt()
-                        } else {
-                            @Suppress("DEPRECATION")
-                            packageInfo.versionCode
-                        }
-                        apiService.checkUpdate(versionCode)
-                    } else {
-                        null
-                    }
-                } catch (e: Exception) {
-                    null
-                }
+
 
                 if (isLoggedIn && networkMonitor.isOnline()) {
                     val authHeader = "Bearer ${prefs.getToken()}"
@@ -184,8 +189,7 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = dailyTasks,
                             pointsHistory = pointsHistory,
-                            exchangeHistory = exchangeHistory,
-                            appUpdateInfo = appUpdate
+                            exchangeHistory = exchangeHistory
                         )
                     }
                 } else {
@@ -199,8 +203,7 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = emptyList(),
                             pointsHistory = emptyList(),
-                            exchangeHistory = emptyList(),
-                            appUpdateInfo = appUpdate
+                            exchangeHistory = emptyList()
                         )
                     }
                 }
