@@ -18,6 +18,8 @@ import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.max
+import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
+import com.example.sheeps.core.game.GameEngine.isTileBlocked
 
 @HiltViewModel
 class DuelViewModel @Inject constructor(
@@ -30,6 +32,9 @@ class DuelViewModel @Inject constructor(
 
     private var initialTileCount = 0
     private var seqId = 0L
+    private var currentLevelId = 2
+    private var currentGameSeed = 0
+    private var countdownJob: kotlinx.coroutines.Job? = null
 
     init {
         viewModelScope.launch {
@@ -47,22 +52,23 @@ class DuelViewModel @Inject constructor(
 
     override fun handleIntent(intent: DuelViewIntent) {
         when (intent) {
-            is DuelViewIntent.Init -> handleInit(intent.gameId, intent.playerId)
+            is DuelViewIntent.Init -> handleInit(intent.gameId, intent.playerId, intent.levelId, intent.seed)
             is DuelViewIntent.ClickTile -> handleClickTile(intent.tile)
             is DuelViewIntent.Restart -> handleRestart()
             is DuelViewIntent.Leave -> handleLeave()
+            is DuelViewIntent.CastSpell -> handleCastSpell(intent.spellType)
         }
     }
 
-    private fun handleInit(gameId: String, playerId: String) {
-        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true) }
+    private fun handleInit(gameId: String, playerId: String, levelId: Int, seed: Int) {
+        currentLevelId = levelId
+        currentGameSeed = seed
+        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, totalTileCount = 0, opponentEliminatedCount = 0) }
         wsManager.connect(gameId, playerId)
         
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // Multi-player duel usually uses a fixed or synchronized seed level
-                // For simplicity, we use level 2 as base for duel
-                val serverTiles = apiService.getLevel(2)
+                val serverTiles = apiService.getLevel(levelId, seed)
                 val processedTiles = serverTiles.map { it.copy(state = TileState.NORMAL) }
                 val finalTiles = calculateBlockedStates(processedTiles)
                 initialTileCount = finalTiles.size
@@ -71,7 +77,8 @@ class DuelViewModel @Inject constructor(
                     copy(
                         isLoading = false,
                         boardTiles = finalTiles,
-                        gameStatus = GameStatus.PLAYING
+                        gameStatus = GameStatus.PLAYING,
+                        totalTileCount = finalTiles.size
                     )
                 }
             } catch (e: Exception) {
@@ -83,7 +90,8 @@ class DuelViewModel @Inject constructor(
                     copy(
                         isLoading = false,
                         boardTiles = finalTiles,
-                        gameStatus = GameStatus.PLAYING
+                        gameStatus = GameStatus.PLAYING,
+                        totalTileCount = finalTiles.size
                     )
                 }
             }
@@ -147,7 +155,10 @@ class DuelViewModel @Inject constructor(
                         true
                     } else false
                 }
-                updateState { copy(score = score + 100, combo = combo + 1) }
+                updateState { 
+                    val newEnergy = (currentEnergy + 1).coerceAtMost(10)
+                    copy(score = score + 100, combo = combo + 1, currentEnergy = newEnergy) 
+                }
                 matched = true
                 break
             }
@@ -171,7 +182,7 @@ class DuelViewModel @Inject constructor(
         if (remainingTotal == 0) {
             sendSystemEvent("WIN")
             updateState { copy(gameStatus = GameStatus.WON, winnerId = playerId) }
-        } else if (finalSlot.size >= 7) {
+        } else if (finalSlot.size >= currentState.maxSlotSize) {
             sendSystemEvent("LOST")
             updateState { copy(gameStatus = GameStatus.LOST) }
         }
@@ -190,26 +201,83 @@ class DuelViewModel @Inject constructor(
         
         when (command.type) {
             CommandType.ELIMINATE -> {
-                // Update opponent progress
-                val remaining = command.payload.comboCount // Reusing comboCount as a proxy for "remaining" if needed, or better define in payload
-                // Actually let's assume tilesEliminated length/3 * 100 added to score
+                val eliminatedTilesCount = command.payload.tilesEliminated?.size ?: 3
                 updateState { 
+                    val newOpponentEliminatedCount = opponentEliminatedCount + eliminatedTilesCount
+                    val newOpponentProgress = if (totalTileCount > 0) {
+                        (newOpponentEliminatedCount.toFloat() / totalTileCount.toFloat()).coerceIn(0f, 1f)
+                    } else opponentProgress
                     copy(
                         opponentScore = opponentScore + 100,
-                        opponentProgress = opponentProgress + 0.05f // Rough estimate
+                        opponentEliminatedCount = newOpponentEliminatedCount,
+                        opponentProgress = newOpponentProgress
                     )
                 }
             }
             CommandType.ATTACK -> {
                 applyAttackEffect()
             }
+            CommandType.CAST_SPELL -> {
+                applySpellEffect(command.payload.spellType ?: "")
+            }
             CommandType.SYSTEM_EVENT -> {
-                if (command.payload.systemMessage == "WIN") {
-                    updateState { 
-                        copy(
-                            gameStatus = GameStatus.LOST,
-                            winnerId = command.senderId
-                        )
+                when (command.payload.systemMessage) {
+                    "WIN" -> {
+                        updateState { 
+                            copy(
+                                gameStatus = GameStatus.LOST,
+                                winnerId = command.senderId
+                            )
+                        }
+                    }
+                    "LOST" -> {
+                        updateState {
+                            copy(
+                                gameStatus = GameStatus.WON,
+                                winnerId = playerId
+                            )
+                        }
+                    }
+                    "OPPONENT_QUIT" -> {
+                        updateState {
+                            copy(
+                                gameStatus = GameStatus.WON,
+                                winnerId = playerId,
+                                activeSpellMessage = "对手已认输并退出房间！"
+                            )
+                        }
+                    }
+                    "PLAYER_DISCONNECTED" -> {
+                        if (command.payload.targetPlayerId != currentState.playerId) {
+                            updateState { 
+                                copy(incomingAttackMessage = "对手断开连接，等待重连...")
+                            }
+                        }
+                    }
+                    "PLAYER_RECONNECTED" -> {
+                        if (command.payload.targetPlayerId != currentState.playerId) {
+                            updateState { 
+                                copy(incomingAttackMessage = "对手已重新连接！")
+                            }
+                            viewModelScope.launch {
+                                delay(3000)
+                                if (currentState.incomingAttackMessage == "对手已重新连接！") {
+                                    updateState { copy(incomingAttackMessage = null) }
+                                }
+                            }
+                        }
+                    }
+                    "GAME_OVER_DISCONNECT_WIN" -> {
+                        if (command.payload.targetPlayerId != currentState.playerId) {
+                            updateState {
+                                copy(
+                                    gameStatus = GameStatus.WON,
+                                    winnerId = playerId,
+                                    incomingAttackMessage = null
+                                )
+                            }
+                            setEffect(DuelViewEffect.ShowToast("对手超时未重连，你赢了！"))
+                        }
                     }
                 }
             }
@@ -236,6 +304,161 @@ class DuelViewModel @Inject constructor(
             viewModelScope.launch {
                 delay(3000)
                 updateState { copy(incomingAttackMessage = null) }
+            }
+        }
+    }
+
+    private fun startSpellCountdown(seconds: Int, spellType: String, onFinished: () -> Unit) {
+        countdownJob?.cancel()
+        updateState { copy(spellCountdownSeconds = seconds) }
+        
+        countdownJob = viewModelScope.launch {
+            var remaining = seconds
+            while (remaining > 0) {
+                val msg = when (spellType) {
+                    "FOG" -> "对手施放了【迷雾障眼】，迷雾消散倒计时：${remaining}秒"
+                    "SHRINK" -> "对手施放了【画地为牢】，卡槽解锁倒计时：${remaining}秒"
+                    "SILENCE" -> "对手施放了【禁言封印】，技能解封倒计时：${remaining}秒"
+                    else -> "诅咒解除倒计时：${remaining}秒"
+                }
+                updateState { 
+                    copy(
+                        spellCountdownSeconds = remaining,
+                        activeSpellMessage = msg
+                    )
+                }
+                delay(1000)
+                remaining--
+            }
+            updateState { 
+                copy(
+                    spellCountdownSeconds = 0,
+                    activeSpellMessage = if (activeSpellMessage?.contains("倒计时") == true) null else activeSpellMessage
+                )
+            }
+            onFinished()
+        }
+    }
+
+    private fun handleCastSpell(spellType: String) {
+        val state = currentState
+        if (state.gameStatus != GameStatus.PLAYING) return
+        
+        if (state.usedSpells.contains(spellType)) {
+            setEffect(DuelViewEffect.ShowToast("该大招已使用过，本局无法重复使用！"))
+            return
+        }
+        
+        if (state.isSilenced) {
+            setEffect(DuelViewEffect.ShowToast("你正处于禁魔状态，无法使用大招！"))
+            return
+        }
+
+        val cost = when (spellType) {
+            "FOG" -> 3
+            "SHRINK" -> 6
+            "SEAL_ALL" -> 10
+            "SHUFFLE" -> 5
+            "SILENCE" -> 4
+            else -> 999
+        }
+        if (state.currentEnergy < cost) {
+            setEffect(DuelViewEffect.ShowToast("能量不足以施法！"))
+            return
+        }
+
+        // Deduct energy and lock spell
+        updateState { copy(currentEnergy = currentEnergy - cost, usedSpells = usedSpells + spellType) }
+
+        // Send spell cast command to opponent
+        wsManager.sendCommand(GameCommand(
+            gameId = currentState.gameId,
+            seqId = ++seqId,
+            timestamp = System.currentTimeMillis(),
+            senderId = currentState.playerId,
+            type = CommandType.CAST_SPELL,
+            payload = CommandPayload(spellType = spellType)
+        ))
+
+        setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
+        setEffect(DuelViewEffect.ShowToast("施法成功！"))
+    }
+
+    private fun applySpellEffect(spellType: String) {
+        val state = currentState
+        if (state.gameStatus != GameStatus.PLAYING) return
+
+        when (spellType) {
+            "FOG" -> {
+                updateState { copy(isFogActive = true) }
+                startSpellCountdown(1, "FOG") {
+                    updateState { copy(isFogActive = false) }
+                }
+            }
+            "SHRINK" -> {
+                updateState { copy(maxSlotSize = 6) }
+                // If currently holding >= 6 cards, immediate defeat
+                if (currentState.slotTiles.size >= 6) {
+                    sendSystemEvent("LOST")
+                    updateState { copy(gameStatus = GameStatus.LOST) }
+                }
+                startSpellCountdown(1, "SHRINK") {
+                    updateState { copy(maxSlotSize = 7) }
+                }
+            }
+            "SEAL_ALL" -> {
+                val normalTiles = state.boardTiles.filter { it.state == TileState.NORMAL }
+                if (normalTiles.isNotEmpty()) {
+                    val newBoard = state.boardTiles.map { tile ->
+                        if (tile.state == TileState.NORMAL) {
+                            tile.copy(sealedCount = tile.sealedCount + 1)
+                        } else tile
+                    }
+                    updateState {
+                        copy(
+                            boardTiles = calculateBlockedStates(newBoard),
+                            activeSpellMessage = "对手施放了【万重封印】，暴露牌已被封印！"
+                        )
+                    }
+                    viewModelScope.launch {
+                        delay(1000)
+                        updateState {
+                            copy(
+                                activeSpellMessage = if (activeSpellMessage?.contains("万重封印") == true) null else activeSpellMessage
+                            )
+                        }
+                    }
+                }
+            }
+            "SHUFFLE" -> {
+                val boardNormalTiles = state.boardTiles.filter { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
+                val types = boardNormalTiles.map { it.type }.shuffled()
+                var typeIdx = 0
+                val newBoard = state.boardTiles.map { tile ->
+                    if (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) {
+                        tile.copy(type = types[typeIdx++])
+                    } else tile
+                }
+                updateState {
+                    copy(
+                        boardTiles = calculateBlockedStates(newBoard),
+                        activeSpellMessage = "对手施放了【乾坤大挪移】，你的牌面类型被打乱了！"
+                    )
+                }
+                viewModelScope.launch {
+                    delay(1000)
+                    updateState {
+                        copy(
+                            activeSpellMessage = if (activeSpellMessage?.contains("乾坤大挪移") == true) null else activeSpellMessage
+                        )
+                    }
+                }
+            }
+            "SILENCE" -> {
+                updateState { copy(isSilenced = true) }
+                startSpellCountdown(1, "SILENCE") {
+                    updateState { copy(isSilenced = false) }
+                }
             }
         }
     }
@@ -275,35 +498,19 @@ class DuelViewModel @Inject constructor(
     }
 
     private fun handleRestart() {
-        handleInit(currentState.gameId, currentState.playerId)
+        handleInit(currentState.gameId, currentState.playerId, currentLevelId, currentGameSeed)
     }
 
     private fun handleLeave() {
-        wsManager.disconnect()
-    }
-
-    // --- Helper logic (reused from GameViewModel) ---
-
-    private fun isTileBlocked(tile: Tile, board: List<Tile>): Boolean {
-        return board.any { other ->
-            other.id != tile.id &&
-            (other.state == TileState.NORMAL || other.state == TileState.BLOCKED) &&
-            other.z > tile.z &&
-            abs(other.x - tile.x) < 1.0f &&
-            abs(other.y - tile.y) < 1.0f
+        viewModelScope.launch {
+            sendSystemEvent("OPPONENT_QUIT")
+            delay(500)
+            wsManager.disconnect()
+            setEffect(DuelViewEffect.ExitGame)
         }
     }
 
-    private fun calculateBlockedStates(board: List<Tile>): List<Tile> {
-        return board.map { tile ->
-            if (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) {
-                val blocked = isTileBlocked(tile, board)
-                tile.copy(state = if (blocked) TileState.BLOCKED else TileState.NORMAL)
-            } else {
-                tile
-            }
-        }
-    }
+
 
     private fun generateDuelLevel(): List<Tile> {
         // Same logic as GameViewModel's local generation

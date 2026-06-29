@@ -44,7 +44,10 @@ interface ApiService {
     suspend fun rename(@Body request: RenameRequest): GenericResponse
 
     @GET("/api/level")
-    suspend fun getLevel(@Query("id") levelId: Int): List<Tile>
+    suspend fun getLevel(
+        @Query("id") levelId: Int,
+        @Query("seed") seed: Int? = null
+    ): List<Tile>
 
     @POST("/api/score/submit")
     suspend fun submitScore(

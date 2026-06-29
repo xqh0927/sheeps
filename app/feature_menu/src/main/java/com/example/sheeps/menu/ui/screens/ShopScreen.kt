@@ -39,17 +39,19 @@ fun ShopScreen(
             state.shopItems.filter { !it.item_type.startsWith("SKIN_") }
         } else {
             val skins = mutableListOf<ShopItem>()
+            // 默认经典皮肤
             skins.add(
                 ShopItem(
                     id = -1,
-                    name = "经典国风 (卡牌皮肤)",
-                    description = "默认解锁的古典朱红金边卡牌样式",
+                    name = "经典国风",
+                    description = "默认解锁的古典朱红卡牌样式",
                     image_url = "",
                     item_type = "CLASSIC",
                     points_price = 0,
                     stock = 9999
                 )
             )
+            
             skins.addAll(state.shopItems.filter { it.item_type.startsWith("SKIN_") })
             skins
         }

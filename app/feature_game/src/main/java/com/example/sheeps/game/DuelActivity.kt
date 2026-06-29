@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
@@ -29,13 +30,15 @@ class DuelActivity : BaseActivity() {
     override fun initView(savedInstanceState: Bundle?) {
         val gameId = intent.getStringExtra("gameId") ?: ""
         val playerId = intent.getStringExtra("playerId") ?: ""
+        val levelId = intent.getIntExtra("levelId", 2)
+        val seed = intent.getIntExtra("seed", 0)
 
         setContent {
             SheepsTheme {
                 val state by viewModel.viewState.collectAsState()
 
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     DuelScreen(
@@ -43,16 +46,16 @@ class DuelActivity : BaseActivity() {
                         onTileClick = { tile -> viewModel.sendIntent(DuelViewIntent.ClickTile(tile)) },
                         onLeave = { 
                             viewModel.sendIntent(DuelViewIntent.Leave)
-                            finish() 
                         },
-                        onRestart = { viewModel.sendIntent(DuelViewIntent.Restart) }
+                        onRestart = { viewModel.sendIntent(DuelViewIntent.Restart) },
+                        onCastSpell = { spellType -> viewModel.sendIntent(DuelViewIntent.CastSpell(spellType)) }
                     )
                 }
             }
         }
 
         if (gameId.isNotEmpty() && playerId.isNotEmpty()) {
-            viewModel.sendIntent(DuelViewIntent.Init(gameId, playerId))
+            viewModel.sendIntent(DuelViewIntent.Init(gameId, playerId, levelId, seed))
         }
     }
 
@@ -63,6 +66,7 @@ class DuelActivity : BaseActivity() {
                     is DuelViewEffect.ShowToast -> Toaster.show(effect.message)
                     is DuelViewEffect.PlaySound -> { /* Play sound */ }
                     is DuelViewEffect.Vibrate -> { /* Vibrate */ }
+                    is DuelViewEffect.ExitGame -> finish()
                 }
             }
         }

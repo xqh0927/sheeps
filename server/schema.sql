@@ -212,3 +212,22 @@ INSERT INTO shop_items (name, description, name_en, description_en, name_tw, des
 ('水墨江山 (卡牌皮肤)', '古典水墨底色与墨金边框', 'Ink Landscape Skin', 'Classic ink wash background with dark gold frame', '水墨江山', '古典水墨底色與墨金邊框', '水墨山水', '古典的な水墨画の背景とダークゴールドのフレーム', '수묵강산', '고전적인 수묵화 배경과 다크 골드 프레임', 'SKIN_INK', 200, 9999),
 ('赛博霓虹 (卡牌皮肤)', '电子科幻线条与极光发光外框', 'Cyber Neon Skin', 'Electronic sci-fi lines with neon glowing frame', '賽博霓虹', '電子科幻線條與極光發光外框', 'サイバーネオン', 'ネオンに光るフレームを備えた電子SFライン', '사이버 네온', '네온으로 빛나는 프레임이 있는 전자 공상 과학 라인', 'SKIN_CYBER', 500, 9999);
 
+
+-- 联机对战匹配队列
+CREATE TABLE IF NOT EXISTS matchmaking_queue (
+    player_id TEXT PRIMARY KEY,
+    joined_at INTEGER NOT NULL,
+    matched_game_id TEXT,
+    matched_opponent TEXT,
+    game_seed INTEGER,
+    duel_level INTEGER
+);
+
+-- 跨实例 WebSocket 消息转发队列
+CREATE TABLE IF NOT EXISTS game_commands (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    command_data TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);

@@ -91,7 +91,7 @@ class LeaderboardActivity : BaseActivity() {
                 }
 
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     Column(modifier = Modifier.fillMaxSize()) {

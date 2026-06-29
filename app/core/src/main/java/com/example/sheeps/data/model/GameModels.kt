@@ -256,5 +256,7 @@ data class MatchJoinRequest(
 data class MatchStatusResponse(
     val status: String, // searching, matched, error
     val gameId: String? = null,
-    val opponentId: String? = null
+    val opponentId: String? = null,
+    val duelLevel: Int? = null,
+    val gameSeed: Int? = null
 )

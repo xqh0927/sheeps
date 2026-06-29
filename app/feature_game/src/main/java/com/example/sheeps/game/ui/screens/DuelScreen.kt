@@ -1,8 +1,11 @@
 package com.example.sheeps.game.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,9 +14,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -33,8 +40,38 @@ fun DuelScreen(
     state: DuelViewState,
     onTileClick: (Tile) -> Unit,
     onLeave: () -> Unit,
-    onRestart: () -> Unit
+    onRestart: () -> Unit,
+    onCastSpell: (String) -> Unit // 新增：施放法术事件
 ) {
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = true) {
+        showExitConfirmDialog = true
+    }
+
+    if (showExitConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitConfirmDialog = false },
+            title = { Text("确定要认输退出吗？", fontWeight = FontWeight.Bold) },
+            text = { Text("中途退出对局将直接判定失败。确认要认输退出吗？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitConfirmDialog = false
+                        onLeave()
+                    }
+                ) {
+                    Text("确定认输", color = Crimson_Primary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitConfirmDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -53,9 +90,31 @@ fun DuelScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 顶部：双方进度对比
-            DuelHeader(state = state, onLeave = onLeave)
+            // 顶部：双方进度与能量条对比
+            DuelHeader(state = state, onLeave = { showExitConfirmDialog = true })
             
+            // 攻击与诅咒大招提示条（在棋盘上方，避免遮盖）
+            val overlayMsg = state.activeSpellMessage ?: state.incomingAttackMessage
+            AnimatedVisibility(
+                visible = overlayMsg != null,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                overlayMsg?.let { msg ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Crimson_Primary.copy(alpha = 0.9f))
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
 
             // 游戏棋盘
@@ -68,10 +127,7 @@ fun DuelScreen(
                     .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                if (state.isLoading) {
-                    SheepsLoading(size = 56.dp)
-                } else {
-                    val visibleTiles = state.boardTiles.filter {
+                val visibleTiles = state.boardTiles.filter {
                         it.state == TileState.NORMAL || it.state == TileState.BLOCKED
                     }
                     if (visibleTiles.isNotEmpty()) {
@@ -101,22 +157,61 @@ fun DuelScreen(
                             }
                         }
                     }
-                }
-                
-                // 攻击提示覆盖层
-                state.incomingAttackMessage?.let { msg ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 20.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Crimson_Primary.copy(alpha = 0.9f))
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        Text(text = msg, color = Color.White, fontWeight = FontWeight.Bold)
+
+                    // 迷雾障眼特效覆盖层
+                    if (state.isFogActive) {
+                        var touchOffset by remember { mutableStateOf<Offset?>(null) }
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown()
+                                        touchOffset = down.position
+                                        do {
+                                            val event = awaitPointerEvent()
+                                            val anyPressed = event.changes.any { it.pressed }
+                                            if (anyPressed) {
+                                                val position = event.changes.firstOrNull { it.pressed }?.position
+                                                if (position != null) {
+                                                    touchOffset = position
+                                                }
+                                            } else {
+                                                touchOffset = null
+                                            }
+                                        } while (event.changes.any { it.pressed })
+                                        touchOffset = null
+                                    }
+                                }
+                        ) {
+                            val offset = touchOffset
+                            if (offset == null) {
+                                drawRect(color = Color(0xFA202020))
+                            } else {
+                                val paint = Paint().apply {
+                                    color = Color.Black
+                                    style = PaintingStyle.Fill
+                                }
+                                drawIntoCanvas { canvas ->
+                                    canvas.saveLayer(Rect(0f, 0f, size.width, size.height), paint)
+                                    drawRect(color = Color(0xFA202020))
+                                    val radius = 180f
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(Color.Transparent, Color(0xFA202020)),
+                                            center = offset,
+                                            radius = radius
+                                        ),
+                                        radius = radius,
+                                        center = offset,
+                                        blendMode = BlendMode.DstOut
+                                    )
+                                    canvas.restore()
+                                }
+                            }
+                        }
                     }
                 }
-            }
 
             Spacer(Modifier.height(16.dp))
             
@@ -153,15 +248,26 @@ fun DuelScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 for (i in 0 until 7) {
+                    val isLocked = i == 6 && state.maxSlotSize == 6
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                            .background(
+                                if (isLocked) Crimson_Primary.copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isLocked) Crimson_Primary else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (i < state.slotTiles.size) {
+                        if (isLocked) {
+                            Text("🔒", fontSize = 16.sp)
+                        } else if (i < state.slotTiles.size) {
                             TileView(
                                 tile = state.slotTiles[i],
                                 onClick = {},
@@ -171,6 +277,66 @@ fun DuelScreen(
                         }
                     }
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // 恶搞大招/法宝面板
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SpellButton(
+                    name = "迷雾",
+                    cost = 3,
+                    currentEnergy = state.currentEnergy,
+                    isUsed = state.usedSpells.contains("FOG"),
+                    isSilenced = state.isSilenced,
+                    onClick = { onCastSpell("FOG") },
+                    color = Color(0xFF8C7B70),
+                    modifier = Modifier.weight(1f)
+                )
+                SpellButton(
+                    name = "禁魔",
+                    cost = 4,
+                    currentEnergy = state.currentEnergy,
+                    isUsed = state.usedSpells.contains("SILENCE"),
+                    isSilenced = state.isSilenced,
+                    onClick = { onCastSpell("SILENCE") },
+                    color = Color(0xFF7E57C2),
+                    modifier = Modifier.weight(1f)
+                )
+                SpellButton(
+                    name = "乱序",
+                    cost = 5,
+                    currentEnergy = state.currentEnergy,
+                    isUsed = state.usedSpells.contains("SHUFFLE"),
+                    isSilenced = state.isSilenced,
+                    onClick = { onCastSpell("SHUFFLE") },
+                    color = Color(0xFF26A69A),
+                    modifier = Modifier.weight(1f)
+                )
+                SpellButton(
+                    name = "锁槽",
+                    cost = 6,
+                    currentEnergy = state.currentEnergy,
+                    isUsed = state.usedSpells.contains("SHRINK"),
+                    isSilenced = state.isSilenced,
+                    onClick = { onCastSpell("SHRINK") },
+                    color = Crimson_Primary,
+                    modifier = Modifier.weight(1f)
+                )
+                SpellButton(
+                    name = "封魔",
+                    cost = 10,
+                    currentEnergy = state.currentEnergy,
+                    isUsed = state.usedSpells.contains("SEAL_ALL"),
+                    isSilenced = state.isSilenced,
+                    onClick = { onCastSpell("SEAL_ALL") },
+                    color = Gold_Primary,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
@@ -201,6 +367,27 @@ fun DuelScreen(
                     Spacer(Modifier.height(24.dp))
                     PrimaryButton(text = "离开", onClick = onLeave, modifier = Modifier.fillMaxWidth())
                 }
+            }
+        }
+
+        // 阻止加载时手势穿透的全屏遮罩
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                    .clickable(enabled = false, onClick = {}),
+                contentAlignment = Alignment.Center
+            ) {
+                SheepsLoading(size = 56.dp)
             }
         }
     }
@@ -253,8 +440,9 @@ private fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("我", modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
                 val remaining = state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } + state.movedOutTiles.size
+                val totalTiles = if (state.totalTileCount > 0) state.totalTileCount else 100
                 LinearProgressIndicator(
-                    progress = 1f - (remaining.toFloat() / 100f).coerceIn(0f, 1f), // 假设 100 张牌
+                    progress = 1f - (remaining.toFloat() / totalTiles.toFloat()).coerceIn(0f, 1f), // 假设 100 张牌
                     modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
                     color = Gold_Primary,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -270,6 +458,84 @@ private fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             }
+
+            Spacer(Modifier.height(4.dp))
+
+            // 能量流光槽
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("能", modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(state.currentEnergy.toFloat() / 10f)
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFF00E5FF), Color(0xFF0288D1))
+                                )
+                            )
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "${state.currentEnergy}/10",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00E5FF)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpellButton(
+    name: String,
+    cost: Int,
+    currentEnergy: Int,
+    isUsed: Boolean,
+    isSilenced: Boolean,
+    onClick: () -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    val isEnabled = currentEnergy >= cost && !isUsed && !isSilenced
+    val alpha = if (isEnabled) 1.0f else 0.4f
+    
+    val buttonText = if (isUsed) "已用" else if (isSilenced) "禁魔" else name
+    
+    Button(
+        onClick = onClick,
+        enabled = isEnabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            disabledContainerColor = color.copy(alpha = 0.2f)
+        ),
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = PaddingValues(vertical = 8.dp, horizontal = 2.dp),
+        modifier = modifier.alpha(alpha)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = buttonText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isEnabled) Color.White else Color.Gray,
+                maxLines = 1
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "${cost}能",
+                fontSize = 9.sp,
+                color = if (isEnabled) Color.White.copy(alpha = 0.8f) else Color.Gray,
+                maxLines = 1
+            )
         }
     }
 }

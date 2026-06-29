@@ -104,7 +104,7 @@ class MenuViewModel @Inject constructor(
     }
 
     private fun handleJoinMatch(playerId: String) {
-        updateState { copy(matchStatus = "searching", matchedGameId = null, matchedOpponentId = null) }
+        updateState { copy(matchStatus = "searching", matchedGameId = null, matchedOpponentId = null, duelLevel = 2, gameSeed = 0) }
         viewModelScope.launch {
             try {
                 val joinResponse = apiService.joinMatch(MatchJoinRequest(playerId))
@@ -113,7 +113,9 @@ class MenuViewModel @Inject constructor(
                         copy(
                             matchStatus = "matched",
                             matchedGameId = joinResponse.gameId,
-                            matchedOpponentId = joinResponse.opponentId
+                            matchedOpponentId = joinResponse.opponentId,
+                            duelLevel = joinResponse.duelLevel ?: 2,
+                            gameSeed = joinResponse.gameSeed ?: 0
                         )
                     }
                 } else {
@@ -128,7 +130,9 @@ class MenuViewModel @Inject constructor(
                                 copy(
                                     matchStatus = "matched",
                                     matchedGameId = statusResponse.gameId,
-                                    matchedOpponentId = statusResponse.opponentId
+                                    matchedOpponentId = statusResponse.opponentId,
+                                    duelLevel = statusResponse.duelLevel ?: 2,
+                                    gameSeed = statusResponse.gameSeed ?: 0
                                 )
                             }
                             return@launch
@@ -193,7 +197,34 @@ class MenuViewModel @Inject constructor(
             try {
                 // Fetch public shop items & notices
                 val shopItems = try {
-                    apiService.getShopItems()
+                    val remoteItems = apiService.getShopItems()
+                    
+                    // 动态注入 34 个省份美食皮肤
+                    val provinces = listOf(
+                        "北京", "天津", "河北", "山西", "内蒙古", "辽宁", "吉林", "黑龙江", "上海", "江苏",
+                        "浙江", "安徽", "福建", "江西", "山东", "河南", "湖北", "湖南", "广东", "广西",
+                        "海南", "重庆", "四川", "贵州", "云南", "西藏", "陕西", "甘肃", "青海", "宁夏",
+                        "新疆", "香港", "澳门", "台湾"
+                    )
+                    val provinceIds = listOf(
+                        "beijing", "tianjin", "hebei", "shanxi", "inner_mongolia", "liaoning", "jilin", "heilongjiang", "shanghai", "jiangsu",
+                        "zhejiang", "anhui", "fujian", "jiangxi", "shandong", "henan", "hubei", "hunan", "guangdong", "guangxi",
+                        "hainan", "chongqing", "sichuan", "guizhou", "yunnan", "tibet", "shaanxi", "gansu", "qinghai", "ningxia",
+                        "xinjiang", "hongkong", "macau", "taiwan"
+                    )
+
+                    val gourmetSkins = provinces.mapIndexed { index, name ->
+                        ShopItem(
+                            id = 1000 + index,
+                            name = "$name·省味",
+                            description = "解锁${name}省特色美食图标皮肤",
+                            image_url = "",
+                            item_type = "SKIN_${provinceIds[index].uppercase()}",
+                            points_price = 200,
+                            stock = 9999
+                        )
+                    }
+                    remoteItems + gourmetSkins
                 } catch (e: Exception) {
                     currentState.shopItems.ifEmpty { emptyList() }
                 }

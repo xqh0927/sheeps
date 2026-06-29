@@ -2,6 +2,8 @@ package com.example.sheeps.game.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -153,10 +155,7 @@ fun GameScreen(
                         .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.isLoading) {
-                        SheepsLoading(size = 56.dp)
-                    } else {
-                        val visibleTiles = state.boardTiles.filter {
+                    val visibleTiles = state.boardTiles.filter {
                             it.state == TileState.NORMAL || it.state == TileState.BLOCKED
                         }
                         if (visibleTiles.isNotEmpty()) {
@@ -199,7 +198,6 @@ fun GameScreen(
                             }
                         }
                     }
-                }
 
                 // 移出置物架
                 if (state.movedOutTiles.isNotEmpty()) {
@@ -220,6 +218,65 @@ fun GameScreen(
                     onUseJoker   = onUseJoker,
                     onUseDouble  = onUseDouble
                 )
+
+                // 携带道具展示栏（在最下方显示携带的道具图片与名称）
+                val carriedItems = remember(state) {
+                    listOf(
+                        "UNDO" to ("撤销符" to state.undoCount),
+                        "SHUFFLE" to ("洗牌咒" to state.shuffleCount),
+                        "MOVEOUT" to ("移出印" to state.moveOutCount),
+                        "REVIVE" to ("复活丹" to state.reviveCount),
+                        "HINT" to ("提示符" to state.hintCount),
+                        "BOMB" to ("爆裂弹" to state.bombCount),
+                        "JOKER" to ("万能牌" to state.jokerCount),
+                        "DOUBLE_POINTS" to ("双倍卡" to state.doublePointsCount)
+                    ).filter { it.second.second > 0 }
+                }
+
+                if (carriedItems.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                            .padding(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "— 已携带法宝 —",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Gold_Primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            carriedItems.forEach { (type, pair) ->
+                                val (name, count) = pair
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    com.example.sheeps.ui.components.ItemAnimationIcon(
+                                        itemType = type,
+                                        size = 36.dp
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = "$name x$count",
+                                        fontSize = 10.sp,
+                                        color = Text_Secondary_Dark,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(8.dp))
             }
@@ -253,6 +310,27 @@ fun GameScreen(
                 onRestart = onRestart,
                 onRevive  = onRevive
             )
+        }
+
+        // 阻止加载时手势穿透的全屏遮罩
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+                    .clickable(enabled = false, onClick = {}),
+                contentAlignment = Alignment.Center
+            ) {
+                SheepsLoading(size = 56.dp)
+            }
         }
     }
 }

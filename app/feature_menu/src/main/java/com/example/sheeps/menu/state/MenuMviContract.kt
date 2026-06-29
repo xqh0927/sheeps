@@ -39,7 +39,9 @@ data class MenuViewState(
     // Matchmaking
     val matchStatus: String = "none", // none, searching, matched, error
     val matchedGameId: String? = null,
-    val matchedOpponentId: String? = null
+    val matchedOpponentId: String? = null,
+    val duelLevel: Int = 2,
+    val gameSeed: Int = 0
 )
 
 data class ConflictInfo(

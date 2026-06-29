@@ -1,19 +1,24 @@
 package com.example.sheeps.menu.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.data.model.ShopItem
+import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.theme.CrimsonRed
 
 @Composable
@@ -27,11 +32,14 @@ fun ShopItemCard(
     val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
     val isUnlocked = if (item.item_type == "CLASSIC") true else backpackCount >= 1
     
-    val skinKey = when (item.item_type) {
-        "SKIN_INK" -> "ink"
-        "SKIN_CYBER" -> "cyber"
-        "CLASSIC" -> "classic"
-        else -> "classic"
+    val skinKey = remember(item.item_type) {
+        if (item.item_type == "CLASSIC") {
+            "classic"
+        } else if (item.item_type.startsWith("SKIN_")) {
+            item.item_type.removePrefix("SKIN_").lowercase()
+        } else {
+            "classic"
+        }
     }
     val isCurrentlyApplied = isSkin && currentSkin == skinKey
 
@@ -45,11 +53,22 @@ fun ShopItemCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 调用高清 Canvas 动画图标
-            com.example.sheeps.menu.components.ItemAnimationIcon(
-                itemType = item.item_type,
-                size = 64.dp
-            )
+            if (isSkin) {
+                // 皮肤预览：显示该皮肤的第一个图标
+                val context = LocalContext.current
+                val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = "Skin Preview",
+                    modifier = Modifier.size(64.dp)
+                )
+            } else {
+                // 调用高清 Canvas 动画图标 (针对道具)
+                com.example.sheeps.menu.components.ItemAnimationIcon(
+                    itemType = item.item_type,
+                    size = 64.dp
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

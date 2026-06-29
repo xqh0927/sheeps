@@ -126,7 +126,7 @@ async function getDatabaseAppUpdate(env: Env, currentCode: number): Promise<AppU
 }
 
 // 声明机房常驻内存缓存，用于缓存已生成的关卡数据
-const CACHE_STAGE_CONFIG = new Map<number, string>();
+const CACHE_STAGE_CONFIG = new Map<number | string, string>();
 
 // HMAC-SHA256 JWT Implementation using Web Crypto API
 const JWT_SECRET = 'antigravity_secret_key';
@@ -261,9 +261,8 @@ function lcg(seed: number) {
   };
 }
 
-function generateSolvableLevel(levelId: number): TileData[] {
+function generateSolvableLevel(levelId: number, seed: number): TileData[] {
   let coordinates: Point3D[] = [];
-  const seed = levelId * 1000;
 
   if (levelId === 1) {
     coordinates = [
@@ -271,27 +270,136 @@ function generateSolvableLevel(levelId: number): TileData[] {
       { x: 1.0, y: 2.0, z: 0 }, { x: 2.0, y: 2.0, z: 0 },
       { x: 1.5, y: 1.5, z: 1 }, { x: 2.5, y: 1.5, z: 1 },
       { x: 1.5, y: 2.5, z: 1 }, { x: 2.5, y: 2.5, z: 1 },
-      { x: 2.0, y: 2.0, z: 2 }
+      { x: 2.0, y: 2.0, z: 2 },
+      { x: 2.0, y: 1.0, z: 3 }, { x: 1.0, y: 2.0, z: 3 }, { x: 2.0, y: 2.0, z: 3 }
     ];
   } else {
-    // x = levelId. Total cards N linearly increases: N = 36 + (x - 2) * 12
-    const maxCards = levelId === 2 ? 36 : 36 + (levelId - 2) * 12;
+    // Single player or multiplayer cards strictly incremental: 24 + levelId * 12
+    const maxCards = 24 + levelId * 12;
     const possibleCoords: Point3D[] = [];
     
-    // Layers count L converges with square root: L = 12 - 8 / sqrt(x - 1), capped at 12
-    const layersCount = levelId === 2 ? 4 : Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
+    // Layers count L = 12 - 8 / sqrt(x - 1), capped at 12
+    const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
     
     const baseSize = 6 + Math.floor(levelId / 20);
+    
+    // Choose one of the 18 shapes based on seed
+    const shapeType = seed % 18;
+    
     for (let z = 0; z < layersCount; z++) {
       const size = Math.max(3, baseSize - Math.floor(z / 3));
       const offset = (z % 2 === 0) ? 0 : 0.5;
+      const center = (size - 1) / 2;
+      
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
-          possibleCoords.push({
-            x: c + offset + 1.0,
-            y: r + offset + 1.0,
-            z: z
-          });
+          let keep = true;
+          
+          // Normalized offsets from center (-1.0 to 1.0)
+          const dx = center > 0 ? (c - center) / center : 0;
+          const dy = center > 0 ? (r - center) / center : 0;
+          const distMan = Math.abs(dx) + Math.abs(dy);
+          const distEuclid = Math.sqrt(dx * dx + dy * dy);
+          
+          switch (shapeType) {
+            case 0: // Square
+              keep = true;
+              break;
+            case 1: // Pyramid / Triangle
+              const margin = z * 0.45;
+              if (r < margin || r >= size - margin || c < margin || c >= size - margin) {
+                keep = false;
+              }
+              break;
+            case 2: // Cross
+              if (Math.abs(c - center) >= 1.2 && Math.abs(r - center) >= 1.2) {
+                keep = false;
+              }
+              break;
+            case 3: // Diamond
+              if (distMan > 1.15) {
+                keep = false;
+              }
+              break;
+            case 4: // Ring
+              if (distEuclid < 0.4 || distEuclid > 1.05) {
+                keep = false;
+              }
+              break;
+            case 5: // X-Shape
+              if (Math.abs(Math.abs(dx) - Math.abs(dy)) > 0.28) {
+                keep = false;
+              }
+              break;
+            case 6: // Heart
+              if (dx * dx + (dy - Math.abs(dx) * 0.6) * (dy - Math.abs(dx) * 0.6) > 0.95) {
+                keep = false;
+              }
+              break;
+            case 7: // Hourglass
+              if (Math.abs(dx) > Math.abs(dy) + 0.1) {
+                keep = false;
+              }
+              break;
+            case 8: // Star
+              if (Math.abs(dx) >= 0.22 && Math.abs(dy) >= 0.22 && Math.abs(Math.abs(dx) - Math.abs(dy)) >= 0.22) {
+                keep = false;
+              }
+              break;
+            case 9: // Hollow Square
+              if (Math.abs(dx) <= 0.6 && Math.abs(dy) <= 0.6) {
+                keep = false;
+              }
+              break;
+            case 10: // Double Ring
+              if (Math.abs(distEuclid - 0.75) > 0.25 && Math.abs(distEuclid - 0.3) > 0.2) {
+                keep = false;
+              }
+              break;
+            case 11: // Grid Hollow
+              if ((r + c) % 2 !== 0) {
+                keep = false;
+              }
+              break;
+            case 12: // Arrow
+              if (dy < -0.7 || Math.abs(dx) > (dy + 1.0) * 0.8) {
+                keep = false;
+              }
+              break;
+            case 13: // Butterfly
+              if (Math.abs(dx) < Math.abs(dy) * 0.65) {
+                keep = false;
+              }
+              break;
+            case 14: // Concentric Circles
+              if (distEuclid >= 0.35 && (distEuclid <= 0.68 || distEuclid >= 1.0)) {
+                keep = false;
+              }
+              break;
+            case 15: // Tai Chi
+              if (distEuclid >= 1.02 || (dy <= Math.sin(dx * Math.PI) * 0.45)) {
+                keep = false;
+              }
+              break;
+            case 16: // Staircase
+              if (r + c < size / 2 || r + c >= size * 1.5) {
+                keep = false;
+              }
+              break;
+            case 17: // Hexagon
+              if (Math.abs(dy) > 0.95 || Math.abs(dx) * 1.5 + Math.abs(dy) > 1.55) {
+                keep = false;
+              }
+              break;
+          }
+          
+          if (keep) {
+            possibleCoords.push({
+              x: c + offset + 1.0,
+              y: r + offset + 1.0,
+              z: z
+            });
+          }
         }
       }
     }
@@ -410,109 +518,93 @@ interface PlayerSession {
   disconnectTimer?: any;
 }
 
-interface GameSession {
-  gameId: string;
-  playerA?: PlayerSession;
-  playerB?: PlayerSession;
-}
+async function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: string, env: Env) {
+  const now = Date.now();
 
-const gameSessions = new Map<string, GameSession>();
-
-function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: string, env: Env) {
-  let game = gameSessions.get(gameId);
-  if (!game) {
-    game = { gameId };
-    gameSessions.set(gameId, game);
-  }
-
-  const session: PlayerSession = {
-    playerId,
-    socket,
-    lastActionTime: 0,
-    status: 'ACTIVE'
-  };
-
-  // Assign Player A or Player B
-  if (!game.playerA) {
-    game.playerA = session;
-  } else if (game.playerA.playerId === playerId) {
-    if (game.playerA.disconnectTimer) {
-      clearTimeout(game.playerA.disconnectTimer);
-      game.playerA.disconnectTimer = undefined;
-    }
-    game.playerA.socket = socket;
-    game.playerA.status = 'ACTIVE';
-    // Broadcast reconnect notify to B
-    if (game.playerB && game.playerB.status === 'ACTIVE') {
-      game.playerB.socket.send(JSON.stringify({
+  // Send PLAYER_RECONNECTED system event to DB
+  try {
+    await env.DB.prepare(
+      'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
+    ).bind(
+      gameId,
+      'SYSTEM',
+      JSON.stringify({
         gameId,
         seqId: 0,
-        timestamp: Date.now(),
+        timestamp: now,
         senderId: 'SYSTEM',
         type: 'SYSTEM_EVENT',
         payload: {
           systemMessage: 'PLAYER_RECONNECTED',
           targetPlayerId: playerId
         }
-      }));
-    }
-  } else if (!game.playerB) {
-    game.playerB = session;
-  } else if (game.playerB.playerId === playerId) {
-    if (game.playerB.disconnectTimer) {
-      clearTimeout(game.playerB.disconnectTimer);
-      game.playerB.disconnectTimer = undefined;
-    }
-    game.playerB.socket = socket;
-    game.playerB.status = 'ACTIVE';
-    // Broadcast reconnect notify to A
-    if (game.playerA && game.playerA.status === 'ACTIVE') {
-      game.playerA.socket.send(JSON.stringify({
-        gameId,
-        seqId: 0,
-        timestamp: Date.now(),
-        senderId: 'SYSTEM',
-        type: 'SYSTEM_EVENT',
-        payload: {
-          systemMessage: 'PLAYER_RECONNECTED',
-          targetPlayerId: playerId
-        }
-      }));
-    }
-  } else {
-    // Room is full
-    socket.close(1008, 'Room Full');
-    return;
+      }),
+      now
+    ).run();
+  } catch (err) {
+    console.error('Failed to insert connect event:', err);
   }
+
+  // Set up polling database loop for incoming commands
+  let lastReadId = 0;
+  try {
+    const maxRow = await env.DB.prepare('SELECT MAX(id) as maxId FROM game_commands WHERE game_id = ?').bind(gameId).first<{ maxId: number | null }>();
+    lastReadId = maxRow?.maxId || 0;
+  } catch (err) {
+    console.error('Failed to query max id:', err);
+  }
+
+  let isClosed = false;
+
+  const intervalId = setInterval(async () => {
+    if (isClosed) {
+      clearInterval(intervalId);
+      return;
+    }
+    try {
+      const rows = await env.DB.prepare(
+        'SELECT id, command_data FROM game_commands WHERE game_id = ? AND id > ? AND sender_id != ? ORDER BY id ASC'
+      ).bind(gameId, lastReadId, playerId).all<{ id: number; command_data: string }>();
+
+      for (const row of rows.results) {
+        socket.send(row.command_data);
+        lastReadId = Math.max(lastReadId, row.id);
+      }
+    } catch (err) {
+      console.error('Error polling commands:', err);
+    }
+  }, 250); // 250ms polling
+
+  let lastActionTime = 0;
 
   socket.addEventListener('message', async (event) => {
     try {
       const text = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
       const command = JSON.parse(text);
 
-      const now = Date.now();
-      // 1. Sliding window rate limit (100ms)
-      if (now - session.lastActionTime < 100) {
+      const currentTime = Date.now();
+      // Sliding window rate limit (100ms)
+      if (currentTime - lastActionTime < 100) {
         socket.send(JSON.stringify({
           gameId,
           seqId: command.seqId,
-          timestamp: now,
+          timestamp: currentTime,
           senderId: 'SYSTEM',
           type: 'SYSTEM_EVENT',
           payload: { systemMessage: 'RATE_LIMIT_EXCEEDED' }
         }));
         return;
       }
-      session.lastActionTime = now;
+      lastActionTime = currentTime;
 
-      // 2. Eliminate validation mock
+      // Eliminate validation mock
       if (command.type === 'ELIMINATE') {
         const payload = command.payload;
         if (!payload.tilesEliminated || payload.tilesEliminated.length !== 3) {
           socket.send(JSON.stringify({
             gameId,
             seqId: command.seqId,
-            timestamp: now,
+            timestamp: currentTime,
             senderId: 'SYSTEM',
             type: 'SYSTEM_EVENT',
             payload: { systemMessage: 'INVALID_ELIMINATE_COMMAND' }
@@ -521,82 +613,113 @@ function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: str
         }
       }
 
-      // 3. Nonlinear damage recalculation and verification
+      // Nonlinear damage recalculation and verification
       if (command.type === 'ATTACK') {
         const combo = command.payload.comboCount || 1;
         const attackPower = 10.0 * (1.0 + Math.log(combo));
-        command.payload.attackPower = attackPower; // Recalculated by server to prevent tampering
+        command.payload.attackPower = attackPower;
       }
 
-      // Forward message to the opponent
-      const opponent = (session === game.playerA) ? game.playerB : game.playerA;
-      if (opponent && opponent.status === 'ACTIVE') {
-        opponent.socket.send(JSON.stringify(command));
-      }
+      // Write into D1 so the opponent can poll it
+      await env.DB.prepare(
+        'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
+      ).bind(gameId, playerId, JSON.stringify(command), currentTime).run();
+
     } catch (e) {
       console.error('WebSocket Message forward error', e);
     }
   });
 
-  const handleDisconnect = () => {
-    session.status = 'DISCONNECTED';
-    const opponent = (session === game.playerA) ? game.playerB : game.playerA;
+  const handleDisconnect = async () => {
+    if (isClosed) return;
+    isClosed = true;
+    clearInterval(intervalId);
 
-    if (!opponent || opponent.status === 'DISCONNECTED') {
-      gameSessions.delete(gameId);
-      return;
-    }
-
-    if (opponent.status === 'ACTIVE') {
-      opponent.socket.send(JSON.stringify({
+    // Send PLAYER_DISCONNECTED event to DB
+    const disconnectTime = Date.now();
+    try {
+      await env.DB.prepare(
+        'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
+      ).bind(
         gameId,
-        seqId: 0,
-        timestamp: Date.now(),
-        senderId: 'SYSTEM',
-        type: 'SYSTEM_EVENT',
-        payload: {
-          systemMessage: 'PLAYER_DISCONNECTED',
-          targetPlayerId: playerId
-        }
-      }));
+        'SYSTEM',
+        JSON.stringify({
+          gameId,
+          seqId: 0,
+          timestamp: disconnectTime,
+          senderId: 'SYSTEM',
+          type: 'SYSTEM_EVENT',
+          payload: {
+            systemMessage: 'PLAYER_DISCONNECTED',
+            targetPlayerId: playerId
+          }
+        }),
+        disconnectTime
+      ).run();
+    } catch (err) {
+      console.error('Failed to insert disconnect event:', err);
     }
 
-    // Start 15s reconnection grace period
-    session.disconnectTimer = setTimeout(async () => {
-      if (session.status === 'DISCONNECTED') {
-        if (opponent && opponent.status === 'ACTIVE') {
-          opponent.socket.send(JSON.stringify({
+    // Set 15 seconds reconnect grace period
+    setTimeout(async () => {
+      try {
+        const latestEvent = await env.DB.prepare(
+          'SELECT command_data FROM game_commands WHERE game_id = ? AND created_at >= ? ORDER BY id DESC LIMIT 1'
+        ).bind(gameId, disconnectTime).first<{ command_data: string }>();
+
+        if (latestEvent) {
+          const cmd = JSON.parse(latestEvent.command_data);
+          if (cmd.type === 'SYSTEM_EVENT' && cmd.payload?.systemMessage === 'PLAYER_RECONNECTED' && cmd.payload?.targetPlayerId === playerId) {
+            // Player successfully reconnected within 15 seconds, cancel timeout
+            return;
+          }
+        }
+
+        // Otherwise declare game over! Declare win for the opponent.
+        const winTime = Date.now();
+        await env.DB.prepare(
+          'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
+        ).bind(
+          gameId,
+          'SYSTEM',
+          JSON.stringify({
             gameId,
             seqId: 0,
-            timestamp: Date.now(),
+            timestamp: winTime,
             senderId: 'SYSTEM',
             type: 'SYSTEM_EVENT',
             payload: {
               systemMessage: 'GAME_OVER_DISCONNECT_WIN',
-              targetPlayerId: opponent.playerId
+              targetPlayerId: playerId
             }
-          }));
-          opponent.socket.close(1000, 'Game Over');
-        }
-        gameSessions.delete(gameId);
+          }),
+          winTime
+        ).run();
 
-        // Record defeat to DB leaderboard
-        try {
+        // Write defeat to DB leaderboard
+        const matchEntry = await env.DB.prepare(
+          'SELECT player_id, matched_opponent FROM matchmaking_queue WHERE matched_game_id = ? LIMIT 1'
+        ).bind(gameId).first<{ player_id: string; matched_opponent: string }>();
+
+        if (matchEntry) {
+          const winnerId = (matchEntry.player_id === playerId) ? matchEntry.matched_opponent : matchEntry.player_id;
+          
           // Verify user exists in users table to prevent FOREIGN KEY constraint failure
-          const userExists = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(opponent.playerId).first();
+          const userExists = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(winnerId).first();
           if (!userExists) {
-            const defaultUsername = `联机玩家_${opponent.playerId.slice(-4)}`;
+            const defaultUsername = `联机玩家_${winnerId.slice(-4)}`;
             await env.DB.prepare(
               'INSERT OR IGNORE INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-            ).bind(opponent.playerId, null, defaultUsername, null, 0, Date.now()).run();
+            ).bind(winnerId, null, defaultUsername, null, 0, Date.now()).run();
           }
 
           await env.DB.prepare(
             'INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)'
-          ).bind(opponent.playerId, 0, 9999, 99999, Date.now()).run();
-        } catch (err) {
-          console.error('Failed to write db game result on disconnect timeout', err);
+          ).bind(winnerId, 0, 9999, 99999, Date.now()).run();
         }
+
+      } catch (err) {
+        console.error('Error handling disconnect timeout:', err);
       }
     }, 15000);
   };
@@ -638,29 +761,7 @@ export default {
       });
     }
 
-    // ========== Matchmaking Queue ==========
-    // In-memory matchmaking queue (works within single CF Worker instance)
-    interface MatchEntry {
-      playerId: string;
-      joinedAt: number;
-      matchedGameId?: string;
-      matchedOpponent?: string;
-    }
-
-    // Use module-level storage to persist across requests in the same isolate
-    if (!(globalThis as any).__matchQueue) {
-      (globalThis as any).__matchQueue = new Map<string, MatchEntry>();
-    }
-    const matchQueue: Map<string, MatchEntry> = (globalThis as any).__matchQueue;
-
-    // Clean up stale entries (older than 30 seconds)
-    const now = Date.now();
-    for (const [pid, entry] of matchQueue) {
-      if (now - entry.joinedAt > 30000 && !entry.matchedGameId) {
-        matchQueue.delete(pid);
-      }
-    }
-
+    // ========== D1 Matchmaking Queue ==========
     // Match Join: POST /api/match/join  body: { playerId }
     if (path === '/api/match/join' && request.method === 'POST') {
       const body: { playerId: string } = await request.json();
@@ -670,51 +771,46 @@ export default {
 
       const playerId = body.playerId;
 
-      // Check if already in queue and matched
-      const existing = matchQueue.get(playerId);
-      if (existing && existing.matchedGameId) {
-        return new Response(JSON.stringify({
-          status: 'matched',
-          gameId: existing.matchedGameId,
-          opponentId: existing.matchedOpponent
-        }), { headers: corsHeaders });
-      }
+      // 1. Always delete any existing matchmaking entry of this player to start fresh
+      await env.DB.prepare('DELETE FROM matchmaking_queue WHERE player_id = ?').bind(playerId).run();
 
-      // Try to find an opponent in the queue
-      let opponent: MatchEntry | null = null;
-      let opponentId: string | null = null;
-      for (const [pid, entry] of matchQueue) {
-        if (pid !== playerId && !entry.matchedGameId) {
-          opponent = entry;
-          opponentId = pid;
-          break;
-        }
-      }
+      // 2. Clean up globally stale entries (older than 30 seconds) in the queue
+      const now = Date.now();
+      await env.DB.prepare('DELETE FROM matchmaking_queue WHERE joined_at < ? AND matched_game_id IS NULL').bind(now - 30000).run();
 
-      if (opponent && opponentId) {
-        // Found a match! Generate a gameId
-        const gameId = `duel_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      // 3. Try to find a waiting opponent (joined within 30 seconds, not matched)
+      const opponent = await env.DB.prepare(
+        'SELECT player_id FROM matchmaking_queue WHERE player_id != ? AND matched_game_id IS NULL AND joined_at >= ? ORDER BY joined_at ASC LIMIT 1'
+      ).bind(playerId, now - 30000).first<{ player_id: string }>();
+
+      if (opponent) {
+        // Found a match! Generate a gameId, random seed and random level
+        const gameId = `duel_${now}_${Math.random().toString(36).substring(2, 8)}`;
+        const gameSeed = Math.floor(Math.random() * 1000000) + 1;
+        const duelLevel = Math.floor(Math.random() * 7) + 8; // Random level between 8 and 14 (120 to 192 cards)
         
-        // Update both entries
-        opponent.matchedGameId = gameId;
-        opponent.matchedOpponent = playerId;
+        // Update opponent to be matched
+        await env.DB.prepare(
+          'UPDATE matchmaking_queue SET matched_game_id = ?, matched_opponent = ?, game_seed = ?, duel_level = ? WHERE player_id = ?'
+        ).bind(gameId, playerId, gameSeed, duelLevel, opponent.player_id).run();
 
-        const myEntry: MatchEntry = {
-          playerId,
-          joinedAt: Date.now(),
-          matchedGameId: gameId,
-          matchedOpponent: opponentId
-        };
-        matchQueue.set(playerId, myEntry);
+        // Insert self as matched
+        await env.DB.prepare(
+          'INSERT INTO matchmaking_queue (player_id, joined_at, matched_game_id, matched_opponent, game_seed, duel_level) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(playerId, now, gameId, opponent.player_id, gameSeed, duelLevel).run();
 
         return new Response(JSON.stringify({
           status: 'matched',
           gameId,
-          opponentId
+          opponentId: opponent.player_id,
+          duelLevel,
+          gameSeed
         }), { headers: corsHeaders });
       } else {
-        // No opponent yet, add to queue
-        matchQueue.set(playerId, { playerId, joinedAt: Date.now() });
+        // No opponent yet, insert self into queue as waiting
+        await env.DB.prepare(
+          'INSERT INTO matchmaking_queue (player_id, joined_at, matched_game_id, matched_opponent, game_seed, duel_level) VALUES (?, ?, NULL, NULL, NULL, NULL)'
+        ).bind(playerId, now).run();
 
         return new Response(JSON.stringify({
           status: 'waiting',
@@ -730,17 +826,60 @@ export default {
         return new Response(JSON.stringify({ error: 'Missing playerId' }), { status: 400, headers: corsHeaders });
       }
 
-      const entry = matchQueue.get(playerId);
+      const entry = await env.DB.prepare(
+        'SELECT matched_game_id, matched_opponent, game_seed, duel_level, joined_at FROM matchmaking_queue WHERE player_id = ?'
+      ).bind(playerId).first<{ matched_game_id: string | null; matched_opponent: string | null; game_seed: number | null; duel_level: number | null; joined_at: number }>();
+
       if (!entry) {
         return new Response(JSON.stringify({ status: 'not_in_queue' }), { headers: corsHeaders });
       }
 
-      if (entry.matchedGameId) {
+      if (entry.matched_game_id) {
         return new Response(JSON.stringify({
           status: 'matched',
-          gameId: entry.matchedGameId,
-          opponentId: entry.matchedOpponent
+          gameId: entry.matched_game_id,
+          opponentId: entry.matched_opponent,
+          duelLevel: entry.duel_level,
+          gameSeed: entry.game_seed
         }), { headers: corsHeaders });
+      }
+
+      // 自动尝试双向主动匹配，防止同时点击造成锁死
+      const now = Date.now();
+      const opponent = await env.DB.prepare(
+        'SELECT player_id FROM matchmaking_queue WHERE player_id != ? AND matched_game_id IS NULL AND joined_at >= ? ORDER BY joined_at ASC LIMIT 1'
+      ).bind(playerId, now - 30000).first<{ player_id: string }>();
+
+      if (opponent) {
+        const gameId = `duel_${now}_${Math.random().toString(36).substring(2, 8)}`;
+        const gameSeed = Math.floor(Math.random() * 1000000) + 1;
+        const duelLevel = Math.floor(Math.random() * 7) + 8; // 随机 8~14 级
+
+        // 尝试 CAS 锁定对手
+        const updateOpponentResult = await env.DB.prepare(
+          'UPDATE matchmaking_queue SET matched_game_id = ?, matched_opponent = ?, game_seed = ?, duel_level = ? WHERE player_id = ? AND matched_game_id IS NULL'
+        ).bind(gameId, playerId, gameSeed, duelLevel, opponent.player_id).run();
+
+        if (updateOpponentResult.meta.changes > 0) {
+          // 对手锁定成功，更新自身
+          await env.DB.prepare(
+            'UPDATE matchmaking_queue SET matched_game_id = ?, matched_opponent = ?, game_seed = ?, duel_level = ? WHERE player_id = ?'
+          ).bind(gameId, opponent.player_id, gameSeed, duelLevel, playerId).run();
+
+          return new Response(JSON.stringify({
+            status: 'matched',
+            gameId,
+            opponentId: opponent.player_id,
+            duelLevel,
+            gameSeed
+          }), { headers: corsHeaders });
+        }
+      }
+
+      // If waiting but timeout (30 seconds)
+      if (Date.now() - entry.joined_at > 30000) {
+        await env.DB.prepare('DELETE FROM matchmaking_queue WHERE player_id = ?').bind(playerId).run();
+        return new Response(JSON.stringify({ status: 'not_in_queue' }), { headers: corsHeaders });
       }
 
       return new Response(JSON.stringify({ status: 'waiting' }), { headers: corsHeaders });
@@ -750,7 +889,7 @@ export default {
     if (path === '/api/match/leave' && request.method === 'POST') {
       const body: { playerId: string } = await request.json();
       if (body.playerId) {
-        matchQueue.delete(body.playerId);
+        await env.DB.prepare('DELETE FROM matchmaking_queue WHERE player_id = ?').bind(body.playerId).run();
       }
       return new Response(JSON.stringify({ status: 'left' }), { headers: corsHeaders });
     }
@@ -1447,32 +1586,22 @@ export default {
           return new Response(JSON.stringify({ error: 'Invalid level ID' }), { status: 400, headers: corsHeaders });
         }
 
-        // 1. 内存中存在？直接秒回
-        if (CACHE_STAGE_CONFIG.has(levelId)) {
-          return new Response(CACHE_STAGE_CONFIG.get(levelId)!, { headers: corsHeaders });
+        const seedStr = url.searchParams.get('seed');
+        // If a seed is passed (multiplayer), use it.
+        // Otherwise, generate a completely random seed for single-player every game, so it's always random!
+        const seed = seedStr ? parseInt(seedStr, 10) : Math.floor(Math.random() * 1000000) + 1;
+
+        const cacheKey = `${levelId}_${seed}`;
+        if (seedStr && CACHE_STAGE_CONFIG.has(cacheKey)) {
+          return new Response(CACHE_STAGE_CONFIG.get(cacheKey)!, { headers: corsHeaders });
         }
 
-        // 2. 内存没有？从 D1 数据库查询
-        const levelRow = await env.DB.prepare(
-          'SELECT layout_data FROM levels WHERE level_id = ?'
-        ).bind(levelId).first<{ layout_data: string }>();
-
-        if (levelRow) {
-          // 写入内存，以便下次直接返回
-          CACHE_STAGE_CONFIG.set(levelId, levelRow.layout_data);
-          return new Response(levelRow.layout_data, { headers: corsHeaders });
-        }
-
-        const newLayout = generateSolvableLevel(levelId);
+        const newLayout = generateSolvableLevel(levelId, seed);
         const layoutJson = JSON.stringify(newLayout);
 
-        // Store level layouts in database to prevent local generation discrepancy
-        await env.DB.prepare(
-          'INSERT OR IGNORE INTO levels (level_id, difficulty, layout_data, created_at) VALUES (?, ?, ?, ?)'
-        ).bind(levelId, getDifficultyForLevel(levelId), layoutJson, Date.now()).run();
-
-        // 写入内存
-        CACHE_STAGE_CONFIG.set(levelId, layoutJson);
+        if (seedStr) {
+          CACHE_STAGE_CONFIG.set(cacheKey, layoutJson);
+        }
 
         return new Response(layoutJson, { headers: corsHeaders });
       }

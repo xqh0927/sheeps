@@ -102,7 +102,7 @@ class MenuActivity : BaseActivity() {
                     }
 
                     Scaffold(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().statusBarsPadding(),
                         topBar = {
                             if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
                                 OfflineWarnBanner()
@@ -154,10 +154,12 @@ class MenuActivity : BaseActivity() {
                                         onJoinMatch = { viewModel.sendIntent(MenuViewIntent.JoinMatch(state.phone)) },
                                         onLeaveMatch = { viewModel.sendIntent(MenuViewIntent.LeaveMatch(state.phone)) },
                                         onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
-                                        onNavigateToDuel = { gId, pId ->
+                                        onNavigateToDuel = { gId, pId, levelId, seed ->
                                             TheRouter.build("/game/duel")
                                                 .withString("gameId", gId)
                                                 .withString("playerId", pId)
+                                                .withInt("levelId", levelId)
+                                                .withInt("seed", seed)
                                                 .navigation()
                                         }
                                     )

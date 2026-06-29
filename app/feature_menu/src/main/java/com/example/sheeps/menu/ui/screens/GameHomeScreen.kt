@@ -39,7 +39,7 @@ fun GameHomeScreen(
     onJoinMatch: () -> Unit,
     onLeaveMatch: () -> Unit,
     onResetMatch: () -> Unit,
-    onNavigateToDuel: (String, String) -> Unit
+    onNavigateToDuel: (String, String, Int, Int) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -106,7 +106,7 @@ fun GameHomeScreen(
         LaunchedEffect(state.matchStatus) {
             if (state.matchStatus == "matched") {
                 delay(1500)
-                onNavigateToDuel(state.matchedGameId ?: "", state.phone)
+                onNavigateToDuel(state.matchedGameId ?: "", state.phone, state.duelLevel, state.gameSeed)
                 showDuelMatch = false
                 onResetMatch()
             }
@@ -187,6 +187,37 @@ fun GameHomeScreen(
                     isUnlocked = isUnlocked,
                     onStart    = { onLevelClick(lvl) }
                 )
+            }
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Gold_Subtle.copy(alpha = 0.15f)
+                    ),
+                    border = BorderStroke(1.dp, Gold_Primary.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .clickable {
+                            Toaster.show("正在窥探玄妙天机... 闯关积攒更高修为，可自动显现无尽难关！")
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "✨ 窥探天机 · 解锁更多未知关卡 ✨",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Gold_Primary,
+                            fontFamily = FontFamily.Serif
+                        )
+                    }
+                }
             }
         }
     }
