@@ -87,6 +87,15 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                         icon = { CoinCanvas() }
                     )
                 }
+
+                // 5. 天命对决多人对局与法术诅咒
+                item {
+                    GuideSectionCard(
+                        title = "五、天命对决 (多人法术竞技)",
+                        description = "在天命对决模式中，每次熔炼消除卡牌将充盈能量（上限 10 点）。\n迷雾咒（消耗 3 能量）：令对手战场黑雾弥漫，需点击探照驱散（持续 6 秒）。\n锁槽咒（消耗 6 能量）：封锁对手消除槽至 6 格（持续 8 秒），槽满立即判负。\n封印咒（消耗 10 能量）：瞬间给对手所有当前可点击的暴露牌附加封印。",
+                        icon = { StarCanvas() }
+                    )
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
