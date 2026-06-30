@@ -229,6 +229,7 @@ class MenuViewModel @Inject constructor(
                 // Fetch public shop items & notices
                 val shopItems = try {
                     val remoteItems = apiService.getShopItems()
+                    val remoteTypes = remoteItems.map { it.item_type }.toSet()
 
                     // 动态注入 34 个省份美食皮肤 (从 SkinConstants 获取)
                     val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
@@ -241,7 +242,7 @@ class MenuViewModel @Inject constructor(
                             points_price = 200,
                             stock = 9999
                         )
-                    }
+                    }.filter { it.item_type !in remoteTypes }
                     remoteItems + gourmetSkins
                 } catch (e: Exception) {
                     currentState.shopItems.ifEmpty { emptyList() }
