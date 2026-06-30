@@ -51,7 +51,7 @@ fun DailyLeaderboardPopupDialog(
                     .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Top 3 list
+                // 循环展示前三甲的荣誉榜单
                 data.top3.forEachIndexed { index, entry ->
                     val rankText = when (index) {
                         0 -> stringResource(id = R.string.daily_rank_first, entry.username, entry.points)
@@ -78,7 +78,7 @@ fun DailyLeaderboardPopupDialog(
 
                 HorizontalDivider(color = Color(0xFFE5DDD3))
 
-                // My Yesterday Rank
+                // 展示玩家个人昨日的最终天梯排名
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

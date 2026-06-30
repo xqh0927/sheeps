@@ -87,7 +87,7 @@ fun PrepareGameDialog(
                         .padding(20.dp)
                         .fillMaxWidth()
                 ) {
-                    // Header text
+                    // 对话框头部主标题文本
                     Text(
                         text = if (isLocked) stringResource(id = R.string.prepare_title_locked) else stringResource(id = R.string.prepare_title_unlocked, levelId),
                         fontWeight = FontWeight.Bold,

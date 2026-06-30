@@ -59,13 +59,13 @@ class LeaderboardActivity : BaseActivity() {
     }
 
     override fun initData() {
-        // Handled in Composable Screen lifecycle
+        // 异步请求与加载已被迁移到 Composable 屏幕组件生命周期内处理
     }
 
     private fun showLeaderboardContent() {
         setContent {
             SheepsTheme {
-                var selectedTab by remember { mutableStateOf("history") } // daily, weekly, history
+                var selectedTab by remember { mutableStateOf("history") } // 可选标签：daily (每日榜), weekly (每周榜), history (总榜)
                 var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }
                 var isLoading by remember { mutableStateOf(false) }
 
@@ -241,9 +241,9 @@ fun RankingRow(
     isCurrentUser: Boolean
 ) {
     val medalColor = when (index) {
-        0 -> Color(0xFFFFD700) // Gold
-        1 -> Color(0xFFC0C0C0) // Silver
-        2 -> Color(0xFFCD7F32) // Bronze
+        0 -> Color(0xFFFFD700) // 金牌
+        1 -> Color(0xFFC0C0C0) // 银牌
+        2 -> Color(0xFFCD7F32) // 铜牌
         else -> Color.Transparent
     }
 

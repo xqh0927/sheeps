@@ -41,12 +41,12 @@ fun DuelMatchDialog(
 
     var dotCount by remember { mutableIntStateOf(0) }
 
-    // Start matching on enter
+    // 启动对话框时立即自动加入匹配队列
     LaunchedEffect(Unit) {
         onJoin()
     }
 
-    // Dot animation
+    // 循环播放加载中的省略号动画
     LaunchedEffect(state.matchStatus) {
         while (state.matchStatus == "searching") {
             delay(500)
@@ -54,7 +54,7 @@ fun DuelMatchDialog(
         }
     }
 
-    // Leave queue on dismiss
+    // 对话框销毁时自动离开匹配队列，防止空置对手
     DisposableEffect(Unit) {
         onDispose {
             onLeave()

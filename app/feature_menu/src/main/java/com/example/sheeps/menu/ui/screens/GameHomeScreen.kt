@@ -65,7 +65,7 @@ fun GameHomeScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Section Title
+        // 区域分割标题（如“天命修行”）
         Row(
             modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -115,7 +115,7 @@ fun GameHomeScreen(
             )
         }
 
-        // Auto-navigate when matched
+        // 匹配成功后自动倒计时并跳转到对决战场
         LaunchedEffect(state.matchStatus) {
             if (state.matchStatus == "matched") {
                 delay(1500)

@@ -31,7 +31,7 @@ fun OfflineWarnBanner() {
                     val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    // ignore
+                    // 忽略设置页面跳转失败的异常（可能在某些深度定制的系统上没有 Settings 模块）
                 }
             }
             .padding(vertical = 10.dp, horizontal = 16.dp),

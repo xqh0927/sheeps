@@ -24,7 +24,7 @@ fun ConflictDialog(
     onChooseCloud: () -> Unit
 ) {
     AlertDialog(
-        onDismissRequest = {}, // Force selection
+        onDismissRequest = {}, // 强制用户必须做出存档选择，不能直接点外部关闭
         title = {
             Text(
                 text = stringResource(id = R.string.dialog_conflict_title),
@@ -44,7 +44,7 @@ fun ConflictDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Local Save Card
+                    // 选项 1：本地存档卡片
                     Card(
                         modifier = Modifier
                             .weight(1f)
@@ -75,7 +75,7 @@ fun ConflictDialog(
                         }
                     }
 
-                    // Cloud Save Card
+                    // 选项 2：云端存档卡片
                     Card(
                         modifier = Modifier
                             .weight(1f)
