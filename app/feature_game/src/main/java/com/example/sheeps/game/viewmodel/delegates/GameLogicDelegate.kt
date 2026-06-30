@@ -108,7 +108,7 @@ class GameLogicDelegate @Inject constructor() {
         var scoreAdd = 0
 
         // 不需要进行全局排序，以便卡槽中的卡牌保持顺序依次追加，并在插入相同卡牌后面后能够进行平滑移动动画
-        // finalSlot.sortBy { it.type }
+        // 对卡槽进行花色排序的废弃逻辑：finalSlot.sortBy { it.type }
 
         val counts = finalSlot.groupBy { it.type }
         var matched = false

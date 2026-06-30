@@ -119,9 +119,12 @@ class GameLevelGenerator @Inject constructor() {
             }
         }
 
+        // 关卡类型全局概率分布计算 (20% 盲盒, 40% 封印, 40% 正常)
         val randType = lcg(levelId * 1000L + 500)
         val typeRoll = randType()
+        // 只有 levelId >= 3 才能生成盲盒关卡，概率为 20%
         val isBlindLevel = levelId >= 3 && typeRoll < 0.20
+        // 关卡为 Level 2 及以上时，40% 的概率为封印关卡 (即 0.20 <= typeRoll < 0.60)
         val isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60
 
         val randProps = lcg(levelId * 1000L + 200)
