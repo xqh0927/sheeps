@@ -148,19 +148,26 @@ export async function checkApkExists(url: string): Promise<boolean> {
   }
 }
 
-async function getDatabaseAppUpdate(env: Env, currentCode: number): Promise<AppUpdatePayload> {
-  const latest = await env.DB.prepare(
-    'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version ORDER BY version_code DESC LIMIT 1'
-  ).first<{ version_code: number; version_name: string; apk_url: string; update_log: string; is_force_update: number }>();
+export async function getDatabaseAppUpdate(env: Env, currentCode: number): Promise<AppUpdatePayload> {
+  const versions = await env.DB.prepare(
+    'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version WHERE version_code > ? ORDER BY version_code DESC LIMIT 5'
+  ).bind(currentCode).all<{ version_code: number; version_name: string; apk_url: string; update_log: string; is_force_update: number }>();
 
-  if (latest && latest.version_code > currentCode) {
-    return {
-      has_update: true,
-      version_name: latest.version_name,
-      apk_url: latest.apk_url,
-      update_log: latest.update_log,
-      force_update: latest.is_force_update === 1
-    };
+  if (versions.results && versions.results.length > 0) {
+    for (const release of versions.results) {
+      if (release.apk_url) {
+        const exists = await checkApkExists(release.apk_url);
+        if (exists) {
+          return {
+            has_update: true,
+            version_name: release.version_name,
+            apk_url: release.apk_url,
+            update_log: release.update_log,
+            force_update: release.is_force_update === 1
+          };
+        }
+      }
+    }
   }
 
   return { has_update: false };
