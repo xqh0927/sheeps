@@ -17,6 +17,9 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.theme.CrimsonRed
@@ -27,7 +30,8 @@ import kotlin.math.sin
 fun ItemAnimationIcon(
     itemType: String,
     modifier: Modifier = Modifier,
-    size: Dp = 64.dp
+    size: Dp = 64.dp,
+    isGray: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "item_icon")
     
@@ -79,7 +83,21 @@ fun ItemAnimationIcon(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFCFAF6)),
+            .background(Color(0xFFFCFAF6))
+            .then(
+                if (isGray) {
+                    Modifier.drawWithContent {
+                        val paint = Paint().apply {
+                            colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
+                        }
+                        drawIntoCanvas { canvas ->
+                            canvas.saveLayer(Rect(0f, 0f, this.size.width, this.size.height), paint)
+                            drawContent()
+                            canvas.restore()
+                        }
+                    }.graphicsLayer(alpha = 0.5f)
+                } else Modifier
+            ),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size * 0.75f)) {

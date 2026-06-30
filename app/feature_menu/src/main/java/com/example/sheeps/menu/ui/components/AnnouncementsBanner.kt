@@ -1,17 +1,17 @@
 package com.example.sheeps.menu.ui.components
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,11 +20,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Notice
 import com.example.sheeps.theme.*
+import kotlinx.coroutines.delay
 
 @Composable
-fun AnnouncementsBanner(notices: List<Notice>) {
+fun AnnouncementsBanner(
+    notices: List<Notice>,
+    onClick: () -> Unit
+) {
+    val latestTwo = remember(notices) { notices.take(2) }
+    var currentIndex by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(latestTwo) {
+        if (latestTwo.size > 1) {
+            while (true) {
+                delay(4000)
+                currentIndex = (currentIndex + 1) % latestTwo.size
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -34,6 +52,7 @@ fun AnnouncementsBanner(notices: List<Notice>) {
                 BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
                 shape = ShapeMedium
             )
+            .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
         Column {
@@ -43,13 +62,13 @@ fun AnnouncementsBanner(notices: List<Notice>) {
             ) {
                 Icon(
                     imageVector = Icons.Default.Notifications,
-                    contentDescription = "公告",
+                    contentDescription = stringResource(id = R.string.notice_title),
                     tint = Crimson_Primary,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "福禄公告栏",
+                    text = stringResource(id = R.string.notice_banner_title),
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Serif,
                     fontSize = 13.sp,
@@ -59,22 +78,25 @@ fun AnnouncementsBanner(notices: List<Notice>) {
 
             if (notices.isEmpty()) {
                 Text(
-                    text  = "凡尘清静，暂无公告发布。",
+                    text  = stringResource(id = R.string.notice_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                val scrollState = rememberScrollState()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(scrollState)
-                ) {
-                    notices.forEach { n ->
+                AnimatedContent(
+                    targetState = currentIndex,
+                    transitionSpec = {
+                        (slideInVertically { height -> height } + fadeIn()).togetherWith(
+                            slideOutVertically { height -> -height } + fadeOut()
+                        )
+                    },
+                    label = "noticeTicker"
+                ) { index ->
+                    val notice = latestTwo.getOrNull(index)
+                    if (notice != null) {
                         Box(
                             modifier = Modifier
-                                .width(280.dp)
-                                .padding(end = 10.dp)
+                                .fillMaxWidth()
                                 .clip(ShapeSmall)
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
                                 .border(0.5.dp, MaterialTheme.colorScheme.outline, ShapeSmall)
@@ -82,17 +104,17 @@ fun AnnouncementsBanner(notices: List<Notice>) {
                         ) {
                             Column {
                                 Text(
-                                    text = n.title,
+                                    text = notice.title,
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = n.content,
+                                    text = notice.content,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )

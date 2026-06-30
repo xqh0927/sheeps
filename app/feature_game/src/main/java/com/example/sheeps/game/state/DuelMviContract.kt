@@ -32,7 +32,8 @@ data class DuelViewState(
     val opponentEliminatedCount: Int = 0,     // 对手已消除的卡牌数量
     val spellCountdownSeconds: Int = 0,       // 道具卡/诅咒倒计时
     val isSilenced: Boolean = false,          // 是否被禁魔/沉默
-    val usedSpells: Set<String> = emptySet()  // 局内已经使用过的大招
+    val usedSpells: Set<String> = emptySet(),  // 局内已经使用过的大招
+    val shakingTileIds: Set<String> = emptySet()
 )
 
 sealed interface DuelViewIntent {

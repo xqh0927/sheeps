@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.theme.CrimsonRed
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
 @Composable
@@ -68,18 +70,18 @@ fun DuelMatchDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("重新匹配", color = Color.White)
+                    Text(stringResource(id = R.string.dialog_match_re), color = Color.White)
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("退出", color = Color.Gray)
+                Text(stringResource(id = R.string.dialog_match_exit), color = Color.Gray)
             }
         },
         title = {
             Text(
-                "天命对决",
+                text = stringResource(id = R.string.home_match_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = CrimsonRed,
@@ -97,10 +99,41 @@ fun DuelMatchDialog(
                         .graphicsLayer { rotationZ = rotation }
                 ) {
                     val r = size.width / 2f
-                    drawCircle(color = CrimsonRed, radius = r, style = Stroke(width = 2.dp.toPx()))
-                    drawArc(color = CrimsonRed, startAngle = -90f, sweepAngle = 180f, useCenter = true, size = size)
-                    drawCircle(color = Color.White, radius = r * 0.22f, center = Offset(size.width / 2f, size.height * 0.25f))
-                    drawCircle(color = CrimsonRed, radius = r * 0.22f, center = Offset(size.width / 2f, size.height * 0.75f))
+                    val centerOffset = center
+                    drawCircle(color = Color.White, radius = r, center = centerOffset)
+                    drawArc(
+                        color = CrimsonRed,
+                        startAngle = -90f,
+                        sweepAngle = 180f,
+                        useCenter = true,
+                        size = size
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r / 2f,
+                        center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = r / 2f,
+                        center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = r * 0.15f,
+                        center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r * 0.15f,
+                        center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r,
+                        center = centerOffset,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -108,10 +141,10 @@ fun DuelMatchDialog(
                 val dots = ".".repeat(dotCount)
                 Text(
                     text = when (state.matchStatus) {
-                        "searching" -> "正在寻找对手$dots"
-                        "matched" -> "匹配成功！对手: ${state.matchedOpponentId?.takeLast(4) ?: "???"}"
-                        "error" -> "暂无匹配对手，请稍后再试"
-                        else -> "匹配中..."
+                        "searching" -> stringResource(id = R.string.duel_match_searching, dots)
+                        "matched" -> stringResource(id = R.string.duel_match_success, state.matchedOpponentId?.takeLast(4) ?: "???")
+                        "error" -> stringResource(id = R.string.duel_match_error)
+                        else -> stringResource(id = R.string.duel_match_pending)
                     },
                     fontSize = 14.sp,
                     color = when (state.matchStatus) {
@@ -125,7 +158,7 @@ fun DuelMatchDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "修士: ${state.phone}",
+                    text = stringResource(id = R.string.duel_match_cultivator, state.phone),
                     fontSize = 11.sp,
                     color = Color.Gray
                 )

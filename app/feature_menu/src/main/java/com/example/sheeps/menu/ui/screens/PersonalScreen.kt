@@ -20,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
+import com.example.sheeps.core.utils.getLocalizedItemName
+import com.example.sheeps.core.utils.getLocalizedSource
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.GameGuideDialog
 import com.example.sheeps.theme.*
@@ -76,14 +78,14 @@ fun PersonalScreen(
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
                                 Text(
-                                    text = if (state.isLoggedIn) state.username else "游客小友",
+                                    text = if (state.isLoggedIn) state.username else stringResource(id = R.string.user_guest),
                                     fontSize = 20.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = CrimsonRed,
                                     fontFamily = FontFamily.Serif
                                 )
                                 Text(
-                                    text = if (state.isLoggedIn) "UID: ${state.phone}" else "尚未签到登录",
+                                    text = if (state.isLoggedIn) "UID: ${state.phone}" else stringResource(id = R.string.user_not_logged_in),
                                     fontSize = 12.sp,
                                     color = Color.Gray
                                 )
@@ -97,16 +99,16 @@ fun PersonalScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Column {
-                                Text("积分余额", fontSize = 12.sp, color = Color.Gray)
+                                Text(stringResource(id = R.string.points_balance_label), fontSize = 12.sp, color = Color.Gray)
                                 Text("${state.points}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
                             }
                             Column {
-                                Text("连续签到", fontSize = 12.sp, color = Color.Gray)
-                                Text("${state.signStreak} 天", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                                Text(stringResource(id = R.string.streak_label), fontSize = 12.sp, color = Color.Gray)
+                                Text(stringResource(id = R.string.streak_days, state.signStreak), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
                             }
                             Column {
-                                Text("最高通关", fontSize = 12.sp, color = Color.Gray)
-                                Text("${state.highestLevelCleared} 关", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                                Text(stringResource(id = R.string.highest_level_label), fontSize = 12.sp, color = Color.Gray)
+                                Text(stringResource(id = R.string.level_number, state.highestLevelCleared), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
                             }
                         }
 
@@ -124,7 +126,7 @@ fun PersonalScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = if (state.todaySigned) "今日已签署签到" else "签到签署福禄",
+                                    text = if (state.todaySigned) stringResource(id = R.string.btn_signed_today) else stringResource(id = R.string.btn_sign_today),
                                     color = if (state.todaySigned) Color.DarkGray else Color.White
                                 )
                             }
@@ -135,7 +137,7 @@ fun PersonalScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("登录同步签到", color = Color.White)
+                                Text(stringResource(id = R.string.btn_login_sync), color = Color.White)
                             }
                         }
                     }
@@ -145,7 +147,7 @@ fun PersonalScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.HelpOutline,
-                            contentDescription = "游戏说明",
+                            contentDescription = stringResource(id = R.string.description_game_guide),
                             tint = CrimsonRed.copy(alpha = 0.8f)
                         )
                     }
@@ -164,7 +166,7 @@ fun PersonalScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "每日修仙任务",
+                            text = stringResource(id = R.string.tasks_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = CrimsonRed,
@@ -173,7 +175,7 @@ fun PersonalScreen(
                         )
 
                         if (state.dailyTasks.isEmpty()) {
-                            Text("无日常任务", fontSize = 12.sp, color = Color.Gray)
+                            Text(stringResource(id = R.string.tasks_empty), fontSize = 12.sp, color = Color.Gray)
                         } else {
                             state.dailyTasks.forEach { task ->
                                 Row(
@@ -184,15 +186,15 @@ fun PersonalScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(task.name, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                        Text(com.example.sheeps.core.utils.getLocalizedTaskName(task.name), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                         Text(
-                                            "${task.description} (${task.progress}/${task.target_count})",
+                                            "${com.example.sheeps.core.utils.getLocalizedTaskName(task.description)} (${task.progress}/${task.target_count})",
                                             fontSize = 11.sp,
                                             color = Color.Gray
                                         )
                                     }
                                     if (task.is_rewarded) {
-                                        Text("已领奖", fontSize = 12.sp, color = Color.Gray)
+                                        Text(stringResource(id = R.string.task_rewarded), fontSize = 12.sp, color = Color.Gray)
                                     } else {
                                         Button(
                                             onClick = { onClaimTask(task.task_id) },
@@ -206,7 +208,7 @@ fun PersonalScreen(
                                             modifier = Modifier.height(28.dp)
                                         ) {
                                             Text(
-                                                text = if (task.is_completed) "领奖 (+${task.points_reward})" else "未完成",
+                                                text = if (task.is_completed) stringResource(id = R.string.task_claim, task.points_reward) else stringResource(id = R.string.task_incomplete),
                                                 fontSize = 10.sp,
                                                 color = Color.White
                                             )
@@ -231,7 +233,7 @@ fun PersonalScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "乾坤法宝袋 (我的背包)",
+                            text = stringResource(id = R.string.backpack_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
                             color = CrimsonRed,
@@ -252,13 +254,13 @@ fun PersonalScreen(
                                         .width(72.dp)
                                 ) {
                                     Text(
-                                        text = item.item_type,
+                                        text = getLocalizedItemName(item.item_type),
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = CrimsonRed
                                     )
                                     Text(
-                                        text = "存: ${item.count}",
+                                        text = stringResource(id = R.string.backpack_stock, item.count),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = Color.DarkGray
@@ -339,7 +341,7 @@ fun PersonalScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "主题设置",
+                        text = stringResource(id = R.string.theme_settings_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CrimsonRed,
@@ -353,9 +355,9 @@ fun PersonalScreen(
                     ) {
                         val currentTheme = ThemeManager.currentTheme.collectAsState().value
                         val themes = listOf(
-                            AppTheme.QING_RI_CHUN to "清日春(浅色)",
-                            AppTheme.MO_YE_GOLD to "墨夜金(金黑)",
-                            AppTheme.DARK_MODE to "暗黑(深黑)"
+                            AppTheme.QING_RI_CHUN to stringResource(id = R.string.theme_light),
+                            AppTheme.MO_YE_GOLD to stringResource(id = R.string.theme_gold),
+                            AppTheme.DARK_MODE to stringResource(id = R.string.theme_dark)
                         )
                         
                         themes.forEach { (theme, name) ->
@@ -400,7 +402,7 @@ fun PersonalScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("查看积分流水", color = CrimsonRed)
+                        Text(stringResource(id = R.string.btn_view_points_log), color = CrimsonRed)
                     }
 
                     Button(
@@ -410,7 +412,7 @@ fun PersonalScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("查看兑换历史记录", color = CrimsonRed)
+                        Text(stringResource(id = R.string.btn_view_exchange_log), color = CrimsonRed)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -421,7 +423,7 @@ fun PersonalScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("退出登录", color = Color.White)
+                        Text(stringResource(id = R.string.btn_logout), color = Color.White)
                     }
                 }
             }
@@ -433,10 +435,10 @@ fun PersonalScreen(
     if (showPointHistory) {
         AlertDialog(
             onDismissRequest = { showPointHistory = false },
-            title = { Text("积分流水日志", fontWeight = FontWeight.Bold, color = CrimsonRed) },
+            title = { Text(stringResource(id = R.string.points_history_title), fontWeight = FontWeight.Bold, color = CrimsonRed) },
             text = {
                 if (state.pointsHistory.isEmpty()) {
-                    Text("暂无流水变动记载")
+                    Text(stringResource(id = R.string.no_points_history))
                 } else {
                     LazyColumn(modifier = Modifier.height(240.dp)) {
                         items(state.pointsHistory) { record ->
@@ -447,7 +449,7 @@ fun PersonalScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text(record.source, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(getLocalizedSource(record.source), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     Text(
                                         text = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(record.created_at)),
                                         fontSize = 10.sp,
@@ -467,7 +469,7 @@ fun PersonalScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showPointHistory = false }) { Text("关闭") }
+                TextButton(onClick = { showPointHistory = false }) { Text(stringResource(id = R.string.btn_cancel)) }
             }
         )
     }
@@ -476,10 +478,10 @@ fun PersonalScreen(
     if (showExchangeHistory) {
         AlertDialog(
             onDismissRequest = { showExchangeHistory = false },
-            title = { Text("商品兑换历史记录", fontWeight = FontWeight.Bold, color = CrimsonRed) },
+            title = { Text(stringResource(id = R.string.exchange_history_title), fontWeight = FontWeight.Bold, color = CrimsonRed) },
             text = {
                 if (state.exchangeHistory.isEmpty()) {
-                    Text("暂无兑换记录记载")
+                    Text(stringResource(id = R.string.no_exchange_history))
                 } else {
                     LazyColumn(modifier = Modifier.height(240.dp)) {
                         items(state.exchangeHistory) { record ->
@@ -490,7 +492,7 @@ fun PersonalScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("兑换了 ${record.count} 个 ${record.item_type}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(id = R.string.exchange_record_desc, record.count, getLocalizedItemName(record.item_type)), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                     Text(
                                         text = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(record.created_at)),
                                         fontSize = 10.sp,
@@ -498,7 +500,7 @@ fun PersonalScreen(
                                     )
                                 }
                                 Text(
-                                    text = "-${record.points_cost} 积分",
+                                    text = "-${record.points_cost}",
                                     color = CrimsonRed,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
@@ -510,7 +512,7 @@ fun PersonalScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showExchangeHistory = false }) { Text("关闭") }
+                TextButton(onClick = { showExchangeHistory = false }) { Text(stringResource(id = R.string.btn_cancel)) }
             }
         )
     }

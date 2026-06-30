@@ -1,5 +1,6 @@
 export interface Env {
   DB: D1Database;
+  SHEEPS_CACHE: KVNamespace;
 }
 
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/xqh0927/sheeps-releases/releases/latest';
@@ -976,33 +977,28 @@ export default {
           return new Response(JSON.stringify({ error: 'Verification code expired' }), { status: 400, headers: corsHeaders });
         }
 
-        await env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run();
+        // Batch delete code and query user
+        const [deleteTokenResult, userResult] = await env.DB.batch([
+          env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone),
+          env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE phone = ?').bind(body.phone)
+        ]);
 
-        let user = await env.DB.prepare(
-          'SELECT id, phone, username, avatar, points FROM users WHERE phone = ?'
-        ).bind(body.phone).first<{ id: string; phone: string; username: string; avatar: string | null; points: number }>();
+        let user = userResult.results[0] as { id: string; phone: string; username: string; avatar: string | null; points: number } | undefined;
 
-        let isNewUser = false;
         if (!user) {
-          isNewUser = true;
           const uuid = crypto.randomUUID();
           const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
-          await env.DB.prepare(
-            'INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-          ).bind(uuid, body.phone, defaultUsername, null, 0, Date.now()).run();
-
-          // Unlock Level 1 by default
-          await env.DB.prepare(
-            'INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)'
-          ).bind(uuid, Date.now()).run();
-
-          // Grant initial inventory items
+          const insertQueries = [
+            env.DB.prepare('INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(uuid, body.phone, defaultUsername, null, 0, Date.now()),
+            env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
+          ];
           const initialItems = ['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE'];
           for (const item of initialItems) {
-            await env.DB.prepare(
-              'INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?)'
-            ).bind(uuid, item, 1).run();
+            insertQueries.push(
+              env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?)').bind(uuid, item, 1)
+            );
           }
+          await env.DB.batch(insertQueries);
 
           user = { id: uuid, phone: body.phone, username: defaultUsername, avatar: null, points: 0 };
         }
@@ -1011,37 +1007,49 @@ export default {
         if (body.device_uuid && body.device_uuid !== user.id) {
           const guestUser = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(body.device_uuid).first<{ points: number }>();
           if (guestUser) {
-            // 1. Merge points
+            const [guestLevelsResult, guestItemsResult] = await env.DB.batch([
+              env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(body.device_uuid),
+              env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(body.device_uuid)
+            ]);
+            const guestLevels = guestLevelsResult.results as { level_id: number }[];
+            const guestItems = guestItemsResult.results as { item_type: string; count: number }[];
+
             const mergedPoints = user.points + guestUser.points;
-            await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(mergedPoints, user.id).run();
             user.points = mergedPoints;
 
-            // 2. Merge levels
-            const guestLevels = await env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(body.device_uuid).all<{ level_id: number }>();
-            for (const row of guestLevels.results) {
-              await env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)')
-                .bind(user.id, row.level_id, Date.now()).run();
+            const mergeMutations = [
+              env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(mergedPoints, user.id)
+            ];
+
+            for (const row of guestLevels) {
+              mergeMutations.push(
+                env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(user.id, row.level_id, Date.now())
+              );
             }
 
-            // 3. Merge items
-            const guestItems = await env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(body.device_uuid).all<{ item_type: string; count: number }>();
-            for (const row of guestItems.results) {
-              await env.DB.prepare(
-                'INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ' +
-                'ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?'
-              ).bind(user.id, row.item_type, row.count, row.count).run();
+            for (const row of guestItems) {
+              mergeMutations.push(
+                env.DB.prepare(
+                  'INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ' +
+                  'ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?'
+                ).bind(user.id, row.item_type, row.count, row.count)
+              );
             }
 
-            // 4. Delete guest progress
-            await env.DB.prepare('DELETE FROM level_unlock WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM user_items WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM leaderboard WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM point_record WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM exchange_record WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM sign_record WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM user_task WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM backup_save_log WHERE user_id = ?').bind(body.device_uuid).run();
-            await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(body.device_uuid).run();
+            const tablesToDelete = [
+              'level_unlock', 'user_items', 'leaderboard', 'point_record',
+              'exchange_record', 'sign_record', 'user_task', 'backup_save_log'
+            ];
+            for (const table of tablesToDelete) {
+              mergeMutations.push(
+                env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(body.device_uuid)
+              );
+            }
+            mergeMutations.push(
+              env.DB.prepare('DELETE FROM users WHERE id = ?').bind(body.device_uuid)
+            );
+
+            await env.DB.batch(mergeMutations);
           }
         }
 
@@ -1049,27 +1057,19 @@ export default {
         const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
         const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
 
-        // Query unlocked levels
-        const unlockedRows = await env.DB.prepare(
-          'SELECT level_id FROM level_unlock WHERE user_id = ?'
-        ).bind(user.id).all<{ level_id: number }>();
-        const unlockedLevels = unlockedRows.results.map(r => r.level_id);
-
-        // Query inventory items
-        const itemRows = await env.DB.prepare(
-          'SELECT item_type, count FROM user_items WHERE user_id = ?'
-        ).bind(user.id).all<{ item_type: string; count: number }>();
-        const items = itemRows.results;
-
-        // Query sign in status
+        // Query unlocked levels, items, sign status and last sign
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const signToday = await env.DB.prepare(
-          'SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?'
-        ).bind(user.id, chinaToday).first();
+        const [unlockedResult, itemsResult, signTodayResult, lastSignResult] = await env.DB.batch([
+          env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(user.id),
+          env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(user.id),
+          env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(user.id, chinaToday),
+          env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(user.id)
+        ]);
 
-        const lastSign = await env.DB.prepare(
-          'SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1'
-        ).bind(user.id).first<{ streak: number }>();
+        const unlockedLevels = unlockedResult.results.map((r: any) => r.level_id);
+        const items = itemsResult.results;
+        const signToday = signTodayResult.results[0];
+        const lastSign = lastSignResult.results[0] as { streak: number } | undefined;
 
         return new Response(JSON.stringify({
           success: true,
@@ -1117,61 +1117,78 @@ export default {
           items?: { item_type: string; count: number }[];
         } = await request.json();
 
-        // 1. Back up existing cloud data before overwrite
-        const oldUser = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
+        // 1. Parallel fetch of old data to create backup
+        const backupQueries = [
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId)
+        ];
+        const [oldUserResult, oldLevelsResult, oldItemsResult] = await env.DB.batch(backupQueries);
+        const oldUser = oldUserResult.results[0] as { points: number } | undefined;
+        const oldLevels = oldLevelsResult.results as { level_id: number }[];
+        const oldItems = oldItemsResult.results as { item_type: string; count: number }[];
+
+        const mutationStatements = [];
+
         if (oldUser) {
-          const oldLevels = await env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId).all();
-          const oldItems = await env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId).all();
           const backupPayload = JSON.stringify({
             points: oldUser.points,
-            unlocked_levels: oldLevels.results.map((r: any) => r.level_id),
-            items: oldItems.results
+            unlocked_levels: oldLevels.map((r: any) => r.level_id),
+            items: oldItems
           });
-          // Write to backup logs
-          await env.DB.prepare(
-            'INSERT INTO backup_save_log (user_id, save_data, created_at) VALUES (?, ?, ?)'
-          ).bind(authUser.userId, backupPayload, Date.now()).run();
-
-          // Delete logs older than 7 days
-          await env.DB.prepare(
-            'DELETE FROM backup_save_log WHERE created_at < ?'
-          ).bind(Date.now() - 7 * 86400000).run();
+          mutationStatements.push(
+            env.DB.prepare('INSERT INTO backup_save_log (user_id, save_data, created_at) VALUES (?, ?, ?)').bind(authUser.userId, backupPayload, Date.now()),
+            env.DB.prepare('DELETE FROM backup_save_log WHERE created_at < ?').bind(Date.now() - 7 * 86400000)
+          );
         }
 
         // Apply sync updates
         if (body.points !== undefined && body.points > 0) {
-          await env.DB.prepare(
-            'UPDATE users SET points = MAX(points, ?) WHERE id = ?'
-          ).bind(body.points, authUser.userId).run();
+          mutationStatements.push(
+            env.DB.prepare('UPDATE users SET points = MAX(points, ?) WHERE id = ?').bind(body.points, authUser.userId)
+          );
         }
 
         if (body.unlocked_levels) {
           for (const lvl of body.unlocked_levels) {
-            await env.DB.prepare(
-              'INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)'
-            ).bind(authUser.userId, lvl, Date.now()).run();
+            mutationStatements.push(
+              env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, lvl, Date.now())
+            );
           }
         }
 
         if (body.items) {
           for (const item of body.items) {
-            await env.DB.prepare(
-              'INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, ' +
-              'COALESCE((SELECT MAX(count, ?) FROM user_items WHERE user_id = ? AND item_type = ?), ?))'
-            ).bind(authUser.userId, item.item_type, item.count, authUser.userId, item.item_type, item.count).run();
+            mutationStatements.push(
+              env.DB.prepare(
+                'INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, ' +
+                'COALESCE((SELECT MAX(count, ?) FROM user_items WHERE user_id = ? AND item_type = ?), ?))'
+              ).bind(authUser.userId, item.item_type, item.count, authUser.userId, item.item_type, item.count)
+            );
           }
         }
 
-        // Return updated values
-        const updatedUser = await env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId).first();
-        const updatedLevels = await env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId).all();
-        const updatedItems = await env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId).all();
+        // Execute all writes inside a single transaction batch
+        if (mutationStatements.length > 0) {
+          await env.DB.batch(mutationStatements);
+        }
+
+        // Return updated values using parallel fetch
+        const readQueries = [
+          env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId)
+        ];
+        const [updatedUserResult, updatedLevelsResult, updatedItemsResult] = await env.DB.batch(readQueries);
+        const updatedUser = updatedUserResult.results[0];
+        const updatedLevels = updatedLevelsResult.results as { level_id: number }[];
+        const updatedItems = updatedItemsResult.results as { item_type: string; count: number }[];
 
         return new Response(JSON.stringify({
           success: true,
           user: updatedUser,
-          unlocked_levels: updatedLevels.results.map((r: any) => r.level_id),
-          items: updatedItems.results
+          unlocked_levels: updatedLevels.map((r: any) => r.level_id),
+          items: updatedItems
         }), { headers: corsHeaders });
       }
 
@@ -1187,32 +1204,35 @@ export default {
           return new Response(JSON.stringify({ error: 'Missing level ID' }), { status: 400, headers: corsHeaders });
         }
 
-        // Check if already unlocked
-        const checkUnlock = await env.DB.prepare(
-          'SELECT 1 FROM level_unlock WHERE user_id = ? AND level_id = ?'
-        ).bind(authUser.userId, body.level_id).first();
-        if (checkUnlock) {
-          const userPoints = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
-          return new Response(JSON.stringify({ success: true, current_points: userPoints?.points || 0 }), { headers: corsHeaders });
+        // Batch initial read checks (isUnlocked, unlock points config, user points)
+        const configKey = `level_${body.level_id}_unlock_points`;
+        const [unlockCheckResult, configResult, userResult] = await env.DB.batch([
+          env.DB.prepare('SELECT 1 FROM level_unlock WHERE user_id = ? AND level_id = ?').bind(authUser.userId, body.level_id),
+          env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(configKey),
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        ]);
+
+        const isUnlocked = unlockCheckResult.results.length > 0;
+        const userRow = userResult.results[0] as { points: number } | undefined;
+
+        if (isUnlocked) {
+          return new Response(JSON.stringify({ success: true, current_points: userRow?.points || 0 }), { headers: corsHeaders });
         }
 
-        // Fetch unlock points cost from DB config
-        const configRow = await env.DB.prepare('SELECT value FROM config WHERE key = ?')
-          .bind(`level_${body.level_id}_unlock_points`).first<{ value: string }>();
+        const configRow = configResult.results[0] as { value: string } | undefined;
         const cost = configRow ? parseInt(configRow.value, 10) : (body.level_id === 2 ? 50 : (body.level_id === 3 ? 100 : 200));
 
-        const userRow = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
         if (!userRow || userRow.points < cost) {
           return new Response(JSON.stringify({ error: 'Insufficient points' }), { status: 400, headers: corsHeaders });
         }
 
-        // Transaction simulation
+        // Transaction updates batch
         const newPoints = userRow.points - cost;
-        await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId).run();
-        await env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)')
-          .bind(authUser.userId, body.level_id, Date.now()).run();
-        await env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(authUser.userId, 'OUT', cost, `UNLOCK_LEVEL_${body.level_id}`, newPoints, Date.now()).run();
+        await env.DB.batch([
+          env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
+          env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, body.level_id, Date.now()),
+          env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'OUT', cost, `UNLOCK_LEVEL_${body.level_id}`, newPoints, Date.now())
+        ]);
 
         return new Response(JSON.stringify({ success: true, current_points: newPoints }), { headers: corsHeaders });
       }
@@ -1247,69 +1267,78 @@ export default {
         const authUser = await getAuthenticatedUser(request, env);
         const resolvedUserId = authUser ? authUser.userId : body.user_id;
 
+        // Batch read checks
+        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
+        const [userResult, clearsResult, tasksResult] = await env.DB.batch([
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(resolvedUserId),
+          env.DB.prepare('SELECT COUNT(*) as count FROM leaderboard WHERE user_id = ? AND level_id = ?').bind(resolvedUserId, body.level_id),
+          env.DB.prepare('SELECT ut.task_id, ut.progress, t.target_count, ut.is_completed FROM user_task ut JOIN task t ON ut.task_id = t.id WHERE ut.user_id = ? AND ut.task_id IN (\'PLAY_3_GAMES\', \'PLAY_5_GAMES\') AND ut.task_date = ?').bind(resolvedUserId, chinaToday)
+        ]);
+
+        let userExists = userResult.results[0] as { points: number } | undefined;
+        const clears = clearsResult.results[0] as { count: number } | undefined;
+        const taskProgresses = tasksResult.results as { task_id: string; progress: number; target_count: number; is_completed: number }[];
+
+        const mutations = [];
+
         // Check if user exists, if not, create a guest/new user and unlock first 3 levels automatically
-        let userExists = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(resolvedUserId).first<{ points: number }>();
         if (!userExists) {
           const defaultUsername = resolvedUserId.startsWith('uuid-') ? `游客_${resolvedUserId.slice(-4)}` : `玩家_${resolvedUserId.slice(-4)}`;
-          await env.DB.prepare(
-            'INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-          ).bind(resolvedUserId, null, defaultUsername, null, 0, Date.now()).run();
+          mutations.push(
+            env.DB.prepare('INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(resolvedUserId, null, defaultUsername, null, 0, Date.now())
+          );
 
           // Automatically unlock the first 3 levels for new guest/offline users so they can play them directly
           for (const lvl of [1, 2, 3]) {
-            await env.DB.prepare(
-              'INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)'
-            ).bind(resolvedUserId, lvl, Date.now()).run();
+            mutations.push(
+              env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, lvl, Date.now())
+            );
           }
-
           userExists = { points: 0 };
         }
 
         // Check if first clear of this level
-        const clears = await env.DB.prepare(
-          'SELECT COUNT(*) as count FROM leaderboard WHERE user_id = ? AND level_id = ?'
-        ).bind(resolvedUserId, body.level_id).first<{ count: number }>();
-        
         let firstClear = false;
         let finalPoints = userExists.points;
         if (!clears || clears.count === 0) {
           firstClear = true;
           finalPoints += 50; // reward 50 points for first clear
-          await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(finalPoints, resolvedUserId).run();
-          await env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-            .bind(resolvedUserId, 'IN', 50, 'FIRST_CLEAR', finalPoints, Date.now()).run();
+          mutations.push(
+            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(finalPoints, resolvedUserId),
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(resolvedUserId, 'IN', 50, 'FIRST_CLEAR', finalPoints, Date.now())
+          );
         }
 
         // Auto unlock next level
-        await env.DB.prepare(
-          'INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)'
-        ).bind(resolvedUserId, body.level_id + 1, Date.now()).run();
+        mutations.push(
+          env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now())
+        );
 
         // Increment daily task progress
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         for (const tid of ['PLAY_3_GAMES', 'PLAY_5_GAMES']) {
-          const taskProgress = await env.DB.prepare(
-            'SELECT ut.progress, t.target_count, ut.is_completed FROM user_task ut JOIN task t ON ut.task_id = t.id WHERE ut.user_id = ? AND ut.task_id = ? AND ut.task_date = ?'
-          ).bind(resolvedUserId, tid, chinaToday).first<{ progress: number; target_count: number; is_completed: number }>();
+          const taskProgress = taskProgresses.find(t => t.task_id === tid);
 
           if (!taskProgress) {
-            const target = tid === 'PLAY_3_GAMES' ? 3 : 5;
-            await env.DB.prepare(
-              'INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 1, 0, 0)'
-            ).bind(resolvedUserId, tid, chinaToday).run();
+            mutations.push(
+              env.DB.prepare('INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 1, 0, 0)').bind(resolvedUserId, tid, chinaToday)
+            );
           } else if (taskProgress.is_completed === 0) {
             const newProg = Math.min(taskProgress.target_count, taskProgress.progress + 1);
             const completed = newProg >= taskProgress.target_count ? 1 : 0;
-            await env.DB.prepare(
-              'UPDATE user_task SET progress = ?, is_completed = ? WHERE user_id = ? AND task_id = ? AND task_date = ?'
-            ).bind(newProg, completed, resolvedUserId, tid, chinaToday).run();
+            mutations.push(
+              env.DB.prepare('UPDATE user_task SET progress = ?, is_completed = ? WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(newProg, completed, resolvedUserId, tid, chinaToday)
+            );
           }
         }
 
         // Insert into leaderboard
-        await env.DB.prepare(
-          'INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, Date.now()).run();
+        mutations.push(
+          env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, Date.now())
+        );
+
+        if (mutations.length > 0) {
+          await env.DB.batch(mutations);
+        }
 
         return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
       }
@@ -1322,39 +1351,42 @@ export default {
         }
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const checkSign = await env.DB.prepare(
-          'SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?'
-        ).bind(authUser.userId, chinaToday).first();
+        const chinaYesterday = new Date(Date.now() + 8 * 3600000 - 24 * 3600000).toISOString().split('T')[0];
 
+        // Batch read checks
+        const [checkSignResult, lastSignResult, configResult, userResult] = await env.DB.batch([
+          env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
+          env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaYesterday),
+          env.DB.prepare('SELECT value FROM config WHERE key = ?').bind('sign_rewards'),
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        ]);
+
+        const checkSign = checkSignResult.results[0];
         if (checkSign) {
           return new Response(JSON.stringify({ error: 'Already signed in today' }), { status: 400, headers: corsHeaders });
         }
 
-        const chinaYesterday = new Date(Date.now() + 8 * 3600000 - 24 * 3600000).toISOString().split('T')[0];
-        const lastSign = await env.DB.prepare(
-          'SELECT streak FROM sign_record WHERE user_id = ? AND sign_date = ?'
-        ).bind(authUser.userId, chinaYesterday).first<{ streak: number }>();
-
+        const lastSign = lastSignResult.results[0] as { streak: number } | undefined;
         const newStreak = lastSign ? lastSign.streak + 1 : 1;
 
         // Fetch reward config
-        const rewardsConfigRow = await env.DB.prepare('SELECT value FROM config WHERE key = ?').bind('sign_rewards').first<{ value: string }>();
+        const rewardsConfigRow = configResult.results[0] as { value: string } | undefined;
         const rewards = rewardsConfigRow ? rewardsConfigRow.value.split(',').map(Number) : [20, 20, 30, 30, 40, 50, 100];
         const rewardPoints = rewards[Math.min(newStreak, 7) - 1] || 20;
 
-        const userRow = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
+        const userRow = userResult.results[0] as { points: number } | undefined;
         const newPoints = (userRow?.points || 0) + rewardPoints;
 
-        await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId).run();
-        await env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)')
-          .bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()).run();
-        await env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()).run();
-
-        // Increment SIGN_IN_ONCE task
-        await env.DB.prepare(
-          'INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 0).run();
+        // Batch write updates
+        await env.DB.batch([
+          env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
+          env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)')
+            .bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()),
+          env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()),
+          env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 0)
+        ]);
 
         return new Response(JSON.stringify({
           success: true,
@@ -1366,11 +1398,19 @@ export default {
 
       // 7. Shop Items List with multi-language
       if (path === '/api/shop/items' && request.method === 'GET') {
+        const cacheKey = `shop_items_${lang}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) {
+          return new Response(cached, { headers: corsHeaders });
+        }
+
         const nameCol = lang ? `COALESCE(name_${lang}, name)` : 'name';
         const descCol = lang ? `COALESCE(description_${lang}, description)` : 'description';
         const queryStr = `SELECT id, ${nameCol} as name, ${descCol} as description, image_url, item_type, points_price, stock FROM shop_items`;
         const items = await env.DB.prepare(queryStr).all();
-        return new Response(JSON.stringify(items.results), { headers: corsHeaders });
+        const jsonStr = JSON.stringify(items.results);
+        await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
+        return new Response(jsonStr, { headers: corsHeaders });
       }
 
       // 8. Shop Exchange
@@ -1385,16 +1425,19 @@ export default {
           return new Response(JSON.stringify({ error: 'Invalid parameters' }), { status: 400, headers: corsHeaders });
         }
 
-        const shopItem = await env.DB.prepare(
-          'SELECT name, item_type, points_price, stock FROM shop_items WHERE id = ?'
-        ).bind(body.shop_item_id).first<{ name: string; item_type: string; points_price: number; stock: number }>();
+        // Batch read checks
+        const [shopItemResult, userResult] = await env.DB.batch([
+          env.DB.prepare('SELECT name, item_type, points_price, stock FROM shop_items WHERE id = ?').bind(body.shop_item_id),
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        ]);
 
+        const shopItem = shopItemResult.results[0] as { name: string; item_type: string; points_price: number; stock: number } | undefined;
         if (!shopItem || shopItem.stock < body.count) {
           return new Response(JSON.stringify({ error: 'Item out of stock or not found' }), { status: 400, headers: corsHeaders });
         }
 
         const totalCost = shopItem.points_price * body.count;
-        const userRow = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
+        const userRow = userResult.results[0] as { points: number } | undefined;
         
         if (!userRow || userRow.points < totalCost) {
           return new Response(JSON.stringify({ error: 'Insufficient points' }), { status: 400, headers: corsHeaders });
@@ -1402,25 +1445,23 @@ export default {
 
         const remainingPoints = userRow.points - totalCost;
 
-        // Perform transactional operations
-        await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId).run();
-        await env.DB.prepare('UPDATE shop_items SET stock = stock - ? WHERE id = ?').bind(body.count, body.shop_item_id).run();
-        
-        await env.DB.prepare(
-          'INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ' +
-          'ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?'
-        ).bind(authUser.userId, shopItem.item_type, body.count, body.count).run();
+        // Perform transactional writes and select final count in a single batch
+        const writeResults = await env.DB.batch([
+          env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),
+          env.DB.prepare('UPDATE shop_items SET stock = stock - ? WHERE id = ?').bind(body.count, body.shop_item_id),
+          env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?').bind(authUser.userId, shopItem.item_type, body.count, body.count),
+          env.DB.prepare('INSERT INTO exchange_record (user_id, shop_item_id, item_type, count, points_cost, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, body.shop_item_id, shopItem.item_type, body.count, totalCost, Date.now()),
+          env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'OUT', totalCost, `SHOP_REDEEM_${shopItem.item_type}`, remainingPoints, Date.now()),
+          env.DB.prepare('SELECT count FROM user_items WHERE user_id = ? AND item_type = ?').bind(authUser.userId, shopItem.item_type)
+        ]);
 
-        await env.DB.prepare(
-          'INSERT INTO exchange_record (user_id, shop_item_id, item_type, count, points_cost, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(authUser.userId, body.shop_item_id, shopItem.item_type, body.count, totalCost, Date.now()).run();
+        const backpackItem = writeResults[5].results[0] as { count: number } | undefined;
 
-        await env.DB.prepare(
-          'INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(authUser.userId, 'OUT', totalCost, `SHOP_REDEEM_${shopItem.item_type}`, remainingPoints, Date.now()).run();
-
-        const backpackItem = await env.DB.prepare('SELECT count FROM user_items WHERE user_id = ? AND item_type = ?')
-          .bind(authUser.userId, shopItem.item_type).first<{ count: number }>();
+        // Invalidate shop items cache for all languages
+        const languages = ['', 'en', 'tw', 'ja', 'ko'];
+        for (const l of languages) {
+          await env.SHEEPS_CACHE.delete(`shop_items_${l}`);
+        }
 
         return new Response(JSON.stringify({
           success: true,
@@ -1443,33 +1484,41 @@ export default {
         const descCol = lang ? `COALESCE(description_${lang}, description)` : 'description';
         const queryStr = `SELECT id, ${nameCol} as name, ${descCol} as description, target_count, points_reward FROM task`;
         
-        const allTasks = await env.DB.prepare(queryStr).all<{
-          id: string; name: string; description: string; target_count: number; points_reward: number;
-        }>();
+        // Parallel queries to fetch tasks and task status
+        const [allTasks, userTasks] = await env.DB.batch([
+          env.DB.prepare(queryStr),
+          env.DB.prepare('SELECT task_id, progress, is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_date = ?').bind(authUser.userId, chinaToday)
+        ]);
 
+        const taskList = allTasks.results as { id: string; name: string; description: string; target_count: number; points_reward: number }[];
+        const userTaskList = userTasks.results as { task_id: string; progress: number; is_completed: number; is_rewarded: number }[];
+
+        const inserts = [];
         const list = [];
-        for (const task of allTasks.results) {
-          let userTask = await env.DB.prepare(
-            'SELECT progress, is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?'
-          ).bind(authUser.userId, task.id, chinaToday).first<{ progress: number; is_completed: number; is_rewarded: number }>();
 
-          if (!userTask) {
-            await env.DB.prepare(
-              'INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 0, 0, 0)'
-            ).bind(authUser.userId, task.id, chinaToday).run();
-            userTask = { progress: 0, is_completed: 0, is_rewarded: 0 };
+        for (const task of taskList) {
+          let ut = userTaskList.find(u => u.task_id === task.id);
+          if (!ut) {
+            inserts.push(
+              env.DB.prepare('INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 0, 0, 0)').bind(authUser.userId, task.id, chinaToday)
+            );
+            ut = { task_id: task.id, progress: 0, is_completed: 0, is_rewarded: 0 };
           }
 
           list.push({
             task_id: task.id,
             name: task.name,
             description: task.description,
-            progress: userTask.progress,
+            progress: ut.progress,
             target_count: task.target_count,
-            is_completed: userTask.is_completed === 1,
-            is_rewarded: userTask.is_rewarded === 1,
+            is_completed: ut.is_completed === 1,
+            is_rewarded: ut.is_rewarded === 1,
             points_reward: task.points_reward
           });
+        }
+
+        if (inserts.length > 0) {
+          await env.DB.batch(inserts);
         }
 
         return new Response(JSON.stringify(list), { headers: corsHeaders });
@@ -1488,36 +1537,50 @@ export default {
         }
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const userTask = await env.DB.prepare(
-          'SELECT is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?'
-        ).bind(authUser.userId, body.task_id, chinaToday).first<{ is_completed: number; is_rewarded: number }>();
 
+        // Batch read checks
+        const [userTaskResult, taskResult, userResult] = await env.DB.batch([
+          env.DB.prepare('SELECT is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
+          env.DB.prepare('SELECT points_reward FROM task WHERE id = ?').bind(body.task_id),
+          env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        ]);
+
+        const userTask = userTaskResult.results[0] as { is_completed: number; is_rewarded: number } | undefined;
         if (!userTask || userTask.is_completed === 0 || userTask.is_rewarded === 1) {
           return new Response(JSON.stringify({ error: 'Task not completed or already rewarded' }), { status: 400, headers: corsHeaders });
         }
 
-        const taskRow = await env.DB.prepare('SELECT points_reward FROM task WHERE id = ?').bind(body.task_id).first<{ points_reward: number }>();
+        const taskRow = taskResult.results[0] as { points_reward: number } | undefined;
         const reward = taskRow?.points_reward || 10;
 
-        const userRow = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId).first<{ points: number }>();
+        const userRow = userResult.results[0] as { points: number } | undefined;
         const remainingPoints = (userRow?.points || 0) + reward;
 
-        await env.DB.prepare('UPDATE user_task SET is_rewarded = 1 WHERE user_id = ? AND task_id = ? AND task_date = ?')
-          .bind(authUser.userId, body.task_id, chinaToday).run();
-        await env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId).run();
-        await env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-          .bind(authUser.userId, 'IN', reward, `DAILY_TASK_${body.task_id}`, remainingPoints, Date.now()).run();
+        // Batch write updates
+        await env.DB.batch([
+          env.DB.prepare('UPDATE user_task SET is_rewarded = 1 WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
+          env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),
+          env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', reward, `DAILY_TASK_${body.task_id}`, remainingPoints, Date.now())
+        ]);
 
         return new Response(JSON.stringify({ success: true, current_points: remainingPoints }), { headers: corsHeaders });
       }
 
       // 11. Notices List with multi-language
       if (path === '/api/notice/list' && request.method === 'GET') {
+        const cacheKey = `notices_${lang}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) {
+          return new Response(cached, { headers: corsHeaders });
+        }
+
         const titleCol = lang ? `COALESCE(title_${lang}, title)` : 'title';
         const contentCol = lang ? `COALESCE(content_${lang}, content)` : 'content';
         const queryStr = `SELECT id, ${titleCol} as title, ${contentCol} as content, type, created_at FROM notice ORDER BY created_at DESC`;
         const notices = await env.DB.prepare(queryStr).all();
-        return new Response(JSON.stringify(notices.results), { headers: corsHeaders });
+        const jsonStr = JSON.stringify(notices.results);
+        await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 3600 });
+        return new Response(jsonStr, { headers: corsHeaders });
       }
 
       // 12. Leaderboard Classified & Paginated
@@ -1530,6 +1593,13 @@ export default {
         const type = url.searchParams.get('type') || 'history'; // daily, weekly, history
         const page = parseInt(url.searchParams.get('page') || '1', 10);
         const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+
+        const cacheKey = `leaderboard_${levelId}_${type}_${page}_${limit}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) {
+          return new Response(cached, { headers: corsHeaders });
+        }
+
         const offset = (page - 1) * limit;
 
         let timeFilter = 0;
@@ -1549,11 +1619,13 @@ export default {
            FROM leaderboard l 
            JOIN users u ON l.user_id = u.id 
            WHERE l.level_id = ? AND l.achieved_at >= ?
-           ORDER BY l.clear_time_ms ASC 
+           ORDER BY l.score DESC, l.clear_time_ms ASC 
            LIMIT ? OFFSET ?`
         ).bind(levelId, timeFilter, limit, offset).all();
 
-        return new Response(JSON.stringify({ success: true, rankings: results.results }), { headers: corsHeaders });
+        const responseData = JSON.stringify({ success: true, rankings: results.results });
+        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 30 });
+        return new Response(responseData, { headers: corsHeaders });
       }
 
       // 13. User profile details (all-in-one endpoint)
@@ -1563,20 +1635,30 @@ export default {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         }
 
-        const user = await env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId).first();
-        const levels = await env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId).all();
-        const items = await env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId).all();
-        
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const signedToday = await env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday).first();
-        const lastSign = await env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(authUser.userId).first<{ streak: number }>();
-        const highestCleared = await env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ?').bind(authUser.userId).first<{ highest: number | null }>();
+
+        // Parallel fetch of all profile-related data
+        const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
+          env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
+          env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
+          env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(authUser.userId),
+          env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ?').bind(authUser.userId)
+        ]);
+
+        const user = userResult.results[0];
+        const levels = levelsResult.results as { level_id: number }[];
+        const items = itemsResult.results;
+        const signedToday = signedTodayResult.results[0];
+        const lastSign = lastSignResult.results[0] as { streak: number } | undefined;
+        const highestCleared = highestClearedResult.results[0] as { highest: number | null } | undefined;
 
         return new Response(JSON.stringify({
           success: true,
           user,
-          unlocked_levels: levels.results.map((r: any) => r.level_id),
-          items: items.results,
+          unlocked_levels: levels.map((r: any) => r.level_id),
+          items: items,
           today_signed: signedToday !== null,
           sign_streak: lastSign ? lastSign.streak : 0,
           highest_level_cleared: highestCleared?.highest || 0
@@ -1602,15 +1684,67 @@ export default {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         }
         const records = await env.DB.prepare(
-          'SELECT shop_item_id, item_type, count, points_cost, created_at FROM exchange_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
+          'SELECT id, shop_item_id, item_type, count, points_cost, created_at FROM exchange_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
         ).bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
       }
 
+      // 15.5 Daily Leaderboard Popup
+      if (path === '/api/leaderboard/daily-popup' && request.method === 'GET') {
+        const authUser = await getAuthenticatedUser(request, env);
+        if (!authUser) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        }
+
+        const now = Date.now();
+        // Today 00:00:00 UTC+8 (China Time)
+        const chinaTodayStr = new Date(now + 8 * 3600000).toISOString().split('T')[0];
+        const todayStart = new Date(chinaTodayStr + 'T00:00:00+08:00').getTime();
+
+        // Parallel fetch for top3 and points history yesterday
+        const [top3Result, userPointsYesterdayResult] = await env.DB.batch([
+          env.DB.prepare('SELECT username, points FROM users ORDER BY points DESC LIMIT 3'),
+          env.DB.prepare(
+            `SELECT u.id, 
+                    COALESCE(
+                      (SELECT remaining_points FROM point_record pr 
+                       WHERE pr.user_id = u.id AND pr.created_at < ? 
+                       ORDER BY pr.id DESC LIMIT 1), 
+                      0
+                    ) as points_yesterday
+             FROM users u`
+          ).bind(todayStart)
+        ]);
+
+        const top3 = top3Result.results;
+        const userPointsList = userPointsYesterdayResult.results as { id: string; points_yesterday: number }[];
+
+        // Sort descending
+        userPointsList.sort((a, b) => b.points_yesterday - a.points_yesterday);
+
+        // Find current user's index in the sorted list
+        const userIndex = userPointsList.findIndex(item => item.id === authUser.userId);
+        const yesterdayRank = userIndex !== -1 ? userIndex + 1 : userPointsList.length + 1;
+
+        return new Response(JSON.stringify({
+          success: true,
+          top3: top3,
+          yesterdayRank: yesterdayRank
+        }), { headers: corsHeaders });
+      }
+
       // 16. Get/Set Configs (Admin)
       if (path === '/api/admin/config' && request.method === 'GET') {
+        const cacheKey = 'admin_config_list';
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) {
+          return new Response(cached, { headers: corsHeaders });
+        }
+
         const list = await env.DB.prepare('SELECT key, value FROM config').all();
-        return new Response(JSON.stringify(list.results), { headers: corsHeaders });
+        const jsonStr = JSON.stringify(list.results);
+        await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
+        return new Response(jsonStr, { headers: corsHeaders });
       }
 
       if (path === '/api/admin/config' && request.method === 'POST') {
@@ -1620,6 +1754,10 @@ export default {
         }
         await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)')
           .bind(body.key, body.value).run();
+
+        // Invalidate admin config cache
+        await env.SHEEPS_CACHE.delete('admin_config_list');
+
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
       }
 

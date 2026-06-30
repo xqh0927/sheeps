@@ -800,6 +800,14 @@ class MenuViewModel @Inject constructor(
             return
         }
 
+        if (change > 0 && currentSelect == 0) {
+            val selectedTypesCount = state.selectedCarryItems.count { it.value > 0 }
+            if (selectedTypesCount >= 5) {
+                setEffect(MenuViewEffect.ShowToast("最多只能选择5种道具进行闯关"))
+                return
+            }
+        }
+
         val updatedMap = state.selectedCarryItems.toMutableMap()
         if (target == 0) {
             updatedMap.remove(itemType)

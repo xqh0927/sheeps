@@ -101,8 +101,21 @@ class DuelViewModel @Inject constructor(
     private fun handleClickTile(tile: Tile) {
         val state = currentState
         if (state.gameStatus != GameStatus.PLAYING) return
+        val isBlocked = tile.state == TileState.BLOCKED || (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles))
+        if (isBlocked) {
+            val blockers = com.example.sheeps.core.game.GameEngine.getBlockingTiles(tile, state.boardTiles)
+            val blockerIds = blockers.map { it.id }.toSet()
+            if (blockerIds.isNotEmpty()) {
+                updateState { copy(shakingTileIds = shakingTileIds + blockerIds) }
+                viewModelScope.launch {
+                    delay(500)
+                    updateState { copy(shakingTileIds = shakingTileIds - blockerIds) }
+                }
+            }
+            return
+        }
+
         if (tile.state != TileState.NORMAL && tile.state != TileState.MOVED_OUT) return
-        if (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles)) return
 
         viewModelScope.launch {
             if (tile.state == TileState.MOVED_OUT) {
@@ -276,7 +289,13 @@ class DuelViewModel @Inject constructor(
                                     incomingAttackMessage = null
                                 )
                             }
-                            setEffect(DuelViewEffect.ShowToast("对手超时未重连，你赢了！"))
+                            setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+                                "对手超时未重连，你赢了！", 
+                                "Opponent timed out, you win!", 
+                                "對手超時未重連，你贏了！", 
+                                "相手がタイムアウトしました。あなたの勝ちです！", 
+                                "상대방이 시간 초과되었습니다. 당신이 이겼습니다!"
+                            )))
                         }
                     }
                 }
@@ -345,12 +364,24 @@ class DuelViewModel @Inject constructor(
         if (state.gameStatus != GameStatus.PLAYING) return
         
         if (state.usedSpells.contains(spellType)) {
-            setEffect(DuelViewEffect.ShowToast("该大招已使用过，本局无法重复使用！"))
+            setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+                "该大招已使用过，本局无法重复使用！",
+                "Spell already used, cannot reuse this match!",
+                "該大招已使用過，本局無法重複使用！",
+                "このスキルは既に使用されています。この対局では再使用できません！",
+                "이 주문은 이미 사용되었습니다. 이번 판에서는 재사용할 수 없습니다!"
+            )))
             return
         }
         
         if (state.isSilenced) {
-            setEffect(DuelViewEffect.ShowToast("你正处于禁魔状态，无法使用大招！"))
+            setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+                "你正处于禁魔状态，无法使用大招！",
+                "You are silenced, cannot cast spells!",
+                "你正處於禁魔狀態，無法使用大招！",
+                "現在サイレンス状態です。スキルを使用できません！",
+                "침묵 상태이므로 주문을 사용할 수 없습니다!"
+            )))
             return
         }
 
@@ -363,7 +394,13 @@ class DuelViewModel @Inject constructor(
             else -> 999
         }
         if (state.currentEnergy < cost) {
-            setEffect(DuelViewEffect.ShowToast("能量不足以施法！"))
+            setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+                "能量不足以施法！",
+                "Insufficient energy to cast spell!",
+                "能量不足以施法！",
+                "エネルギーが不足しています！",
+                "주문을 시전할 게이지가 부족합니다!"
+            )))
             return
         }
 
@@ -381,7 +418,13 @@ class DuelViewModel @Inject constructor(
         ))
 
         setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
-        setEffect(DuelViewEffect.ShowToast("施法成功！"))
+        setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+            "施法成功！",
+            "Spell casted successfully!",
+            "施法成功！",
+            "スキル使用成功！",
+            "주문 시전 성공!"
+        )))
     }
 
     private fun applySpellEffect(spellType: String) {
@@ -483,7 +526,13 @@ class DuelViewModel @Inject constructor(
             type = CommandType.ATTACK,
             payload = CommandPayload(obstacleType = "SEALED")
         ))
-        setEffect(DuelViewEffect.ShowToast("发动攻击！封印对手卡牌"))
+        setEffect(DuelViewEffect.ShowToast(getLocalizedString(
+            "发动攻击！封印对手卡牌",
+            "Attacking! Sealed opponent tiles",
+            "發動攻擊！封印對手卡牌",
+            "攻撃発動！相手のカードを封印します",
+            "공격 개시! 상대방 카드를 봉인합니다"
+        )))
     }
 
     private fun sendSystemEvent(msg: String) {
@@ -536,6 +585,16 @@ class DuelViewModel @Inject constructor(
                 y = coord.y,
                 z = coord.z
             )
+        }
+    }
+
+    private fun getLocalizedString(zh: String, en: String, tw: String, ja: String, ko: String): String {
+        return when (prefs.getLanguage()) {
+            "en" -> en
+            "tw" -> tw
+            "ja" -> ja
+            "ko" -> ko
+            else -> zh
         }
     }
 

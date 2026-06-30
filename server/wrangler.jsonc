@@ -11,5 +11,11 @@
       "database_name": "my-app-db",
       "database_id": "e6c896e1-4dcc-4b7d-be10-629eb47041f1"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SHEEPS_CACHE",
+      "id": "784104ac67eb4f3c83a92e9dcc91b673"
+    }
   ]
 }

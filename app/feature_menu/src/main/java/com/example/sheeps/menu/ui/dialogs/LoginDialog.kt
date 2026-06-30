@@ -13,6 +13,9 @@ import androidx.compose.ui.unit.dp
 import com.example.sheeps.theme.CrimsonRed
 import com.hjq.toast.Toaster
 import kotlinx.coroutines.delay
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -21,6 +24,7 @@ fun LoginDialog(
     onSendCode: (String) -> Unit,
     onLogin: (String, String) -> Unit
 ) {
+    val context = LocalContext.current
     var phone by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var countdown by remember { mutableStateOf(0) }
@@ -36,7 +40,7 @@ fun LoginDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "玄门登录验证",
+                text = stringResource(id = R.string.btn_login),
                 fontWeight = FontWeight.Bold,
                 color = CrimsonRed,
                 fontFamily = FontFamily.Serif
@@ -47,7 +51,7 @@ fun LoginDialog(
                 OutlinedTextField(
                     value = phone,
                     onValueChange = { phone = it },
-                    label = { Text("手机号") },
+                    label = { Text(stringResource(id = R.string.dialog_login_phone)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -59,7 +63,7 @@ fun LoginDialog(
                     OutlinedTextField(
                         value = code,
                         onValueChange = { code = it },
-                        label = { Text("验证码") },
+                        label = { Text(stringResource(id = R.string.dialog_login_code)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -70,7 +74,7 @@ fun LoginDialog(
                                 onSendCode(phone)
                                 countdown = 60
                             } else {
-                                Toaster.show("请输入11位手机号")
+                                Toaster.show(context.getString(R.string.hint_phone))
                             }
                         },
                         enabled = countdown == 0,
@@ -79,7 +83,7 @@ fun LoginDialog(
                         modifier = Modifier.height(48.dp)
                     ) {
                         Text(
-                            text = if (countdown > 0) "${countdown}s" else "获取",
+                            text = if (countdown > 0) "${countdown}s" else stringResource(id = R.string.btn_get_otp),
                             color = Color.White
                         )
                     }
@@ -91,12 +95,12 @@ fun LoginDialog(
                 onClick = { onLogin(phone, code) },
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed)
             ) {
-                Text("验证登录", color = Color.White)
+                Text(stringResource(id = R.string.dialog_login_btn), color = Color.White)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消", color = Color.Gray)
+                Text(stringResource(id = R.string.dialog_login_cancel), color = Color.Gray)
             }
         },
         shape = RoundedCornerShape(16.dp)

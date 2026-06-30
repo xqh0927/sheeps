@@ -2,6 +2,7 @@ package com.example.sheeps.data.network
 
 import com.example.sheeps.data.model.AppUpdateResponse
 import com.example.sheeps.data.model.DailyTask
+import com.example.sheeps.data.model.DailyPopupResponse
 import com.example.sheeps.data.model.ExchangeRecord
 import com.example.sheeps.data.model.ExchangeRequest
 import com.example.sheeps.data.model.ExchangeResponse
@@ -146,4 +147,9 @@ interface ApiService {
 
     @POST("/api/match/leave")
     suspend fun leaveMatch(@Body request: MatchJoinRequest): GenericResponse
+
+    @GET("/api/leaderboard/daily-popup")
+    suspend fun getDailyPopup(
+        @Header("Authorization") auth: String
+    ): DailyPopupResponse
 }

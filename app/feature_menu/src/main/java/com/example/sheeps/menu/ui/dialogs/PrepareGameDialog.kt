@@ -28,6 +28,10 @@ import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.theme.GoldenBronze
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.hjq.toast.Toaster
+import com.example.sheeps.core.R
+import com.example.sheeps.core.utils.getLocalizedItemName
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun PrepareGameDialog(
@@ -38,6 +42,7 @@ fun PrepareGameDialog(
     onUpdateItem: (String, Int) -> Unit,
     onUnlock: (Int) -> Unit
 ) {
+    val context = LocalContext.current
     val isLocked = levelId > state.unlockedLevel
     val cost = if (levelId == 2) 50 else if (levelId == 3) 100 else 200
 
@@ -108,7 +113,7 @@ fun PrepareGameDialog(
                     if (isLocked) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Text(
-                                text = "本关卡处于封印锁定状态。少侠当前尚未通关前面的关卡，或者您可选择使用积分强行破除关卡结界提前解锁。\n\n提前破阵所需积分：$cost 积分\n您当前积分余额：${state.points}",
+                                text = stringResource(id = R.string.prepare_locked_desc, cost, state.points),
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,
                                 color = Color.DarkGray
@@ -119,7 +124,7 @@ fun PrepareGameDialog(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text("退避三舍", color = Color.Gray)
+                                    Text(stringResource(id = R.string.dialog_prepare_back), color = Color.Gray)
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Button(
@@ -127,20 +132,20 @@ fun PrepareGameDialog(
                                         if (state.points >= cost) {
                                             onUnlock(levelId)
                                         } else {
-                                            Toaster.show("积分余额不足以强行破阵！")
+                                            Toaster.show(context.getString(R.string.prepare_locked_insufficient))
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("积分子系统强行解封", color = Color.White)
+                                    Text(stringResource(id = R.string.dialog_prepare_unlock), color = Color.White)
                                 }
                             }
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(
-                                text = "少侠即将踏入消除棋阵，可在此选择挑选背包中法宝携带入局辅佐消除（仅本局生效且会最终消耗）：",
+                                text = stringResource(id = R.string.prepare_setup_desc),
                                 fontSize = 12.sp,
                                 color = Color.Gray,
                                 lineHeight = 16.sp
@@ -149,26 +154,25 @@ fun PrepareGameDialog(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             val itemTypes = listOf(
-                                "UNDO" to "撤销符",
-                                "SHUFFLE" to "洗牌咒",
-                                "MOVEOUT" to "移出印",
-                                "REVIVE" to "复活丹",
-                                "HINT" to "提示符",
-                                "BOMB" to "爆裂弹",
-                                "JOKER" to "万能牌",
-                                "DOUBLE_POINTS" to "双倍卡"
+                                "UNDO", "SHUFFLE", "MOVEOUT", "REVIVE", "HINT", "BOMB", "JOKER", "DOUBLE_POINTS"
                             )
+
+                            val selectedTypesCount = remember(state.selectedCarryItems) {
+                                state.selectedCarryItems.count { it.value > 0 }
+                            }
 
                             Column(
                                 modifier = Modifier
                                     .height(280.dp)
                                     .verticalScroll(rememberScrollState())
                             ) {
-                                itemTypes.forEach { (type, name) ->
+                                itemTypes.forEach { type ->
+                                    val name = getLocalizedItemName(type)
                                     val stock =
                                         state.backpackItems.find { it.item_type == type }?.count
                                             ?: 0
                                     val selected = state.selectedCarryItems[type] ?: 0
+                                    val isGray = selected == 0
 
                                     Row(
                                         modifier = Modifier
@@ -191,7 +195,8 @@ fun PrepareGameDialog(
                                             // Call new high definition Canvas vector animation icon
                                             ItemAnimationIcon(
                                                 itemType = type,
-                                                size = 40.dp
+                                                size = 40.dp,
+                                                isGray = isGray
                                             )
                                             Column {
                                                 Text(
@@ -201,7 +206,7 @@ fun PrepareGameDialog(
                                                     color = Color.DarkGray
                                                 )
                                                 Text(
-                                                    "库存: $stock",
+                                                    stringResource(id = R.string.stock_prefix, stock),
                                                     fontSize = 11.sp,
                                                     color = Color.Gray
                                                 )
@@ -224,7 +229,7 @@ fun PrepareGameDialog(
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                                    contentDescription = "减",
+                                                    contentDescription = stringResource(id = R.string.prepare_desc_decrease),
                                                     tint = if (selected > 0) CrimsonRed else Color.Gray,
                                                     modifier = Modifier.size(18.dp)
                                                 )
@@ -248,21 +253,22 @@ fun PrepareGameDialog(
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (selected > 0) CrimsonRed else Color.DarkGray
                                             )
+                                            val canIncrease = selected < stock && (selected > 0 || selectedTypesCount < 5)
                                             IconButton(
                                                 onClick = { onUpdateItem(type, 1) },
-                                                enabled = selected < stock,
+                                                enabled = canIncrease,
                                                 modifier = Modifier
                                                     .size(28.dp)
                                                     .background(
-                                                        if (selected < stock) Color(
+                                                        if (canIncrease) Color(
                                                             0xFFFFF0EC
                                                         ) else Color(0xFFF5F5F5), CircleShape
                                                     )
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.KeyboardArrowUp,
-                                                    contentDescription = "加",
-                                                    tint = if (selected < stock) CrimsonRed else Color.Gray,
+                                                    contentDescription = stringResource(id = R.string.prepare_desc_increase),
+                                                    tint = if (canIncrease) CrimsonRed else Color.Gray,
                                                     modifier = Modifier.size(18.dp)
                                                 )
                                             }
@@ -279,7 +285,7 @@ fun PrepareGameDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text("关闭", color = Color.Gray)
+                                    Text(stringResource(id = R.string.dialog_prepare_close), color = Color.Gray)
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Button(
@@ -288,7 +294,7 @@ fun PrepareGameDialog(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        "启程破阵",
+                                        stringResource(id = R.string.prepare_btn_start),
                                         color = Color.White,
                                         fontWeight = FontWeight.Bold
                                     )

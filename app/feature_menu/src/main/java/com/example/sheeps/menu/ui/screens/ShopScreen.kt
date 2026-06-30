@@ -24,6 +24,8 @@ import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.ShopItemCard
 import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.theme.GoldenBronze
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.rememberScrollState
@@ -38,7 +40,10 @@ fun ShopScreen(
 ) {
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
-    val displayItems = remember(selectedSubTab, state.shopItems) {
+    val classicName = stringResource(id = R.string.item_skin_classic)
+    val classicDesc = stringResource(id = R.string.item_skin_classic_desc)
+
+    val displayItems = remember(selectedSubTab, state.shopItems, classicName, classicDesc) {
         if (selectedSubTab == 0) {
             state.shopItems.filter { !it.item_type.startsWith("SKIN_") }
         } else {
@@ -47,8 +52,8 @@ fun ShopScreen(
             skins.add(
                 ShopItem(
                     id = -1,
-                    name = "经典国风",
-                    description = "默认解锁的古典朱红卡牌样式",
+                    name = classicName,
+                    description = classicDesc,
                     image_url = "",
                     item_type = "CLASSIC",
                     points_price = 0,
@@ -76,14 +81,14 @@ fun ShopScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "福禄聚宝阁",
+                    text = stringResource(id = R.string.shop_title),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = CrimsonRed,
                     fontFamily = FontFamily.Serif
                 )
                 Text(
-                    text = "积分: ${state.points}",
+                    text = stringResource(id = R.string.points_balance, state.points),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = CrimsonRed
@@ -100,12 +105,12 @@ fun ShopScreen(
                 Tab(
                     selected = selectedSubTab == 0,
                     onClick = { selectedSubTab = 0 },
-                    text = { Text("法宝神器", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text(stringResource(id = R.string.shop_item_magic), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = selectedSubTab == 1,
                     onClick = { selectedSubTab = 1 },
-                    text = { Text("奇门皮肤", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                    text = { Text(stringResource(id = R.string.shop_item_skin), fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                 )
             }
 
@@ -157,7 +162,7 @@ fun ShopScreen(
                     ) {
                         // Section 1: Traditional Themes
                         Text(
-                            text = "专属特制卡牌主题",
+                            text = stringResource(id = R.string.shop_section_traditional),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = CrimsonRed,
@@ -186,7 +191,7 @@ fun ShopScreen(
                         // Section 2: Province Gourmet Skins
                         if (provinceSkins.isNotEmpty()) {
                             Text(
-                                text = "华夏省味美食系列 (省份皮肤)",
+                                text = stringResource(id = R.string.shop_section_provinces),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = CrimsonRed,
@@ -242,7 +247,7 @@ fun ShopScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "金库封锁",
+                            text = stringResource(id = R.string.shop_vault_locked),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = CrimsonRed,
@@ -250,7 +255,7 @@ fun ShopScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "请先登录游戏账号，登录后可用积分在此阁内兑换破阵之法宝神器。",
+                            text = stringResource(id = R.string.shop_login_prompt),
                             fontSize = 13.sp,
                             color = Color.Gray,
                             textAlign = TextAlign.Center,
@@ -262,7 +267,7 @@ fun ShopScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("立即登录", color = Color.White)
+                            Text(stringResource(id = R.string.shop_btn_login_sync), color = Color.White)
                         }
                     }
                 }

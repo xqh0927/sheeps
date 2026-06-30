@@ -44,7 +44,8 @@ data class GameViewState(
     val score: Int = 0,
     val gameStatus: GameStatus = GameStatus.INIT,
     val rankings: List<RankingEntry> = emptyList(),
-    val currentSkin: String = "classic"
+    val currentSkin: String = "classic",
+    val shakingTileIds: Set<String> = emptySet()
 )
 
 sealed interface GameViewIntent {

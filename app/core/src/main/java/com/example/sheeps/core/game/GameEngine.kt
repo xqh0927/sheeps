@@ -10,9 +10,24 @@ object GameEngine {
      * Checks if a card (tile) is blocked/obscured by any other card at a higher z-layer.
      */
     fun isTileBlocked(tile: Tile, board: List<Tile>): Boolean {
-        val W = 1.0f
-        val H = 1.0f
+        val W = 52.0f / 46.0f
+        val H = 52.0f / 46.0f
         return board.any { other ->
+            other.id != tile.id &&
+            (other.state == TileState.NORMAL || other.state == TileState.BLOCKED) &&
+            other.z > tile.z &&
+            abs(other.x - tile.x) < W &&
+            abs(other.y - tile.y) < H
+        }
+    }
+
+    /**
+     * Gets all cards (tiles) that are blocking/obscuring the given card at a higher z-layer.
+     */
+    fun getBlockingTiles(tile: Tile, board: List<Tile>): List<Tile> {
+        val W = 52.0f / 46.0f
+        val H = 52.0f / 46.0f
+        return board.filter { other ->
             other.id != tile.id &&
             (other.state == TileState.NORMAL || other.state == TileState.BLOCKED) &&
             other.z > tile.z &&

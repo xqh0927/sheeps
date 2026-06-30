@@ -28,12 +28,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.sheeps.core.multiplayer.WebSocketManager
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.TileView
 import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.*
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import kotlinx.coroutines.launch
+
+private data class DuelFlyingTile(
+    val tileId: String,
+    val type: Int,
+    val start: Offset,
+    val end: Offset,
+    val progress: Animatable<Float, AnimationVector1D>
+)
 
 @Composable
 fun DuelScreen(
@@ -44,6 +57,13 @@ fun DuelScreen(
     onCastSpell: (String) -> Unit // 新增：施放法术事件
 ) {
     var showExitConfirmDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val tileGlobalPositions = remember { mutableStateMapOf<String, Offset>() }
+    val slotGlobalPositions = remember { mutableStateMapOf<Int, Offset>() }
+    var flyingTiles by remember { mutableStateOf(emptyList<DuelFlyingTile>()) }
+    var flyingTileIds by remember { mutableStateOf(emptySet<String>()) }
+    var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
 
     BackHandler(enabled = true) {
         showExitConfirmDialog = true
@@ -52,8 +72,8 @@ fun DuelScreen(
     if (showExitConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showExitConfirmDialog = false },
-            title = { Text("确定要认输退出吗？", fontWeight = FontWeight.Bold) },
-            text = { Text("中途退出对局将直接判定失败。确认要认输退出吗？") },
+            title = { Text(stringResource(id = R.string.dialog_duel_exit_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(id = R.string.dialog_duel_exit_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -61,12 +81,12 @@ fun DuelScreen(
                         onLeave()
                     }
                 ) {
-                    Text("确定认输", color = Crimson_Primary, fontWeight = FontWeight.Bold)
+                    Text(stringResource(id = R.string.dialog_duel_exit_confirm), color = Crimson_Primary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showExitConfirmDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(id = R.string.dialog_duel_exit_cancel))
                 }
             }
         )
@@ -83,6 +103,9 @@ fun DuelScreen(
                     )
                 )
             )
+            .onGloballyPositioned { coords ->
+                screenRootOffset = coords.positionInRoot()
+            }
     ) {
         Column(
             modifier = Modifier
@@ -143,17 +166,41 @@ fun DuelScreen(
 
                         Box(modifier = Modifier.size(width = boardWidth.dp, height = boardHeight.dp)) {
                             visibleTiles.forEach { tile ->
+                                val isFlying = flyingTileIds.contains(tile.id)
                                 TileView(
                                     tile = tile,
-                                    onClick = { onTileClick(tile) },
+                                    onClick = {
+                                        if (!isFlying) {
+                                            val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                                            val nextSlotIdx = state.slotTiles.size
+                                            val endPos = slotGlobalPositions[nextSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                                            
+                                            val anim = Animatable(0f)
+                                            val fly = DuelFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                                            flyingTiles = flyingTiles + fly
+                                            flyingTileIds = flyingTileIds + tile.id
+                                            
+                                            coroutineScope.launch {
+                                                anim.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+                                                flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                                                flyingTileIds = flyingTileIds - tile.id
+                                                onTileClick(tile)
+                                            }
+                                        }
+                                    },
                                     currentSkin = "classic",
                                     tileSize = 52.dp,
+                                    isShaking = state.shakingTileIds.contains(tile.id),
                                     modifier = Modifier
                                         .offset(
                                             x = ((tile.x - minX) * 46).dp,
                                             y = ((tile.y - minY) * 46).dp
                                         )
                                         .zIndex(tile.z.toFloat())
+                                        .alpha(if (isFlying) 0f else 1f)
+                                        .onGloballyPositioned { coords ->
+                                            tileGlobalPositions[tile.id] = coords.positionInRoot()
+                                        }
                                 )
                             }
                         }
@@ -263,7 +310,10 @@ fun DuelScreen(
                                 width = 1.dp,
                                 color = if (isLocked) Crimson_Primary else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
-                            ),
+                            )
+                            .onGloballyPositioned { coords ->
+                                slotGlobalPositions[i] = coords.positionInRoot()
+                            },
                         contentAlignment = Alignment.Center
                     ) {
                         if (isLocked) {
@@ -391,6 +441,30 @@ fun DuelScreen(
                 SheepsLoading(size = 56.dp)
             }
         }
+
+        // Flying tiles overlay
+        flyingTiles.forEach { fly ->
+            val progress = fly.progress.value
+            val x = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
+            val y = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
+            val sizeDp = 52.dp - (12.dp * progress)
+            val xDp = with(density) { x.toDp() }
+            val yDp = with(density) { y.toDp() }
+
+            Box(
+                modifier = Modifier
+                    .offset(x = xDp, y = yDp)
+                    .size(sizeDp)
+                    .zIndex(999f)
+            ) {
+                TileView(
+                    tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
+                    onClick = {},
+                    currentSkin = "classic",
+                    tileSize = sizeDp
+                )
+            }
+        }
     }
 }
 
@@ -439,7 +513,7 @@ private fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // 自己
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("我", modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(id = R.string.label_duel_me), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
                 val remaining = state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } + state.movedOutTiles.size
                 val totalTiles = if (state.totalTileCount > 0) state.totalTileCount else 100
                 LinearProgressIndicator(
@@ -451,7 +525,7 @@ private fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
             }
             // 对手
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("敌", modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(id = R.string.label_duel_enemy), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
                 LinearProgressIndicator(
                     progress = state.opponentProgress.coerceIn(0f, 1f),
                     modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
@@ -464,7 +538,7 @@ private fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
 
             // 能量流光槽
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("能", modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+                Text(stringResource(id = R.string.label_duel_energy), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
                 Box(
                     modifier = Modifier
                         .weight(1f)

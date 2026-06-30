@@ -13,6 +13,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -33,6 +34,7 @@ class GameViewModel @Inject constructor(
     private var levelStartTime: Long = 0
     private var gameScore: Int = 0
     private var carryItemsJsonStr: String? = null
+    private var itemsUsedCount: Int = 0
 
     // Triple of snapshots: board, slot, movedOut
     private val historyStack = mutableListOf<Triple<List<Tile>, List<Tile>, List<Tile>>>()
@@ -101,9 +103,9 @@ class GameViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 apiService.rename(RenameRequest(prefs.getUserId(), newName))
-                setEffect(GameViewEffect.ShowToast("昵称修改成功"))
+                setEffect(GameViewEffect.ShowToast(getLocalizedString("昵称修改成功", "Nickname changed successfully", "暱稱修改成功", "ニックネーム変更完了", "닉네임이 성공적으로 변경되었습니다")))
             } catch (e: Exception) {
-                setEffect(GameViewEffect.ShowToast("昵称本地已修改（网络同步失败）"))
+                setEffect(GameViewEffect.ShowToast(getLocalizedString("昵称本地已修改（网络同步失败）", "Nickname updated locally (sync failed)", "暱稱本地已修改（網絡同步失敗）", "ローカルで変更完了（同期失敗）", "닉네임이 로컬에서 변경됨 (동기화 실패)")))
             }
         }
     }
@@ -113,6 +115,7 @@ class GameViewModel @Inject constructor(
         historyStack.clear()
         levelStartTime = System.currentTimeMillis()
         gameScore = 0
+        itemsUsedCount = 0
         carryItemsJsonStr = carryItemsJson
 
         // Parse carry map
@@ -203,7 +206,7 @@ class GameViewModel @Inject constructor(
                         currentSkin = prefs.getCurrentSkin()
                     )
                 }
-                setEffect(GameViewEffect.ShowToast("网络加载失败，已切换至单机模式"))
+                setEffect(GameViewEffect.ShowToast(getLocalizedString("网络加载失败，已切换至单机模式", "Network load failed, switched to offline mode", "網絡加載失敗，已切換至單機模式", "ネットワークエラー、オフラインモードに切り替えました", "네트워크 로드 실패, 오프라인 모드로 전환됨")))
             }
         }
     }
@@ -212,8 +215,21 @@ class GameViewModel @Inject constructor(
         val state = currentState
         if (state.gameStatus != GameStatus.PLAYING) return
 
+        val isBlocked = tile.state == TileState.BLOCKED || (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles))
+        if (isBlocked) {
+            val blockers = com.example.sheeps.core.game.GameEngine.getBlockingTiles(tile, state.boardTiles)
+            val blockerIds = blockers.map { it.id }.toSet()
+            if (blockerIds.isNotEmpty()) {
+                updateState { copy(shakingTileIds = shakingTileIds + blockerIds) }
+                viewModelScope.launch {
+                    delay(500)
+                    updateState { copy(shakingTileIds = shakingTileIds - blockerIds) }
+                }
+            }
+            return
+        }
+
         if (tile.state != TileState.NORMAL && tile.state != TileState.MOVED_OUT) return
-        if (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles)) return
 
         saveHistoryState()
         
@@ -311,6 +327,7 @@ class GameViewModel @Inject constructor(
         if (state.gameStatus != GameStatus.PLAYING || state.undoCount <= 0 || historyStack.isEmpty()) return
 
         val (prevBoard, prevSlot, prevMovedOut) = historyStack.removeLast()
+        itemsUsedCount++
 
         updateState {
             copy(
@@ -332,6 +349,7 @@ class GameViewModel @Inject constructor(
         val toMove = state.slotTiles.take(3).map { it.copy(state = TileState.MOVED_OUT) }
         val remainingSlot = state.slotTiles.drop(3)
         val newMovedOut = state.movedOutTiles + toMove
+        itemsUsedCount++
 
         updateState {
             copy(
@@ -354,6 +372,7 @@ class GameViewModel @Inject constructor(
         if (activeTiles.isEmpty()) return
 
         val shuffledTypes = activeTiles.map { it.type }.shuffled()
+        itemsUsedCount++
 
         var idx = 0
         val newBoard = state.boardTiles.map { tile ->
@@ -382,6 +401,7 @@ class GameViewModel @Inject constructor(
         val toMove = state.slotTiles.take(3).map { it.copy(state = TileState.MOVED_OUT) }
         val remainingSlot = state.slotTiles.drop(3)
         val newMovedOut = state.movedOutTiles + toMove
+        itemsUsedCount++
 
         updateState {
             copy(
@@ -408,18 +428,19 @@ class GameViewModel @Inject constructor(
         val targetGroup = groups.values.find { it.size >= 3 }
 
         if (targetGroup == null) {
-            setEffect(GameViewEffect.ShowToast("棋盘上已无成组之卡牌！"))
+            setEffect(GameViewEffect.ShowToast(getLocalizedString("棋盘上已无成组之卡牌！", "No more matching groups on board!", "棋盤上已無成組之卡牌！", "ボード上に一致するグループはありません！", "보드에 일치하는 그룹이 없습니다!")))
             return
         }
 
         val targetIds = targetGroup.take(3).map { it.id }.toSet()
+        itemsUsedCount++
         updateState {
             copy(
                 highlightedTileIds = targetIds,
                 hintCount = state.hintCount - 1
             )
         }
-        setEffect(GameViewEffect.ShowToast("天眼符开启：已为您高亮出一组可消卡牌！"))
+        setEffect(GameViewEffect.ShowToast(getLocalizedString("天眼符开启：已为您高亮出一组可消卡牌！", "Hint activated: matching group highlighted!", "天眼符開啟：已為您高亮出一組可消卡牌！", "ヒント有効：一致するグループをハイライトしました！", "힌트 활성화: 일치하는 그룹이 하이라이트되었습니다!")))
     }
 
     private fun handleUseBomb() {
@@ -427,19 +448,20 @@ class GameViewModel @Inject constructor(
         if (state.gameStatus != GameStatus.PLAYING || state.bombCount <= 0) return
 
         if (state.slotTiles.size < 2) {
-            setEffect(GameViewEffect.ShowToast("卡槽内卡牌不足两张，无法使用雷震子！"))
+            setEffect(GameViewEffect.ShowToast(getLocalizedString("卡槽内卡牌不足两张，无法使用雷震子！", "Need at least 2 cards in tray to use Bomb!", "卡槽內卡牌不足兩張，無法使用雷震子！", "爆弾を使用するにはトレイに少なくとも2枚のカードが必要です！", "폭탄을 사용하려면 트레이에 카드가 2장 이상 있어야 합니다!")))
             return
         }
 
         // Destroy the last two tiles from the slot
         val newSlot = state.slotTiles.dropLast(2)
+        itemsUsedCount++
         updateState {
             copy(
                 slotTiles = newSlot,
                 bombCount = state.bombCount - 1
             )
         }
-        setEffect(GameViewEffect.ShowToast("雷震子炸裂！直接销毁卡槽最后两张牌！"))
+        setEffect(GameViewEffect.ShowToast(getLocalizedString("雷震子炸裂！直接销毁卡槽最后两张牌！", "Bomb exploded! Destroyed the last two cards!", "雷震子炸裂！直接銷毀卡槽最後兩張牌！", "爆弾爆発！最後の2枚のカードが破壊されました！", "폭탄 폭발! 마지막 카드 2장이 제거되었습니다!")))
         
         // Re-run end game checking just in case
         viewModelScope.launch {
@@ -452,7 +474,7 @@ class GameViewModel @Inject constructor(
         if (state.gameStatus != GameStatus.PLAYING || state.jokerCount <= 0) return
 
         if (state.slotTiles.isEmpty()) {
-            setEffect(GameViewEffect.ShowToast("卡槽为空，太极牌无处幻化！"))
+            setEffect(GameViewEffect.ShowToast(getLocalizedString("卡槽为空，太极牌无处幻化！", "Tray is empty, Joker cannot morph!", "卡槽為空，太極牌無處幻化！", "トレイが空です、ワイルドカードは変化できません！", "트레이가 비어 있어 조커를 변환할 수 없습니다!")))
             return
         }
 
@@ -470,12 +492,13 @@ class GameViewModel @Inject constructor(
         )
 
         val newSlot = state.slotTiles + jokerTile
+        itemsUsedCount++
         updateState {
             copy(
                 jokerCount = state.jokerCount - 1
             )
         }
-        setEffect(GameViewEffect.ShowToast("太极牌显灵！幻化为同名图案凑成消除！"))
+        setEffect(GameViewEffect.ShowToast(getLocalizedString("太极牌显灵！幻化为同名图案凑成消除！", "Joker activated! Morphed to match and eliminate!", "太極牌顯靈！幻化為同名圖案湊成消除！", "ワイルドカード有効！一致させて消去しました！", "조커 활성화! 일치하도록 변환되어 제거되었습니다!")))
 
         viewModelScope.launch {
             processSlotMatchAndCheckEndGame(state.boardTiles, newSlot, state.movedOutTiles)
@@ -486,7 +509,7 @@ class GameViewModel @Inject constructor(
         val state = currentState
         if (state.gameStatus != GameStatus.PLAYING || state.doublePointsCount <= 0) return
         if (state.isDoublePointsActive) {
-            setEffect(GameViewEffect.ShowToast("双倍积分已在激活状态中"))
+            setEffect(GameViewEffect.ShowToast(getLocalizedString("双倍积分已在激活状态中", "Double points already active", "雙倍積分已在激活狀態中", "ダブルポイントは既に有効です", "더블 포인트가 이미 활성화되어 있습니다")))
             return
         }
 
@@ -496,7 +519,8 @@ class GameViewModel @Inject constructor(
                 doublePointsCount = state.doublePointsCount - 1
             )
         }
-        setEffect(GameViewEffect.ShowToast("双倍积分符激活！通关时成绩积分将翻倍"))
+        itemsUsedCount++
+        setEffect(GameViewEffect.ShowToast(getLocalizedString("双倍积分符激活！通关时成绩积分将翻倍", "Double points active! Clearing level will double your score", "雙倍積分符激活！通關時成績積分將翻倍", "ダブルポイント有効！クリア時にスコアが2倍になります", "더블 포인트 활성화! 클리어 시 점수가 2배가 됩니다")))
     }
 
     private fun handleLoadLeaderboard(levelId: Int) {
@@ -509,7 +533,7 @@ class GameViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false, rankings = emptyList()) }
-                setEffect(GameViewEffect.ShowToast("无法加载排行榜，请检查网络连接"))
+                setEffect(GameViewEffect.ShowToast(getLocalizedString("无法加载排行榜，请检查网络连接", "Failed to load leaderboard, check network connection", "無法加載排行榜，請檢查網絡連接", "ランキングの読み込みに失敗しました。接続を確認してください", "랭킹 로드 실패, 네트워크 연결을 확인하세요")))
             }
         }
     }
@@ -540,7 +564,16 @@ class GameViewModel @Inject constructor(
             prefs.setUnlockedLevel(levelId + 1)
         }
 
-        val finalScore = if (currentState.isDoublePointsActive) gameScore * 2 else gameScore
+        val timeInSeconds = clearTime / 1000L
+        val difficultyCoeff = when (levelId) {
+            1 -> 1
+            2 -> 2
+            3 -> 3
+            else -> 4
+        }
+        val calculatedScore = maxOf(100L, (1000L - timeInSeconds * 2) - itemsUsedCount * 50L) * difficultyCoeff
+        val baseScore = calculatedScore.toInt()
+        val finalScore = if (currentState.isDoublePointsActive) baseScore * 2 else baseScore
 
         // 使用全局协程生命周期 scope 提交，防止 Activity.finish 时被 viewModelScope 取消导致云端没记录
         CoroutineScope(Dispatchers.IO).launch {
@@ -575,11 +608,16 @@ class GameViewModel @Inject constructor(
                 )
 
                 setEffect(GameViewEffect.ShowToast(
-                    if (pointsReward > 0) "恭喜通关！首次通关获得50积分，进度已安全存储！" 
-                    else "通关成功！进度已安全存储！"
+                    if (pointsReward > 0) {
+                        getLocalizedString("恭喜通关！首次通关获得50积分，进度已安全存储！", "Congratulations! First clear rewarded 50 points, progress saved!", "恭喜通關！首次通關獲得50積分，進度已安全存儲！", "クリアおめでとうございます！初回クリアで50ポイント獲得、セーブしました！", "클리어를 축하합니다! 최초 클리어로 50포인트를 획득했으며, 저장되었습니다!")
+                    } else {
+                        getLocalizedString("通关成功！进度已安全存储！", "Cleared! Progress saved!", "通關成功！進度已安全存儲！", "クリア成功！セーブしました！", "클리어 성공! 저장되었습니다!")
+                    }
                 ))
             } catch (e: Exception) {
-                setEffect(GameViewEffect.ShowToast("通关成功！已离线保存进度，恢复连接后自动同步"))
+                setEffect(GameViewEffect.ShowToast(
+                    getLocalizedString("通关成功！已离线保存进度，恢复连接后自动同步", "Cleared! Progress saved offline, will sync when reconnected", "通關成功！已離線保存進度，恢復連接後自動同步", "クリア成功！オフラインで保存しました。再接続時に同期されます", "클리어 성공! 오프라인으로 저장되었으며, 재연결 시 동기화됩니다")
+                ))
             }
         }
     }
@@ -704,6 +742,16 @@ class GameViewModel @Inject constructor(
                 isBlind = isBlind,
                 sealedCount = sealed
             )
+        }
+    }
+
+    private fun getLocalizedString(zh: String, en: String, tw: String, ja: String, ko: String): String {
+        return when (prefs.getLanguage()) {
+            "en" -> en
+            "tw" -> tw
+            "ja" -> ja
+            "ko" -> ko
+            else -> zh
         }
     }
 

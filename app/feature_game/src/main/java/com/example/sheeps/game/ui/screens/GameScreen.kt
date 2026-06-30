@@ -34,6 +34,18 @@ import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.*
 import kotlin.math.cos
 import kotlin.math.sin
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.launch
+
+private data class GameFlyingTile(
+    val tileId: String,
+    val type: Int,
+    val start: Offset,
+    val end: Offset,
+    val progress: Animatable<Float, AnimationVector1D>
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,16 +55,24 @@ fun GameScreen(
     onUseUndo: () -> Unit,
     onUseMoveOut: () -> Unit,
     onUseShuffle: () -> Unit,
-    onRevive: () -> Unit,
     onUseHint: () -> Unit,
     onUseBomb: () -> Unit,
     onUseJoker: () -> Unit,
     onUseDouble: () -> Unit,
+    onRevive: () -> Unit,
     onRestart: () -> Unit,
     onBack: () -> Unit,
     onNextLevel: () -> Unit,
     onShowLeaderboard: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    val tileGlobalPositions = remember { mutableStateMapOf<String, Offset>() }
+    val slotGlobalPositions = remember { mutableStateMapOf<Int, Offset>() }
+    var flyingTiles by remember { mutableStateOf(emptyList<GameFlyingTile>()) }
+    var flyingTileIds by remember { mutableStateOf(emptySet<String>()) }
+    var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -65,6 +85,9 @@ fun GameScreen(
                     )
                 )
             )
+            .onGloballyPositioned { coords ->
+                screenRootOffset = coords.positionInRoot()
+            }
     ) {
         // 顶部微光装饰
         Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
@@ -174,17 +197,41 @@ fun GameScreen(
                             Box(modifier = Modifier.size(width = boardWidth.dp, height = boardHeight.dp)) {
                                 visibleTiles.forEach { tile ->
                                     val isHighlighted = state.highlightedTileIds.contains(tile.id)
+                                    val isFlying = flyingTileIds.contains(tile.id)
                                     TileView(
                                         tile     = tile,
-                                        onClick  = { onTileClick(tile) },
+                                        onClick  = {
+                                            if (!isFlying) {
+                                                val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                                                val nextSlotIdx = state.slotTiles.size
+                                                val endPos = slotGlobalPositions[nextSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                                                
+                                                val anim = Animatable(0f)
+                                                val fly = GameFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                                                flyingTiles = flyingTiles + fly
+                                                flyingTileIds = flyingTileIds + tile.id
+                                                
+                                                coroutineScope.launch {
+                                                    anim.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
+                                                    flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                                                    flyingTileIds = flyingTileIds - tile.id
+                                                    onTileClick(tile)
+                                                }
+                                            }
+                                        },
                                         currentSkin = state.currentSkin,
                                         tileSize = 52.dp,
+                                        isShaking = state.shakingTileIds.contains(tile.id),
                                         modifier = Modifier
                                             .offset(
                                                 x = ((tile.x - minX) * 46).dp,
                                                 y = ((tile.y - minY) * 46).dp
                                             )
                                             .zIndex(tile.z.toFloat())
+                                            .alpha(if (isFlying) 0f else 1f)
+                                            .onGloballyPositioned { coords ->
+                                                tileGlobalPositions[tile.id] = coords.positionInRoot()
+                                            }
                                             .then(
                                                 if (isHighlighted) {
                                                     Modifier.border(
@@ -206,7 +253,7 @@ fun GameScreen(
                 }
 
                 // 消除槽
-                MatchingSlot(state = state)
+                MatchingSlot(state = state, slotGlobalPositions = slotGlobalPositions)
 
                 // 道具栏
                 ToolButtonRow(
@@ -220,9 +267,9 @@ fun GameScreen(
                     onUseDouble  = onUseDouble
                 )
 
-                // 携带道具展示栏（在最下方显示携带的道具图片与名称）
+                // 携带道具展示栏（在最下方显示携带的道具图片与名称，固定展示5个槽位）
                 val carriedItems = remember(state) {
-                    listOf(
+                    val allItemsList = listOf(
                         "UNDO" to ("撤销符" to state.undoCount),
                         "SHUFFLE" to ("洗牌咒" to state.shuffleCount),
                         "MOVEOUT" to ("移出印" to state.moveOutCount),
@@ -231,46 +278,84 @@ fun GameScreen(
                         "BOMB" to ("爆裂弹" to state.bombCount),
                         "JOKER" to ("万能牌" to state.jokerCount),
                         "DOUBLE_POINTS" to ("双倍卡" to state.doublePointsCount)
-                    ).filter { it.second.second > 0 }
+                    )
+
+                    // First, filter items that are carried (count > 0)
+                    val activeItems = allItemsList.filter { it.second.second > 0 }
+
+                    // Pad with placeholders up to 5 elements (Option B)
+                    val result = activeItems.toMutableList()
+                    while (result.size < 5) {
+                        result.add("" to ("未选择" to 0))
+                    }
+                    result
                 }
 
-                if (carriedItems.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-                            .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "— 已携带法宝 —",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Gold_Primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "— 已携带法宝 —",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Gold_Primary,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            carriedItems.forEach { (type, pair) ->
-                                val (name, count) = pair
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
+                        carriedItems.forEach { (type, pair) ->
+                            val (name, count) = pair
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (count > 0) {
                                     com.example.sheeps.ui.components.ItemAnimationIcon(
                                         itemType = type,
-                                        size = 36.dp
+                                        size = 36.dp,
+                                        isGray = false
                                     )
                                     Spacer(Modifier.height(2.dp))
                                     Text(
                                         text = "$name x$count",
                                         fontSize = 10.sp,
                                         color = Text_Secondary_Dark,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                            .border(
+                                                width = 1.dp,
+                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "空",
+                                            fontSize = 10.sp,
+                                            color = Text_Disabled_Dark,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = "未选择",
+                                        fontSize = 10.sp,
+                                        color = Text_Disabled_Dark,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -313,25 +398,32 @@ fun GameScreen(
             )
         }
 
-        // 阻止加载时手势穿透的全屏遮罩
-        if (state.isLoading) {
+        // Flying tiles overlay
+        flyingTiles.forEach { fly ->
+            val progress = fly.progress.value
+            val x = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
+            val y = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
+            val sizeDp = 52.dp - (12.dp * progress)
+            val xDp = with(density) { x.toDp() }
+            val yDp = with(density) { y.toDp() }
+
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                event.changes.forEach { it.consume() }
-                            }
-                        }
-                    }
-                    .clickable(enabled = false, onClick = {}),
-                contentAlignment = Alignment.Center
+                    .offset(x = xDp, y = yDp)
+                    .size(sizeDp)
+                    .zIndex(999f)
             ) {
-                SheepsLoading(size = 56.dp)
+                TileView(
+                    tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
+                    onClick = {},
+                    currentSkin = state.currentSkin,
+                    tileSize = sizeDp
+                )
             }
+        }
+
+        if (state.isLoading) {
+            FullScreenLoading()
         }
     }
 }
@@ -432,7 +524,7 @@ private fun MovedOutTray(
 
 // --- 消除槽 ---
 @Composable
-private fun MatchingSlot(state: GameViewState) {
+private fun MatchingSlot(state: GameViewState, slotGlobalPositions: androidx.compose.runtime.snapshots.SnapshotStateMap<Int, Offset>) {
     val slotBorderAlpha by rememberInfiniteTransition(label = "slotBorder").animateFloat(
         initialValue = 0.6f,
         targetValue  = 1f,
@@ -464,7 +556,10 @@ private fun MatchingSlot(state: GameViewState) {
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                    .onGloballyPositioned { coords ->
+                        slotGlobalPositions[i] = coords.positionInRoot()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (i < state.slotTiles.size) {

@@ -32,6 +32,9 @@ import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.core.R
+import com.example.sheeps.core.utils.getLocalizedItemName
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun ShopItemCard(
@@ -84,17 +87,17 @@ fun ShopItemCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = item.name,
+                text = getLocalizedItemName(item.item_type),
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 color = Color.DarkGray
             )
 
             Text(
-                text = item.description ?: "奇门法宝",
+                text = item.description ?: stringResource(id = R.string.default_item_desc),
                 fontSize = 11.sp,
                 color = Color.Gray,
-                maxLines = 1,
+                minLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp)
             )
@@ -107,14 +110,14 @@ fun ShopItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (isSkin && isUnlocked) "已解锁" else "${item.points_price} 积分",
+                    text = if (isSkin && isUnlocked) stringResource(id = R.string.skin_unlocked) else stringResource(id = R.string.points_suffix, item.points_price),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = CrimsonRed
                 )
                 if (!isSkin) {
                     Text(
-                        text = "存: ${item.stock}",
+                        text = stringResource(id = R.string.stock_prefix, item.stock),
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
@@ -139,7 +142,7 @@ fun ShopItemCard(
                         .height(30.dp)
                 ) {
                     Text(
-                        text = if (isCurrentlyApplied) "已启用" else "启用",
+                        text = if (isCurrentlyApplied) stringResource(id = R.string.skin_applied) else stringResource(id = R.string.skin_apply),
                         fontSize = 11.sp,
                         color = if (isCurrentlyApplied) Color.DarkGray else Color.White
                     )
@@ -154,7 +157,7 @@ fun ShopItemCard(
                         .fillMaxWidth()
                         .height(30.dp)
                 ) {
-                    Text("兑换", fontSize = 11.sp, color = Color.White)
+                    Text(stringResource(id = R.string.btn_exchange), fontSize = 11.sp, color = Color.White)
                 }
             }
         }

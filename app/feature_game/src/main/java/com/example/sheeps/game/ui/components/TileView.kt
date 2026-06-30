@@ -3,6 +3,7 @@ package com.example.sheeps.game.ui.components
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -23,6 +24,8 @@ import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 
+import androidx.compose.ui.graphics.Color
+
 /**
  * 秘境消消乐 · 卡牌组件（重构版）
  * 已经过优化，移除臃肿的 Canvas 绘图代码，支持 34 套省级行政区美食 WebP 图标
@@ -33,7 +36,8 @@ fun TileView(
     onClick: () -> Unit,
     currentSkin: String = "classic",
     modifier: Modifier = Modifier,
-    tileSize: Dp = 52.dp
+    tileSize: Dp = 52.dp,
+    isShaking: Boolean = false
 ) {
     val isBlocked = tile.state == TileState.BLOCKED
     val isBlind = tile.isBlind && isBlocked
@@ -52,18 +56,51 @@ fun TileView(
         label = "tileScale"
     )
 
+    // Blocked shake feedback animation
+    val shakeOffset = remember { Animatable(0f) }
+    LaunchedEffect(isShaking) {
+        if (isShaking) {
+            repeat(4) {
+                shakeOffset.animateTo(
+                    targetValue = -6f,
+                    animationSpec = tween(durationMillis = 50, easing = LinearEasing)
+                )
+                shakeOffset.animateTo(
+                    targetValue = 6f,
+                    animationSpec = tween(durationMillis = 50, easing = LinearEasing)
+                )
+            }
+            shakeOffset.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(durationMillis = 50, easing = LinearEasing)
+            )
+        }
+    }
+
+    val scaleByJiggle by animateFloatAsState(
+        targetValue = if (isShaking) 1.1f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "jiggleScale"
+    )
+
     TileCardBase(
         skin = currentSkin,
         modifier = modifier
+            .offset(x = shakeOffset.value.dp)
             .graphicsLayer(
-                scaleX = scale,
-                scaleY = scale,
+                scaleX = if (isShaking) scaleByJiggle else scale,
+                scaleY = if (isShaking) scaleByJiggle else scale,
             )
             .size(tileSize)
+            .border(
+                width = if (isShaking) 2.dp else 0.dp,
+                color = if (isShaking) Color.Red else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
-                enabled = !isBlocked,
+                enabled = true,
                 onClick = onClick
             )
     ) {

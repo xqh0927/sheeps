@@ -28,6 +28,8 @@ import com.example.sheeps.menu.ui.components.AnnouncementsBanner
 import com.example.sheeps.menu.ui.components.LevelItemRow
 import com.example.sheeps.menu.ui.dialogs.DuelMatchDialog
 import com.example.sheeps.theme.*
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
 import com.hjq.toast.Toaster
 import kotlinx.coroutines.delay
 
@@ -35,6 +37,8 @@ import kotlinx.coroutines.delay
 fun GameHomeScreen(
     state: MenuViewState,
     onLevelClick: (Int) -> Unit,
+    onShowLeaderboard: (Int) -> Unit,
+    onNoticeClick: () -> Unit,
     onLoginClick: () -> Unit,
     onJoinMatch: () -> Unit,
     onLeaveMatch: () -> Unit,
@@ -48,7 +52,10 @@ fun GameHomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 公告轮播
-        AnnouncementsBanner(notices = state.notices)
+        AnnouncementsBanner(
+            notices = state.notices,
+            onClick = onNoticeClick
+        )
 
         Spacer(modifier = Modifier.height(14.dp))
 
@@ -69,7 +76,7 @@ fun GameHomeScreen(
                     )
             )
             Text(
-                text = "  破阵陀邪 · 奇门遁甲  ",
+                text = stringResource(id = R.string.home_section_title),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = Gold_Primary.copy(alpha = 0.85f),
@@ -112,6 +119,7 @@ fun GameHomeScreen(
             }
         }
 
+        val matchHint = stringResource(id = R.string.home_match_hint)
         Card(
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -121,7 +129,7 @@ fun GameHomeScreen(
                 .clickable {
                     if (!state.isLoggedIn) {
                         onLoginClick()
-                        Toaster.show("天命对决需先登录，方可一战！")
+                        Toaster.show(matchHint)
                     } else {
                         showDuelMatch = true
                     }
@@ -134,22 +142,53 @@ fun GameHomeScreen(
                 // 太极小图标
                 Canvas(modifier = Modifier.size(36.dp)) {
                     val r = size.width / 2f
-                    drawCircle(color = CrimsonRed, radius = r, style = Stroke(width = 2.dp.toPx()))
-                    drawArc(color = CrimsonRed, startAngle = -90f, sweepAngle = 180f, useCenter = true, size = size)
-                    drawCircle(color = Color.White, radius = r * 0.2f, center = Offset(size.width / 2f, size.height * 0.25f))
-                    drawCircle(color = CrimsonRed, radius = r * 0.2f, center = Offset(size.width / 2f, size.height * 0.75f))
+                    val centerOffset = center
+                    drawCircle(color = Color.White, radius = r, center = centerOffset)
+                    drawArc(
+                        color = CrimsonRed,
+                        startAngle = -90f,
+                        sweepAngle = 180f,
+                        useCenter = true,
+                        size = size
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r / 2f,
+                        center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = r / 2f,
+                        center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = r * 0.15f,
+                        center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r * 0.15f,
+                        center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                    )
+                    drawCircle(
+                        color = CrimsonRed,
+                        radius = r,
+                        center = centerOffset,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "天命对决 · 实时匹配",
+                        text = stringResource(id = R.string.home_match_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
                         color = CrimsonRed,
                         fontFamily = FontFamily.Serif
                     )
                     Text(
-                        "与天下修士一较高下，赢取修为积分！",
+                        text = stringResource(id = R.string.home_match_desc),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
@@ -185,11 +224,13 @@ fun GameHomeScreen(
                 LevelItemRow(
                     levelId    = lvl,
                     isUnlocked = isUnlocked,
-                    onStart    = { onLevelClick(lvl) }
+                    onStart    = { onLevelClick(lvl) },
+                    onShowLeaderboard = { onShowLeaderboard(lvl) }
                 )
             }
             item {
                 Spacer(modifier = Modifier.height(6.dp))
+                val levelsUnlockedDesc = stringResource(id = R.string.home_levels_unlocked_desc)
                 Card(
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(
@@ -200,7 +241,7 @@ fun GameHomeScreen(
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                         .clickable {
-                            Toaster.show("正在窥探玄妙天机... 闯关积攒更高修为，可自动显现无尽难关！")
+                            Toaster.show(levelsUnlockedDesc)
                         }
                 ) {
                     Box(
@@ -210,7 +251,7 @@ fun GameHomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "✨ 窥探天机 · 解锁更多未知关卡 ✨",
+                            text = stringResource(id = R.string.home_levels_unlocked_btn),
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
                             color = Gold_Primary,

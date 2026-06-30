@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.pointerInput
 import com.example.sheeps.theme.*
 import kotlin.math.cos
 import kotlin.math.sin
@@ -115,7 +118,16 @@ fun FullScreenLoading(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Overlay_Dark_Medium),
+            .background(Overlay_Dark_Medium)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    }
+                }
+            }
+            .clickable(enabled = false, onClick = {}),
         contentAlignment = Alignment.Center
     ) {
         Box(

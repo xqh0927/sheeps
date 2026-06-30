@@ -22,6 +22,8 @@ import com.example.sheeps.menu.ui.components.CompassCanvas
 import com.example.sheeps.menu.ui.components.GourdCanvas
 import com.example.sheeps.menu.ui.components.StarCanvas
 import com.example.sheeps.theme.CrimsonRed
+import com.example.sheeps.core.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun GameGuideDialog(onDismiss: () -> Unit) {
@@ -33,12 +35,12 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("吾已领悟", color = Color.White)
+                Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
             }
         },
         title = {
             Text(
-                "秘境修仙指南",
+                text = stringResource(id = R.string.guide_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 color = CrimsonRed,
@@ -55,8 +57,8 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 // 1. 玩法说明
                 item {
                     GuideSectionCard(
-                        title = "一、奇门法阵 (基本玩法)",
-                        description = "点击上方重叠层叠的神秘卡牌，它们会落入下方 7 格的乾坤法宝槽。只要槽内集齐 3 张相同图案的卡牌，即可将其熔炼消除。若 7 个槽位被填满且无法消除，则法决失效，挑战失败。",
+                        title = stringResource(id = R.string.guide_sec1_title),
+                        description = stringResource(id = R.string.guide_sec1_desc),
                         icon = { CompassCanvas() }
                     )
                 }
@@ -64,8 +66,8 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 // 2. 道具说明
                 item {
                     GuideSectionCard(
-                        title = "二、仙法法宝 (三大道具)",
-                        description = "移出法宝：将最左侧 3 张卡牌移出法宝槽并暂存，腾出空间。\n洗牌符咒：将场上所有未消除的卡牌彻底重新排列，化解死局。\n撤销仙法：撤回上一步的熔炼点击，退回上一张卡牌。",
+                        title = stringResource(id = R.string.guide_sec2_title),
+                        description = stringResource(id = R.string.guide_sec2_desc),
                         icon = { GourdCanvas() }
                     )
                 }
@@ -73,8 +75,8 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 // 3. 积分说明
                 item {
                     GuideSectionCard(
-                        title = "三、福禄修为 (积分规则)",
-                        description = "每日签署福禄（签到）可稳定斩获积分。挑战秘境主线关卡，首次破阵通关亦可赢得海量积分。参与多人实时“天命对决”斩获胜绩，更是赢取大量积分与连胜荣耀的最佳途径！",
+                        title = stringResource(id = R.string.guide_sec3_title),
+                        description = stringResource(id = R.string.guide_sec3_desc),
                         icon = { StarCanvas() }
                     )
                 }
@@ -82,8 +84,8 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 // 4. 商城说明
                 item {
                     GuideSectionCard(
-                        title = "四、藏宝仙阁 (积分兑换)",
-                        description = "修仙积攒的积分可在“商场”中兑换移出、洗牌、撤销等珍稀辅助法宝。更有酷炫的“赛博霓虹”与儒雅的“水墨写意”定制卡牌皮肤，任君兑换，以换取不同的悟道意境。",
+                        title = stringResource(id = R.string.guide_sec4_title),
+                        description = stringResource(id = R.string.guide_sec4_desc),
                         icon = { CoinCanvas() }
                     )
                 }
@@ -91,8 +93,8 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 // 5. 天命对决多人对局与法术诅咒
                 item {
                     GuideSectionCard(
-                        title = "五、天命对决 (多人法术竞技)",
-                        description = "在天命对决模式中，每次熔炼消除卡牌将充盈能量（上限 10 点）。\n迷雾咒（消耗 3 能量）：令对手战场黑雾弥漫，需点击探照驱散（持续 6 秒）。\n锁槽咒（消耗 6 能量）：封锁对手消除槽至 6 格（持续 8 秒），槽满立即判负。\n封印咒（消耗 10 能量）：瞬间给对手所有当前可点击的暴露牌附加封印。",
+                        title = stringResource(id = R.string.guide_sec5_title),
+                        description = stringResource(id = R.string.guide_sec5_desc),
                         icon = { StarCanvas() }
                     )
                 }

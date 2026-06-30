@@ -35,4 +35,183 @@
     <string name="lang_ko">한국어</string>
     <string name="btn_back">Back</string>
     <string name="no_net_warn">No network connection. Features limited. Tap to open Settings.</string>
+
+    <!-- Points Flow & Items -->
+    <string name="points_source_unlock_level">Unlock Level %1$s</string>
+    <string name="points_source_first_clear">First Clear Bonus</string>
+    <string name="points_source_sign_in">Daily Check-in Reward</string>
+    <string name="points_source_shop_redeem">Redeemed %1$s</string>
+    <string name="points_source_daily_task">Completed Task: %1$s</string>
+    
+    <string name="item_undo">Undo Talisman</string>
+    <string name="item_moveout">Move-out Seal</string>
+    <string name="item_shuffle">Shuffle Incantation</string>
+    <string name="item_revive">Resurrection Pill</string>
+    <string name="item_hint">Hint Talisman</string>
+    <string name="item_bomb">Burst Bomb</string>
+    <string name="item_joker">Joker Card</string>
+    <string name="item_double_points">Double Card</string>
+    <string name="item_skin_classic">Classic Red</string>
+    <string name="item_skin_classic_desc">Default classical cinnabar red card skin</string>
+    <string name="item_skin_ink">Ink Landscape Skin</string>
+    <string name="item_skin_cyber">Cyber Neon Skin</string>
+    <string name="shop_title">Treasure Pavilion</string>
+    <string name="shop_vault_locked">Vault Locked</string>
+    <string name="shop_section_traditional">Special Card Themes</string>
+    <string name="shop_section_provinces">China Province Gourmet Series</string>
+    
+    <string name="task_play_3">First Steps</string>
+    <string name="task_play_5">Master Show</string>
+    <string name="task_sign_in">Daily Dawn</string>
+
+    <string name="exchange_record_desc">Redeemed %1$d %2$s</string>
+    
+    <string name="backpack_title">Bag of Wonder (My Backpack)</string>
+    <string name="backpack_stock">Qty: %d</string>
+    <string name="theme_settings">Theme Settings</string>
+    <string name="btn_view_points_log">View Points Logs</string>
+    <string name="btn_view_exchange_log">View Exchange History</string>
+    
+    <string name="points_history_title">Points Log</string>
+    <string name="no_points_history">No points changes recorded.</string>
+    <string name="exchange_history_title">Exchange Records</string>
+    <string name="no_exchange_history">No exchange records found.</string>
+
+    <!-- General Game Screen -->
+    <string name="game_score">Score</string>
+    <string name="game_remaining">%d remaining</string>
+    <string name="game_slot_tray">— Card Tray —</string>
+    <string name="game_carried_items">— Carried Items —</string>
+    <string name="game_win">Victory!</string>
+    <string name="game_win_sub">Renowned far and wide, success achieved!</string>
+    <string name="game_points_earned">Points Earned</string>
+    <string name="game_btn_leaderboard">Leaderboard</string>
+    <string name="game_btn_home">Home</string>
+    <string name="game_btn_next">Next Level</string>
+    <string name="game_lose">Challenge Failed</string>
+    <string name="game_lose_sub">The slot tray is full, no moves left!</string>
+    <string name="game_btn_revive">Use Resurrection Pill (%d left)</string>
+    <string name="game_btn_revive_empty">Resurrection Pill Depleted</string>
+    <string name="game_btn_restart">Restart</string>
+    
+    <!-- Duel Screen -->
+    <string name="duel_title_exit">Are you sure you want to surrender?</string>
+    <string name="duel_desc_exit">Leaving mid-game results in instant defeat. Concede and exit?</string>
+    <string name="duel_btn_exit_confirm">Concede</string>
+    <string name="duel_label_me">Me</string>
+    <string name="duel_label_op">Foe</string>
+    <string name="duel_label_en">Eng</string>
+    <string name="duel_score_me">Your Score: %d</string>
+    <string name="duel_score_op">Opponent: %d</string>
+    
+    <!-- Shop Screen -->
+    <string name="shop_item_magic">Magic Items</string>
+    <string name="shop_item_skin">Board Skins</string>
+    <string name="shop_btn_login_sync">Login to Sync</string>
+    
+    <!-- Home Screen -->
+    <string name="home_section_title">  Destiny Trial · Qimen Dunjia  </string>
+    <string name="home_match_title">Destiny Duel · Live Match</string>
+    <string name="home_match_desc">Battle with online cultivators, gain points!</string>
+    <string name="home_match_hint">Please login first to enter match!</string>
+    <string name="home_levels_unlocked_desc">Prying into cosmic secrets... Unlock more challenges by earning points!</string>
+    <string name="home_levels_unlocked_btn">✨ Secrets · Unlock More Levels ✨</string>
+    <string name="home_btn_leaderboard">Rank</string>
+    
+    <!-- Dialogs -->
+    <string name="dialog_prepare_back">Withdraw</string>
+    <string name="dialog_prepare_unlock">Force Unlock Subsystem</string>
+    <string name="dialog_prepare_close">Close</string>
+    <string name="dialog_login_phone">Phone No.</string>
+    <string name="dialog_login_code">OTP Code</string>
+    <string name="dialog_login_btn">Login</string>
+    <string name="dialog_login_cancel">Cancel</string>
+    <string name="dialog_guide_ok">I Understood</string>
+    <string name="dialog_match_re">Rematch</string>
+    <string name="dialog_match_exit">Exit</string>
+
+    <!-- Daily Popup & Notices -->
+    <string name="daily_popup_title">Yesterday\'s Rankings</string>
+    <string name="daily_popup_rank_rank">You were ranked %d yesterday. Strive harder today!</string>
+    <string name="daily_popup_rank_none">You were not ranked yesterday. Start climbing today!</string>
+    <string name="daily_popup_btn">Acknowledge</string>
+    
+    <string name="notice_title">Announcement</string>
+    <string name="notice_list_title">History Notices</string>
+    <string name="notice_empty">Cultivation world is quiet. No notices.</string>
+    <string name="notice_banner_title">Announcement Banner</string>
+    <string name="notice_detail_title">Notice Details</string>
+    <string name="notice_type_system">System</string>
+    <string name="notice_type_activity">Activity</string>
+    <string name="notice_type_general">General</string>
+
+    <!-- Menu Stats & Tasks -->
+    <string name="user_guest">Guest Cultivator</string>
+    <string name="user_not_logged_in">Not logged in yet</string>
+    <string name="points_balance_label">Points Balance</string>
+    <string name="streak_label">Streak</string>
+    <string name="highest_level_label">Max Clear</string>
+    <string name="streak_days">%d Days</string>
+    <string name="level_number">Level %d</string>
+    <string name="btn_signed_today">Checked In Today</string>
+    <string name="btn_sign_today">Sign In for Reward</string>
+    <string name="btn_login_sync">Login to Sync</string>
+    <string name="tasks_title">Daily Cultivation Tasks</string>
+    <string name="tasks_empty">No Tasks</string>
+    <string name="task_rewarded">Claimed</string>
+    <string name="task_claim">Claim (+%d)</string>
+    <string name="task_incomplete">Incomplete</string>
+    <string name="description_game_guide">Guide</string>
+    <string name="theme_settings_title">Theme Settings</string>
+    <string name="theme_light">Spring(Light)</string>
+    <string name="theme_gold">Golden(Ink)</string>
+    <string name="theme_dark">Dark(Classic)</string>
+    <string name="shop_login_prompt">Please login to redeem powerful magic items with your points.</string>
+    <string name="skin_unlocked">Unlocked</string>
+    <string name="skin_apply">Apply</string>
+    <string name="skin_applied">Active</string>
+    <string name="points_suffix">%d pts</string>
+    <string name="default_item_desc">Magic Item</string>
+    <string name="prepare_locked_desc">This level is locked. Clear previous levels or use points to force unlock.\n\nRequired: %1$d pts\nYour balance: %2$d</string>
+    <string name="prepare_locked_insufficient">Insufficient points to unlock!</string>
+    <string name="prepare_setup_desc">You are entering the level. Select items to carry (consumed upon use):</string>
+    <string name="prepare_btn_start">Start</string>
+    <string name="prepare_desc_decrease">Dec</string>
+    <string name="prepare_desc_increase">Inc</string>
+    <string name="btn_get_otp">Get</string>
+    <string name="duel_match_searching">Searching for opponent%1$s</string>
+    <string name="duel_match_success">Match found! Opponent: %1$s</string>
+    <string name="duel_match_error">No opponent found. Please try again later.</string>
+    <string name="duel_match_pending">Matching...</string>
+    <string name="duel_match_cultivator">Cultivator: %1$s</string>
+    <string name="level_desc_1">Novice Entrance · Very Easy</string>
+    <string name="level_desc_2">Intermediate · Normal</string>
+    <string name="level_desc_3">Demon Slayer · Challenging</string>
+    <string name="level_desc_other">Samsara Loop · Seal/Mystery</string>
+    <string name="btn_break_array">Enter</string>
+    <string name="btn_locked">Locked</string>
+    <string name="daily_leaderboard_title">Yesterday\'s Golden List</string>
+    <string name="daily_rank_first">🥇 Champion: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_second">🥈 2nd Place: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_third">🥉 3rd Place: %1$s (%2$d Pt)</string>
+    <string name="daily_my_rank">Your rank yesterday: No. %1$d</string>
+    <string name="daily_my_rank_unranked">Your rank yesterday: Unranked</string>
+    <string name="dialog_duel_exit_title">Are you sure you want to surrender?</string>
+    <string name="dialog_duel_exit_text">Leaving mid-game counts as a direct loss. Do you confirm?</string>
+    <string name="dialog_duel_exit_confirm">Surrender</string>
+    <string name="dialog_duel_exit_cancel">Cancel</string>
+    <string name="label_duel_me">Me</string>
+    <string name="label_duel_enemy">Opp</string>
+    <string name="label_duel_energy">Nrg</string>
+    <string name="guide_title">Cultivation Guide</string>
+    <string name="guide_sec1_title">1. Cosmic Board (Basic Play)</string>
+    <string name="guide_sec1_desc">Tap layered tiles to move them to the 7-slot card tray below. Match 3 identical tiles to eliminate them. If the tray fills up completely with no matches, the challenge fails.</string>
+    <string name="guide_sec2_title">2. Magic Tools (Three Items)</string>
+    <string name="guide_sec2_desc">Move Out: Moves 3 cards from the tray to a temp holder to save space.\nShuffle: Shuffles all remaining cards on the board to resolve deadlocks.\nUndo: Reverts your last card selection move.</string>
+    <string name="guide_sec3_title">3. Points Rules</string>
+    <string name="guide_sec3_desc">Check-in daily for steady points. Clearing levels for the first time awards massive points. Winning live multiplayer Destiny Duels is the best way to earn points and win streak titles!</string>
+    <string name="guide_sec4_title">4. Treasure Shop (Exchange)</string>
+    <string name="guide_sec4_desc">Use points in the shop to purchase tools like Move Out, Shuffle, and Undo. You can also redeem customized skins like "Cyber Neon" or "Ink Landscape" to change your play environment.</string>
+    <string name="guide_sec5_title">5. Destiny Duel (Multiplayer spells)</string>
+    <string name="guide_sec5_desc">In Destiny Duel, matches charge up your energy (max 10 points).\nMist spell (3 energy): Blinds opponent with black fog. They must tap to search (lasts 6s).\nSlot Lock (6 energy): Locks opponent\'s tray to 6 slots (lasts 8s).\nSeal spell (10 energy): Instantly applies a seal lock to all opponent\'s selectable cards.</string>
 </resources>

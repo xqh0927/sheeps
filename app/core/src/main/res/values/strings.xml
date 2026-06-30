@@ -35,4 +35,183 @@
     <string name="lang_ko">한국어</string>
     <string name="btn_back">返回</string>
     <string name="no_net_warn">当前无网络，功能受限。点击前往系统设置</string>
+
+    <!-- Points Flow & Items -->
+    <string name="points_source_unlock_level">解锁第 %1$s 关</string>
+    <string name="points_source_first_clear">首次通关奖励</string>
+    <string name="points_source_sign_in">每日签到奖励</string>
+    <string name="points_source_shop_redeem">兑换 %1$s</string>
+    <string name="points_source_daily_task">完成任务: %1$s</string>
+    
+    <string name="item_undo">撤销符</string>
+    <string name="item_moveout">移出印</string>
+    <string name="item_shuffle">洗牌咒</string>
+    <string name="item_revive">复活丹</string>
+    <string name="item_hint">提示符</string>
+    <string name="item_bomb">爆裂弹</string>
+    <string name="item_joker">万能牌</string>
+    <string name="item_double_points">双倍卡</string>
+    <string name="item_skin_classic">经典国风</string>
+    <string name="item_skin_classic_desc">默认解锁的古典朱红卡牌样式</string>
+    <string name="item_skin_ink">水墨江山皮肤</string>
+    <string name="item_skin_cyber">赛博霓虹皮肤</string>
+    <string name="shop_title">福禄聚宝阁</string>
+    <string name="shop_vault_locked">金库封锁</string>
+    <string name="shop_section_traditional">专属特制卡牌主题</string>
+    <string name="shop_section_provinces">华夏省味美食系列 (省份皮肤)</string>
+    
+    <string name="task_play_3">小试牛刀</string>
+    <string name="task_play_5">大显身手</string>
+    <string name="task_sign_in">每日晨曦</string>
+
+    <string name="exchange_record_desc">已兑换 %1$d 个 %2$s</string>
+    
+    <string name="backpack_title">乾坤法宝袋 (我的背包)</string>
+    <string name="backpack_stock">存: %d</string>
+    <string name="theme_settings">主题设置</string>
+    <string name="btn_view_points_log">查看积分流水</string>
+    <string name="btn_view_exchange_log">查看兑换历史记录</string>
+    
+    <string name="points_history_title">积分流水日志</string>
+    <string name="no_points_history">暂无流水变动记载</string>
+    <string name="exchange_history_title">商品兑换历史记录</string>
+    <string name="no_exchange_history">暂无兑换记录记载</string>
+
+    <!-- General Game Screen -->
+    <string name="game_score">得分</string>
+    <string name="game_remaining">剩余 %d 张</string>
+    <string name="game_slot_tray">— 置物架 —</string>
+    <string name="game_carried_items">— 已携带法宝 —</string>
+    <string name="game_win">恭喜通关！</string>
+    <string name="game_win_sub">名扬四海，金榜题名！</string>
+    <string name="game_points_earned">本次积分</string>
+    <string name="game_btn_leaderboard">英雄榜</string>
+    <string name="game_btn_home">主页</string>
+    <string name="game_btn_next">下一关</string>
+    <string name="game_lose">挑战失败</string>
+    <string name="game_lose_sub">消除槽已满，棋局陷入死局！</string>
+    <string name="game_btn_revive">使用还魂丹复活（剩 %d 次）</string>
+    <string name="game_btn_revive_empty">复活法宝已耗尽</string>
+    <string name="game_btn_restart">重新开始</string>
+    
+    <!-- Duel Screen -->
+    <string name="duel_title_exit">确定要认输退出吗？</string>
+    <string name="duel_desc_exit">中途退出对局将直接判定失败。确认要认输退出吗？</string>
+    <string name="duel_btn_exit_confirm">确定认输</string>
+    <string name="duel_label_me">我</string>
+    <string name="duel_label_op">敌</string>
+    <string name="duel_label_en">能</string>
+    <string name="duel_score_me">你的得分: %d</string>
+    <string name="duel_score_op">对手得分: %d</string>
+    
+    <!-- Shop Screen -->
+    <string name="shop_item_magic">法宝神器</string>
+    <string name="shop_item_skin">奇门皮肤</string>
+    <string name="shop_btn_login_sync">立即登录</string>
+    
+    <!-- Home Screen -->
+    <string name="home_section_title">  破阵陀邪 · 奇门遁甲  </string>
+    <string name="home_match_title">天命对决 · 实时匹配</string>
+    <string name="home_match_desc">与天下修士一较高下，赢取修为积分！</string>
+    <string name="home_match_hint">天命对决需先登录，方可一战！</string>
+    <string name="home_levels_unlocked_desc">正在窥探玄妙天机... 闯关积攒更高修为，可自动显现无尽难关！</string>
+    <string name="home_levels_unlocked_btn">✨ 窥探天机 · 解锁更多未知关卡 ✨</string>
+    <string name="home_btn_leaderboard">榜单</string>
+    
+    <!-- Dialogs -->
+    <string name="dialog_prepare_back">退避三舍</string>
+    <string name="dialog_prepare_unlock">积分子系统强行解封</string>
+    <string name="dialog_prepare_close">关闭</string>
+    <string name="dialog_login_phone">手机号</string>
+    <string name="dialog_login_code">验证码</string>
+    <string name="dialog_login_btn">验证登录</string>
+    <string name="dialog_login_cancel">取消</string>
+    <string name="dialog_guide_ok">吾已领悟</string>
+    <string name="dialog_match_re">重新匹配</string>
+    <string name="dialog_match_exit">退出</string>
+
+    <!-- Daily Popup & Notices -->
+    <string name="daily_popup_title">昨日修真界 · 积分总榜</string>
+    <string name="daily_popup_rank_rank">您昨日位列天命总榜第 %d 名，望今日道友再破奇局！</string>
+    <string name="daily_popup_rank_none">您昨日暂未登榜，今日破局夺魁！</string>
+    <string name="daily_popup_btn">吾知悉矣</string>
+    
+    <string name="notice_title">公告</string>
+    <string name="notice_list_title">历史公告</string>
+    <string name="notice_empty">凡尘清静，暂无公告发布。</string>
+    <string name="notice_banner_title">福禄公告栏</string>
+    <string name="notice_detail_title">公告详情</string>
+    <string name="notice_type_system">系统</string>
+    <string name="notice_type_activity">活动</string>
+    <string name="notice_type_general">公告</string>
+
+    <!-- Menu Stats & Tasks -->
+    <string name="user_guest">游客小友</string>
+    <string name="user_not_logged_in">尚未签到登录</string>
+    <string name="points_balance_label">积分余额</string>
+    <string name="streak_label">连续签到</string>
+    <string name="highest_level_label">最高通关</string>
+    <string name="streak_days">%d 天</string>
+    <string name="level_number">第 %d 关</string>
+    <string name="btn_signed_today">今日已签署签到</string>
+    <string name="btn_sign_today">签到签署福禄</string>
+    <string name="btn_login_sync">登录同步签到</string>
+    <string name="tasks_title">每日修仙任务</string>
+    <string name="tasks_empty">无日常任务</string>
+    <string name="task_rewarded">已领奖</string>
+    <string name="task_claim">领奖 (+%d)</string>
+    <string name="task_incomplete">未完成</string>
+    <string name="description_game_guide">游戏说明</string>
+    <string name="theme_settings_title">主题设置</string>
+    <string name="theme_light">清日春(浅色)</string>
+    <string name="theme_gold">墨夜金(金黑)</string>
+    <string name="theme_dark">暗黑(深黑)</string>
+    <string name="shop_login_prompt">请先登录游戏账号，登录后可用积分在此阁内兑换破阵之法宝神器。</string>
+    <string name="skin_unlocked">已解锁</string>
+    <string name="skin_apply">启用</string>
+    <string name="skin_applied">已启用</string>
+    <string name="points_suffix">%d 积分</string>
+    <string name="default_item_desc">奇门法宝</string>
+    <string name="prepare_locked_desc">本关卡处于封印锁定状态。少侠当前尚未通关前面的关卡，或者您可选择使用积分强行破除关卡结界提前解锁。\n\n提前破阵所需积分：%1$d 积分\n您当前积分余额：%2$d</string>
+    <string name="prepare_locked_insufficient">积分余额不足以强行破阵！</string>
+    <string name="prepare_setup_desc">少侠即将踏入消除棋阵，可在此选择挑选背包中法宝携带入局辅佐消除（仅本局生效且会最终消耗）：</string>
+    <string name="prepare_btn_start">启程破阵</string>
+    <string name="prepare_desc_decrease">减</string>
+    <string name="prepare_desc_increase">加</string>
+    <string name="btn_get_otp">获取</string>
+    <string name="duel_match_searching">正在寻找对手%1$s</string>
+    <string name="duel_match_success">匹配成功！对手: %1$s</string>
+    <string name="duel_match_error">暂无匹配对手，请稍后再试</string>
+    <string name="duel_match_pending">匹配中...</string>
+    <string name="duel_match_cultivator">修士: %1$s</string>
+    <string name="level_desc_1">初入仙门 · 极其简单</string>
+    <string name="level_desc_2">略有小成 · 普通难度</string>
+    <string name="level_desc_3">降妖伏魔 · 略有挑战</string>
+    <string name="level_desc_other">奇门生死局 · 包含封印/盲盒</string>
+    <string name="btn_break_array">破阵</string>
+    <string name="btn_locked">封印中</string>
+    <string name="daily_leaderboard_title">昨日福禄金榜</string>
+    <string name="daily_rank_first">🥇 冠军: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_second">🥈 亚军: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_third">🥉 季军: %1$s (%2$d Pt)</string>
+    <string name="daily_my_rank">您的昨日排名：第 %1$d 名</string>
+    <string name="daily_my_rank_unranked">您的昨日排名：未上榜</string>
+    <string name="dialog_duel_exit_title">确定要认输退出吗？</string>
+    <string name="dialog_duel_exit_text">中途退出对局将直接判定失败。确认要认输退出吗？</string>
+    <string name="dialog_duel_exit_confirm">确定认输</string>
+    <string name="dialog_duel_exit_cancel">取消</string>
+    <string name="label_duel_me">我</string>
+    <string name="label_duel_enemy">敌</string>
+    <string name="label_duel_energy">能</string>
+    <string name="guide_title">秘境修仙指南</string>
+    <string name="guide_sec1_title">一、奇门法阵 (基本玩法)</string>
+    <string name="guide_sec1_desc">点击上方重叠层叠的神秘卡牌，它们会落入下方 7 格的乾坤法宝槽。只要槽内集齐 3 张相同图案的卡牌，即可将其熔炼消除。若 7 个槽位被填满且无法消除，则法决失效，挑战失败。</string>
+    <string name="guide_sec2_title">二、仙法法宝 (三大道具)</string>
+    <string name="guide_sec2_desc">移出法宝：将最左侧 3 张卡牌移出法宝槽并暂存，腾出空间。\n洗牌符咒：将场上所有未消除的卡牌彻底重新排列，化解死局。\n撤销仙法：撤回上一步的熔炼点击，退回上一张卡牌。</string>
+    <string name="guide_sec3_title">三、福禄修为 (积分规则)</string>
+    <string name="guide_sec3_desc">每日签署福禄（签到）可稳定斩获积分。挑战秘境主线关卡，首次破阵通关亦可赢得海量积分。参与多人实时“天命对决”斩获胜绩，更是赢取大量积分与连胜荣耀的最佳途径！</string>
+    <string name="guide_sec4_title">四、藏宝仙阁 (积分兑换)</string>
+    <string name="guide_sec4_desc">修仙积攒的积分可在“商场”中兑换移出、洗牌、撤销等珍稀辅助法宝。更有酷炫的“赛博霓虹”与儒雅的“水墨写意”定制卡牌皮肤，任君兑换，以换取不同的悟道意境。</string>
+    <string name="guide_sec5_title">五、天命对决 (多人法术竞技)</string>
+    <string name="guide_sec5_desc">在天命对决模式中，每次熔炼消除卡牌将充盈能量（上限 10 点）。\n迷雾咒（消耗 3 能量）：令对手战场黑雾弥漫，需点击探照驱散（持续 6 秒）。\n锁槽咒（消耗 6 能量）：封锁对手消除槽至 6 格（持续 8 秒），槽满立即判负。\n封印咒（消耗 10 能量）：瞬间给对手所有当前可点击的暴露牌附加封印。</string>
 </resources>

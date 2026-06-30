@@ -6,6 +6,9 @@ import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +32,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
+import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.data.model.DailyPopupResponse
 
 @Route(path = "/menu/main")
 @AndroidEntryPoint
@@ -38,6 +44,12 @@ class MenuActivity : BaseActivity() {
 
     @Inject
     lateinit var json: Json
+
+    @Inject
+    lateinit var apiService: ApiService
+
+    @Inject
+    lateinit var userPrefs: UserPreferences
 
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
@@ -70,6 +82,27 @@ class MenuActivity : BaseActivity() {
                     var showLoginDialog by remember { mutableStateOf(false) }
                     var showPrepareDialog by remember { mutableStateOf<Int?>(null) } // levelId
                     var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) }
+                    var showNoticeListScreen by remember { mutableStateOf(false) }
+                    var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) }
+
+                    LaunchedEffect(state.isLoggedIn) {
+                        if (state.isLoggedIn) {
+                            val token = userPrefs.getToken()
+                            val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                            val lastShown = userPrefs.getLastShownDailyPopupDate()
+                            if (lastShown != todayStr && token != null && token.isNotEmpty()) {
+                                try {
+                                    val response = apiService.getDailyPopup("Bearer $token")
+                                    if (response.success) {
+                                        userPrefs.setLastShownDailyPopupDate(todayStr)
+                                        showDailyPopup = response
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        }
+                    }
 
                     // Observe Side Effects
                     LaunchedEffect(Unit) {
@@ -101,7 +134,13 @@ class MenuActivity : BaseActivity() {
                         }
                     }
 
-                    Scaffold(
+                    if (showNoticeListScreen) {
+                        NoticeListScreen(
+                            notices = state.notices,
+                            onBack = { showNoticeListScreen = false }
+                        )
+                    } else {
+                        Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
                             if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
@@ -154,6 +193,12 @@ class MenuActivity : BaseActivity() {
                                                 showPrepareDialog = lvl
                                             }
                                         },
+                                        onShowLeaderboard = { lvl ->
+                                            TheRouter.build("/leaderboard/show")
+                                                .withInt("levelId", lvl)
+                                                .navigation()
+                                        },
+                                        onNoticeClick = { showNoticeListScreen = true },
                                         onLoginClick = { showLoginDialog = true },
                                         onJoinMatch = { viewModel.sendIntent(MenuViewIntent.JoinMatch(state.phone)) },
                                         onLeaveMatch = { viewModel.sendIntent(MenuViewIntent.LeaveMatch(state.phone)) },
@@ -250,11 +295,28 @@ class MenuActivity : BaseActivity() {
                                 }
                             }
 
+                            // Daily leaderboard popup
+                            if (showDailyPopup != null) {
+                                DailyLeaderboardPopupDialog(
+                                    data = showDailyPopup!!,
+                                    onDismiss = { showDailyPopup = null }
+                                )
+                            }
+
                             if (state.isLoading) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Overlay_Dark_Medium),
+                                        .background(Overlay_Dark_Medium)
+                                        .pointerInput(Unit) {
+                                            awaitEachGesture {
+                                                while (true) {
+                                                    val event = awaitPointerEvent()
+                                                    event.changes.forEach { it.consume() }
+                                                }
+                                            }
+                                        }
+                                        .clickable(enabled = false, onClick = {}),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
@@ -269,6 +331,7 @@ class MenuActivity : BaseActivity() {
                                 }
                             }
                         }
+                    }
                     }
                 }
             }

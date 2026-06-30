@@ -152,4 +152,12 @@ class UserPreferences @Inject constructor(
     fun setHighestLevelCleared(level: Int) {
         kv.encode("highest_level_cleared", level)
     }
+
+    fun getLastShownDailyPopupDate(): String {
+        return kv.decodeString("last_shown_daily_popup_date", "") ?: ""
+    }
+
+    fun setLastShownDailyPopupDate(date: String) {
+        kv.encode("last_shown_daily_popup_date", date)
+    }
 }

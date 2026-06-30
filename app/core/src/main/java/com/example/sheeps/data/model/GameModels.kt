@@ -50,7 +50,7 @@ data class ShopItem(
 
 @Serializable
 data class ExchangeRecord(
-    val id: Int,
+    val id: Int = 0,
     val shop_item_id: Int,
     val item_type: String,
     val count: Int,
@@ -259,4 +259,17 @@ data class MatchStatusResponse(
     val opponentId: String? = null,
     val duelLevel: Int? = null,
     val gameSeed: Int? = null
+)
+
+@Serializable
+data class DailyPopupResponse(
+    val success: Boolean,
+    val top3: List<Top3Entry> = emptyList(),
+    val yesterdayRank: Int
+)
+
+@Serializable
+data class Top3Entry(
+    val username: String,
+    val points: Int
 )

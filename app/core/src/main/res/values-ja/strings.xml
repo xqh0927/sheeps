@@ -35,4 +35,183 @@
     <string name="lang_ko">한국어</string>
     <string name="btn_back">戻る</string>
     <string name="no_net_warn">オフライン状態です。機能制限あり。タップして設定を開く</string>
+
+    <!-- Points Flow & Items -->
+    <string name="points_source_unlock_level">ステージ %1$s をアンロック</string>
+    <string name="points_source_first_clear">初回クリア報酬</string>
+    <string name="points_source_sign_in">ログインチェック報酬</string>
+    <string name="points_source_shop_redeem">%1$s を交換</string>
+    <string name="points_source_daily_task">任務完了: %1$s</string>
+    
+    <string name="item_undo">乾坤符 (元に戻す)</string>
+    <string name="item_moveout">縮地呪 (取り出す)</string>
+    <string name="item_shuffle">流砂契 (シャッフル)</string>
+    <string name="item_revive">還魂丹 (復活)</string>
+    <string name="item_hint">天眼符 (ヒント)</string>
+    <string name="item_bomb">雷震子 (爆弾)</string>
+    <string name="item_joker">太極牌 (ジョーカー)</string>
+    <string name="item_double_points">倍増符 (ダブル)</string>
+    <string name="item_skin_classic">クラシック国風</string>
+    <string name="item_skin_classic_desc">デフォルトでアンロックされる朱色のカードスタイル</string>
+    <string name="item_skin_ink">水墨山水スキン</string>
+    <string name="item_skin_cyber">サイバーネオンスキン</string>
+    <string name="shop_title">福禄宝物閣</string>
+    <string name="shop_vault_locked">宝物庫ロック</string>
+    <string name="shop_section_traditional">特製カードスキン</string>
+    <string name="shop_section_provinces">中華グルメシリーズ (省別スキン)</string>
+    
+    <string name="task_play_3">初めの一歩</string>
+    <string name="task_play_5">実力発揮</string>
+    <string name="task_sign_in">毎日の夜明け</string>
+
+    <string name="exchange_record_desc">%2$s を %1$d 個交換しました</string>
+    
+    <string name="backpack_title">乾坤法宝袋 (バックパック)</string>
+    <string name="backpack_stock">所持: %d</string>
+    <string name="theme_settings">テーマ設定</string>
+    <string name="btn_view_points_log">ポイント履歴を表示</string>
+    <string name="btn_view_exchange_log">交換履歴を表示</string>
+    
+    <string name="points_history_title">ポイント履歴ログ</string>
+    <string name="no_points_history">ポイント変動の記録はありません</string>
+    <string name="exchange_history_title">アイテム交換履歴</string>
+    <string name="no_exchange_history">交換の記録はありません</string>
+
+    <!-- General Game Screen -->
+    <string name="game_score">スコア</string>
+    <string name="game_remaining">残り %d 枚</string>
+    <string name="game_slot_tray">— カードトレイ —</string>
+    <string name="game_carried_items">— 所持アイテム —</string>
+    <string name="game_win">クリアおめでとう！</string>
+    <string name="game_win_sub">名声を博し、見事クリア！</string>
+    <string name="game_points_earned">獲得ポイント</string>
+    <string name="game_btn_leaderboard">ランキング</string>
+    <string name="game_btn_home">ホーム</string>
+    <string name="game_btn_next">次へ</string>
+    <string name="game_lose">ゲームオーバー</string>
+    <string name="game_lose_sub">トレイが満杯です、もう動かせません！</string>
+    <string name="game_btn_revive">復活薬を使用（残り %d 個）</string>
+    <string name="game_btn_revive_empty">復活薬がありません</string>
+    <string name="game_btn_restart">もう一度</string>
+    
+    <!-- Duel Screen -->
+    <string name="duel_title_exit">本当に降伏して終了しますか？</string>
+    <string name="duel_desc_exit">途中で退出すると敗北扱いになります。終了しますか？</string>
+    <string name="duel_btn_exit_confirm">降伏する</string>
+    <string name="duel_label_me">自分</string>
+    <string name="duel_label_op">相手</string>
+    <string name="duel_label_en">エネ</string>
+    <string name="duel_score_me">マイスコア: %d</string>
+    <string name="duel_score_op">相手スコア: %d</string>
+    
+    <!-- Shop Screen -->
+    <string name="shop_item_magic">神器アイテム</string>
+    <string name="shop_item_skin">盤面スキン</string>
+    <string name="shop_btn_login_sync">ログインして同期</string>
+    
+    <!-- Home Screen -->
+    <string name="home_section_title">  破陣邪陀 · 奇門遁甲  </string>
+    <string name="home_match_title">宿命の対決 · リアルタイム対戦</string>
+    <string name="home_match_desc">オンラインの修行者と対戦し、ポイントを競おう！</string>
+    <string name="home_match_hint">対戦するにはまずログインしてください！</string>
+    <string name="home_levels_unlocked_desc">宇宙の真理を見通す... ポイントを稼いで新たなステージを解放しよう！</string>
+    <string name="home_levels_unlocked_btn">✨ 真理の鍵 · 新ステージ解放 ✨</string>
+    <string name="home_btn_leaderboard">順位</string>
+    
+    <!-- Dialogs -->
+    <string name="dialog_prepare_back">退却</string>
+    <string name="dialog_prepare_unlock">ポイントで強制解放</string>
+    <string name="dialog_prepare_close">閉じる</string>
+    <string name="dialog_login_phone">電話番号</string>
+    <string name="dialog_login_code">認証コード</string>
+    <string name="dialog_login_btn">ログイン</string>
+    <string name="dialog_login_cancel">キャンセル</string>
+    <string name="dialog_guide_ok">了解しました</string>
+    <string name="dialog_match_re">再マッチ</string>
+    <string name="dialog_match_exit">終了</string>
+
+    <!-- Daily Popup & Notices -->
+    <string name="daily_popup_title">昨日の修真界 · 総合ランキング</string>
+    <string name="daily_popup_rank_rank">昨日の総合順位は %d 位でした。今日も頑張りましょう！</string>
+    <string name="daily_popup_rank_none">昨日の順位はありません。今日から挑戦しましょう！</string>
+    <string name="daily_popup_btn">確認</string>
+    
+    <string name="notice_title">お知らせ</string>
+    <string name="notice_list_title">お知らせ一覧</string>
+    <string name="notice_empty">修行界は平穏です。お知らせはありません。</string>
+    <string name="notice_banner_title">お知らせボード</string>
+    <string name="notice_detail_title">詳細内容</string>
+    <string name="notice_type_system">システム</string>
+    <string name="notice_type_activity">イベント</string>
+    <string name="notice_type_general">お知らせ</string>
+
+    <!-- Menu Stats & Tasks -->
+    <string name="user_guest">ゲスト道友</string>
+    <string name="user_not_logged_in">未ログイン</string>
+    <string name="points_balance_label">ポイント残高</string>
+    <string name="streak_label">連続ログイン</string>
+    <string name="highest_level_label">最高クリア</string>
+    <string name="streak_days">%d 日</string>
+    <string name="level_number">ステージ %d</string>
+    <string name="btn_signed_today">本日はチェックイン済み</string>
+    <string name="btn_sign_today">チェックインして報酬受取</string>
+    <string name="btn_login_sync">ログインして同期</string>
+    <string name="tasks_title">毎日の修仙任務</string>
+    <string name="tasks_empty">本日の任務はありません</string>
+    <string name="task_rewarded">受取済み</string>
+    <string name="task_claim">受け取る (+%d)</string>
+    <string name="task_incomplete">未完了</string>
+    <string name="description_game_guide">遊び方</string>
+    <string name="theme_settings_title">テーマ設定</string>
+    <string name="theme_light">春日(ライト)</string>
+    <string name="theme_gold">墨夜金(ゴールド)</string>
+    <string name="theme_dark">ダーク(ダーク)</string>
+    <string name="shop_login_prompt">ログインしてポイントで強力なアイテムを交換しましょう。</string>
+    <string name="skin_unlocked">アンロック済み</string>
+    <string name="skin_apply">適用</string>
+    <string name="skin_applied">適用中</string>
+    <string name="points_suffix">%d Pt</string>
+    <string name="default_item_desc">奇門法宝</string>
+    <string name="prepare_locked_desc">このステージはロックされています。前のステージをクリアするか、ポイントを消費して強制的に解放してください。\n\n必要ポイント: %1$d Pt\n所持ポイント: %2$d</string>
+    <string name="prepare_locked_insufficient">ポイントが不足しています！</string>
+    <string name="prepare_setup_desc">ステージに入ります。持ち込むアイテムを選択してください（使用すると消費されます）:</string>
+    <string name="prepare_btn_start">開始</string>
+    <string name="prepare_desc_decrease">減</string>
+    <string name="prepare_desc_increase">増</string>
+    <string name="btn_get_otp">取得</string>
+    <string name="duel_match_searching">対戦相手を探しています%1$s</string>
+    <string name="duel_match_success">マッチング成功！対戦相手: %1$s</string>
+    <string name="duel_match_error">対戦相手が見つかりません。後ほどお試しください</string>
+    <string name="duel_match_pending">マッチング中...</string>
+    <string name="duel_match_cultivator">修士: %1$s</string>
+    <string name="level_desc_1">初入仙門 · 極めて簡単</string>
+    <string name="level_desc_2">略有小成 · 普通難易度</string>
+    <string name="level_desc_3">降妖伏魔 · やや難解</string>
+    <string name="level_desc_other">奇門生死局 · 封印/ブラインド</string>
+    <string name="btn_break_array">破陣</string>
+    <string name="btn_locked">封印中</string>
+    <string name="daily_leaderboard_title">昨日のゴールドランキング</string>
+    <string name="daily_rank_first">🥇 優勝: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_second">🥈 準優勝: %1$s (%2$d Pt)</string>
+    <string name="daily_rank_third">🥉 ３位: %1$s (%2$d Pt)</string>
+    <string name="daily_my_rank">あなたの昨日の順位：第 %1$d 位</string>
+    <string name="daily_my_rank_unranked">あなたの昨日の順位：ランク外</string>
+    <string name="dialog_duel_exit_title">降参して退出しますか？</string>
+    <string name="dialog_duel_exit_text">途中で退出すると負けとなります。降参して退出しますか？</string>
+    <string name="dialog_duel_exit_confirm">降参</string>
+    <string name="dialog_duel_exit_cancel">キャンセル</string>
+    <string name="label_duel_me">自分</string>
+    <string name="label_duel_enemy">敵</string>
+    <string name="label_duel_energy">エネ</string>
+    <string name="guide_title">修仙秘境ガイド</string>
+    <string name="guide_sec1_title">一、奇門法陣 (基本ルール)</string>
+    <string name="guide_sec1_desc">重なったカードをタップし、下部の7スロットのトレイに入れます。同じ絵柄が3枚揃うと消去されます。スロットが満杯になると失敗になります。</string>
+    <string name="guide_sec2_title">二、仙法法宝 (3つのアイテム)</string>
+    <string name="guide_sec2_desc">取り出す：左端の3枚のカードを取り出して一時保存します。\nシャッフル：未消去のカードをすべてシャッフルし、窮地を脱します。\n元に戻す：直前の操作を1ステップキャンセルします。</string>
+    <string name="guide_sec3_title">三、福禄修行 (ポイント規則)</string>
+    <string name="guide_sec3_desc">毎日のログインでポイントを獲得できます。メインステージ의初回クリアでも大量のポイントが得られます。また、「対決」で勝利するのが最高効率のポイント獲得方法です。</string>
+    <string name="guide_sec4_title">四、蔵宝仙閣 (アイテム交換)</string>
+    <string name="guide_sec4_desc">獲得したポイントは「ショップ」で各種アイテムと交換できます。「サイバーネオン」や「水墨山水」といった限定スキンも交換可能です。</string>
+    <string name="guide_sec5_title">五、宿命の対決 (対戦呪文)</string>
+    <string name="guide_sec5_desc">対戦モードでは、カードを消去するとエネルギー（最大10）が溜まります。\n霧の呪い（消費3）：相手の視界を霧で覆います（6秒間）。\nロック呪い（消費6）：相手のトレイを6スロットに制限します（8秒間）。\n封印の呪い（消費10）：相手の表向きのカードをすべて封印します。</string>
 </resources>

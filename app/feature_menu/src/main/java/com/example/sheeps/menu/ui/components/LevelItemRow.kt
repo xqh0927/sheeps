@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,13 +22,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 import com.example.sheeps.theme.*
 
 @Composable
 fun LevelItemRow(
     levelId: Int,
     isUnlocked: Boolean,
-    onStart: () -> Unit
+    onStart: () -> Unit,
+    onShowLeaderboard: () -> Unit
 ) {
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -97,7 +101,7 @@ fun LevelItemRow(
             modifier = Modifier.fillMaxWidth()
         ) {
             // 左侧：关卡编号 + 难度
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                 // 关卡编号圆标
                 Box(
                     modifier = Modifier
@@ -131,17 +135,17 @@ fun LevelItemRow(
 
                 Column {
                     Text(
-                        text       = "第 $levelId 关",
+                        text       = stringResource(id = R.string.level_number, levelId),
                         style      = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Serif,
                         color      = if (isUnlocked) Text_Primary_Dark else Text_Disabled_Dark
                     )
                     Text(
                         text  = when (levelId) {
-                            1    -> "初稺门径 · 极其简单"
-                            2    -> "略有小成 · 普通难度"
-                            3    -> "降妖伏魔 · 略有挑战"
-                            else -> "奇门生死局 · 包含封印/盲盒"
+                            1    -> stringResource(id = R.string.level_desc_1)
+                            2    -> stringResource(id = R.string.level_desc_2)
+                            3    -> stringResource(id = R.string.level_desc_3)
+                            else -> stringResource(id = R.string.level_desc_other)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isUnlocked) Text_Secondary_Dark else Text_Disabled_Dark.copy(alpha = 0.6f)
@@ -149,37 +153,65 @@ fun LevelItemRow(
                 }
             }
 
-            // 右侧：状态指示
-            if (isUnlocked) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+            Spacer(Modifier.width(8.dp))
+
+            // 右侧：排行榜按钮 + 状态指示
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // 榜单按钮
+                IconButton(
+                    onClick = onShowLeaderboard,
                     modifier = Modifier
-                        .clip(ShapeSmall)
-                        .background(Crimson_Primary.copy(alpha = 0.15f))
-                        .border(0.5.dp, Crimson_Primary.copy(alpha = 0.3f), ShapeSmall)
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .size(36.dp)
+                        .background(
+                            color = if (isUnlocked) Crimson_Primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
+                            shape = CircleShape
+                        )
+                        .border(
+                            0.5.dp,
+                            if (isUnlocked) Gold_Primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline,
+                            CircleShape
+                        )
                 ) {
                     Text(
-                        text       = "破阵",
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize   = 13.sp,
-                        color      = Gold_Primary
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = Gold_Primary,
-                        modifier = Modifier.size(16.dp)
+                        text = "🏆",
+                        fontSize = 14.sp
                     )
                 }
-            } else {
-                Text(
-                    text  = "封印中",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Text_Disabled_Dark
-                )
+
+                if (isUnlocked) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(ShapeSmall)
+                            .background(Crimson_Primary.copy(alpha = 0.15f))
+                            .border(0.5.dp, Crimson_Primary.copy(alpha = 0.3f), ShapeSmall)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text       = stringResource(id = R.string.btn_break_array),
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 13.sp,
+                            color      = Gold_Primary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = Gold_Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                } else {
+                    Text(
+                        text  = stringResource(id = R.string.btn_locked),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Text_Disabled_Dark
+                    )
+                }
             }
         }
     }
