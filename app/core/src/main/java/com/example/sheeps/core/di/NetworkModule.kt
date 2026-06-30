@@ -21,10 +21,17 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
+/**
+ * 客户端网络配置 Hilt 依赖注入模块
+ * 负责提供全局唯一的 Json 序列化解析器、配置五大核心拦截器的 OkHttpClient、以及 Retrofit 服务代理。
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    /**
+     * 提供全局共享的 Json 序列化配置，容忍未知字段
+     */
     @Provides
     @Singleton
     fun provideJson(): Json = Json {
@@ -32,9 +39,13 @@ object NetworkModule {
         coerceInputValues = true
     }
 
+    /**
+     * 构造并配置搭载五大拦截器的 OkHttpClient
+     */
     @Provides
     @Singleton
     fun provideOkHttpClient(prefs: UserPreferences, json: Json): OkHttpClient {
+        // 1. 基于 LogUtils 包装的日志拦截器：通过 StringBuilder 缓冲单次 HTTP 往返日志，避免日志控制台被交错多线程打碎
         val loggingInterceptor = HttpLoggingInterceptor(object : HttpLoggingInterceptor.Logger {
             private val threadLocalBuffer = object : ThreadLocal<StringBuilder>() {
                 override fun initialValue(): StringBuilder = StringBuilder()
@@ -52,6 +63,7 @@ object NetworkModule {
             level = HttpLoggingInterceptor.Level.BODY
         }
 
+        // 2. 国际化语言头拦截器：自动根据首选项或系统语言，为所有 API 请求附带 Accept-Language 请求头
         val languageInterceptor = Interceptor { chain ->
             val request = chain.request()
             val lang = prefs.getLanguage().ifEmpty { java.util.Locale.getDefault().language }
@@ -61,6 +73,7 @@ object NetworkModule {
             chain.proceed(newRequest)
         }
 
+        // 3. 鉴权 Token 拦截器：如果用户已登录，且当前请求未手动带上 Authorization，则自动填充 Bearer AccessToken
         val authInterceptor = Interceptor { chain ->
             val request = chain.request()
             val token = prefs.getToken()
@@ -71,7 +84,9 @@ object NetworkModule {
             chain.proceed(builder.build())
         }
 
-        // Silent Double-Token Refresh Interceptor with Lock
+        // 4. 双 Token 静默刷新拦截器（带线程同步锁）：
+        // 监听 HTTP 401 错误。如果 AccessToken 过期，会在同步锁内挂起并发请求，并使用 RefreshToken 发起静默刷新；
+        // 刷新成功后自动保存新 Token，并静默重试原始请求。若刷新失败则强行执行本地 Logout。
         val tokenRefreshInterceptor = Interceptor { chain ->
             val request = chain.request()
             var response = chain.proceed(request)
@@ -81,7 +96,7 @@ object NetworkModule {
                     val currentToken = prefs.getToken()
                     val requestToken = request.header("Authorization")?.removePrefix("Bearer ")
 
-                    // If another request thread has already updated the token, retry immediately
+                    // 锁并发优化：如果另一个并发网络请求线程已经率先刷新了 Token，当前线程直接读新 Token 重试，不重复请求刷新 API
                     if (currentToken != requestToken && currentToken != null) {
                         response.close()
                         val newRequest = request.newBuilder()
@@ -98,7 +113,7 @@ object NetworkModule {
                         return@Interceptor response
                     }
 
-                    // Call refresh API synchronously
+                    // 同步阻塞发起刷新 Token 请求
                     val client = OkHttpClient.Builder()
                         .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
                         .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
@@ -136,10 +151,10 @@ object NetworkModule {
                             }
                         }
                     } catch (e: Exception) {
-                        LogUtils.e( "Failed to refresh token", e)
+                        LogUtils.e( "刷新 Token 失败", e)
                     }
 
-                    // If refresh failed, perform logout
+                    // 刷新失败，强制退出登录并向主页发送单点登出总线事件以切换页面
                     prefs.logout()
                     com.example.sheeps.core.utils.AuthEventBus.post(com.example.sheeps.core.utils.AuthEvent.Logout)
                 }
@@ -147,6 +162,8 @@ object NetworkModule {
             response
         }
 
+        // 5. 弱网/服务器 5xx 故障自动指数退避重试拦截器：
+        // 针对网络异常或后端服务器偶发性 502/504 故障，在 1~3 秒内进行退避重试，最大尝试 3 次，大幅提高不稳网络环境下的通关成绩提交成功率。
         val weakNetworkRetryInterceptor = Interceptor { chain ->
             val request = chain.request()
             var attempt = 1
@@ -169,16 +186,16 @@ object NetworkModule {
 
                 if (attempt < 3) {
                     try {
-                        Thread.sleep(attempt * 1000L) // Wait 1s, 2s
+                        Thread.sleep(attempt * 1000L) // 分别等待 1秒、2秒 再次重试
                     } catch (e: InterruptedException) {
                         Thread.currentThread().interrupt()
-                        throw IOException("Retry interrupted", e)
+                        throw IOException("重试过程被中断", e)
                     }
                 }
                 attempt++
             }
             if (response != null) return@Interceptor response
-            throw lastException ?: IOException("Request failed after 3 attempts")
+            throw lastException ?: IOException("重试 3 次后请求依然失败")
         }
 
         return OkHttpClient.Builder()
@@ -193,6 +210,9 @@ object NetworkModule {
             .build()
     }
 
+    /**
+     * 提供全局唯一的 Retrofit 实例
+     */
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit =
@@ -202,6 +222,9 @@ object NetworkModule {
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
 
+    /**
+     * 提供网络 API 接口访问代理实现
+     */
     @Provides
     @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService =

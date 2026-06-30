@@ -16,11 +16,11 @@ data class AppColors(
 )
 
 val LightColors = AppColors(
-    iconColor = Color(0xFF333333) // Light mode icon color (dark gray)
+    iconColor = Color(0xFF333333) // 浅色模式下的图标颜色（深灰）
 )
 
 val DarkColors = AppColors(
-    iconColor = Color(0xFFCCCCCC) // Dark mode icon color (light gray)
+    iconColor = Color(0xFFCCCCCC) // 深色模式下的图标颜色（浅灰）
 )
 
 val LocalAppColors = compositionLocalOf { LightColors }
