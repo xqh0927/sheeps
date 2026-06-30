@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -25,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.blankj.utilcode.util.LogUtils
 import com.example.sheeps.core.base.BaseActivity
+import com.example.sheeps.core.R
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.network.ApiService
@@ -75,11 +78,11 @@ class LeaderboardActivity : BaseActivity() {
                             if (response.success) {
                                 rankings = response.rankings
                             } else {
-                                Toaster.show("数据获取失败")
+                                Toaster.show(getString(R.string.leaderboard_data_error))
                             }
                         } catch (e: Exception) {
                             LogUtils.e( e)
-                            Toaster.show("加载失败，请检查网络")
+                            Toaster.show(getString(R.string.leaderboard_load_error))
                         } finally {
                             isLoading = false
                         }
@@ -123,7 +126,7 @@ class LeaderboardActivity : BaseActivity() {
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "暂无英雄登榜，静候少侠破局！",
+                                        text = stringResource(id = R.string.leaderboard_empty),
                                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                                         fontSize = 15.sp
                                     )
@@ -159,10 +162,11 @@ fun LeaderboardAppBar(
     levelId: Int,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     CenterAlignedTopAppBar(
         title = {
             Text(
-                text = "第 ${levelId} 关 · 英雄榜",
+                text = stringResource(id = R.string.leaderboard_title_format, levelId),
                 fontWeight = FontWeight.Bold,
                 color = CrimsonRed,
                 fontSize = 20.sp
@@ -172,7 +176,7 @@ fun LeaderboardAppBar(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(id = R.string.btn_back),
                     tint = CrimsonRed
                 )
             }
@@ -198,7 +202,11 @@ fun LeaderboardTabs(
             )
             .padding(4.dp)
     ) {
-        val tabs = listOf("daily" to "今日排行", "weekly" to "本周排行", "history" to "历史排行")
+        val tabs = listOf(
+            "daily" to stringResource(id = R.string.leaderboard_tab_daily),
+            "weekly" to stringResource(id = R.string.leaderboard_tab_weekly),
+            "history" to stringResource(id = R.string.leaderboard_tab_history)
+        )
         tabs.forEach { (tabKey, tabLabel) ->
             val isSelected = selectedTab == tabKey
             Box(
@@ -284,7 +292,7 @@ fun RankingRow(
                     color = if (isCurrentUser) CrimsonRed else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "通关时间: ${String.format("%.2f", entry.clear_time_ms / 1000.0)}秒",
+                    text = stringResource(id = R.string.leaderboard_clear_time_format, entry.clear_time_ms / 1000.0),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -296,7 +304,7 @@ fun RankingRow(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = "${entry.score} 分",
+                    text = stringResource(id = R.string.leaderboard_score_format, entry.score),
                     color = CrimsonRed,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold

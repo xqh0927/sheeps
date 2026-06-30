@@ -18,7 +18,7 @@ data class Tile(
     val y: Float,
     val z: Int,
     var state: TileState = TileState.NORMAL,
-    val isBlind: Boolean = false,
+    var isBlind: Boolean = false,
     var sealedCount: Int = 0
 )
 

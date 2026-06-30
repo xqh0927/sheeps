@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,21 +42,11 @@ fun LevelItemRow(
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "levelCardScale"
     )
-    val infiniteTransition = rememberInfiniteTransition(label = "levelGlow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue  = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "levelGlowAlpha"
-    )
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
+            .graphicsLayer(alpha = if (isUnlocked) 1f else 0.55f)
             .clip(ShapeLarge)
             .background(
                 if (isUnlocked) {
@@ -76,14 +67,14 @@ fun LevelItemRow(
                 brush = if (isUnlocked) {
                     Brush.linearGradient(
                         colors = listOf(
-                            Gold_Subtle.copy(alpha = glowAlpha),
-                            Gold_Primary.copy(alpha = glowAlpha * 0.5f),
-                            Gold_Subtle.copy(alpha = glowAlpha)
+                            Gold_Subtle.copy(alpha = 0.5f),
+                            Gold_Primary.copy(alpha = 0.25f),
+                            Gold_Subtle.copy(alpha = 0.5f)
                         )
                     )
                 } else {
                     Brush.linearGradient(
-                        colors = listOf(MaterialTheme.colorScheme.outline, MaterialTheme.colorScheme.outline)
+                        colors = listOf(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                     )
                 },
                 shape = ShapeLarge
@@ -155,33 +146,33 @@ fun LevelItemRow(
 
             Spacer(Modifier.width(8.dp))
 
-            // 右侧：排行榜按钮 + 状态指示
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // 榜单按钮
-                IconButton(
-                    onClick = onShowLeaderboard,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            color = if (isUnlocked) Crimson_Primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant,
-                            shape = CircleShape
-                        )
-                        .border(
-                            0.5.dp,
-                            if (isUnlocked) Gold_Primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline,
-                            CircleShape
-                        )
+            // 右侧：排行榜按钮 + 状态指示 (未解锁时不显示任何按钮或重合文字)
+            if (isUnlocked) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "🏆",
-                        fontSize = 14.sp
-                    )
-                }
+                    // 榜单按钮
+                    IconButton(
+                        onClick = onShowLeaderboard,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(
+                                color = Crimson_Primary.copy(alpha = 0.1f),
+                                shape = CircleShape
+                            )
+                            .border(
+                                0.5.dp,
+                                Gold_Primary.copy(alpha = 0.5f),
+                                CircleShape
+                            )
+                    ) {
+                        Text(
+                            text = "🏆",
+                            fontSize = 14.sp
+                        )
+                    }
 
-                if (isUnlocked) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -205,12 +196,6 @@ fun LevelItemRow(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                } else {
-                    Text(
-                        text  = stringResource(id = R.string.btn_locked),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Text_Disabled_Dark
-                    )
                 }
             }
         }

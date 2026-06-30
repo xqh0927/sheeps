@@ -122,6 +122,11 @@ class DuelActionDelegate @Inject constructor() {
 
         if (matched) {
             setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
+            // 每合并一个自动解锁一个棋盘上的对决模式盲盒牌
+            val blindTile = finalBoard.firstOrNull { it.isBlind }
+            if (blindTile != null) {
+                blindTile.isBlind = false
+            }
             onMatchSuccess(eliminatedIds)
         } else if (slot.size > state.slotTiles.size) {
             // 新增了牌但未消除，重置连击

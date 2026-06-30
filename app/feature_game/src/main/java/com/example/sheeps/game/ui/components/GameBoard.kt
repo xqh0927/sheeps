@@ -5,7 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -14,6 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.sheeps.data.model.Tile
@@ -35,16 +36,37 @@ fun GameBoard(
     state: GameViewState,
     flyingTileIds: Set<String>,
     tileGlobalPositions: MutableMap<String, Offset>,
-    onTileClick: (Tile) -> Unit
+    onTileClick: (Tile) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    // 棋盘固定尺寸
-    val boardFixedWidth = 340.dp
-    val boardFixedHeight = 400.dp
+    val minX = remember(state.currentLevelId, state.boardTiles.isEmpty()) {
+        state.boardTiles.minOfOrNull { it.x } ?: 0f
+    }
+    val maxX = remember(state.currentLevelId, state.boardTiles.isEmpty()) {
+        state.boardTiles.maxOfOrNull { it.x } ?: 0f
+    }
+    val minY = remember(state.currentLevelId, state.boardTiles.isEmpty()) {
+        state.boardTiles.minOfOrNull { it.y } ?: 0f
+    }
+    val maxY = remember(state.currentLevelId, state.boardTiles.isEmpty()) {
+        state.boardTiles.maxOfOrNull { it.y } ?: 0f
+    }
+
+    val tileSize = 48
+    val spacing = 46
+    // 计算卡片内容边界尺寸
+    val contentWidth = (maxX - minX) * spacing + tileSize
+    val contentHeight = (maxY - minY) * spacing + tileSize
+
+    // 棋盘自适应宽度：保证左右比屏幕边缘少 16dp
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val boardWidth = screenWidth - 32.dp
+    val boardHeight = 450.dp
 
     Box(
-        modifier = Modifier
-            .size(width = boardFixedWidth, height = boardFixedHeight)
-            .padding(vertical = 8.dp)
+        modifier = modifier
+            .size(width = boardWidth, height = boardHeight)
+            .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(
                 Brush.linearGradient(
@@ -62,49 +84,33 @@ fun GameBoard(
         }
 
         if (visibleTiles.isNotEmpty()) {
-            val minX = visibleTiles.minOf { it.x }
-            val maxX = visibleTiles.maxOf { it.x }
-            val minY = visibleTiles.minOf { it.y }
-            val maxY = visibleTiles.maxOf { it.y }
-
-            val tileSize = 52
-            val spacing = 46
-            // 计算棋盘内部所有卡片占据的实际区域大小
-            val contentWidth = (maxX - minX) * spacing + tileSize
-            val contentHeight = (maxY - minY) * spacing + tileSize
 
             Box(modifier = Modifier.size(width = contentWidth.dp, height = contentHeight.dp)) {
                 visibleTiles.forEach { tile ->
-                    val isHighlighted = state.highlightedTileIds.contains(tile.id)
-                    val isFlying = flyingTileIds.contains(tile.id)
+                    key(tile.id) {
+                        val isHighlighted = state.highlightedTileIds.contains(tile.id)
+                        val isFlying = flyingTileIds.contains(tile.id)
 
-                    TileView(
-                        tile = tile,
-                        onClick = { if (!isFlying) onTileClick(tile) },
-                        currentSkin = state.currentSkin,
-                        tileSize = tileSize.dp,
-                        isShaking = state.shakingTileIds.contains(tile.id),
-                        modifier = Modifier
-                            .offset(
-                                x = ((tile.x - minX) * spacing).dp,
-                                y = ((tile.y - minY) * spacing).dp
-                            )
-                            .zIndex(tile.z.toFloat())
-                            .alpha(if (isFlying) 0f else 1f)
-                            .onGloballyPositioned { coords ->
-                                // 记录卡牌位置
-                                tileGlobalPositions[tile.id] = coords.positionInRoot()
-                            }
-                            .then(
-                                if (isHighlighted) {
-                                    Modifier.border(
-                                        width = 2.dp,
-                                        color = Gold_Primary,
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
-                                } else Modifier
-                            )
-                    )
+                        TileView(
+                            tile = tile,
+                            onClick = { if (!isFlying) onTileClick(tile) },
+                            currentSkin = state.currentSkin,
+                            tileSize = tileSize.dp,
+                            isShaking = state.shakingTileIds.contains(tile.id),
+                            isHighlighted = isHighlighted,
+                            modifier = Modifier
+                                .offset(
+                                    x = ((tile.x - minX) * spacing).dp,
+                                    y = ((tile.y - minY) * spacing).dp
+                                )
+                                .zIndex(tile.z.toFloat())
+                                .alpha(if (isFlying) 0f else 1f)
+                                .onGloballyPositioned { coords ->
+                                    // 记录卡牌位置
+                                    tileGlobalPositions[tile.id] = coords.positionInRoot()
+                                }
+                        )
+                    }
                 }
             }
         }

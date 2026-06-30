@@ -86,7 +86,17 @@ class GameActivity : BaseActivity() {
                         // 预留：此处触发全局音效播放
                     }
                     is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
-                        // 预留：此处触发设备震动反馈
+                        try {
+                            val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                            } else {
+                                @Suppress("DEPRECATION")
+                                vibrator.vibrate(100)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
                 }
             }

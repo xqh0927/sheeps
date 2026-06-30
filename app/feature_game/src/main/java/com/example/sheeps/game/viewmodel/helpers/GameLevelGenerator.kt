@@ -36,8 +36,9 @@ class GameLevelGenerator @Inject constructor() {
 
             val baseSize = 6 + levelId / 20
             for (z in 0 until layersCount) {
-                val size = maxOf(3, baseSize - z / 3)
-                val offset = if (z % 2 == 0) 0.0f else 0.5f
+                val size = baseSize - z
+                if (size < 2) break
+                val offset = z * 0.5f
                 for (r in 0 until size) {
                     for (c in 0 until size) {
                         possible.add(Point3D(c + offset + 1.0f, r + offset + 1.0f, z))
@@ -68,9 +69,17 @@ class GameLevelGenerator @Inject constructor() {
         val unassigned = nodes.toMutableSet()
         val randAssign = lcg(levelId * 1000L + 100)
 
-        // 判断卡牌遮挡关系的闭包
+        // 判断卡牌遮挡关系的闭包，与运行时物理重叠规则完全对齐以保证可解性（重叠面积大于单张卡牌10%）
         val blocks = { a: Point3D, b: Point3D ->
-            a.z > b.z && abs(a.x - b.x) < 1.0f && abs(a.y - b.y) < 1.0f
+            if (a.z <= b.z) {
+                false
+            } else {
+                val dx = abs(a.x - b.x)
+                val dy = abs(a.y - b.y)
+                val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
+                val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
+                ox * oy > 230.4f
+            }
         }
 
         // 反向分配卡牌类型，确保顶层总是存在可消除的组合
@@ -110,20 +119,27 @@ class GameLevelGenerator @Inject constructor() {
             }
         }
 
+        val randType = lcg(levelId * 1000L + 500)
+        val typeRoll = randType()
+        val isBlindLevel = levelId >= 3 && typeRoll < 0.20
+        val isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60
+
         val randProps = lcg(levelId * 1000L + 200)
+        val maxZ = coordinates.maxOfOrNull { it.z } ?: 0
         return nodes.map { node ->
             var isBlind = false
             var sealed = 0
 
-            // 高级关卡增加特殊属性（盲盒、封印等）
-            if (levelId >= 2) {
-                val r = randProps()
-                if (levelId % 10 == 0) {
-                    if (r < 0.15) {
-                        isBlind = true
-                    } else if (r < 0.30) {
-                        sealed = 1
-                    }
+            val r = randProps()
+            if (isBlindLevel) {
+                val blindProb = minOf(0.20, 0.10 + (levelId - 3) * 0.015)
+                val limitZ = if (maxZ >= 4) (maxZ - 2) else (maxZ - 1)
+                if (r < blindProb && node.coord.z < limitZ) {
+                    isBlind = true
+                }
+            } else if (isSealedLevel) {
+                if (r < 0.30) {
+                    sealed = 1
                 }
             }
 

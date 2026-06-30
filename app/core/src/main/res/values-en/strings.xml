@@ -1,4 +1,6 @@
 <resources>
+    <string name="app_name">Folk Ink Match</string>
+    <string name="app_subtitle">Break Patterns · King of Leaderboard</string>
     <string name="tab_game">Play</string>
     <string name="tab_shop">Shop</string>
     <string name="tab_me">Me</string>
@@ -54,8 +56,7 @@
     <string name="item_skin_classic">Classic Red</string>
     <string name="item_skin_classic_desc">Default classical cinnabar red card skin</string>
     <string name="item_skin_ink">Ink Landscape Skin</string>
-    <string name="item_skin_cyber">Cyber Neon Skin</string>
-    <string name="shop_title">Treasure Pavilion</string>
+     <string name="shop_title">Treasure Pavilion</string>
     <string name="shop_vault_locked">Vault Locked</string>
     <string name="shop_section_traditional">Special Card Themes</string>
     <string name="shop_section_provinces">China Province Gourmet Series</string>
@@ -214,4 +215,77 @@
     <string name="guide_sec4_desc">Use points in the shop to purchase tools like Move Out, Shuffle, and Undo. You can also redeem customized skins like "Cyber Neon" or "Ink Landscape" to change your play environment.</string>
     <string name="guide_sec5_title">5. Destiny Duel (Multiplayer spells)</string>
     <string name="guide_sec5_desc">In Destiny Duel, matches charge up your energy (max 10 points).\nMist spell (3 energy): Blinds opponent with black fog. They must tap to search (lasts 6s).\nSlot Lock (6 energy): Locks opponent\'s tray to 6 slots (lasts 8s).\nSeal spell (10 energy): Instantly applies a seal lock to all opponent\'s selectable cards.</string>
+
+    <string name="backpack_magic_section">Magic Items</string>
+    <string name="backpack_skins_section">Skins</string>
+    <string name="prepare_title_locked">Level Sealed</string>
+    <string name="prepare_title_unlocked">Prepare for Level %1$d</string>
+    <string name="update_discovered">New version %1$s</string>
+    <string name="update_log_title">Changelog:</string>
+    <string name="update_default_log">New version with optimized gameplay experience.</string>
+    <string name="update_btn_later">Later</string>
+    <string name="update_btn_now">Update Now</string>
+    <string name="update_download_error">Cannot launch download. Check URL configuration.</string>
+    <string name="game_won_title">Victory!</string>
+    <string name="game_won_desc">Renowned and victorious!</string>
+    <string name="game_won_score">Points Earned</string>
+    <string name="btn_leaderboard">Leaderboard</string>
+    <string name="btn_home">Home</string>
+    <string name="btn_next_level">Next Level</string>
+    <string name="game_lost_title">Defeat</string>
+    <string name="game_lost_desc">Slot is full, gridlock reached!</string>
+    <string name="btn_revive_count">Revive (Remains %1$d)</string>
+    <string name="btn_revive_empty">Revive items depleted</string>
+    <string name="btn_restart">Restart</string>
+    <string name="btn_back_home">Back to Home</string>
+    <string name="game_score_label">Score</string>
+    <string name="game_remaining_tiles">Remaining: %1$d</string>
+    <string name="duel_title">Destiny Duel</string>
+    <string name="duel_status_connected">Connected</string>
+    <string name="duel_status_connecting">Connecting</string>
+    <string name="duel_status_disconnected">Disconnected</string>
+    <string name="duel_btn_leave">Leave</string>
+    <string name="duel_won_title">Victory!</string>
+    <string name="duel_lost_title">Defeat</string>
+    <string name="duel_your_score">Your Score: %1$d</string>
+    <string name="duel_opponent_score">Opponent Score: %1$d</string>
+    <string name="spell_fog">Fog</string>
+    <string name="spell_silence">Silence</string>
+    <string name="spell_shuffle">Reshuffle</string>
+    <string name="spell_shrink">Shrink</string>
+    <string name="spell_seal_all">Seal All</string>
+    <string name="spell_state_used">Used</string>
+    <string name="spell_energy_cost">%1$d E</string>
+    <string name="slot_empty">Empty</string>
+    <string name="slot_not_carried">Empty</string>
+    <string name="carried_magic_items">Carried Magic Items</string>
+
+     <string name="item_skin_ink_desc">Classic ink wash background with dark gold frame</string>
+    <string name="item_skin_cyber">Cyber Neon Skin</string>
+    <string name="item_skin_cyber_desc">Electronic sci-fi lines with neon glowing frame</string>
+    <string name="item_skin_henan">Henan Gourmet Skin</string>
+    <string name="item_skin_henan_desc">Unlock Henan local gourmet icon skin</string>
+    <string name="item_skin_sichuan">Sichuan Gourmet Skin</string>
+    <string name="item_skin_sichuan_desc">Unlock Sichuan local gourmet icon skin</string>
+
+    <string name="leaderboard_data_error">Data fetch failed</string>
+    <string name="leaderboard_load_error">Load failed, please check network</string>
+    <string name="leaderboard_empty">No rankings yet. Be the first to clear!</string>
+    <string name="leaderboard_title_format">Level %1$d Leaderboard</string>
+    <string name="leaderboard_tab_daily">Daily</string>
+    <string name="leaderboard_tab_weekly">Weekly</string>
+    <string name="leaderboard_tab_history">All-Time</string>
+    <string name="leaderboard_clear_time_format">Clear Time: %1$.2fs</string>
+    <string name="leaderboard_score_format">%1$d Pts</string>
+
+    <string name="item_undo_desc">Undo the last operation</string>
+    <string name="item_moveout_desc">Move the first three cards out of the slot</string>
+    <string name="item_shuffle_desc">Reshuffle remaining cards on the board</string>
+    <string name="item_revive_desc">Resurrect and avoid penalties when you fail</string>
+    <string name="item_hint_desc">Automatically highlight a matching set</string>
+    <string name="item_bomb_desc">Directly destroy the last two cards in the slot</string>
+    <string name="item_joker_desc">Acts as any tile to complete a match</string>
+    <string name="item_double_points_desc">Double points earned upon level clearance</string>
+    <string name="btn_go_to_play">Use Item</string>
+    <string name="skin_apply_success">Skin applied successfully</string>
 </resources>

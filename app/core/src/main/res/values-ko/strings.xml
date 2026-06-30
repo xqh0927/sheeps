@@ -1,4 +1,6 @@
 <resources>
+    <string name="app_name">국풍수묵퍼즐</string>
+    <string name="app_subtitle">지용파국 · 랭킹제패</string>
     <string name="tab_game">플레이</string>
     <string name="tab_shop">상점</string>
     <string name="tab_me">마이페이지</string>
@@ -42,7 +44,7 @@
     <string name="points_source_sign_in">일일 출석 보상</string>
     <string name="points_source_shop_redeem">%1$s 교환</string>
     <string name="points_source_daily_task">미션 완료: %1$s</string>
-    
+
     <string name="item_undo">건곤부 (실행 취소)</string>
     <string name="item_moveout">축지법 (꺼내기)</string>
     <string name="item_shuffle">유사계 (섞기)</string>
@@ -51,27 +53,23 @@
     <string name="item_bomb">뇌진자 (폭탄)</string>
     <string name="item_joker">태극패 (조커)</string>
     <string name="item_double_points">더블 부적 (더블)</string>
-    <string name="item_skin_classic">클래식 동양풍</string>
-    <string name="item_skin_classic_desc">기본으로 해제되는 전통 붉은 카드 스타일</string>
-    <string name="item_skin_ink">수묵강산 스킨</string>
-    <string name="item_skin_cyber">사이버 네온 스킨</string>
     <string name="shop_title">복록보물각</string>
     <string name="shop_vault_locked">보물고 잠김</string>
     <string name="shop_section_traditional">특수 카드 스킨</string>
     <string name="shop_section_provinces">중국 지역별 미식 시리즈 스킨</string>
-    
+
     <string name="task_play_3">첫걸음</string>
     <string name="task_play_5">기량 발휘</string>
     <string name="task_sign_in">매일 아침</string>
 
     <string name="exchange_record_desc">%2$s %1$d개 교환 완료</string>
-    
+
     <string name="backpack_title">건곤법보주머니 (내 인벤토리)</string>
     <string name="backpack_stock">보유: %d</string>
     <string name="theme_settings">테마 설정</string>
     <string name="btn_view_points_log">포인트 변동 내역</string>
     <string name="btn_view_exchange_log">교환 이력 조회</string>
-    
+
     <string name="points_history_title">포인트 이용 내역</string>
     <string name="no_points_history">변동 내역이 없습니다</string>
     <string name="exchange_history_title">아이템 교환 내역</string>
@@ -93,7 +91,7 @@
     <string name="game_btn_revive">부활약 사용 (남음 %d개)</string>
     <string name="game_btn_revive_empty">부활약이 없습니다</string>
     <string name="game_btn_restart">다시 시작</string>
-    
+
     <!-- Duel Screen -->
     <string name="duel_title_exit">정말로 기권하고 종료하시겠습니까?</string>
     <string name="duel_desc_exit">도중에 종료하면 패배 처리됩니다. 기권하시겠습니까?</string>
@@ -103,12 +101,12 @@
     <string name="duel_label_en">에너</string>
     <string name="duel_score_me">내 점수: %d</string>
     <string name="duel_score_op">상대 점수: %d</string>
-    
+
     <!-- Shop Screen -->
     <string name="shop_item_magic">법보 아이템</string>
     <string name="shop_item_skin">보드 스킨</string>
     <string name="shop_btn_login_sync">로그인 후 동기화</string>
-    
+
     <!-- Home Screen -->
     <string name="home_section_title">  파진사타 · 기문둔갑  </string>
     <string name="home_match_title">천명 대결 · 실시간 매칭</string>
@@ -117,7 +115,7 @@
     <string name="home_levels_unlocked_desc">천기를 엿보는 중... 포인트를 모아 새로운 단계를 해제하세요!</string>
     <string name="home_levels_unlocked_btn">✨ 천기 엿보기 · 신규 단계 해제 ✨</string>
     <string name="home_btn_leaderboard">랭킹</string>
-    
+
     <!-- Dialogs -->
     <string name="dialog_prepare_back">후퇴</string>
     <string name="dialog_prepare_unlock">포인트로 강제 해제</string>
@@ -135,7 +133,7 @@
     <string name="daily_popup_rank_rank">어제 종합 순위는 %d위였습니다. 오늘도 분발하세요!</string>
     <string name="daily_popup_rank_none">어제 순위 기록이 없습니다. 오늘부터 시작해 보세요!</string>
     <string name="daily_popup_btn">확인</string>
-    
+
     <string name="notice_title">공지사항</string>
     <string name="notice_list_title">공지 목록</string>
     <string name="notice_empty">수련계가 조용합니다. 등록된 공지가 없습니다.</string>
@@ -214,4 +212,80 @@
     <string name="guide_sec4_desc">포인트를 사용하여 상점에서 꺼내기, 섞기, 취소 등의 아이템을 교환할 수 있습니다. 수묵강산, 사이버 네온 등의 전용 스킨도 교환 가능합니다.</string>
     <string name="guide_sec5_title">오. 천명 대결 (멀티플레이 주문)</string>
     <string name="guide_sec5_desc">대결 모드에서는 카드 제거 시 게이지가 차오릅니다 (최대 10).\n안개 주문 (소모 3): 상대방 화면에 안개를 생성합니다 (6초 지속).\n트레이 제한 (소모 6): 상대의 트레이를 6칸으로 제한합니다 (8초 지속).\n봉인 주문 (소모 10): 상대의 활성화된 카드를 모두 봉인합니다.</string>
+
+    <string name="backpack_magic_section">마법 도구</string>
+    <string name="backpack_skins_section">테마 스킨</string>
+    <string name="prepare_title_locked">결계가 풀리지 않음</string>
+    <string name="prepare_title_unlocked">출전 준비 (제 %1$d 관)</string>
+    <string name="update_discovered">새 버전 %1$s 발견</string>
+    <string name="update_log_title">업데이트 로그:</string>
+    <string name="update_default_log">새로운 버전, 게임 플레이 최적화.</string>
+    <string name="update_btn_later">나중에</string>
+    <string name="update_btn_now">지금 업데이트</string>
+    <string name="update_download_error">다운로드할 수 없습니다. URL을 확인해 주세요.</string>
+    <string name="game_won_title">축하합니다! 통과!</string>
+    <string name="game_won_desc">이름을 널리 알리고 합격하셨습니다!</string>
+    <string name="game_won_score">이번 획득 점수</string>
+    <string name="btn_leaderboard">랭킹</string>
+    <string name="btn_home">홈</string>
+    <string name="btn_next_level">다음 단계</string>
+    <string name="game_lost_title">도전 실패</string>
+    <string name="game_lost_desc">슬롯이 가득 차 게임 오버되었습니다!</string>
+    <string name="btn_revive_count">부활 약 사용 (남은 횟수 %1$d회)</string>
+    <string name="btn_revive_empty">부활 아이템 소진</string>
+    <string name="btn_restart">다시 시작</string>
+    <string name="btn_back_home">홈으로 이동</string>
+    <string name="game_score_label">점수</string>
+    <string name="game_remaining_tiles">남은 카드: %1$d</string>
+    <string name="duel_title">천명의 대결</string>
+    <string name="duel_status_connected">연결됨</string>
+    <string name="duel_status_connecting">연결 중</string>
+    <string name="duel_status_disconnected">연결 끊김</string>
+    <string name="duel_btn_leave">나가기</string>
+    <string name="duel_won_title">완승!</string>
+    <string name="duel_lost_title">패배</string>
+    <string name="duel_your_score">내 점수: %1$d</string>
+    <string name="duel_opponent_score">상대 점수: %1$d</string>
+    <string name="spell_fog">안개</string>
+    <string name="spell_silence">침묵</string>
+    <string name="spell_shuffle">셔플</string>
+    <string name="spell_shrink">슬롯축소</string>
+    <string name="spell_seal_all">전체봉인</string>
+    <string name="spell_state_used">사용됨</string>
+    <string name="spell_energy_cost">%1$d마나</string>
+    <string name="slot_empty">비어있음</string>
+    <string name="slot_not_carried">장착안됨</string>
+    <string name="carried_magic_items">장착 중인 법보</string>
+
+    <string name="item_skin_classic">클래식 레드</string>
+    <string name="item_skin_classic_desc">기본으로 잠금 해제되는 고전적인 주홍색 카드 스킨</string>
+    <string name="item_skin_ink">수묵강산 스킨</string>
+    <string name="item_skin_ink_desc">고전적인 수묵화 배경과 다크 골드 프레임</string>
+    <string name="item_skin_cyber">사이버 네온 스킨</string>
+    <string name="item_skin_cyber_desc">네온으로 빛나는 프레임이 있는 전자 공상 과학 라인</string>
+    <string name="item_skin_henan">허난성 맛 스킨</string>
+    <string name="item_skin_henan_desc">허난성 특색 미식 아이콘 스킨 해제</string>
+    <string name="item_skin_sichuan">쓰촨성 맛 스킨</string>
+    <string name="item_skin_sichuan_desc">쓰촨성 특색 미식 아이콘 스킨 해제</string>
+
+    <string name="leaderboard_data_error">데이터 가져오기 실패</string>
+    <string name="leaderboard_load_error">로드 실패, 네트워크를 확인해 주세요</string>
+    <string name="leaderboard_empty">아직 랭킹 정보가 없습니다. 첫 돌파자가 되어보세요!</string>
+    <string name="leaderboard_title_format">제 %1$d 관 랭킹</string>
+    <string name="leaderboard_tab_daily">오늘</string>
+    <string name="leaderboard_tab_weekly">이번 주</string>
+    <string name="leaderboard_tab_history">역대</string>
+    <string name="leaderboard_clear_time_format">클리어 시간: %1$.2f초</string>
+    <string name="leaderboard_score_format">%1$d 점</string>
+
+    <string name="item_undo_desc">마지막 작업을 실행 취소합니다</string>
+    <string name="item_moveout_desc">트레이에서 맨 위 카드 3장을 꺼냅니다</string>
+    <string name="item_shuffle_desc">남아있는 카드를 다시 섞습니다</string>
+    <string name="item_revive_desc">게임 오버 시 패널티 없이 부활합니다</string>
+    <string name="item_hint_desc">매칭 가능한 카드 세트를 자동으로 강조합니다</string>
+    <string name="item_bomb_desc">트레이의 마지막 카드 2장을 파괴합니다</string>
+    <string name="item_joker_desc">모든 카드에 매칭 가능한 카드로 작동합니다</string>
+    <string name="item_double_points_desc">클리어 시 획득 점수가 2배가 됩니다</string>
+    <string name="btn_go_to_play">사용하기</string>
+    <string name="skin_apply_success">스킨이 성공적으로 적용되었습니다</string>
 </resources>

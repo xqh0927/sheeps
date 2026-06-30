@@ -34,6 +34,7 @@ import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
+import com.example.sheeps.core.utils.getLocalizedItemDesc
 import androidx.compose.ui.res.stringResource
 
 @Composable
@@ -94,7 +95,7 @@ fun ShopItemCard(
             )
 
             Text(
-                text = item.description ?: stringResource(id = R.string.default_item_desc),
+                text = getLocalizedItemDesc(item.item_type, item.description),
                 fontSize = 11.sp,
                 color = Color.Gray,
                 minLines = 2,

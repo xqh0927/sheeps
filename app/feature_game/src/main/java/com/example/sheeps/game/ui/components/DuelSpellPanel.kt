@@ -14,6 +14,20 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.DuelViewState
 import com.example.sheeps.theme.Crimson_Primary
 import com.example.sheeps.theme.Gold_Primary
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
+
+@Composable
+fun getLocalizedSpellName(spellKey: String): String {
+    return when (spellKey.uppercase()) {
+        "FOG" -> stringResource(id = R.string.spell_fog)
+        "SILENCE" -> stringResource(id = R.string.spell_silence)
+        "SHUFFLE" -> stringResource(id = R.string.spell_shuffle)
+        "SHRINK" -> stringResource(id = R.string.spell_shrink)
+        "SEAL_ALL" -> stringResource(id = R.string.spell_seal_all)
+        else -> spellKey
+    }
+}
 
 /**
  * 对决法术/大招面板
@@ -30,11 +44,11 @@ fun DuelSpellPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val spells = listOf(
-            SpellInfo("迷雾", "FOG", 3, Color(0xFF8C7B70)),
-            SpellInfo("禁魔", "SILENCE", 4, Color(0xFF7E57C2)),
-            SpellInfo("乱序", "SHUFFLE", 5, Color(0xFF26A69A)),
-            SpellInfo("锁槽", "SHRINK", 6, Crimson_Primary),
-            SpellInfo("封魔", "SEAL_ALL", 10, Gold_Primary)
+            SpellInfo("FOG", 3, Color(0xFF8C7B70)),
+            SpellInfo("SILENCE", 4, Color(0xFF7E57C2)),
+            SpellInfo("SHUFFLE", 5, Color(0xFF26A69A)),
+            SpellInfo("SHRINK", 6, Crimson_Primary),
+            SpellInfo("SEAL_ALL", 10, Gold_Primary)
         )
 
         spells.forEach { spell ->
@@ -51,7 +65,6 @@ fun DuelSpellPanel(
 }
 
 private data class SpellInfo(
-    val name: String,
     val key: String,
     val cost: Int,
     val color: Color
@@ -70,9 +83,9 @@ private fun SpellButton(
     val alpha = if (isEnabled) 1.0f else 0.4f
     
     val buttonText = when {
-        isUsed -> "已用"
-        isSilenced -> "禁魔"
-        else -> info.name
+        isUsed -> stringResource(id = R.string.spell_state_used)
+        isSilenced -> stringResource(id = R.string.spell_silence)
+        else -> getLocalizedSpellName(info.key)
     }
     
     Button(
@@ -96,7 +109,7 @@ private fun SpellButton(
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "${info.cost}能",
+                text = stringResource(id = R.string.spell_energy_cost, info.cost),
                 fontSize = 9.sp,
                 color = if (isEnabled) Color.White.copy(alpha = 0.8f) else Color.Gray,
                 maxLines = 1

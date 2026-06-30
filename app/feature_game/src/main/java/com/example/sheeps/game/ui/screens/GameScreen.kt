@@ -17,7 +17,10 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.sheeps.data.model.Tile
+import com.example.sheeps.data.model.TileState
+import com.example.sheeps.core.game.GameEngine
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.GameResultOverlay
@@ -70,6 +73,17 @@ fun GameScreen(
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
     val density = androidx.compose.ui.platform.LocalDensity.current
 
+    // 炸弹使用时震屏效果状态
+    var prevBombCount by remember { mutableStateOf(state.bombCount) }
+    val boardShakeOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+
+    LaunchedEffect(state.bombCount) {
+        if (state.bombCount < prevBombCount) {
+            com.example.sheeps.game.ui.animations.GameAnimations.runBoardShakeAnimation(boardShakeOffset)
+        }
+        prevBombCount = state.bombCount
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -116,28 +130,44 @@ fun GameScreen(
                     flyingTileIds = flyingTileIds,
                     tileGlobalPositions = tileGlobalPositions,
                     onTileClick = { tile ->
-                        // 处理卡片点击逻辑，触发飞行动画
-                        val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
-                        val nextSlotIdx = state.slotTiles.size
-                        val endPos = slotGlobalPositions[nextSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
-                        
-                        val anim = Animatable(0f)
-                        val fly = GameFlyingTile(tile.id, tile.type, startPos, endPos, anim)
-                        flyingTiles = flyingTiles + fly
-                        flyingTileIds = flyingTileIds + tile.id
-                        
-                        coroutineScope.launch {
-                            anim.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
-                            flyingTiles = flyingTiles.filter { it.tileId != tile.id }
-                            flyingTileIds = flyingTileIds - tile.id
-                            onTileClick(tile)
-                        }
-                    }
+                        val isBlocked = tile.state == TileState.BLOCKED || 
+                                (tile.state == TileState.NORMAL && GameEngine.isTileBlocked(tile, state.boardTiles))
+                        val isSealed = tile.sealedCount > 0
+
+                        if (isBlocked || isSealed) {
+                             onTileClick(tile)
+                         } else {
+                             // 处理卡片点击逻辑，触发飞行动画
+                             val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                             // 计算卡牌在卡槽中的实际插入索引位置，使其飞向真正安放的位置，而非一律追加到卡槽最末尾
+                             val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
+                             val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
+                             val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                             
+                             val anim = Animatable(0f)
+                             val fly = GameFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                             flyingTiles = flyingTiles + fly
+                             flyingTileIds = flyingTileIds + tile.id
+                             
+                             onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
+                             
+                             coroutineScope.launch {
+                                 com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
+                                 flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                                 flyingTileIds = flyingTileIds - tile.id
+                             }
+                         }
+                    },
+                    modifier = Modifier.offset(
+                        x = boardShakeOffset.value.x.dp,
+                        y = boardShakeOffset.value.y.dp
+                    )
                 )
 
                 // 3. 底部槽位区（置物架 + 消除槽）
                 GameDock(
                     state = state,
+                    flyingTileIds = flyingTileIds,
                     slotGlobalPositions = slotGlobalPositions,
                     onTileClick = onTileClick
                 )
@@ -162,8 +192,7 @@ fun GameScreen(
         FlyingTilesLayer(
             flyingTiles = flyingTiles,
             currentSkin = state.currentSkin,
-            screenRootOffset = screenRootOffset,
-            density = density
+            screenRootOffset = screenRootOffset
         )
 
         // 6. 结果覆盖层（胜利/失败）
@@ -189,29 +218,30 @@ fun GameScreen(
 private fun FlyingTilesLayer(
     flyingTiles: List<GameFlyingTile>,
     currentSkin: String,
-    screenRootOffset: Offset,
-    density: androidx.compose.ui.unit.Density
+    screenRootOffset: Offset
 ) {
     flyingTiles.forEach { fly ->
-        val progress = fly.progress.value
-        val x = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
-        val y = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
-        val sizeDp = 52.dp - (12.dp * progress)
-        val xDp = with(density) { x.toDp() }
-        val yDp = with(density) { y.toDp() }
-
-        Box(
-            modifier = Modifier
-                .offset(x = xDp, y = yDp)
-                .size(sizeDp)
-                .zIndex(999f)
-        ) {
-            TileView(
-                tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
-                onClick = {},
-                currentSkin = currentSkin,
-                tileSize = sizeDp
-            )
+        key(fly.tileId) {
+            Box(
+                modifier = Modifier
+                    .zIndex(999f)
+                    .size(48.dp)
+                    .graphicsLayer {
+                        val progress = fly.progress.value
+                        translationX = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
+                        translationY = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
+                        
+                        scaleX = 1f
+                        scaleY = 1f
+                    }
+            ) {
+                TileView(
+                    tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
+                    onClick = {},
+                    currentSkin = currentSkin,
+                    tileSize = 48.dp
+                )
+            }
         }
     }
 }

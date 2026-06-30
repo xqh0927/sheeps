@@ -16,6 +16,8 @@ import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.theme.Crimson_Primary
 import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.ui.components.PrimaryButton
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 
 /**
  * 对决模式结算对话框
@@ -42,20 +44,20 @@ fun DuelResultDialog(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = if (state.gameStatus == GameStatus.WON) "旗开得胜！" else "棋差一招",
+                text = if (state.gameStatus == GameStatus.WON) stringResource(id = R.string.duel_won_title) else stringResource(id = R.string.duel_lost_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = if (state.gameStatus == GameStatus.WON) Gold_Primary else Crimson_Primary
             )
             
             Spacer(Modifier.height(16.dp))
             
-            Text(text = "你的得分: ${state.score}", style = MaterialTheme.typography.bodyLarge)
-            Text(text = "对手得分: ${state.opponentScore}", style = MaterialTheme.typography.bodyLarge)
+            Text(text = stringResource(id = R.string.duel_your_score, state.score), style = MaterialTheme.typography.bodyLarge)
+            Text(text = stringResource(id = R.string.duel_opponent_score, state.opponentScore), style = MaterialTheme.typography.bodyLarge)
             
             Spacer(Modifier.height(24.dp))
             
             PrimaryButton(
-                text = "离开",
+                text = stringResource(id = R.string.duel_btn_leave),
                 onClick = onLeave,
                 modifier = Modifier.fillMaxWidth()
             )

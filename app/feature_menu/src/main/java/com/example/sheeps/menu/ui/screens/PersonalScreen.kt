@@ -23,6 +23,8 @@ import com.example.sheeps.menu.ui.dialogs.PointHistoryDialog
  * @param onClaimTask 领取任务奖励回调
  * @param onChangeLanguage 语言设置变更回调
  * @param onThemeChange 主题变更回调
+ * @param onApplySkin 应用/切换皮肤回调
+ * @param onGoToPlay 前往游戏关卡回调
  */
 @Composable
 fun PersonalScreen(
@@ -32,7 +34,9 @@ fun PersonalScreen(
     onSignInClick: () -> Unit,
     onClaimTask: (String) -> Unit,
     onChangeLanguage: (String) -> Unit,
-    onThemeChange: () -> Unit
+    onThemeChange: () -> Unit,
+    onApplySkin: (String) -> Unit,
+    onGoToPlay: () -> Unit
 ) {
     // 弹窗控制状态
     var showPointHistory by remember { mutableStateOf(false) }
@@ -67,10 +71,11 @@ fun PersonalScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // 1. 用户基本信息卡片（包含签到、登录入口）
+        // 1. 用户信息卡片与签到
         item {
             UserProfileCard(
                 state = state,
@@ -90,7 +95,11 @@ fun PersonalScreen(
 
         // 3. 背包物品展示（仅登录且有物品时可见）
         item {
-            BackpackCard(state = state)
+            BackpackCard(
+                state = state,
+                onApplySkin = onApplySkin,
+                onGoToPlay = onGoToPlay
+            )
         }
 
         // 4. 语言设置

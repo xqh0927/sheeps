@@ -17,7 +17,30 @@ fun getLocalizedItemName(itemType: String): String {
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points)
         "SKIN_INK" -> stringResource(id = R.string.item_skin_ink)
         "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber)
+        "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan)
+        "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan)
+        "CLASSIC" -> stringResource(id = R.string.item_skin_classic)
         else -> itemType
+    }
+}
+
+@Composable
+fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
+    return when (itemType.uppercase()) {
+        "UNDO" -> stringResource(id = R.string.item_undo_desc)
+        "MOVEOUT" -> stringResource(id = R.string.item_moveout_desc)
+        "SHUFFLE" -> stringResource(id = R.string.item_shuffle_desc)
+        "REVIVE" -> stringResource(id = R.string.item_revive_desc)
+        "HINT" -> stringResource(id = R.string.item_hint_desc)
+        "BOMB" -> stringResource(id = R.string.item_bomb_desc)
+        "JOKER" -> stringResource(id = R.string.item_joker_desc)
+        "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points_desc)
+        "SKIN_INK" -> stringResource(id = R.string.item_skin_ink_desc)
+        "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber_desc)
+        "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan_desc)
+        "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan_desc)
+        "CLASSIC" -> stringResource(id = R.string.item_skin_classic_desc)
+        else -> defaultDesc ?: stringResource(id = R.string.default_item_desc)
     }
 }
 

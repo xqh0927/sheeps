@@ -150,7 +150,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         else if (type === 'weekly') timeFilter = todayStart - ((new Date(now + 8 * 3600000).getDay() + 6) % 7) * 24 * 3600000;
 
         const results = await env.DB.prepare(
-            `SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.achieved_at >= ? ORDER BY l.score DESC, l.clear_time_ms ASC LIMIT ? OFFSET ?`
+            `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.achieved_at >= ?) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`
         ).bind(levelId, timeFilter, limit, offset).all();
 
         const responseData = JSON.stringify({ success: true, rankings: results.results });

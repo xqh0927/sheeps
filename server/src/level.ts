@@ -171,8 +171,8 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
 
   coordinates.sort((a, b) => a.z - b.z);
 
-  const W = 1.0;
-  const H = 1.0;
+  const W = 52.0 / 46.0;
+  const H = 52.0 / 46.0;
 
   // Card types T increases logarithmically: T = 3 + 3 * ln(x), capped at 16
   const numTypes = levelId === 1 ? 3 : Math.min(16, Math.floor(3 + 3 * Math.log(levelId)));
@@ -190,7 +190,14 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
   }));
 
   const blocks = (a: Point3D, b: Point3D) => {
-    return a.z > b.z && Math.abs(a.x - b.x) < W && Math.abs(a.y - b.y) < H;
+    if (a.z <= b.z) {
+      return false;
+    }
+    const dx = Math.abs(a.x - b.x);
+    const dy = Math.abs(a.y - b.y);
+    const ox = Math.max(0, 48.0 - dx * 46.0);
+    const oy = Math.max(0, 48.0 - dy * 46.0);
+    return ox * oy > 230.4;
   };
 
   const unassigned = new Set<Node>(nodes);
@@ -237,16 +244,26 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
     }
   }
 
+  let randType = lcg(seed + 500);
+  const typeRoll = randType();
+  const isBlindLevel = levelId >= 3 && typeRoll < 0.20;
+  const isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60;
+
   let randProps = lcg(seed + 200);
+  const maxZ = Math.max(...nodes.map(n => n.coord.z));
   return nodes.map((node) => {
     let isBlind = false;
     let sealedCount = 0;
 
-    if (levelId >= 2) {
-      const r = randProps();
-      if (levelId % 10 === 0 && r < 0.15) {
+    const r = randProps();
+    if (isBlindLevel) {
+      const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
+      const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
+      if (r < blindProb && node.coord.z < limitZ) {
         isBlind = true;
-      } else if (r < 0.30) {
+      }
+    } else if (isSealedLevel) {
+      if (r < 0.30) {
         sealedCount = 1;
       }
     }

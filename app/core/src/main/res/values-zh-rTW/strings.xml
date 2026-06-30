@@ -1,4 +1,6 @@
 <resources>
+    <string name="app_name">國風水墨消消樂</string>
+    <string name="app_subtitle">智勇破局 · 登榜稱王</string>
     <string name="tab_game">遊玩</string>
     <string name="tab_shop">商城</string>
     <string name="tab_me">個人</string>
@@ -42,7 +44,7 @@
     <string name="points_source_sign_in">每日簽到獎勵</string>
     <string name="points_source_shop_redeem">兌換 %1$s</string>
     <string name="points_source_daily_task">完成任務: %1$s</string>
-    
+
     <string name="item_undo">撤銷符</string>
     <string name="item_moveout">移出印</string>
     <string name="item_shuffle">洗牌咒</string>
@@ -51,27 +53,23 @@
     <string name="item_bomb">爆裂彈</string>
     <string name="item_joker">萬能牌</string>
     <string name="item_double_points">雙倍卡</string>
-    <string name="item_skin_classic">經典國風</string>
-    <string name="item_skin_classic_desc">默認解鎖的古典朱紅卡牌樣式</string>
-    <string name="item_skin_ink">水墨江山皮膚</string>
-    <string name="item_skin_cyber">賽博霓虹皮膚</string>
     <string name="shop_title">福祿聚寶閣</string>
     <string name="shop_vault_locked">金庫封鎖</string>
     <string name="shop_section_traditional">專屬特製卡牌主題</string>
     <string name="shop_section_provinces">華夏省味美食系列 (省份皮膚)</string>
-    
+
     <string name="task_play_3">小試牛刀</string>
     <string name="task_play_5">大顯身手</string>
     <string name="task_sign_in">每日晨曦</string>
 
     <string name="exchange_record_desc">已兌換 %1$d 個 %2$s</string>
-    
+
     <string name="backpack_title">乾坤法寶袋 (我的背包)</string>
     <string name="backpack_stock">存: %d</string>
     <string name="theme_settings">主題設置</string>
     <string name="btn_view_points_log">查看積分流水</string>
     <string name="btn_view_exchange_log">查看兌換歷史記錄</string>
-    
+
     <string name="points_history_title">積分流水日誌</string>
     <string name="no_points_history">暫無流水變動記載</string>
     <string name="exchange_history_title">商品兌換歷史記錄</string>
@@ -93,7 +91,7 @@
     <string name="game_btn_revive">使用還魂丹復活（剩 %d 次）</string>
     <string name="game_btn_revive_empty">復活法寶已耗盡</string>
     <string name="game_btn_restart">重新開始</string>
-    
+
     <!-- Duel Screen -->
     <string name="duel_title_exit">確定要認輸退出嗎？</string>
     <string name="duel_desc_exit">中途退出對局將直接判定失敗。確認要認輸退出嗎？</string>
@@ -103,12 +101,12 @@
     <string name="duel_label_en">能</string>
     <string name="duel_score_me">你的得分: %d</string>
     <string name="duel_score_op">對手得分: %d</string>
-    
+
     <!-- Shop Screen -->
     <string name="shop_item_magic">法寶神器</string>
     <string name="shop_item_skin">奇門皮膚</string>
     <string name="shop_btn_login_sync">立即登錄</string>
-    
+
     <!-- Home Screen -->
     <string name="home_section_title">  破陣陀邪 · 奇門遁甲  </string>
     <string name="home_match_title">天命對決 · 實時匹配</string>
@@ -117,7 +115,7 @@
     <string name="home_levels_unlocked_desc">正在窺探玄妙天機... 闖關積攢更高修為，可自動顯現無盡難關！</string>
     <string name="home_levels_unlocked_btn">✨ 窺探天機 · 解鎖更多未知關卡 ✨</string>
     <string name="home_btn_leaderboard">榜單</string>
-    
+
     <!-- Dialogs -->
     <string name="dialog_prepare_back">退避三舍</string>
     <string name="dialog_prepare_unlock">積分子系統強行解封</string>
@@ -135,7 +133,7 @@
     <string name="daily_popup_rank_rank">您昨日位列天命總榜第 %d 名，望今日道友再破奇局！</string>
     <string name="daily_popup_rank_none">您昨日暫未登榜，今日破局奪魁！</string>
     <string name="daily_popup_btn">吾知悉矣</string>
-    
+
     <string name="notice_title">公告</string>
     <string name="notice_list_title">歷史公告</string>
     <string name="notice_empty">凡塵清靜，暫無公告發布。</string>
@@ -214,4 +212,80 @@
     <string name="guide_sec4_desc">修仙積攢的積分可在“商場”中兌換移出、洗牌、撤銷等珍稀輔助法寶。更有酷炫的“賽博霓虹”與儒雅的“水墨寫意”定制卡牌皮膚，任君兌換，以換取不同的悟道意境。</string>
     <string name="guide_sec5_title">五、天命對決 (多人法術競技)</string>
     <string name="guide_sec5_desc">在天命對決模式中，每次熔煉消除卡牌將充盈能量（上限 10 點）。\n迷霧咒（消耗 3 能量）：令對手戰場黑霧彌漫，需點擊探照驅散（持續 6 秒）。\n鎖槽咒（消耗 6 能量）：封鎖對手消除槽至 6 格（持續 8 秒），槽滿立即判負。\n封印咒（消耗 10 能量）：瞬間給對手所有當前可點擊的暴露牌附加封印。</string>
+
+    <string name="backpack_magic_section">法寶神器</string>
+    <string name="backpack_skins_section">主題皮膚</string>
+    <string name="prepare_title_locked">關卡結界未解</string>
+    <string name="prepare_title_unlocked">整裝破局 (第 %1$d 關)</string>
+    <string name="update_discovered">發現新版本 %1$s</string>
+    <string name="update_log_title">更新日誌：</string>
+    <string name="update_default_log">全新版本，優化遊戲操作體驗。</string>
+    <string name="update_btn_later">稍後更新</string>
+    <string name="update_btn_now">立即更新</string>
+    <string name="update_download_error">無法喚起瀏覽器下載，請檢查鏈接配置</string>
+    <string name="game_won_title">恭喜通關！</string>
+    <string name="game_won_desc">名揚四海，金榜題名！</string>
+    <string name="game_won_score">本次積分</string>
+    <string name="btn_leaderboard">英雄榜</string>
+    <string name="btn_home">主頁</string>
+    <string name="btn_next_level">下一關</string>
+    <string name="game_lost_title">挑戰失敗</string>
+    <string name="game_lost_desc">消除槽已滿，棋局陷入死局！</string>
+    <string name="btn_revive_count">使用還魂丹復活（剩 %1$d 次）</string>
+    <string name="btn_revive_empty">復活法寶已耗盡</string>
+    <string name="btn_restart">重新開始</string>
+    <string name="btn_back_home">返回主頁</string>
+    <string name="game_score_label">得分</string>
+    <string name="game_remaining_tiles">剩餘 %1$d 張</string>
+    <string name="duel_title">天命對決</string>
+    <string name="duel_status_connected">已連接</string>
+    <string name="duel_status_connecting">連接中</string>
+    <string name="duel_status_disconnected">斷開</string>
+    <string name="duel_btn_leave">離開</string>
+    <string name="duel_won_title">旗開得勝！</string>
+    <string name="duel_lost_title">棋差一招</string>
+    <string name="duel_your_score">你的得分: %1$d</string>
+    <string name="duel_opponent_score">對手得分: %1$d</string>
+    <string name="spell_fog">迷霧</string>
+    <string name="spell_silence">禁魔</string>
+    <string name="spell_shuffle">亂序</string>
+    <string name="spell_shrink">鎖槽</string>
+    <string name="spell_seal_all">封魔</string>
+    <string name="spell_state_used">已用</string>
+    <string name="spell_energy_cost">%1$d能</string>
+    <string name="slot_empty">空</string>
+    <string name="slot_not_carried">未攜帶</string>
+    <string name="carried_magic_items">已攜帶法寶</string>
+
+    <string name="item_skin_classic">經典國風</string>
+    <string name="item_skin_classic_desc">默認解鎖的古典朱紅卡牌樣式</string>
+    <string name="item_skin_ink">水墨江山皮膚</string>
+    <string name="item_skin_ink_desc">古典水墨底色與墨金邊框</string>
+    <string name="item_skin_cyber">賽博霓虹皮膚</string>
+    <string name="item_skin_cyber_desc">電子科幻線條與極光發光外框</string>
+    <string name="item_skin_henan">河南·省味皮膚</string>
+    <string name="item_skin_henan_desc">解鎖河南省特色美食圖標皮膚</string>
+    <string name="item_skin_sichuan">四川·省味皮膚</string>
+    <string name="item_skin_sichuan_desc">解鎖四川省特色美食圖標皮膚</string>
+
+    <string name="leaderboard_data_error">數據獲取失敗</string>
+    <string name="leaderboard_load_error">加載失敗，請檢查網絡</string>
+    <string name="leaderboard_empty">暫無英雄登榜，靜候少俠破局！</string>
+    <string name="leaderboard_title_format">第 %1$d 關 · 英雄榜</string>
+    <string name="leaderboard_tab_daily">今日排行</string>
+    <string name="leaderboard_tab_weekly">本周排行</string>
+    <string name="leaderboard_tab_history">歷史排行</string>
+    <string name="leaderboard_clear_time_format">通關時間: %1$.2f秒</string>
+    <string name="leaderboard_score_format">%1$d 分</string>
+
+    <string name="item_undo_desc">撤銷上一步操作</string>
+    <string name="item_moveout_desc">從卡槽移出前三張卡牌</string>
+    <string name="item_shuffle_desc">重新打亂桌面剩餘卡牌</string>
+    <string name="item_revive_desc">消除失敗時免除懲罰復活</string>
+    <string name="item_hint_desc">自動高亮出一組可消卡牌</string>
+    <string name="item_bomb_desc">直接炸毀卡槽中最後2張卡牌</string>
+    <string name="item_joker_desc">作為任意圖案卡牌與前兩張直接湊對消除</string>
+    <string name="item_double_points_desc">結算時獲得雙倍積分卡</string>
+    <string name="btn_go_to_play">去使用</string>
+    <string name="skin_apply_success">皮膚套用成功</string>
 </resources>

@@ -18,18 +18,19 @@ object GameEngine {
      * @return 如果被遮挡返回 true，否则返回 false
      */
     fun isTileBlocked(tile: Tile, board: List<Tile>): Boolean {
-        // 卡牌渲染宽度与逻辑步长比例，用于重叠判定
-        val W = 52.0f / 46.0f
-        val H = 52.0f / 46.0f
         return board.any { other ->
-            other.id != tile.id &&
-            // 只有处于正常或锁定状态的卡牌会产生遮挡效果
-            (other.state == TileState.NORMAL || other.state == TileState.BLOCKED) &&
-            // 对方必须在上方
-            other.z > tile.z &&
-            // 检查 X, Y 轴是否有足够的重叠面积
-            abs(other.x - tile.x) < W &&
-            abs(other.y - tile.y) < H
+            if (other.id == tile.id || 
+                (other.state != TileState.NORMAL && other.state != TileState.BLOCKED) ||
+                other.z <= tile.z
+            ) {
+                false
+            } else {
+                val dx = abs(other.x - tile.x)
+                val dy = abs(other.y - tile.y)
+                val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
+                val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
+                ox * oy > 230.4f
+            }
         }
     }
 
@@ -41,14 +42,19 @@ object GameEngine {
      * @return 正在遮挡该卡牌的卡牌集合
      */
     fun getBlockingTiles(tile: Tile, board: List<Tile>): List<Tile> {
-        val W = 52.0f / 46.0f
-        val H = 52.0f / 46.0f
         return board.filter { other ->
-            other.id != tile.id &&
-            (other.state == TileState.NORMAL || other.state == TileState.BLOCKED) &&
-            other.z > tile.z &&
-            abs(other.x - tile.x) < W &&
-            abs(other.y - tile.y) < H
+            if (other.id == tile.id || 
+                (other.state != TileState.NORMAL && other.state != TileState.BLOCKED) ||
+                other.z <= tile.z
+            ) {
+                false
+            } else {
+                val dx = abs(other.x - tile.x)
+                val dy = abs(other.y - tile.y)
+                val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
+                val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
+                ox * oy > 230.4f
+            }
         }
     }
 

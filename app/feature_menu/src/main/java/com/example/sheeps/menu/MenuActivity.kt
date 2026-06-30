@@ -78,7 +78,9 @@ class MenuActivity : BaseActivity() {
                     }
                     val config = android.content.res.Configuration(configuration)
                     config.setLocale(locale)
-                    context.createConfigurationContext(config)
+                    val configContext = context.createConfigurationContext(config)
+                    configContext.theme.setTo(context.theme)
+                    configContext
                 }
             }
 
@@ -237,7 +239,9 @@ class MenuActivity : BaseActivity() {
                                                 onSignInClick = { viewModel.sendIntent(MenuViewIntent.SignIn) },
                                                 onClaimTask = { taskId -> viewModel.sendIntent(MenuViewIntent.ClaimTask(taskId)) },
                                                 onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) },
-                                                onThemeChange = { recreate() }
+                                                onThemeChange = { recreate() },
+                                                onApplySkin = { skin -> viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin)) },
+                                                onGoToPlay = { currentTab = "game" }
                                             )
                                         }
                                     }

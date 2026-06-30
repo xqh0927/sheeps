@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.*
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
 import javax.inject.Inject
 
 @Route(path = "/splash/entry")
@@ -89,7 +90,6 @@ class SplashActivity : BaseActivity() {
                                 userPrefs.setPrivacyAccepted(true)
                                 Toaster.show("感谢您的理解与同意！")
                                 showPrivacyDialog = false
-                                requestPermissionsAndProceed()
                             },
                             onDismiss = {
                                 Toaster.show("很抱歉，您需要同意隐私政策才能体验游戏")
@@ -260,7 +260,7 @@ fun SplashVisuals() {
 
                 // 游戏标题
                 Text(
-                    text       = "秘境消消乐",
+                    text       = stringResource(id = com.example.sheeps.core.R.string.app_name),
                     fontSize   = 38.sp,
                     color      = Gold_Primary,
                     fontWeight = FontWeight.Bold,
@@ -273,7 +273,7 @@ fun SplashVisuals() {
 
                 // 副标题
                 Text(
-                    text       = "智勇破局 · 登榜称王",
+                    text       = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
                     fontSize   = 16.sp,
                     color      = Text_Secondary_Dark,
                     fontWeight = FontWeight.Medium,

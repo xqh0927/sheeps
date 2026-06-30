@@ -7,16 +7,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.times
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.theme.Crimson_Primary
@@ -34,6 +35,7 @@ import com.example.sheeps.theme.Gold_Subtle
 @Composable
 fun GameDock(
     state: GameViewState,
+    flyingTileIds: Set<String>,
     slotGlobalPositions: MutableMap<Int, Offset>,
     onTileClick: (Tile) -> Unit
 ) {
@@ -54,6 +56,7 @@ fun GameDock(
         // 消除槽
         MatchingSlot(
             state = state,
+            flyingTileIds = flyingTileIds,
             slotGlobalPositions = slotGlobalPositions
         )
     }
@@ -87,12 +90,14 @@ private fun MovedOutTray(
                 .padding(8.dp)
         ) {
             tiles.forEach { tile ->
-                TileView(
-                    tile    = tile,
-                    onClick = { onTileClick(tile) },
-                    currentSkin = currentSkin,
-                    tileSize = 46.dp
-                )
+                key(tile.id) {
+                    TileView(
+                        tile    = tile,
+                        onClick = { onTileClick(tile) },
+                        currentSkin = currentSkin,
+                        tileSize = 48.dp
+                    )
+                }
             }
         }
     }
@@ -104,6 +109,7 @@ private fun MovedOutTray(
 @Composable
 private fun MatchingSlot(
     state: GameViewState,
+    flyingTileIds: Set<String>,
     slotGlobalPositions: MutableMap<Int, Offset>
 ) {
     // 呼吸边框效果
@@ -118,8 +124,10 @@ private fun MatchingSlot(
         label = "slotBorderAlpha"
     )
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    val density = LocalDensity.current
+    var containerWidthPx by remember { mutableStateOf(0) }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -129,28 +137,59 @@ private fun MatchingSlot(
                 color = Crimson_Primary.copy(alpha = slotBorderAlpha),
                 shape = RoundedCornerShape(12.dp)
             )
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(8.dp)
+            .onGloballyPositioned { coords ->
+                containerWidthPx = coords.size.width
+            }
     ) {
-        for (i in 0 until 7) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .onGloballyPositioned { coords ->
-                        slotGlobalPositions[i] = coords.positionInRoot()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                if (i < state.slotTiles.size) {
+        // 1. 绘制 7 个空插槽背景
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            for (i in 0 until 7) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .aspectRatio(1f)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .onGloballyPositioned { coords ->
+                            slotGlobalPositions[i] = coords.positionInRoot()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {}
+            }
+        }
+
+        // 2. 绘制卡槽中的实体卡牌，并添加位置滑动动画
+        if (containerWidthPx > 0 && state.slotTiles.isNotEmpty()) {
+            val containerWidthDp = with(density) { containerWidthPx.toDp() }
+            val itemWidth = (containerWidthDp - 24.dp) / 7
+
+            state.slotTiles.forEachIndexed { index, tile ->
+                val targetX = index * (itemWidth + 4.dp)
+                val animatedX by animateDpAsState(
+                    targetValue = targetX,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "slot_tile_move_${tile.id}"
+                )
+
+                val isFlying = flyingTileIds.contains(tile.id)
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = animatedX)
+                        .size(itemWidth)
+                        .alpha(if (isFlying) 0f else 1f),
+                    contentAlignment = Alignment.Center
+                ) {
                     TileView(
-                        tile    = state.slotTiles[i],
+                        tile = tile,
                         onClick = {},
                         currentSkin = state.currentSkin,
-                        tileSize = 40.dp
+                        tileSize = 48.dp
                     )
                 }
             }

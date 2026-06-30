@@ -35,9 +35,12 @@ class GameLogicDelegate @Inject constructor() {
         val isBlocked = tile.state == TileState.BLOCKED || (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles))
         if (isBlocked) {
             val blockers = getBlockingTiles(tile, state.boardTiles)
-            val blockerIds = blockers.map { it.id }.toSet()
+            val minZ = blockers.minOfOrNull { it.z }
+            val directBlockers = blockers.filter { it.z == minZ }
+            val blockerIds = directBlockers.map { it.id }.toSet()
             if (blockerIds.isNotEmpty()) {
                 updateState { copy(shakingTileIds = shakingTileIds + blockerIds) }
+                setEffect(GameViewEffect.Vibrate)
                 scope.launch {
                     delay(500)
                     updateState { copy(shakingTileIds = shakingTileIds - blockerIds) }
@@ -58,7 +61,7 @@ class GameLogicDelegate @Inject constructor() {
                 // 处理从置物架点击
                 val updatedBoard = state.boardTiles
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = state.slotTiles + tile.copy(state = TileState.IN_SLOT)
+                val newSlot = insertIntoSlot(state.slotTiles, tile.copy(state = TileState.IN_SLOT))
 
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                 processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
@@ -76,7 +79,7 @@ class GameLogicDelegate @Inject constructor() {
                     // 正常移入槽位
                     tile.state = TileState.IN_SLOT
                     val updatedBoard = state.boardTiles
-                    val newSlot = state.slotTiles + tile
+                    val newSlot = insertIntoSlot(state.slotTiles, tile)
 
                     setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                     processSlotMatch(updatedBoard, newSlot, state.movedOutTiles)
@@ -104,8 +107,8 @@ class GameLogicDelegate @Inject constructor() {
         val finalSlot = slot.toMutableList()
         var scoreAdd = 0
 
-        // 排序以方便匹配
-        finalSlot.sortBy { it.type }
+        // 不需要进行全局排序，以便卡槽中的卡牌保持顺序依次追加，并在插入相同卡牌后面后能够进行平滑移动动画
+        // finalSlot.sortBy { it.type }
 
         val counts = finalSlot.groupBy { it.type }
         var matched = false
@@ -126,6 +129,11 @@ class GameLogicDelegate @Inject constructor() {
 
         if (matched) {
             setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
+            // 每合并一个自动解锁一个棋盘上的盲盒牌
+            val blindTile = finalBoard.firstOrNull { it.isBlind }
+            if (blindTile != null) {
+                blindTile.isBlind = false
+            }
         }
 
         val remainingOnBoard = finalBoard.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
@@ -156,5 +164,22 @@ class GameLogicDelegate @Inject constructor() {
         }
         
         return scoreAdd
+    }
+
+    /**
+     * 辅助函数：向卡槽中追加卡牌。
+     * 如果卡槽中已存在相同图案的牌，则插入到最后一个相同牌的后面；
+     * 否则，直接追加到卡槽尾部。
+     */
+    private fun insertIntoSlot(slot: List<Tile>, newTile: Tile): List<Tile> {
+        val result = slot.toMutableList()
+        val lastIndex = result.indexOfLast { it.type == newTile.type }
+        return if (lastIndex == -1) {
+            result.add(newTile)
+            result
+        } else {
+            result.add(lastIndex + 1, newTile)
+            result
+        }
     }
 }

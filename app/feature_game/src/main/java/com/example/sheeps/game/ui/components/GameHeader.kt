@@ -18,6 +18,9 @@ import androidx.compose.ui.unit.dp
 import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.theme.Text_Secondary_Dark
 
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
+
 /**
  * 游戏顶栏组件
  * 包含：返回按钮、关卡标题、重玩按钮
@@ -52,14 +55,14 @@ fun GameHeader(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "返回",
+                    contentDescription = stringResource(id = R.string.btn_back),
                     tint = Gold_Primary
                 )
             }
 
             // 关卡标题
             Text(
-                text = "第 $currentLevelId 关",
+                text = stringResource(id = R.string.prepare_title_unlocked, currentLevelId),
                 style = MaterialTheme.typography.titleLarge,
                 fontFamily = FontFamily.Serif,
                 color = Gold_Primary,

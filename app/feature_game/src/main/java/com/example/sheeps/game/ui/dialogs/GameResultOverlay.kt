@@ -23,6 +23,8 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.*
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 
 /**
  * 游戏结果覆盖层组件（胜利或失败弹窗）
@@ -126,14 +128,14 @@ private fun WonContent(
         modifier = Modifier.padding(bottom = 8.dp)
     )
     Text(
-        text       = "恭喜通关！",
+        text       = stringResource(id = R.string.game_won_title),
         style      = MaterialTheme.typography.displaySmall,
         fontFamily = FontFamily.Serif,
         color      = Gold_Primary,
         modifier   = Modifier.padding(bottom = 6.dp)
     )
     Text(
-        text  = "名扬四海，金榜题名！",
+        text  = stringResource(id = R.string.game_won_desc),
         style = MaterialTheme.typography.bodyLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 20.dp)
@@ -151,7 +153,7 @@ private fun WonContent(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text  = "本次积分",
+                text  = stringResource(id = R.string.game_won_score),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -169,17 +171,17 @@ private fun WonContent(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         SecondaryButton(
-            text     = "英雄榜",
+            text     = stringResource(id = R.string.btn_leaderboard),
             onClick  = onShowLeaderboard,
             modifier = Modifier.weight(1f)
         )
         SecondaryButton(
-            text     = "主页",
+            text     = stringResource(id = R.string.btn_home),
             onClick  = onBack,
             modifier = Modifier.weight(1f)
         )
         PrimaryButton(
-            text     = "下一关",
+            text     = stringResource(id = R.string.btn_next_level),
             onClick  = onNextLevel,
             modifier = Modifier.weight(1.2f)
         )
@@ -202,14 +204,14 @@ private fun LostContent(
         modifier = Modifier.padding(bottom = 8.dp)
     )
     Text(
-        text       = "挑战失败",
+        text       = stringResource(id = R.string.game_lost_title),
         style      = MaterialTheme.typography.headlineLarge,
         fontFamily = FontFamily.Serif,
         color      = Crimson_PrimaryLight,
         modifier   = Modifier.padding(bottom = 6.dp)
     )
     Text(
-        text  = "消除槽已满，棋局陷入死局！",
+        text  = stringResource(id = R.string.game_lost_desc),
         style = MaterialTheme.typography.bodyMedium,
         color = Text_Secondary_Dark,
         textAlign = TextAlign.Center,
@@ -222,18 +224,18 @@ private fun LostContent(
     ) {
         val canRevive = state.reviveCount > 0
         PrimaryButton(
-            text     = if (canRevive) "使用还魂丹复活（剩 ${state.reviveCount} 次）" else "复活法宝已耗尽",
+            text     = if (canRevive) stringResource(id = R.string.btn_revive_count, state.reviveCount) else stringResource(id = R.string.btn_revive_empty),
             onClick  = onRevive,
             enabled  = canRevive,
             modifier = Modifier.fillMaxWidth()
         )
         SecondaryButton(
-            text     = "重新开始",
+            text     = stringResource(id = R.string.btn_restart),
             onClick  = onRestart,
             modifier = Modifier.fillMaxWidth()
         )
         GhostButton(
-            text    = "返回主页",
+            text    = stringResource(id = R.string.btn_back_home),
             onClick = onBack,
             modifier = Modifier.fillMaxWidth()
         )

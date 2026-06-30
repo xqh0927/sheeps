@@ -28,6 +28,9 @@ import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.theme.Text_Disabled_Dark
 import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.ItemAnimationIcon
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
+import com.example.sheeps.core.utils.getLocalizedItemName
 
 /**
  * 游戏道具栏组件
@@ -63,17 +66,17 @@ fun GameTools(
 private fun CarriedItemsSection(state: GameViewState, onToolClick: (String) -> Unit) {
     val carriedItems = remember(state) {
         val all = listOf(
-            "UNDO" to ("撤销符" to state.undoCount),
-            "SHUFFLE" to ("洗牌咒" to state.shuffleCount),
-            "MOVEOUT" to ("移出印" to state.moveOutCount),
-            "HINT" to ("提示符" to state.hintCount),
-            "BOMB" to ("爆裂弹" to state.bombCount),
-            "JOKER" to ("万能牌" to state.jokerCount),
-            "DOUBLE_POINTS" to ("双倍卡" to state.doublePointsCount)
-        ).filter { it.second.second > 0 }
+            "UNDO" to state.undoCount,
+            "SHUFFLE" to state.shuffleCount,
+            "MOVEOUT" to state.moveOutCount,
+            "HINT" to state.hintCount,
+            "BOMB" to state.bombCount,
+            "JOKER" to state.jokerCount,
+            "DOUBLE_POINTS" to state.doublePointsCount
+        ).filter { it.second > 0 }
 
         val result = all.toMutableList()
-        while (result.size < 5) result.add("" to ("空" to 0))
+        while (result.size < 5) result.add("" to 0)
         result
     }
 
@@ -91,18 +94,17 @@ private fun CarriedItemsSection(state: GameViewState, onToolClick: (String) -> U
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "— 已携带法宝 —",
+            text = stringResource(id = R.string.carried_magic_items),
             style = MaterialTheme.typography.labelSmall,
             color = Gold_Primary,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            carriedItems.forEach { (type, pair) ->
+            carriedItems.forEach { (type, count) ->
                 CarriedItemIcon(
-                    type,
-                    pair.first,
-                    pair.second,
+                    type = type,
+                    count = count,
                     onClick = { if (type.isNotEmpty()) onToolClick(type) })
             }
         }
@@ -112,7 +114,6 @@ private fun CarriedItemsSection(state: GameViewState, onToolClick: (String) -> U
 @Composable
 private fun CarriedItemIcon(
     type: String,
-    name: String,
     count: Int,
     onClick: () -> Unit
 ) {
@@ -131,7 +132,7 @@ private fun CarriedItemIcon(
             Spacer(Modifier.height(2.dp))
             // 显示名称
             Text(
-                text = name,
+                text = getLocalizedItemName(type),
                 fontSize = 10.sp,
                 color = Text_Secondary_Dark,
                 fontWeight = FontWeight.Medium
@@ -156,10 +157,10 @@ private fun CarriedItemIcon(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text("空", fontSize = 10.sp, color = Text_Disabled_Dark)
+                Text(stringResource(id = R.string.slot_empty), fontSize = 10.sp, color = Text_Disabled_Dark)
             }
             Spacer(Modifier.height(2.dp))
-            Text("未携带", fontSize = 10.sp, color = Text_Disabled_Dark)
+            Text(stringResource(id = R.string.slot_not_carried), fontSize = 10.sp, color = Text_Disabled_Dark)
         }
     }
 }

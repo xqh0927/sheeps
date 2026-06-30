@@ -40,7 +40,7 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "天命对决",
+                text = stringResource(id = R.string.duel_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = Gold_Primary,
                 fontFamily = FontFamily.Serif
@@ -57,16 +57,16 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = when (state.connectionState) {
-                        WebSocketManager.ConnectionState.Connected -> "已连接"
-                        WebSocketManager.ConnectionState.Connecting -> "连接中"
-                        else -> "断开"
+                        WebSocketManager.ConnectionState.Connected -> stringResource(id = R.string.duel_status_connected)
+                        WebSocketManager.ConnectionState.Connecting -> stringResource(id = R.string.duel_status_connecting)
+                        else -> stringResource(id = R.string.duel_status_disconnected)
                     },
                     style = MaterialTheme.typography.labelSmall
                 )
             }
 
             IconButton(onClick = onLeave) {
-                Icon(Icons.Default.Close, contentDescription = "离开")
+                Icon(Icons.Default.Close, contentDescription = stringResource(id = R.string.duel_btn_leave))
             }
         }
         

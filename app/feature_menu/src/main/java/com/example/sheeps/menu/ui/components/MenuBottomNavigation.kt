@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,9 +29,9 @@ fun MenuBottomNavigation(
     onTabSelected: (String) -> Unit
 ) {
     val navItems = listOf(
-        Triple("game", "消除", com.example.sheeps.core.R.drawable.ic_nav_game),
-        Triple("shop", "商城", com.example.sheeps.core.R.drawable.ic_nav_shop),
-        Triple("me",   "我的", com.example.sheeps.core.R.drawable.ic_nav_profile)
+        Triple("game", com.example.sheeps.core.R.string.tab_game, com.example.sheeps.core.R.drawable.ic_nav_game),
+        Triple("shop", com.example.sheeps.core.R.string.tab_shop, com.example.sheeps.core.R.drawable.ic_nav_shop),
+        Triple("me",   com.example.sheeps.core.R.string.tab_me, com.example.sheeps.core.R.drawable.ic_nav_profile)
     )
 
     NavigationBar(
@@ -40,7 +41,8 @@ fun MenuBottomNavigation(
             .border(width = 0.5.dp, color = MaterialTheme.colorScheme.outline)
             .shadow(elevation = 8.dp)
     ) {
-        navItems.forEach { (tab, label, icon) ->
+        navItems.forEach { (tab, labelResId, icon) ->
+            val label = stringResource(id = labelResId)
             val selected = currentTab == tab
             val iconScale by animateFloatAsState(
                 targetValue = if (selected) 1.15f else 1f,

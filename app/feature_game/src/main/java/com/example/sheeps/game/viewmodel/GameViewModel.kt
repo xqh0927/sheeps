@@ -65,7 +65,7 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.Revive -> handleRevive()
             is GameViewIntent.UseHint -> toolDelegate.handleUseHint(currentState, ::getLocalizedString, ::updateState, ::setEffect) { itemsUsedCount++ }
             is GameViewIntent.UseBomb -> toolDelegate.handleUseBomb(currentState, ::getLocalizedString, ::updateState, ::setEffect, { itemsUsedCount++ }, ::processSlotMatchAndCheckEndGame)
-            is GameViewIntent.UseJoker -> toolDelegate.handleUseJoker(currentState, ::getLocalizedString, ::updateState, ::setEffect, { itemsUsedCount++ }, ::saveHistoryState, ::processSlotMatchAndCheckEndGame)
+            is GameViewIntent.UseJoker -> toolDelegate.handleUseJoker(viewModelScope, currentState, ::getLocalizedString, ::updateState, ::setEffect, { itemsUsedCount++ }, ::saveHistoryState, ::processSlotMatchAndCheckEndGame)
             is GameViewIntent.UseDoublePoints -> handleUseDoublePoints()
             is GameViewIntent.LoadLeaderboard -> handleLoadLeaderboard(intent.levelId)
             is GameViewIntent.RestartLevel -> handleLoadLevel(currentState.currentLevelId, carryItemsJsonStr)

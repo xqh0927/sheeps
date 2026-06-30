@@ -21,12 +21,15 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
 import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
+import com.example.sheeps.core.game.GameEngine
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.DuelResultDialog
@@ -105,20 +108,32 @@ fun DuelScreen(
                 flyingTileIds = flyingTileIds,
                 tileGlobalPositions = tileGlobalPositions,
                 onTileClick = { tile ->
-                    // 飞行动画触发逻辑
-                    val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
-                    val nextSlotIdx = state.slotTiles.size
-                    val endPos = slotGlobalPositions[nextSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
-                    val anim = Animatable(0f)
-                    val fly = DuelFlyingTile(tile.id, tile.type, startPos, endPos, anim)
-                    
-                    flyingTiles = flyingTiles + fly
-                    flyingTileIds = flyingTileIds + tile.id
-                    coroutineScope.launch {
-                        anim.animateTo(1f, tween(350, easing = FastOutSlowInEasing))
-                        flyingTiles = flyingTiles.filter { it.tileId != tile.id }
-                        flyingTileIds = flyingTileIds - tile.id
+                    val isBlocked = tile.state == TileState.BLOCKED || 
+                            (tile.state == TileState.NORMAL && GameEngine.isTileBlocked(tile, state.boardTiles))
+                    val isSealed = tile.sealedCount > 0
+
+                    if (isBlocked || isSealed) {
                         onTileClick(tile)
+                    } else {
+                        // 飞行动画触发逻辑
+                        val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                        // 计算卡牌在卡槽中的实际插入索引位置，使其飞向真正安放的位置，而非一律追加到卡槽最末尾
+                        val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
+                        val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
+                        val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                        val anim = Animatable(0f)
+                        val fly = DuelFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                        
+                        flyingTiles = flyingTiles + fly
+                        flyingTileIds = flyingTileIds + tile.id
+                        
+                        onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
+                        
+                        coroutineScope.launch {
+                            com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
+                            flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                            flyingTileIds = flyingTileIds - tile.id
+                        }
                     }
                 }
             )
@@ -131,7 +146,7 @@ fun DuelScreen(
             Spacer(Modifier.height(8.dp))
 
             // 5. 消除槽区域
-            DuelMatchingSlot(state = state, slotGlobalPositions = slotGlobalPositions)
+            DuelMatchingSlot(state = state, flyingTileIds = flyingTileIds, slotGlobalPositions = slotGlobalPositions)
 
             Spacer(Modifier.height(12.dp))
 
@@ -150,8 +165,7 @@ fun DuelScreen(
         // 9. 飞行卡片动画层
         DuelFlyingTilesLayer(
             flyingTiles = flyingTiles,
-            screenRootOffset = screenRootOffset,
-            density = density
+            screenRootOffset = screenRootOffset
         )
     }
 }
@@ -219,7 +233,9 @@ private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) 
             .padding(8.dp)
     ) {
         state.movedOutTiles.forEach { tile ->
-            TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = "classic", tileSize = 46.dp)
+            key(tile.id) {
+                TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = "classic", tileSize = 48.dp)
+            }
         }
     }
 }
@@ -228,26 +244,75 @@ private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) 
  * 对决模式消除槽位（支持缩减槽位诅咒）
  */
 @Composable
-private fun DuelMatchingSlot(state: DuelViewState, slotGlobalPositions: MutableMap<Int, Offset>) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun DuelMatchingSlot(
+    state: DuelViewState,
+    flyingTileIds: Set<String>,
+    slotGlobalPositions: MutableMap<Int, Offset>
+) {
+    val density = LocalDensity.current
+    var containerWidthPx by remember { mutableStateOf(0) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(8.dp)
+            .onGloballyPositioned { coords ->
+                containerWidthPx = coords.size.width
+            }
     ) {
-        for (i in 0 until 7) {
-            val isLocked = i == 6 && state.maxSlotSize == 6
-            Box(
-                modifier = Modifier
-                    .weight(1f).aspectRatio(1f).clip(RoundedCornerShape(8.dp))
-                    .background(if (isLocked) Crimson_Primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .border(width = 1.dp, color = if (isLocked) Crimson_Primary else Color.Transparent, shape = RoundedCornerShape(8.dp))
-                    .onGloballyPositioned { slotGlobalPositions[i] = it.positionInRoot() },
-                contentAlignment = Alignment.Center
-            ) {
-                if (isLocked) {
-                    Text("🔒", fontSize = 16.sp)
-                } else if (i < state.slotTiles.size) {
-                    TileView(tile = state.slotTiles[i], onClick = {}, currentSkin = "classic", tileSize = 40.dp)
+        // 1. 绘制 7 个空插槽背景
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            for (i in 0 until 7) {
+                val isLocked = i == 6 && state.maxSlotSize == 6
+                Box(
+                    modifier = Modifier
+                        .weight(1f).aspectRatio(1f)
+                        .background(if (isLocked) Crimson_Primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .border(width = 1.dp, color = if (isLocked) Crimson_Primary else Color.Transparent, shape = RoundedCornerShape(8.dp))
+                        .onGloballyPositioned { slotGlobalPositions[i] = it.positionInRoot() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLocked) {
+                        Text("🔒", fontSize = 16.sp)
+                    }
+                }
+            }
+        }
+
+        // 2. 绘制卡槽中的实体卡牌，并添加位置滑动动画
+        if (containerWidthPx > 0 && state.slotTiles.isNotEmpty()) {
+            val containerWidthDp = with(density) { containerWidthPx.toDp() }
+            val itemWidth = (containerWidthDp - 24.dp) / 7
+
+            state.slotTiles.forEachIndexed { index, tile ->
+                val targetX = index * (itemWidth + 4.dp)
+                val animatedX by animateDpAsState(
+                    targetValue = targetX,
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    label = "duel_slot_tile_move_${tile.id}"
+                )
+
+                val isFlying = flyingTileIds.contains(tile.id)
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = animatedX)
+                        .size(itemWidth)
+                        .alpha(if (isFlying) 0f else 1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TileView(
+                        tile = tile,
+                        onClick = {},
+                        currentSkin = "classic",
+                        tileSize = 48.dp
+                    )
                 }
             }
         }
@@ -275,19 +340,25 @@ private fun FullScreenLoadingOverlay() {
 @Composable
 private fun DuelFlyingTilesLayer(
     flyingTiles: List<DuelFlyingTile>,
-    screenRootOffset: Offset,
-    density: androidx.compose.ui.unit.Density
+    screenRootOffset: Offset
 ) {
     flyingTiles.forEach { fly ->
-        val progress = fly.progress.value
-        val x = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
-        val y = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
-        val sizeDp = 52.dp - (12.dp * progress)
-        val xDp = with(density) { x.toDp() }
-        val yDp = with(density) { y.toDp() }
-
-        Box(modifier = Modifier.offset(x = xDp, y = yDp).size(sizeDp).zIndex(999f)) {
-            TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = "classic", tileSize = sizeDp)
+        key(fly.tileId) {
+            Box(
+                modifier = Modifier
+                    .zIndex(999f)
+                    .size(48.dp)
+                    .graphicsLayer {
+                        val progress = fly.progress.value
+                        translationX = fly.start.x + (fly.end.x - fly.start.x) * progress - screenRootOffset.x
+                        translationY = fly.start.y + (fly.end.y - fly.start.y) * progress - screenRootOffset.y
+                        
+                        scaleX = 1f
+                        scaleY = 1f
+                    }
+            ) {
+                TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = "classic", tileSize = 48.dp)
+            }
         }
     }
 }

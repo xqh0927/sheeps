@@ -12,6 +12,29 @@ import com.blankj.utilcode.util.LogUtils
  */
 abstract class BaseActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        val mmkvContext = newBase.applicationContext ?: newBase
+        try {
+            com.tencent.mmkv.MMKV.initialize(mmkvContext)
+        } catch (e: Exception) {}
+        val lang = com.tencent.mmkv.MMKV.defaultMMKV()?.decodeString("language", "zh") ?: "zh"
+        if (lang.isEmpty() || lang == "zh") {
+            super.attachBaseContext(newBase)
+        } else {
+            val locale = when (lang) {
+                "en" -> java.util.Locale.ENGLISH
+                "tw" -> java.util.Locale.TRADITIONAL_CHINESE
+                "ja" -> java.util.Locale.JAPANESE
+                "ko" -> java.util.Locale.KOREAN
+                else -> java.util.Locale.SIMPLIFIED_CHINESE
+            }
+            val config = android.content.res.Configuration(newBase.resources.configuration)
+            config.setLocale(locale)
+            val configContext = newBase.createConfigurationContext(config)
+            super.attachBaseContext(configContext)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // 配置主题，SplashActivity 使用其特定主题除外
         if (javaClass.simpleName != "SplashActivity") {

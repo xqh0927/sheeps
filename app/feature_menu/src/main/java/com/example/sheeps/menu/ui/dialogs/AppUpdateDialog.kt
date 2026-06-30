@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.data.model.AppUpdateResponse
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 
 @Composable
 fun AppUpdateDialog(
@@ -67,7 +69,7 @@ fun AppUpdateDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "发现新版本 ${updateInfo.version_name ?: ""}",
+                    text = stringResource(id = R.string.update_discovered, updateInfo.version_name ?: ""),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -83,14 +85,14 @@ fun AppUpdateDialog(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "更新日志：",
+                            text = stringResource(id = R.string.update_log_title),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = updateInfo.update_log ?: "全新版本，优化游戏操作体验。",
+                            text = updateInfo.update_log ?: stringResource(id = R.string.update_default_log),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                             lineHeight = 18.sp
@@ -112,7 +114,7 @@ fun AppUpdateDialog(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = "稍后更新", fontSize = 14.sp)
+                            Text(text = stringResource(id = R.string.update_btn_later), fontSize = 14.sp)
                         }
                     }
 
@@ -126,7 +128,7 @@ fun AppUpdateDialog(
                                     }
                                     context.startActivity(intent)
                                 } catch (e: Exception) {
-                                    com.hjq.toast.Toaster.show("无法唤起浏览器下载，请检查链接配置")
+                                    com.hjq.toast.Toaster.show(context.getString(R.string.update_download_error))
                                 }
                             }
                         },
@@ -137,7 +139,7 @@ fun AppUpdateDialog(
                         ),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(text = "立即更新", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(id = R.string.update_btn_now), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -18,6 +18,8 @@ import com.example.sheeps.theme.Crimson_PrimaryContainer
 import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.AnimatedCounter
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 
 /**
  * 游戏状态栏组件
@@ -37,7 +39,7 @@ fun GameStatusBar(state: GameViewState) {
         // 得分展示区域
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "得分",
+                text = stringResource(id = R.string.game_score_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = Text_Secondary_Dark
             )
@@ -75,7 +77,7 @@ fun GameStatusBar(state: GameViewState) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text  = "剩余 $remaining 张",
+                text  = stringResource(id = R.string.game_remaining_tiles, remaining),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Text_Secondary_Dark
             )
