@@ -12,11 +12,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * 描述网络连接状态。
+ */
 enum class NetworkStatus {
+    /** 联网状态 */
     ONLINE,
+    /** 断网状态 */
     OFFLINE
 }
 
+/**
+ * 全局网络状态监控器。
+ * 使用 ConnectivityManager 的回调机制实时监听网络可用性。
+ */
 @Singleton
 class NetworkMonitor @Inject constructor(
     @ApplicationContext private val context: Context
@@ -24,6 +33,10 @@ class NetworkMonitor @Inject constructor(
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     
     private val _status = MutableStateFlow(getInitialStatus())
+    
+    /**
+     * 响应式的网络状态流。
+     */
     val status: StateFlow<NetworkStatus> = _status.asStateFlow()
 
     init {
@@ -37,17 +50,21 @@ class NetworkMonitor @Inject constructor(
                 }
 
                 override fun onLost(network: Network) {
+                    // 确保所有可用网络都丢失后才标记为离线
                     if (!isNetworkConnected()) {
                         _status.value = NetworkStatus.OFFLINE
                     }
                 }
             })
         } catch (e: Exception) {
-            // Fallback for safety
+            // 兜底：异常情况下默认在线，防止功能完全不可用
             _status.value = NetworkStatus.ONLINE
         }
     }
 
+    /**
+     * 检查当前是否在线。
+     */
     fun isOnline(): Boolean {
         return _status.value == NetworkStatus.ONLINE
     }
@@ -56,6 +73,9 @@ class NetworkMonitor @Inject constructor(
         return if (isNetworkConnected()) NetworkStatus.ONLINE else NetworkStatus.OFFLINE
     }
 
+    /**
+     * 同步检测网络连接能力。
+     */
     private fun isNetworkConnected(): Boolean {
         return try {
             val activeNetwork = connectivityManager.activeNetwork ?: return false

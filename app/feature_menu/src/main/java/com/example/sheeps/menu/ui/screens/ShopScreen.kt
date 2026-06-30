@@ -31,6 +31,15 @@ import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 
+/**
+ * 道具商店界面。
+ * 允许用户使用积分兑换游戏道具（如洗牌、撤销等）以及各种主题皮肤。
+ * 
+ * @param state 菜单界面状态
+ * @param onLoginClick 点击登录按钮回调
+ * @param onExchangeClick 确认兑换商品回调 (itemId, count)
+ * @param onChangeSkin 切换当前应用皮肤回调
+ */
 @Composable
 fun ShopScreen(
     state: MenuViewState,
@@ -38,17 +47,20 @@ fun ShopScreen(
     onExchangeClick: (Int, Int) -> Unit,
     onChangeSkin: (String) -> Unit
 ) {
+    // 当前选中的二级 Tab：0 - 神奇道具, 1 - 角色/图标皮肤
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
     val classicName = stringResource(id = R.string.item_skin_classic)
     val classicDesc = stringResource(id = R.string.item_skin_classic_desc)
 
+    // 根据选中的 Tab 过滤展示的商品
     val displayItems = remember(selectedSubTab, state.shopItems, classicName, classicDesc) {
         if (selectedSubTab == 0) {
+            // 过滤出非皮肤类道具
             state.shopItems.filter { !it.item_type.startsWith("SKIN_") }
         } else {
             val skins = mutableListOf<ShopItem>()
-            // 默认经典皮肤
+            // 默认添加经典（默认）皮肤作为选项
             skins.add(
                 ShopItem(
                     id = -1,
@@ -60,7 +72,7 @@ fun ShopScreen(
                     stock = 9999
                 )
             )
-            
+            // 添加所有从服务器拉取的皮肤商品
             skins.addAll(state.shopItems.filter { it.item_type.startsWith("SKIN_") })
             skins
         }
@@ -72,7 +84,7 @@ fun ShopScreen(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // Header
+            // --- 顶部栏：标题与余额 ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -95,7 +107,7 @@ fun ShopScreen(
                 )
             }
 
-            // 二级分类页签
+            // --- 分类切换页签 ---
             TabRow(
                 selectedTabIndex = selectedSubTab,
                 containerColor = Color.Transparent,
@@ -114,7 +126,9 @@ fun ShopScreen(
                 )
             }
 
+            // --- 商品列表展示 ---
             if (state.shopItems.isEmpty() && selectedSubTab == 0) {
+                // 加载中状态
                 Box(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -123,6 +137,7 @@ fun ShopScreen(
                 }
             } else {
                 if (selectedSubTab == 0) {
+                    // 道具类商品：两列网格展示
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -146,7 +161,7 @@ fun ShopScreen(
                         }
                     }
                 } else {
-                    // 皮肤横向显示，一套的皮肤堆叠显示
+                    // 皮肤类商品：按系列分组纵向排列，每组内部横向滚动
                     val traditionalSkins = displayItems.filter {
                         it.item_type == "CLASSIC" || it.item_type == "SKIN_INK" || it.item_type == "SKIN_CYBER"
                     }
@@ -160,7 +175,7 @@ fun ShopScreen(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Section 1: Traditional Themes
+                        // 区域 1：传统系列皮肤
                         Text(
                             text = stringResource(id = R.string.shop_section_traditional),
                             fontSize = 14.sp,
@@ -188,7 +203,7 @@ fun ShopScreen(
                             }
                         }
 
-                        // Section 2: Province Gourmet Skins
+                        // 区域 2：各省份美食特色皮肤
                         if (provinceSkins.isNotEmpty()) {
                             Text(
                                 text = stringResource(id = R.string.shop_section_provinces),
@@ -220,7 +235,7 @@ fun ShopScreen(
             }
         }
 
-        // Locked mask if guest mode
+        // --- 未登录状态的锁定蒙层 ---
         if (!state.isLoggedIn) {
             Box(
                 modifier = Modifier

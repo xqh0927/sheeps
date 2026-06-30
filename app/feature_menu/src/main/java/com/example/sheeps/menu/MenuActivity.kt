@@ -36,6 +36,11 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.DailyPopupResponse
 
+/**
+ * 游戏主入口菜单 Activity。
+ * 承载了游戏主页、商店、个人中心三个主要 Tab 页。
+ * 负责处理多语言切换、登录冲突解决、App 更新检测以及全局弹窗逻辑。
+ */
 @Route(path = "/menu/main")
 @AndroidEntryPoint
 class MenuActivity : BaseActivity() {
@@ -55,7 +60,8 @@ class MenuActivity : BaseActivity() {
         setContent {
             val state by viewModel.viewState.collectAsState()
             
-            // Real-time language updates in Compose context without Activity reload
+            // --- 多语言动态刷新逻辑 ---
+            // 通过监听 State 中的 language 变化，动态创建并提供经过语言配置修正的 Context
             val currentLang = state.language
             val configuration = androidx.compose.ui.platform.LocalConfiguration.current
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -76,15 +82,18 @@ class MenuActivity : BaseActivity() {
                 }
             }
 
-            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides localizedContext) {
+            // 使用 CompositionLocalProvider 将修正后的 Context 注入 Compose 树
+            CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides localizedContext) {
                 SheepsTheme {
-                    var currentTab by remember { mutableStateOf("game") } // game, shop, me
-                    var showLoginDialog by remember { mutableStateOf(false) }
-                    var showPrepareDialog by remember { mutableStateOf<Int?>(null) } // levelId
-                    var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) }
-                    var showNoticeListScreen by remember { mutableStateOf(false) }
-                    var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) }
+                    // --- 界面控制状态 ---
+                    var currentTab by remember { mutableStateOf("game") } // 当前选中的标签页：game, shop, me
+                    var showLoginDialog by remember { mutableStateOf(false) } // 登录弹窗显示控制
+                    var showPrepareDialog by remember { mutableStateOf<Int?>(null) } // 备战弹窗（传入关卡ID）
+                    var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) } // 存档冲突信息
+                    var showNoticeListScreen by remember { mutableStateOf(false) } // 公告列表全屏显示
+                    var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) } // 每日弹窗内容
 
+                    // 登录后检查每日弹窗
                     LaunchedEffect(state.isLoggedIn) {
                         if (state.isLoggedIn) {
                             val token = userPrefs.getToken()
@@ -104,7 +113,7 @@ class MenuActivity : BaseActivity() {
                         }
                     }
 
-                    // Observe Side Effects
+                    // --- 监听 ViewModel 副作用 ---
                     LaunchedEffect(Unit) {
                         viewModel.viewEffect.collect { effect ->
                             when (effect) {
@@ -117,6 +126,7 @@ class MenuActivity : BaseActivity() {
                                 is MenuViewEffect.NavigateToGame -> {
                                     showPrepareDialog = null
                                     viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
+                                    // 路由跳转至单机游戏
                                     TheRouter.build("/game/play")
                                         .withInt("levelId", effect.levelId)
                                         .withString("carryItemsJson", effect.carryItemsJson)
@@ -134,6 +144,7 @@ class MenuActivity : BaseActivity() {
                         }
                     }
 
+                    // --- 页面内容布局 ---
                     if (showNoticeListScreen) {
                         NoticeListScreen(
                             notices = state.notices,
@@ -141,210 +152,210 @@ class MenuActivity : BaseActivity() {
                         )
                     } else {
                         Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = {
-                            if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
-                                OfflineWarnBanner()
-                            }
-                        },
-                        bottomBar = {
-                            MenuBottomNavigation(
-                                currentTab = currentTab,
-                                onTabSelected = { tab ->
-                                    currentTab = tab
-                                    viewModel.sendIntent(MenuViewIntent.LoadData)
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = {
+                                if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
+                                    OfflineWarnBanner()
                                 }
-                            )
-                        }
-                    ) { paddingValues ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.background,
-                                            MaterialTheme.colorScheme.surface,
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        )
-                                    )
+                            },
+                            bottomBar = {
+                                MenuBottomNavigation(
+                                    currentTab = currentTab,
+                                    onTabSelected = { tab ->
+                                        currentTab = tab
+                                        viewModel.sendIntent(MenuViewIntent.LoadData)
+                                    }
                                 )
-                        ) {
+                            }
+                        ) { paddingValues ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(paddingValues)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.background,
+                                                MaterialTheme.colorScheme.surface,
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                            )
+                                        )
+                                    )
                             ) {
-                            AnimatedContent(
-                                targetState = currentTab,
-                                transitionSpec = {
-                                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                                },
-                                label = "tabChange"
-                            ) { targetTab ->
-                                when (targetTab) {
-                                    "game" -> GameHomeScreen(
-                                        state = state,
-                                        onLevelClick = { lvl ->
-                                            if (lvl > 3 && !state.isLoggedIn) {
-                                                showLoginDialog = true
-                                                Toaster.show("第四关及后续关卡需要登录解锁，请先登录！")
-                                            } else {
-                                                showPrepareDialog = lvl
-                                            }
+                                Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                                    // 标签页切换动画
+                                    AnimatedContent(
+                                        targetState = currentTab,
+                                        transitionSpec = {
+                                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
                                         },
-                                        onShowLeaderboard = { lvl ->
-                                            TheRouter.build("/leaderboard/show")
-                                                .withInt("levelId", lvl)
-                                                .navigation()
-                                        },
-                                        onNoticeClick = { showNoticeListScreen = true },
-                                        onLoginClick = { showLoginDialog = true },
-                                        onJoinMatch = { viewModel.sendIntent(MenuViewIntent.JoinMatch(state.phone)) },
-                                        onLeaveMatch = { viewModel.sendIntent(MenuViewIntent.LeaveMatch(state.phone)) },
-                                        onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
-                                        onNavigateToDuel = { gId, pId, levelId, seed ->
-                                            TheRouter.build("/game/duel")
-                                                .withString("gameId", gId)
-                                                .withString("playerId", pId)
-                                                .withInt("levelId", levelId)
-                                                .withInt("seed", seed)
-                                                .navigation()
-                                        }
-                                    )
-                                    "shop" -> ShopScreen(
-                                        state = state,
-                                        onLoginClick = { showLoginDialog = true },
-                                        onExchangeClick = { itemId, count ->
-                                            viewModel.sendIntent(MenuViewIntent.ExchangeShopItem(itemId, count))
-                                        },
-                                        onChangeSkin = { skin ->
-                                            viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin))
-                                        }
-                                    )
-                                    "me" -> PersonalScreen(
-                                        state = state,
-                                        onLoginClick = { showLoginDialog = true },
-                                        onLogoutClick = { viewModel.sendIntent(MenuViewIntent.Logout) },
-                                        onSignInClick = { viewModel.sendIntent(MenuViewIntent.SignIn) },
-                                        onClaimTask = { taskId -> viewModel.sendIntent(MenuViewIntent.ClaimTask(taskId)) },
-                                        onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) },
-                                        onThemeChange = { recreate() }
-                                    )
-                                }
-                            }
-
-                            // Prepare game dialog
-                            if (showPrepareDialog != null) {
-                                PrepareGameDialog(
-                                    levelId = showPrepareDialog!!,
-                                    state = state,
-                                    onDismiss = {
-                                        showPrepareDialog = null
-                                        viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
-                                    },
-                                    onConfirm = { lvl ->
-                                        val carryJson = json.encodeToString(state.selectedCarryItems)
-                                        viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
-                                        viewModel.sendIntent(MenuViewIntent.GoToGame(lvl, carryJson))
-                                    },
-                                    onUpdateItem = { itemType, change ->
-                                        viewModel.sendIntent(MenuViewIntent.UpdateCarryItem(itemType, change))
-                                    },
-                                    onUnlock = { lvl ->
-                                        viewModel.sendIntent(MenuViewIntent.UnlockLevelWithPoints(lvl))
-                                    }
-                                )
-                            }
-
-                            // Login simulation dialog
-                            if (showLoginDialog) {
-                                LoginDialog(
-                                    onDismiss = { showLoginDialog = false },
-                                    onSendCode = { phone -> viewModel.sendIntent(MenuViewIntent.SendSmsCode(phone)) },
-                                    onLogin = { phone, code ->
-                                        viewModel.sendIntent(MenuViewIntent.LoginWithCode(phone, code))
-                                        showLoginDialog = false
-                                    }
-                                )
-                            }
-
-                            if (showConflictInfo != null) {
-                                ConflictDialog(
-                                    info = showConflictInfo!!,
-                                    onChooseLocal = {
-                                        viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = true))
-                                        showConflictInfo = null
-                                    },
-                                    onChooseCloud = {
-                                        viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = false))
-                                        showConflictInfo = null
-                                    }
-                                )
-                            }
-
-                            // 检查 App 版本更新并显示弹窗
-                            state.appUpdateInfo?.let { updateInfo ->
-                                if (updateInfo.has_update) {
-                                    AppUpdateDialog(
-                                        updateInfo = updateInfo,
-                                        onDismiss = {
-                                            viewModel.sendIntent(MenuViewIntent.DismissUpdate)
-                                        }
-                                    )
-                                }
-                            }
-
-                            // Daily leaderboard popup
-                            if (showDailyPopup != null) {
-                                DailyLeaderboardPopupDialog(
-                                    data = showDailyPopup!!,
-                                    onDismiss = { showDailyPopup = null }
-                                )
-                            }
-
-                            if (state.isLoading) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Overlay_Dark_Medium)
-                                        .pointerInput(Unit) {
-                                            awaitEachGesture {
-                                                while (true) {
-                                                    val event = awaitPointerEvent()
-                                                    event.changes.forEach { it.consume() }
+                                        label = "tabChange"
+                                    ) { targetTab ->
+                                        when (targetTab) {
+                                            "game" -> GameHomeScreen(
+                                                state = state,
+                                                onLevelClick = { lvl ->
+                                                    if (lvl > 3 && !state.isLoggedIn) {
+                                                        showLoginDialog = true
+                                                        Toaster.show("第四关及后续关卡需要登录解锁，请先登录！")
+                                                    } else {
+                                                        showPrepareDialog = lvl
+                                                    }
+                                                },
+                                                onShowLeaderboard = { lvl ->
+                                                    TheRouter.build("/leaderboard/show")
+                                                        .withInt("levelId", lvl)
+                                                        .navigation()
+                                                },
+                                                onNoticeClick = { showNoticeListScreen = true },
+                                                onLoginClick = { showLoginDialog = true },
+                                                onJoinMatch = { viewModel.sendIntent(MenuViewIntent.JoinMatch(state.phone)) },
+                                                onLeaveMatch = { viewModel.sendIntent(MenuViewIntent.LeaveMatch(state.phone)) },
+                                                onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
+                                                onNavigateToDuel = { gId, pId, levelId, seed ->
+                                                    TheRouter.build("/game/duel")
+                                                        .withString("gameId", gId)
+                                                        .withString("playerId", pId)
+                                                        .withInt("levelId", levelId)
+                                                        .withInt("seed", seed)
+                                                        .navigation()
                                                 }
+                                            )
+                                            "shop" -> ShopScreen(
+                                                state = state,
+                                                onLoginClick = { showLoginDialog = true },
+                                                onExchangeClick = { itemId, count ->
+                                                    viewModel.sendIntent(MenuViewIntent.ExchangeShopItem(itemId, count))
+                                                },
+                                                onChangeSkin = { skin ->
+                                                    viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin))
+                                                }
+                                            )
+                                            "me" -> PersonalScreen(
+                                                state = state,
+                                                onLoginClick = { showLoginDialog = true },
+                                                onLogoutClick = { viewModel.sendIntent(MenuViewIntent.Logout) },
+                                                onSignInClick = { viewModel.sendIntent(MenuViewIntent.SignIn) },
+                                                onClaimTask = { taskId -> viewModel.sendIntent(MenuViewIntent.ClaimTask(taskId)) },
+                                                onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) },
+                                                onThemeChange = { recreate() }
+                                            )
+                                        }
+                                    }
+
+                                    // 备战弹窗：选择携带道具
+                                    if (showPrepareDialog != null) {
+                                        PrepareGameDialog(
+                                            levelId = showPrepareDialog!!,
+                                            state = state,
+                                            onDismiss = {
+                                                showPrepareDialog = null
+                                                viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
+                                            },
+                                            onConfirm = { lvl ->
+                                                val carryJson = json.encodeToString(state.selectedCarryItems)
+                                                viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
+                                                viewModel.sendIntent(MenuViewIntent.GoToGame(lvl, carryJson))
+                                            },
+                                            onUpdateItem = { itemType, change ->
+                                                viewModel.sendIntent(MenuViewIntent.UpdateCarryItem(itemType, change))
+                                            },
+                                            onUnlock = { lvl ->
+                                                viewModel.sendIntent(MenuViewIntent.UnlockLevelWithPoints(lvl))
+                                            }
+                                        )
+                                    }
+
+                                    // 登录/注册弹窗
+                                    if (showLoginDialog) {
+                                        LoginDialog(
+                                            onDismiss = { showLoginDialog = false },
+                                            onSendCode = { phone -> viewModel.sendIntent(MenuViewIntent.SendSmsCode(phone)) },
+                                            onLogin = { phone, code ->
+                                                viewModel.sendIntent(MenuViewIntent.LoginWithCode(phone, code))
+                                                showLoginDialog = false
+                                            }
+                                        )
+                                    }
+
+                                    // 存档冲突处理弹窗
+                                    if (showConflictInfo != null) {
+                                        ConflictDialog(
+                                            info = showConflictInfo!!,
+                                            onChooseLocal = {
+                                                viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = true))
+                                                showConflictInfo = null
+                                            },
+                                            onChooseCloud = {
+                                                viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = false))
+                                                showConflictInfo = null
+                                            }
+                                        )
+                                    }
+
+                                    // App 更新弹窗
+                                    state.appUpdateInfo?.let { updateInfo ->
+                                        if (updateInfo.has_update) {
+                                            AppUpdateDialog(
+                                                updateInfo = updateInfo,
+                                                onDismiss = {
+                                                    viewModel.sendIntent(MenuViewIntent.DismissUpdate)
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    // 每日排行榜奖励公示弹窗
+                                    if (showDailyPopup != null) {
+                                        DailyLeaderboardPopupDialog(
+                                            data = showDailyPopup!!,
+                                            onDismiss = { showDailyPopup = null }
+                                        )
+                                    }
+
+                                    // 全屏加载指示器（带手势拦截）
+                                    if (state.isLoading) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Overlay_Dark_Medium)
+                                                .pointerInput(Unit) {
+                                                    awaitEachGesture {
+                                                        while (true) {
+                                                            val event = awaitPointerEvent()
+                                                            event.changes.forEach { it.consume() }
+                                                        }
+                                                    }
+                                                }
+                                                .clickable(enabled = false, onClick = {}),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(80.dp)
+                                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                SheepsLoading(size = 44.dp)
                                             }
                                         }
-                                        .clickable(enabled = false, onClick = {}),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        SheepsLoading(size = 44.dp)
                                     }
                                 }
                             }
                         }
                     }
-                    }
                 }
-            }
             }
         }
     }
 
     override fun initData() {
-        // ViewModel handles loading on creation
+        // ViewModel 在创建时自动加载初始数据
     }
 
     override fun onResume() {
         super.onResume()
+        // 每次回到前台刷新一次数据（如积分、体力等）
         viewModel.sendIntent(MenuViewIntent.LoadData)
     }
 }

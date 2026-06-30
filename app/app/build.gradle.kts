@@ -11,7 +11,7 @@ plugins {
 
 android {
     namespace = "com.example.sheeps"
-    compileSdk = 36
+    compileSdk = 37
     lint {
         checkReleaseBuilds = false
         abortOnError = false

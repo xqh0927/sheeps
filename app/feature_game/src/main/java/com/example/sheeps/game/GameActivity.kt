@@ -19,6 +19,10 @@ import com.example.sheeps.game.viewmodel.GameViewModel
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 
+/**
+ * 单机游戏模式 Activity。
+ * 负责接收外部参数（如关卡ID、携带道具），初始化游戏界面，并处理与 UI 相关的副作用（如振动、音效、弹窗）。
+ */
 @Route(path = "/game/play")
 @dagger.hilt.android.AndroidEntryPoint
 class GameActivity : BaseActivity() {
@@ -27,6 +31,7 @@ class GameActivity : BaseActivity() {
     private var levelId: Int = 1
 
     override fun initView(savedInstanceState: Bundle?) {
+        // 从 intent 中获取关卡 ID，默认为第 1 关
         levelId = intent.getIntExtra("levelId", 1)
 
         setContent {
@@ -54,6 +59,7 @@ class GameActivity : BaseActivity() {
                             viewModel.sendIntent(GameViewIntent.LoadLevel(state.currentLevelId + 1, null))
                         },
                         onShowLeaderboard = {
+                            // 路由跳转至排行榜
                             com.therouter.TheRouter.build("/leaderboard/show")
                                 .withInt("levelId", state.currentLevelId)
                                 .navigation()
@@ -66,10 +72,10 @@ class GameActivity : BaseActivity() {
 
     override fun initData() {
         val carryJson = intent.getStringExtra("carryItemsJson")
-        // Automatically request loading the level with carried items
+        // 发送初始加载关卡意图
         viewModel.sendIntent(GameViewIntent.LoadLevel(levelId, carryJson))
 
-        // Collect side effects in lifecycleScope
+        // 在生命周期范围内收集 ViewModel 发出的副作用
         lifecycleScope.launchWhenStarted {
             viewModel.viewEffect.collect { effect ->
                 when (effect) {
@@ -77,10 +83,10 @@ class GameActivity : BaseActivity() {
                         Toaster.show(effect.message)
                     }
                     is com.example.sheeps.game.state.GameViewEffect.PlaySound -> {
-                        // Play CASUAL matching sounds
+                        // 预留：此处触发全局音效播放
                     }
                     is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
-                        // Vibrate phone
+                        // 预留：此处触发设备震动反馈
                     }
                 }
             }

@@ -15,8 +15,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 多人联机实时对局 WebSocket 管理器
- * 负责客户端的握手连接、心跳监测、自动退避重连以及消息的统一收发
+ * 多人联机实时对局 WebSocket 管理器。
+ * 负责客户端的握手连接、心跳监测、自动退避重连以及消息的统一收发。
  */
 @Singleton
 class WebSocketManager @Inject constructor(
@@ -33,26 +33,39 @@ class WebSocketManager @Inject constructor(
     private var currentGameId: String? = null
     private var currentPlayerId: String? = null
 
-    // 暴露给 UI 订阅的连接状态
+    /**
+     * 暴露给 UI 订阅的连接状态流。
+     */
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
     val connectionState: StateFlow<ConnectionState> = _connectionState
 
-    // 暴露给 UI 订阅的实时对局指令数据流
+    /**
+     * 暴露给 UI 订阅的实时对局指令数据流。
+     */
     private val _messageFlow = MutableSharedFlow<GameCommand>(extraBufferCapacity = 64)
     val messageFlow: SharedFlow<GameCommand> = _messageFlow
 
     // 退避重连延迟计算器
     private val backoffCalculator = BackoffCalculator(1000L, 8000L)
 
+    /**
+     * WebSocket 连接状态描述。
+     */
     sealed class ConnectionState {
+        /** 正在尝试连接 */
         object Connecting : ConnectionState()
+        /** 已建立连接 */
         object Connected : ConnectionState()
+        /** 掉线并正在尝试重连 */
         data class Reconnecting(val attempt: Int) : ConnectionState()
+        /** 已断开连接 */
         object Disconnected : ConnectionState()
     }
 
     /**
-     * 发起 WebSocket 对局连接
+     * 发起 WebSocket 对局连接。
+     * @param gameId 游戏对局 ID
+     * @param playerId 玩家个人 ID
      */
     fun connect(gameId: String, playerId: String) {
         isManualClose = false
@@ -72,7 +85,9 @@ class WebSocketManager @Inject constructor(
     }
 
     /**
-     * 发送同步对局指令
+     * 发送同步对局指令。
+     * @param command 要发送的对局指令对象
+     * @return 发送是否成功
      */
     fun sendCommand(command: GameCommand): Boolean {
         val ws = webSocket
@@ -90,7 +105,8 @@ class WebSocketManager @Inject constructor(
     }
 
     /**
-     * 主动断开连接（如退出房间或登出游戏时调用）
+     * 主动断开连接。
+     * 正常退出房间或注销登录时应当调用，避免自动重连。
      */
     fun disconnect() {
         isManualClose = true
@@ -145,7 +161,7 @@ class WebSocketManager @Inject constructor(
     }
 
     /**
-     * 自动触发指数退避重连流程
+     * 自动触发指数退避重连流程。
      */
     private fun triggerReconnect() {
         if (reconnectJob?.isActive == true) return
@@ -172,9 +188,15 @@ class WebSocketManager @Inject constructor(
     }
 
     /**
-     * 指数退避算法计算器
+     * 指数退避算法计算器。
+     * 用于生成随尝试次数增加而指数级增长的重连延迟。
      */
     class BackoffCalculator(private val initialDelayMs: Long, private val maxDelayMs: Long) {
+        /**
+         * 获取当前重连尝试对应的延迟时间。
+         * @param attempt 当前尝试次数（从 0 开始）
+         * @return 应当延迟的毫秒数
+         */
         fun getDelay(attempt: Int): Long {
             // 避免整型溢出，安全进行位移计算
             val factor = if (attempt >= 30) (1 shl 30) else (1 shl attempt)

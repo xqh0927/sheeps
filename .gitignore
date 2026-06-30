@@ -1,13 +1,22 @@
-/sheeps
-.wrangler
+# 后端 (Cloudflare Workers)
+server/.wrangler/
 server/.tmp-test/
+server/node_modules/
+.env
+.DS_Store
+.idea
+.vscode
 
 # Android Studio & Gradle
-.idea/
-.gradle/
-**/.kotlin/
-**/build/
-*.iml
-local.properties
-*.bak
-*.tmp
+app/.idea/
+app/.gradle/
+app/.kotlin/
+app/build/
+app/app/build/
+app/core/build/
+app/feature_game/build/
+app/feature_leaderboard/build/
+app/feature_menu/build/
+app/feature_splash/build
+app/local.properties
+app/.navigation/
