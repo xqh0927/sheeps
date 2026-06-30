@@ -93,7 +93,69 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
     }
 
-    // /api/sign/today, /api/leaderboard 等其他 game 路由以此类推... (为节省篇幅略，结构一致)
+    // 每日签到
+    if (path === '/api/sign/today' && request.method === 'POST') {
+        const authUser = await getAuthenticatedUser(request, env);
+        if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
+        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
+        const chinaYesterday = new Date(Date.now() + 8 * 3600000 - 24 * 3600000).toISOString().split('T')[0];
+
+        const [checkSignResult, lastSignResult, configResult, userResult] = await env.DB.batch([
+            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
+            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaYesterday),
+            env.DB.prepare('SELECT value FROM config WHERE key = ?').bind('sign_rewards'),
+            env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        ]);
+
+        if (checkSignResult.results[0]) return new Response(JSON.stringify({ error: 'Already signed in today' }), { status: 400, headers: corsHeaders });
+
+        const newStreak = ((lastSignResult.results[0] as { streak: number } | undefined)?.streak || 0) + 1;
+        const rewardsConfigRow = configResult.results[0] as { value: string } | undefined;
+        const rewards = rewardsConfigRow ? rewardsConfigRow.value.split(',').map(Number) : [20, 20, 30, 30, 40, 50, 100];
+        const rewardPoints = rewards[Math.min(newStreak, 7) - 1] || 20;
+
+        const newPoints = ((userResult.results[0] as { points: number } | undefined)?.points || 0) + rewardPoints;
+
+        await env.DB.batch([
+            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
+            env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)').bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()),
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()),
+            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 0)
+        ]);
+
+        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints, current_points: newPoints }), { headers: corsHeaders });
+    }
+    // 排行榜查询
+    if (path === '/api/leaderboard' && request.method === 'GET') {
+        const levelIdStr = url.searchParams.get('level_id');
+        if (!levelIdStr) return new Response(JSON.stringify({ error: 'Missing level_id' }), { status: 400, headers: corsHeaders });
+
+        const levelId = parseInt(levelIdStr, 10);
+        const type = url.searchParams.get('type') || 'history';
+        const page = parseInt(url.searchParams.get('page') || '1', 10);
+        const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+
+        const cacheKey = `leaderboard_${levelId}_${type}_${page}_${limit}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) return new Response(cached, { headers: corsHeaders });
+
+        const offset = (page - 1) * limit;
+        let timeFilter = 0;
+        const now = Date.now();
+        const chinaTodayStr = new Date(now + 8 * 3600000).toISOString().split('T')[0];
+        const todayStart = new Date(chinaTodayStr + 'T00:00:00+08:00').getTime();
+
+        if (type === 'daily') timeFilter = todayStart;
+        else if (type === 'weekly') timeFilter = todayStart - ((new Date(now + 8 * 3600000).getDay() + 6) % 7) * 24 * 3600000;
+
+        const results = await env.DB.prepare(
+            `SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.achieved_at >= ? ORDER BY l.score DESC, l.clear_time_ms ASC LIMIT ? OFFSET ?`
+        ).bind(levelId, timeFilter, limit, offset).all();
+
+        const responseData = JSON.stringify({ success: true, rankings: results.results });
+        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 120 });
+        return new Response(responseData, { headers: corsHeaders });
+    }
     return null;
 }

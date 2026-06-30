@@ -41,7 +41,7 @@ fun GameDock(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 1. 置物架（由“移出”道具触发展示）
+        // --- 这里的逻辑负责展示置物架 ---
         if (state.movedOutTiles.isNotEmpty()) {
             MovedOutTray(
                 tiles = state.movedOutTiles,
@@ -49,8 +49,9 @@ fun GameDock(
                 onTileClick = onTileClick
             )
         }
+        // ------------------------------
 
-        // 2. 消除槽（Slot）
+        // 消除槽
         MatchingSlot(
             state = state,
             slotGlobalPositions = slotGlobalPositions
@@ -124,7 +125,7 @@ private fun MatchingSlot(
             .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(
-                width = 1.5.dp,
+                width = 1.dp,
                 color = Crimson_Primary.copy(alpha = slotBorderAlpha),
                 shape = RoundedCornerShape(12.dp)
             )
