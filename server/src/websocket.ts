@@ -91,7 +91,7 @@ export async function handleWebSocketSession(socket: WebSocket, gameId: string, 
   });
 
   // 5. 优雅断线与掉线判负逻辑 (15秒宽限期)
-  const handleDisconnect = async () => { /* 详细代码同前，这里主要是清理 Timer 和判定超时胜负 */ };
+  const handleDisconnect = async () => { /* 详细代码同前，此处主要负责清理定时器与判定掉线超时胜负 */ };
   socket.addEventListener('close', handleDisconnect);
   socket.addEventListener('error', handleDisconnect);
 }
