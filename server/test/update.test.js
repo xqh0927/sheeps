@@ -6,6 +6,8 @@ const {
   findApkAsset,
   isForceUpdateRelease,
   mapGitHubReleaseToUpdate,
+  checkApkExists,
+  clearApkCache,
 } = require('../.tmp-test/index.js');
 
 test('parses numeric release tags as Android version codes', () => {
@@ -61,3 +63,36 @@ test('does not report an update when the latest release is not newer', () => {
     ],
   }, 10000), { has_update: false });
 });
+
+test('checkApkExists fetches URL status and caches result', async () => {
+  let callCount = 0;
+  const originalFetch = globalThis.fetch;
+  
+  globalThis.fetch = async (url) => {
+    callCount++;
+    if (url === 'https://example.com/exist.apk') {
+      return { status: 200 };
+    }
+    return { status: 404 };
+  };
+
+  if (clearApkCache) clearApkCache();
+
+  // First request: should call fetch and return true
+  const ok = await checkApkExists('https://example.com/exist.apk');
+  assert.equal(ok, true);
+  assert.equal(callCount, 1);
+
+  // Second request: should hit cache and not fetch again
+  const okCached = await checkApkExists('https://example.com/exist.apk');
+  assert.equal(okCached, true);
+  assert.equal(callCount, 1);
+
+  // Request a non-existent one: should return false
+  const notOk = await checkApkExists('https://example.com/404.apk');
+  assert.equal(notOk, false);
+  assert.equal(callCount, 2);
+
+  globalThis.fetch = originalFetch;
+});
+

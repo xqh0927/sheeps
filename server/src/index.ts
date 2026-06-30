@@ -107,6 +107,47 @@ async function getGitHubAppUpdate(currentCode: number): Promise<AppUpdatePayload
   }
 }
 
+
+export interface ApkStatus {
+  exists: boolean;
+  checkedAt: number;
+}
+
+export const apkExistenceCache = new Map<string, ApkStatus>();
+const CACHE_TTL_SUCCESS = 24 * 60 * 60 * 1000; // 24小时
+const CACHE_TTL_FAILURE = 60 * 1000; // 60秒
+
+export function clearApkCache() {
+  apkExistenceCache.clear();
+}
+
+export async function checkApkExists(url: string): Promise<boolean> {
+  const now = Date.now();
+  const cached = apkExistenceCache.get(url);
+  if (cached) {
+    const ttl = cached.exists ? CACHE_TTL_SUCCESS : CACHE_TTL_FAILURE;
+    if (now - cached.checkedAt < ttl) {
+      return cached.exists;
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        'User-Agent': 'sheeps-update-checker'
+      }
+    });
+    
+    const exists = response.status === 200;
+    apkExistenceCache.set(url, { exists, checkedAt: now });
+    return exists;
+  } catch {
+    apkExistenceCache.set(url, { exists: false, checkedAt: now });
+    return false;
+  }
+}
+
 async function getDatabaseAppUpdate(env: Env, currentCode: number): Promise<AppUpdatePayload> {
   const latest = await env.DB.prepare(
     'SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version ORDER BY version_code DESC LIMIT 1'
