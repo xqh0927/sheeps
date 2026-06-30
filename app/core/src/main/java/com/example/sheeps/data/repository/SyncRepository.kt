@@ -150,6 +150,9 @@ class SyncRepository @Inject constructor(
                 // Write user details
                 userPreferences.setPoints(response.user.points)
                 userPreferences.setUsername(response.user.username)
+                userPreferences.setTodaySigned(response.today_signed)
+                userPreferences.setSignStreak(response.sign_streak)
+                userPreferences.setHighestLevelCleared(response.highest_level_cleared)
                 
                 val profile = UserProfileEntity(
                     userId = response.user.id,

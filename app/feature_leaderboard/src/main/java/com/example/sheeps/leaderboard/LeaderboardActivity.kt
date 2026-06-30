@@ -91,10 +91,10 @@ class LeaderboardActivity : BaseActivity() {
                 }
 
                 Surface(
-                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                    modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
                         LeaderboardAppBar(
                             levelId = levelId,
                             onBack = { finish() }

@@ -116,6 +116,9 @@ class UserPreferences @Inject constructor(
         kv.removeValueForKey("user_points")
         kv.encode("unlocked_level", 1)
         kv.removeValueForKey("username")
+        kv.removeValueForKey("today_signed")
+        kv.removeValueForKey("sign_streak")
+        kv.removeValueForKey("highest_level_cleared")
     }
 
     fun getCurrentSkin(): String {
@@ -124,5 +127,29 @@ class UserPreferences @Inject constructor(
 
     fun setCurrentSkin(skin: String) {
         kv.encode("current_skin", skin)
+    }
+
+    fun getTodaySigned(): Boolean {
+        return kv.decodeBool("today_signed", false)
+    }
+
+    fun setTodaySigned(signed: Boolean) {
+        kv.encode("today_signed", signed)
+    }
+
+    fun getSignStreak(): Int {
+        return kv.decodeInt("sign_streak", 0)
+    }
+
+    fun setSignStreak(streak: Int) {
+        kv.encode("sign_streak", streak)
+    }
+
+    fun getHighestLevelCleared(): Int {
+        return kv.decodeInt("highest_level_cleared", 0)
+    }
+
+    fun setHighestLevelCleared(level: Int) {
+        kv.encode("highest_level_cleared", level)
     }
 }

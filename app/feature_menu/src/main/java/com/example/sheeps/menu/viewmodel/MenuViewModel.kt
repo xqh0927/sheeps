@@ -87,7 +87,10 @@ class MenuViewModel @Inject constructor(
         updateState {
             copy(
                 language = prefs.getLanguage(),
-                currentSkin = prefs.getCurrentSkin()
+                currentSkin = prefs.getCurrentSkin(),
+                todaySigned = prefs.getTodaySigned(),
+                signStreak = prefs.getSignStreak(),
+                highestLevelCleared = prefs.getHighestLevelCleared()
             )
         }
         sendIntent(MenuViewIntent.LoadData)
@@ -235,7 +238,7 @@ class MenuViewModel @Inject constructor(
                     val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
                         ShopItem(
                             id = 1000 + index,
-                            name = "${province.name}·省味",
+                            name = "${province.name}美食",
                             description = "解锁${province.name}省特色美食图标皮肤",
                             image_url = "",
                             item_type = "SKIN_${province.id.uppercase()}",
@@ -292,7 +295,10 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = dailyTasks,
                             pointsHistory = pointsHistory,
-                            exchangeHistory = exchangeHistory
+                            exchangeHistory = exchangeHistory,
+                            todaySigned = prefs.getTodaySigned(),
+                            signStreak = prefs.getSignStreak(),
+                            highestLevelCleared = prefs.getHighestLevelCleared()
                         )
                     }
                 } else {
@@ -306,7 +312,10 @@ class MenuViewModel @Inject constructor(
                             notices = notices,
                             dailyTasks = emptyList(),
                             pointsHistory = emptyList(),
-                            exchangeHistory = emptyList()
+                            exchangeHistory = emptyList(),
+                            todaySigned = prefs.getTodaySigned(),
+                            signStreak = prefs.getSignStreak(),
+                            highestLevelCleared = prefs.getHighestLevelCleared()
                         )
                     }
                 }
@@ -494,6 +503,8 @@ class MenuViewModel @Inject constructor(
         prefs.setPhone(response.user.phone)
         prefs.setUsername(response.user.username)
         prefs.setPoints(response.user.points)
+        prefs.setTodaySigned(response.today_signed)
+        prefs.setSignStreak(response.sign_streak)
 
         val now = System.currentTimeMillis()
         localDao.deleteProfile() // 删掉旧游客 Profile
@@ -603,6 +614,8 @@ class MenuViewModel @Inject constructor(
                         )
                     )
                     prefs.setPoints(response.current_points)
+                    prefs.setTodaySigned(true)
+                    prefs.setSignStreak(response.streak)
                 } else {
                     setEffect(MenuViewEffect.ShowToast("签到失败"))
                 }

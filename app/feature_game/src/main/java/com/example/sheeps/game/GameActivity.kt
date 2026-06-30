@@ -34,7 +34,7 @@ class GameActivity : BaseActivity() {
                 val state by viewModel.viewState.collectAsState()
 
                 Surface(
-                    modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                    modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
                     GameScreen(

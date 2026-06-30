@@ -102,7 +102,7 @@ class MenuActivity : BaseActivity() {
                     }
 
                     Scaffold(
-                        modifier = Modifier.fillMaxSize().statusBarsPadding(),
+                        modifier = Modifier.fillMaxSize(),
                         topBar = {
                             if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
                                 OfflineWarnBanner()
@@ -121,7 +121,6 @@ class MenuActivity : BaseActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(paddingValues)
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(
@@ -132,6 +131,11 @@ class MenuActivity : BaseActivity() {
                                     )
                                 )
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(paddingValues)
+                            ) {
                             AnimatedContent(
                                 targetState = currentTab,
                                 transitionSpec = {
@@ -267,6 +271,7 @@ class MenuActivity : BaseActivity() {
                         }
                     }
                 }
+            }
             }
         }
     }

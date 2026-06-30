@@ -87,6 +87,7 @@ fun GameScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+                        .statusBarsPadding()
                         .border(
                             width = 0.5.dp,
                             color = MaterialTheme.colorScheme.outline,

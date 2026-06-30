@@ -24,6 +24,10 @@ import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.ShopItemCard
 import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.theme.GoldenBronze
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as lazyItems
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @Composable
 fun ShopScreen(
@@ -113,28 +117,99 @@ fun ShopScreen(
                     CircularProgressIndicator(color = CrimsonRed)
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(displayItems) { item ->
-                        val backpackCount = if (item.item_type == "CLASSIC") 1 else {
-                            state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+                if (selectedSubTab == 0) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(displayItems) { item ->
+                            val backpackCount = state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+
+                            ShopItemCard(
+                                item = item,
+                                backpackCount = backpackCount,
+                                currentSkin = state.currentSkin,
+                                onExchange = { count ->
+                                    onExchangeClick(item.id, count)
+                                },
+                                onApplySkin = { skin ->
+                                    onChangeSkin(skin)
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    // 皮肤横向显示，一套的皮肤堆叠显示
+                    val traditionalSkins = displayItems.filter {
+                        it.item_type == "CLASSIC" || it.item_type == "SKIN_INK" || it.item_type == "SKIN_CYBER"
+                    }
+                    val provinceSkins = displayItems.filter {
+                        it.item_type.startsWith("SKIN_") && it.item_type != "SKIN_INK" && it.item_type != "SKIN_CYBER"
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Section 1: Traditional Themes
+                        Text(
+                            text = "专属特制卡牌主题",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CrimsonRed,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            lazyItems(traditionalSkins) { item ->
+                                Box(modifier = Modifier.width(160.dp)) {
+                                    val backpackCount = if (item.item_type == "CLASSIC") 1 else {
+                                        state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+                                    }
+                                    ShopItemCard(
+                                        item = item,
+                                        backpackCount = backpackCount,
+                                        currentSkin = state.currentSkin,
+                                        onExchange = { count -> onExchangeClick(item.id, count) },
+                                        onApplySkin = { skin -> onChangeSkin(skin) }
+                                    )
+                                }
+                            }
                         }
 
-                        ShopItemCard(
-                            item = item,
-                            backpackCount = backpackCount,
-                            currentSkin = state.currentSkin,
-                            onExchange = { count ->
-                                onExchangeClick(item.id, count)
-                            },
-                            onApplySkin = { skin ->
-                                onChangeSkin(skin)
+                        // Section 2: Province Gourmet Skins
+                        if (provinceSkins.isNotEmpty()) {
+                            Text(
+                                text = "华夏省味美食系列 (省份皮肤)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CrimsonRed,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                lazyItems(provinceSkins) { item ->
+                                    Box(modifier = Modifier.width(160.dp)) {
+                                        val backpackCount = state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+                                        ShopItemCard(
+                                            item = item,
+                                            backpackCount = backpackCount,
+                                            currentSkin = state.currentSkin,
+                                            onExchange = { count -> onExchangeClick(item.id, count) },
+                                            onApplySkin = { skin -> onChangeSkin(skin) }
+                                        )
+                                    }
+                                }
                             }
-                        )
+                        }
                     }
                 }
             }
