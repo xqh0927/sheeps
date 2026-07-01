@@ -26,6 +26,8 @@ object GameEngine {
                 false
             } else {
                 // 计算重叠面积：根据卡牌坐标差 (dx, dy) 算出水平和垂直的重叠长度
+                val dx = abs(other.x - tile.x)
+                val dy = abs(other.y - tile.y)
                 // 这里假设标准卡牌大小及重叠规则
                 val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
                 val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
@@ -51,7 +53,6 @@ object GameEngine {
             ) {
                 false
             } else {
-                } else {
                 // 重叠检测算法同上
                 val dx = abs(other.x - tile.x)
                 val dy = abs(other.y - tile.y)
