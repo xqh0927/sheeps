@@ -73,11 +73,20 @@ fun ShopItemCard(
             if (isSkin && isProvinceSkin) {
                 val context = LocalContext.current
                 val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
-                Image(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "Skin Preview",
-                    modifier = Modifier.size(64.dp)
-                )
+                if (iconRes != 0) {
+                    Image(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = "Skin Preview",
+                        modifier = Modifier.size(64.dp)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.size(64.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("?", fontSize = 24.sp, color = Color.Gray)
+                    }
+                }
             } else {
                 ItemAnimationIcon(
                     itemType = item.item_type,

@@ -130,13 +130,30 @@ fun TileView(
             } else {
                 // 情况 2：显示正面图标，若被压制则降低透明度
                 val iconResId = TileIconProvider.getIconResource(context, currentSkin, tile.type)
-                Image(
-                    painter = painterResource(id = iconResId),
-                    contentDescription = "Tile Icon",
-                    modifier = Modifier
-                        .size(tileSize * 0.9f)
-                        .alpha(if (isBlocked) 0.45f else 1f)
-                )
+                if (iconResId != 0) {
+                    Image(
+                        painter = painterResource(id = iconResId),
+                        contentDescription = "Tile Icon",
+                        modifier = Modifier
+                            .size(tileSize * 0.9f)
+                            .alpha(if (isBlocked) 0.45f else 1f)
+                    )
+                } else {
+                    // 资源缺失：显示类型编号作为占位符
+                    Box(
+                        modifier = Modifier
+                            .size(tileSize * 0.9f)
+                            .alpha(if (isBlocked) 0.45f else 1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = tile.type.toString(),
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 // 叠加层：封印效果 (方案 A：半透明灰蓝色冰封网格 + 金色锁头图标 + 剩余解封次数)
                 if (isSealed) {

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using System.IO;
+using System.Collections.Generic;
 
 namespace UnityGame.Editor
 {
@@ -107,7 +108,8 @@ namespace UnityGame.Editor
             // 如果是命令行模式，使用非开发构建
             if (Application.isBatchMode)
             {
-                buildOptions.options |= BuildOptions.Il2CPP;
+                // BuildOptions.IL2CPP is deprecated - use PlayerSettings.SetScriptingBackend instead
+                // Already configured in ConfigureAndroidSettings()
             }
 
             Debug.Log($"Output APK: {outputPath}");
@@ -130,12 +132,15 @@ namespace UnityGame.Editor
             else if (summary.result == BuildResult.Failed)
             {
                 Debug.LogError("========== Build Failed! ==========");
+                // 输出所有构建步骤的错误信息
                 foreach (BuildStep step in report.steps)
                 {
-                    if (step.result == BuildStepResult.Failed)
+                    foreach (BuildStepMessage message in step.messages)
                     {
-                        Debug.LogError($"Failed Step: {step.name}");
-                        Debug.LogError($"Error: {step.messages}");
+                        if (message.type == LogType.Error || message.type == LogType.Exception)
+                        {
+                            Debug.LogError($"[{step.name}] {message.content}");
+                        }
                     }
                 }
             }
@@ -193,7 +198,7 @@ namespace UnityGame.Editor
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
 
             // 混淆和优化（发布版本）
-            if (!EditorUserBuildSettings.developmentBuild)
+            if (!EditorUserBuildSettings.development)
             {
                 EditorUserBuildSettings.androidBuildType = AndroidBuildType.Release;
             }
@@ -287,7 +292,7 @@ namespace UnityGame.Editor
                 }
 
                 // 设置开发构建
-                EditorUserBuildSettings.developmentBuild = developmentBuild;
+                EditorUserBuildSettings.development = developmentBuild;
 
                 BuildAndroidAPK(outputAPKPath);
             }

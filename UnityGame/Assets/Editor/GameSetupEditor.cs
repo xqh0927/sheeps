@@ -1,6 +1,9 @@
-﻿using UnityEngine;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEngine.UI;
+using UnityGame.Game;
 
 namespace UnityGame.Editor
 {
@@ -14,11 +17,11 @@ namespace UnityGame.Editor
         public static void SetupGameScene()
         {
             // 确保有一个打开的场景
-            var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            var currentScene = SceneManager.GetActiveScene();
             if (string.IsNullOrEmpty(currentScene.path))
             {
                 // 创建新场景
-                var newScene = UnityEngine.SceneManagement.EditorSceneManager.NewScene(UnityEngine.SceneManagement.NewSceneSetup.DefaultGameObjects, UnityEngine.SceneManagement.NewSceneMode.Single);
+                var newScene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
                 Debug.Log("Created new scene: " + newScene.name);
             }
 
@@ -31,14 +34,14 @@ namespace UnityGame.Editor
             Debug.Log("Game scene setup completed! Please check the Hierarchy panel.");
             
             // 保存场景
-            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             
             // 保存到Assets/Scenes/MainScene.unity
             string scenePath = "Assets/Scenes/MainScene.unity";
             if (!System.IO.File.Exists(scenePath))
             {
-                UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
-                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene(), scenePath);
+                EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                EditorSceneManager.SaveScene(SceneManager.GetActiveScene(), scenePath);
                 Debug.Log("Scene saved to: " + scenePath);
             }
         }

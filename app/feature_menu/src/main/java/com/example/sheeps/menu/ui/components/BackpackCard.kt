@@ -180,11 +180,17 @@ private fun BackpackItem(
             val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER"
             if (isSkin && isProvinceSkin) {
                 val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
-                Image(
-                    painter = painterResource(id = iconRes),
-                    contentDescription = "Skin Preview",
-                    modifier = Modifier.size(36.dp)
-                )
+                if (iconRes != 0) {
+                    Image(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = "Skin Preview",
+                        modifier = Modifier.size(36.dp)
+                    )
+                } else {
+                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                        Text("?", fontSize = 16.sp, color = Color.Gray)
+                    }
+                }
             } else {
                 ItemAnimationIcon(
                     itemType = item.item_type,
