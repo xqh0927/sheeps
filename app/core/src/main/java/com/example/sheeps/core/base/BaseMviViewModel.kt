@@ -62,6 +62,8 @@ abstract class BaseMviViewModel<State, Intent, Effect>(initialState: State) : Vi
 
     /**
      * 更新当前状态。采用 Reducer 模式，基于旧状态生成新状态。
+     * 
+     * @param reducer 定义如何从旧 State 转换到新 State 的逻辑块
      */
     protected fun updateState(reducer: State.() -> State) {
         _viewState.update(reducer)

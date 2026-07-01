@@ -39,8 +39,11 @@ fun PrimaryButton(
     icon: ImageVector? = null,
     height: Dp = 48.dp
 ) {
+    // 按钮互动源：用于监听按钮按压状态以实现缩放动画
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    
+    // 弹簧动画：提供 Q 弹的按压反馈
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
@@ -55,10 +58,10 @@ fun PrimaryButton(
         enabled = enabled,
         modifier = modifier
             .height(height)
-            .scale(scale),
+            .scale(scale), // 应用缩放动画
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
-            containerColor      = Crimson_Primary,
+            containerColor      = Crimson_Primary, // 红色主背景
             contentColor        = Text_OnPrimary,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor   = Text_Disabled_Dark
@@ -66,9 +69,10 @@ fun PrimaryButton(
         shape = ShapeMedium,
         elevation = ButtonDefaults.buttonElevation(
             defaultElevation = 4.dp,
-            pressedElevation = 0.dp
+            pressedElevation = 0.dp // 按压时取消投影，增加下沉感
         )
     ) {
+        // 图标+文字布局
         if (icon != null) {
             Icon(
                 imageVector = icon,
@@ -108,6 +112,7 @@ fun SecondaryButton(
         label = "secondaryButtonScale"
     )
 
+    // 使用 OutlinedButton 实现描边效果
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
@@ -116,12 +121,12 @@ fun SecondaryButton(
             .scale(scale),
         interactionSource = interactionSource,
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor        = Gold_Primary,
+            contentColor        = Gold_Primary, // 金色文字
             disabledContentColor = Text_Disabled_Dark
         ),
         border = BorderStroke(
             width = 1.5.dp,
-            color = if (enabled) Gold_Subtle else Text_Disabled_Dark
+            color = if (enabled) Gold_Subtle else Text_Disabled_Dark // 根据启用状态显示边框颜色
         ),
         shape = ShapeMedium
     ) {
@@ -153,6 +158,7 @@ fun GhostButton(
     enabled: Boolean = true,
     color: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 ) {
+    // TextButton 本身即为无边框按钮
     TextButton(
         onClick = onClick,
         enabled = enabled,
@@ -196,7 +202,7 @@ fun DangerButton(
             .scale(scale),
         interactionSource = interactionSource,
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor        = Vermilion_Error,
+            contentColor        = Vermilion_Error, // 红色错误色
             disabledContentColor = Text_Disabled_Dark
         ),
         border = BorderStroke(1.dp, Vermilion_Error.copy(alpha = 0.7f)),
@@ -234,7 +240,7 @@ fun ToolItemButton(
         enabled = enabled,
         modifier = modifier
             .scale(scale)
-            .widthIn(min = 64.dp),
+            .widthIn(min = 64.dp), // 最小宽度保证视觉统一
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
             containerColor      = containerColor,
@@ -245,6 +251,7 @@ fun ToolItemButton(
         shape = ShapeSmall,
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
     ) {
+        // 使用 Column 实现图标、名称、数量的纵向排列
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center

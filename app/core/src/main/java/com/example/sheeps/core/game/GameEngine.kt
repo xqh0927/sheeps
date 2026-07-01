@@ -19,16 +19,17 @@ object GameEngine {
      */
     fun isTileBlocked(tile: Tile, board: List<Tile>): Boolean {
         return board.any { other ->
-            if (other.id == tile.id || 
+            if (other.id == tile.id ||
                 (other.state != TileState.NORMAL && other.state != TileState.BLOCKED) ||
                 other.z <= tile.z
             ) {
                 false
             } else {
-                val dx = abs(other.x - tile.x)
-                val dy = abs(other.y - tile.y)
+                // 计算重叠面积：根据卡牌坐标差 (dx, dy) 算出水平和垂直的重叠长度
+                // 这里假设标准卡牌大小及重叠规则
                 val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
                 val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
+                // 只要重叠面积超过阈值 230.4 (即大约半张牌的面积)，即判定为被遮挡
                 ox * oy > 230.4f
             }
         }
@@ -43,16 +44,21 @@ object GameEngine {
      */
     fun getBlockingTiles(tile: Tile, board: List<Tile>): List<Tile> {
         return board.filter { other ->
+            // 过滤条件：排除自身、非正常状态的牌、或者在当前牌下方(Z轴更小)的牌
             if (other.id == tile.id || 
                 (other.state != TileState.NORMAL && other.state != TileState.BLOCKED) ||
                 other.z <= tile.z
             ) {
                 false
             } else {
+                } else {
+                // 重叠检测算法同上
                 val dx = abs(other.x - tile.x)
                 val dy = abs(other.y - tile.y)
+                // 计算重叠面积
                 val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
                 val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
+                // 判定遮挡
                 ox * oy > 230.4f
             }
         }
@@ -67,10 +73,13 @@ object GameEngine {
      */
     fun calculateBlockedStates(board: List<Tile>): List<Tile> {
         return board.map { tile ->
+            // 只有处于 NORMAL 或 BLOCKED 状态的牌才需要重新判断状态
             if (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) {
                 val blocked = isTileBlocked(tile, board)
+                // 如果当前牌被遮挡，状态标记为 BLOCKED，否则设为 NORMAL
                 tile.copy(state = if (blocked) TileState.BLOCKED else TileState.NORMAL)
             } else {
+                // 已被消除或其它状态的牌保持原状
                 tile
             }
         }
