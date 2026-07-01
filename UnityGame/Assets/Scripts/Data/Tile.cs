@@ -37,6 +37,18 @@ namespace UnityGame.Data
             return new Tile(id, type, x, y, z, state, sealedCount, isBlind);
         }
 
+        public override bool Equals(object obj)
+        {
+            if (obj is Tile other)
+                return this.id == other.id;
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return id.GetHashCode();
+        }
+
         public override string ToString()
         {
             return $"Tile(id={id}, type={type}, pos=({x},{y},{z}), state={state})";

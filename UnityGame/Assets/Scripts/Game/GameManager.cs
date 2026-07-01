@@ -185,7 +185,11 @@ namespace UnityGame.Game
                     var toRemove = group.Take(3).ToList();
                     foreach (var tile in toRemove)
                     {
-                        slotData.RemoveTile(tile);
+                        bool removed = slotData.RemoveTile(tile);
+                        if (!removed)
+                        {
+                            Debug.LogError($"Failed to remove tile {tile.id} (type={tile.type}) from slot!");
+                        }
                     }
 
                     // 加分

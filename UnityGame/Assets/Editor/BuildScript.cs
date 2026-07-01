@@ -193,7 +193,7 @@ namespace UnityGame.Editor
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
 
             // 混淆和优化（发布版本）
-            if (!EditorUserBuildSettings.development)
+            if (!EditorUserBuildSettings.developmentBuild)
             {
                 EditorUserBuildSettings.androidBuildType = AndroidBuildType.Release;
             }
@@ -287,7 +287,7 @@ namespace UnityGame.Editor
                 }
 
                 // 设置开发构建
-                EditorUserBuildSettings.development = developmentBuild;
+                EditorUserBuildSettings.developmentBuild = developmentBuild;
 
                 BuildAndroidAPK(outputAPKPath);
             }

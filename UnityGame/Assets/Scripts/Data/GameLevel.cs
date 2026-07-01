@@ -41,7 +41,14 @@ namespace UnityGame.Data
         
         public bool RemoveTile(Tile tile)
         {
-            return tiles.Remove(tile);
+            // 按 id 查找，避免引用相等性问题
+            int index = tiles.FindIndex(t => t.id == tile.id);
+            if (index >= 0)
+            {
+                tiles.RemoveAt(index);
+                return true;
+            }
+            return false;
         }
         
         public void Clear()
