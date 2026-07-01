@@ -474,6 +474,15 @@ namespace UnityGame.Game
         }
 
         /// <summary>
+        /// 返回主菜单
+        /// </summary>
+        public void GoBackToMenu()
+        {
+            gameStatus = GameStatus.MENU;
+            OnGameStateChanged?.Invoke();
+        }
+
+        /// <summary>
         /// 使用提示道具
         /// 与 Android 原生代码（GameToolDelegate.kt）逻辑保持一致：
         /// 1. 优先从槽位中已有的牌寻找可匹配的牌

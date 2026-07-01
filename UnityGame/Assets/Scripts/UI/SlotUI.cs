@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityGame.Data;
+using System.Collections.Generic;
 
 namespace UnityGame.UI
 {
@@ -16,7 +17,9 @@ namespace UnityGame.UI
         
         [Header("Layout Settings")]
         [SerializeField] private float slotSpacing = 90f;
+#pragma warning disable CS0414 // 保留用于Inspector配置
         [SerializeField] private int maxSlotCount = 7;
+#pragma warning restore CS0414
 
         [Header("Visual Settings")]
         [SerializeField] private Color normalColor = Color.white;

@@ -178,7 +178,6 @@ namespace UnityGame.UI
         {
             Vector3 originalPos = transform.localPosition;
             float shakeAmount = 5f;
-            float shakeSpeed = 10f;
 
             while (isShaking && tileData != null && tileData.state == TileState.NORMAL)
             {

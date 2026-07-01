@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityGame.Data;
 
@@ -16,8 +17,10 @@ namespace UnityGame.UI
         [Header("Layout Settings")]
         [SerializeField] private float tileSize = 80f;
         [SerializeField] private float tileSpacing = 85f;
+#pragma warning disable CS0414 // 字段在Inspector中配置使用
         [SerializeField] private float boardWidth = 500f;
         [SerializeField] private float boardHeight = 600f;
+#pragma warning restore CS0414
 
         [Header("Visual Settings")]
         [SerializeField] private UnityEngine.UI.Image boardBackground;

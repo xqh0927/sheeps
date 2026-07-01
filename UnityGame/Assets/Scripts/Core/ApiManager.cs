@@ -236,59 +236,93 @@ namespace UnityGame.Core
 
         /// <summary>
         /// 发送 GET 请求
+        /// 使用 TaskCompletionSource 实现异步等待（兼容团结引擎）
         /// </summary>
-        private async Task<string> GetAsync(string url)
+        private Task<string> GetAsync(string url)
         {
-            using (UnityWebRequest request = UnityWebRequest.Get(url))
+            var tcs = new TaskCompletionSource<string>();
+
+            UnityWebRequest request = UnityWebRequest.Get(url);
+            request.timeout = (int)timeout;
+
+            if (!string.IsNullOrEmpty(userToken))
             {
-                request.timeout = (int)timeout;
-
-                // 添加认证 Token
-                if (!string.IsNullOrEmpty(userToken))
-                {
-                    request.SetRequestHeader("Authorization", $"Bearer {userToken}");
-                }
-
-                await request.SendWebRequest();
-
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    throw new Exception($"GET {url} failed: {request.error}");
-                }
-
-                return request.downloadHandler.text;
+                request.SetRequestHeader("Authorization", $"Bearer {userToken}");
             }
+
+            var operation = request.SendWebRequest();
+            operation.completed += (op) =>
+            {
+                try
+                {
+                    if (request.result != UnityWebRequest.Result.Success)
+                    {
+                        tcs.SetException(new Exception($"GET {url} failed: {request.error}"));
+                    }
+                    else
+                    {
+                        tcs.SetResult(request.downloadHandler.text);
+                    }
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+                finally
+                {
+                    request.Dispose();
+                }
+            };
+
+            return tcs.Task;
         }
 
         /// <summary>
         /// 发送 POST 请求
+        /// 使用 TaskCompletionSource 实现异步等待（兼容团结引擎）
         /// </summary>
-        private async Task<string> PostAsync(string url, string json, string token = null)
+        private Task<string> PostAsync(string url, string json, string token = null)
         {
-            using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+            var tcs = new TaskCompletionSource<string>();
+
+            UnityWebRequest request = new UnityWebRequest(url, "POST");
+            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.timeout = (int)timeout;
+
+            string authToken = token ?? userToken;
+            if (!string.IsNullOrEmpty(authToken))
             {
-                byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
-                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-                request.downloadHandler = new DownloadHandlerBuffer();
-                request.SetRequestHeader("Content-Type", "application/json");
-                request.timeout = (int)timeout;
-
-                // 添加认证 Token
-                string authToken = token ?? userToken;
-                if (!string.IsNullOrEmpty(authToken))
-                {
-                    request.SetRequestHeader("Authorization", $"Bearer {authToken}");
-                }
-
-                await request.SendWebRequest();
-
-                if (request.result != UnityWebRequest.Result.Success)
-                {
-                    throw new Exception($"POST {url} failed: {request.error}");
-                }
-
-                return request.downloadHandler.text;
+                request.SetRequestHeader("Authorization", $"Bearer {authToken}");
             }
+
+            var operation = request.SendWebRequest();
+            operation.completed += (op) =>
+            {
+                try
+                {
+                    if (request.result != UnityWebRequest.Result.Success)
+                    {
+                        tcs.SetException(new Exception($"POST {url} failed: {request.error}"));
+                    }
+                    else
+                    {
+                        tcs.SetResult(request.downloadHandler.text);
+                    }
+                }
+                catch (Exception e)
+                {
+                    tcs.SetException(e);
+                }
+                finally
+                {
+                    request.Dispose();
+                }
+            };
+
+            return tcs.Task;
         }
 
         #endregion
