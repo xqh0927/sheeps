@@ -1,1 +1,0 @@
--keep,allowobfuscation,allowshrinking class com.example.sheeps.menu.viewmodel.MenuViewModel
