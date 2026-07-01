@@ -13,6 +13,15 @@ namespace UnityGame.Editor
         [MenuItem("Tools/UnityGame/Setup Game Scene")]
         public static void SetupGameScene()
         {
+            // 确保有一个打开的场景
+            var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+            if (string.IsNullOrEmpty(currentScene.path))
+            {
+                // 创建新场景
+                var newScene = UnityEngine.SceneManagement.EditorSceneManager.NewScene(UnityEngine.SceneManagement.NewSceneSetup.DefaultGameObjects, UnityEngine.SceneManagement.NewSceneMode.Single);
+                Debug.Log("Created new scene: " + newScene.name);
+            }
+
             // 创建GameManager
             CreateGameManager();
             
@@ -22,7 +31,16 @@ namespace UnityGame.Editor
             Debug.Log("Game scene setup completed! Please check the Hierarchy panel.");
             
             // 保存场景
-            EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
+            
+            // 保存到Assets/Scenes/MainScene.unity
+            string scenePath = "Assets/Scenes/MainScene.unity";
+            if (!System.IO.File.Exists(scenePath))
+            {
+                UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+                UnityEditor.SceneManagement.EditorSceneManager.SaveScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene(), scenePath);
+                Debug.Log("Scene saved to: " + scenePath);
+            }
         }
 
         /// <summary>
@@ -86,7 +104,14 @@ namespace UnityGame.Editor
             {
                 GameObject eventSystem = new GameObject("EventSystem");
                 eventSystem.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                eventSystem.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                
+                // 使用StandaloneInputModule（兼容Unity 2022.3）
+                var inputModule = eventSystem.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                // 如果没有StandaloneInputModule，尝试使用InputSystemUIInputModule
+                if (inputModule == null)
+                {
+                    Debug.LogWarning("StandaloneInputModule not found, please add InputSystemUIInputModule manually if using new Input System");
+                }
             }
 
             // 创建游戏面板
