@@ -1,0 +1,53 @@
+﻿=== C# Script Compilation Error Log ===
+Timestamp: 2026-07-01 12:20:11
+Unity Version: 2022.3.62t10
+Platform: Windows
+
+=== Assembly: Assembly-CSharp ===
+Total Errors: 38
+Total Warnings: 0
+
+[ERROR] Assets\Scripts\Core\ApiManager.cs(6,7): Assets\Scripts\Core\ApiManager.cs(6,7): error CS0246: The type or namespace name 'Newtonsoft' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\Core\ApiManager.cs(7,7): Assets\Scripts\Core\ApiManager.cs(7,7): error CS0246: The type or namespace name 'Newtonsoft' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(2,19): Assets\Scripts\UI\GameUI.cs(2,19): error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(3,7): Assets\Scripts\UI\GameUI.cs(3,7): error CS0246: The type or namespace name 'TMPro' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\SlotUI.cs(2,19): Assets\Scripts\UI\SlotUI.cs(2,19): error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(2,19): Assets\Scripts\UI\TileView.cs(2,19): error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)
+[ERROR] Assets\Scripts\UI\SlotUI.cs(38,32): Assets\Scripts\UI\SlotUI.cs(38,32): error CS0246: The type or namespace name 'List<>' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(22,34): Assets\Scripts\UI\GameUI.cs(22,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(23,34): Assets\Scripts\UI\GameUI.cs(23,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(24,34): Assets\Scripts\UI\GameUI.cs(24,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\SlotUI.cs(26,17): Assets\Scripts\UI\SlotUI.cs(26,17): error CS0246: The type or namespace name 'Dictionary<,>' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(33,34): Assets\Scripts\UI\GameUI.cs(33,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(34,34): Assets\Scripts\UI\GameUI.cs(34,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\SlotUI.cs(27,17): Assets\Scripts\UI\SlotUI.cs(27,17): error CS0246: The type or namespace name 'List<>' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(35,34): Assets\Scripts\UI\GameUI.cs(35,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(36,34): Assets\Scripts\UI\GameUI.cs(36,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(37,34): Assets\Scripts\UI\GameUI.cs(37,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(38,34): Assets\Scripts\UI\GameUI.cs(38,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(39,34): Assets\Scripts\UI\GameUI.cs(39,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameBoard.cs(23,46): Assets\Scripts\UI\GameBoard.cs(23,46): error CS0234: The type or namespace name 'UI' does not exist in the namespace 'UnityEngine' (are you missing an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(40,34): Assets\Scripts\UI\GameUI.cs(40,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(43,34): Assets\Scripts\UI\GameUI.cs(43,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(44,34): Assets\Scripts\UI\GameUI.cs(44,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(45,34): Assets\Scripts\UI\GameUI.cs(45,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(46,34): Assets\Scripts\UI\GameUI.cs(46,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(47,34): Assets\Scripts\UI\GameUI.cs(47,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(48,34): Assets\Scripts\UI\GameUI.cs(48,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(49,34): Assets\Scripts\UI\GameUI.cs(49,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(50,34): Assets\Scripts\UI\GameUI.cs(50,34): error CS0246: The type or namespace name 'TextMeshProUGUI' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(53,34): Assets\Scripts\UI\GameUI.cs(53,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(54,34): Assets\Scripts\UI\GameUI.cs(54,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\GameUI.cs(55,34): Assets\Scripts\UI\GameUI.cs(55,34): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(11,30): Assets\Scripts\UI\TileView.cs(11,30): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(12,30): Assets\Scripts\UI\TileView.cs(12,30): error CS0246: The type or namespace name 'Image' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(16,34): Assets\Scripts\UI\TileView.cs(16,34): error CS0246: The type or namespace name 'Image' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(17,34): Assets\Scripts\UI\TileView.cs(17,34): error CS0246: The type or namespace name 'Image' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(28,17): Assets\Scripts\UI\TileView.cs(28,17): error CS0246: The type or namespace name 'Button' could not be found (are you missing a using directive or an assembly reference?)
+[ERROR] Assets\Scripts\UI\TileView.cs(29,17): Assets\Scripts\UI\TileView.cs(29,17): error CS0246: The type or namespace name 'Image' could not be found (are you missing a using directive or an assembly reference?)
+
+=== Compilation Summary ===
+Total Assemblies: 1
+Total Errors: 38
+Total Warnings: 0
+Compilation Status: Failed
