@@ -16,7 +16,7 @@ class GameLevelGenerator @Inject constructor() {
      */
     fun generateSolvableLevelLocal(levelId: Int): List<Tile> {
         // 根据关卡ID计算难度（卡牌种类数）
-        val numTypes = if (levelId == 1) 3 else minOf(16, (3 + 3 * Math.log(levelId.toDouble())).toInt())
+        val numTypes = if (levelId == 1) 3 else minOf(12, (3 + 3 * Math.log(levelId.toDouble())).toInt())
 
         val coordinates = mutableListOf<Point3D>()
         if (levelId == 1) {

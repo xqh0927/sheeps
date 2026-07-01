@@ -201,8 +201,8 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
   const W = 52.0 / 46.0;
   const H = 52.0 / 46.0;
 
-  // 关卡卡牌的花色种类 T 随关卡 ID 增长而增加：T = 3 + 3 * ln(levelId)，最多 16 种花色
-  const numTypes = levelId === 1 ? 3 : Math.min(16, Math.floor(3 + 3 * Math.log(levelId)));
+  // 关卡卡牌的花色种类 T 随关卡 ID 增长而增加：T = 3 + 3 * ln(levelId)，最多 12 种花色
+  const numTypes = levelId === 1 ? 3 : Math.min(12, Math.floor(3 + 3 * Math.log(levelId)));
 
   interface Node {
     index: number;

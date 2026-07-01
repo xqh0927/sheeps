@@ -7,32 +7,57 @@ namespace UnityGame.UI
 {
     /// <summary>
     /// 槽位UI组件
-    /// 显示玩家收集的卡牌（最多7个）
+    /// 显示玩家收集的卡牌（最多7个，自动连接GameManager）
     /// </summary>
     public class SlotUI : MonoBehaviour
     {
-        [Header("UI组件")]
-        [SerializeField] private Transform slotContainer;
-        [SerializeField] private GameObject slotItemPrefab;
-        
         [Header("Layout Settings")]
-        [SerializeField] private float slotSpacing = 90f;
-#pragma warning disable CS0414 // 保留用于Inspector配置
-        [SerializeField] private int maxSlotCount = 7;
-#pragma warning restore CS0414
-
-        [Header("Visual Settings")]
-        [SerializeField] private Color normalColor = Color.white;
-        [SerializeField] private Color matchColor = new Color(1f, 0.8f, 0.8f);
+        [SerializeField] private float slotItemSize = 70f;
+        [SerializeField] private float slotSpacing = 78f;
 
         // 存储槽位中的卡牌视图
         private Dictionary<string, GameObject> slotItems = new Dictionary<string, GameObject>();
         private List<Tile> currentSlotTiles = new List<Tile>();
 
+        // 颜色表（与GameBoard一致）
+        private static readonly Color[] TypeColors = new Color[]
+        {
+            Color.red, Color.blue, Color.green, Color.yellow, Color.magenta,
+            Color.cyan, new Color(1f, 0.5f, 0f),     // 橙色
+            new Color(0.5f, 0f, 1f),                 // 紫色
+            new Color(1f, 0.75f, 0.8f),              // 粉色
+            new Color(0.75f, 0.75f, 0.75f),         // 灰色
+            new Color(0f, 0.5f, 0.25f),             // 深绿
+            new Color(0.54f, 0.17f, 0.89f),         // 靛蓝
+            new Color(1f, 0.84f, 0f),                // 金色
+            new Color(0f, 0.7f, 0.7f),              // 青绿
+            new Color(0.6f, 0.3f, 0f),               // 棕色
+        };
+
         void Start()
         {
-            if (slotContainer == null)
-                slotContainer = transform;
+            // 自动订阅GameManager事件
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnSlotChanged += OnSlotDataChanged;
+                
+                // 立即更新显示
+                if (GameManager.Instance.slotData != null)
+                    UpdateSlot(GameManager.Instance.slotData.tiles);
+            }
+        }
+
+        void OnDestroy()
+        {
+            if (GameManager.Instance != null)
+                GameManager.Instance.OnSlotChanged -= OnSlotDataChanged;
+            ClearSlot();
+        }
+
+        private void OnSlotDataChanged()
+        {
+            if (GameManager.Instance != null && GameManager.Instance.slotData != null)
+                UpdateSlot(GameManager.Instance.slotData.tiles);
         }
 
         /// <summary>
@@ -40,88 +65,70 @@ namespace UnityGame.UI
         /// </summary>
         public void UpdateSlot(List<Tile> slotTiles)
         {
-            // 清除旧的显示
             ClearSlot();
-
             currentSlotTiles = new List<Tile>(slotTiles);
 
-            // 创建槽位卡牌显示
             for (int i = 0; i < slotTiles.Count; i++)
             {
                 Tile tile = slotTiles[i];
                 CreateSlotItem(tile, i);
             }
 
-            // 检查是否有匹配
             CheckAndHighlightMatches();
+            
+            Debug.Log($"[SlotUI] Updated: {slotTiles.Count} items in slot");
         }
 
         /// <summary>
-        /// 创建槽位中的单个卡牌显示
+        /// 创建槽位卡牌（程序化生成）
         /// </summary>
         private void CreateSlotItem(Tile tile, int index)
         {
-            if (slotItemPrefab == null)
-            {
-                Debug.LogError("SlotItemPrefab is not assigned!");
-                return;
-            }
+            GameObject itemObj = new GameObject($"Slot_{tile.id}");
+            itemObj.transform.SetParent(transform, false);
 
-            // 实例化槽位卡牌
-            GameObject slotItem = Instantiate(slotItemPrefab, slotContainer);
-            
-            // 设置位置
-            RectTransform rectTransform = slotItem.GetComponent<RectTransform>();
-            if (rectTransform != null)
-            {
-                rectTransform.anchoredPosition = new Vector2(index * slotSpacing, 0);
-            }
+            Image img = itemObj.AddComponent<Image>();
+            img.sprite = CreateRoundedRectSprite();
 
-            // 设置卡牌图片
-            Image slotImage = slotItem.GetComponent<Image>();
-            if (slotImage != null)
-            {
-                Sprite tileSprite = GetTileSprite(tile.type);
-                if (tileSprite != null)
-                {
-                    slotImage.sprite = tileSprite;
-                    slotImage.color = normalColor;
-                }
-            }
+            // 根据类型设置颜色
+            int colorIndex = Mathf.Abs(tile.type) % TypeColors.Length;
+            img.color = TypeColors[colorIndex];
 
-            // 存储引用
-            slotItems[tile.id] = slotItem;
+            RectTransform rectTransform = itemObj.GetComponent<RectTransform>();
+            rectTransform.sizeDelta = new Vector2(slotItemSize, slotItemSize);
+            // 居中排列
+            float totalWidth = (currentSlotTiles.Count - 1) * slotSpacing;
+            rectTransform.anchoredPosition = new Vector2(index * slotSpacing - totalWidth / 2f, 0);
+
+            // 显示类型编号（帮助区分不同类型）
+            CreateLabel(itemObj, $"{tile.type}", Vector2.zero, 18);
+
+            slotItems[tile.id] = itemObj;
         }
 
         /// <summary>
-        /// 检查并高亮匹配的卡牌
+        /// 检查并高亮可匹配的组
         /// </summary>
         private void CheckAndHighlightMatches()
         {
-            // 统计每种类型的数量
-            Dictionary<int, List<string>> typeGroups = new Dictionary<int, List<string>>();
-            
+            Dictionary<int, int> typeCount = new Dictionary<int, int>();
             foreach (var tile in currentSlotTiles)
             {
-                if (!typeGroups.ContainsKey(tile.type))
-                    typeGroups[tile.type] = new List<string>();
-                typeGroups[tile.type].Add(tile.id);
+                if (!typeCount.ContainsKey(tile.type))
+                    typeCount[tile.type] = 0;
+                typeCount[tile.type]++;
             }
 
-            // 高亮有3张或以上的组
-            foreach (var group in typeGroups.Values)
+            foreach (var kvp in typeCount)
             {
-                if (group.Count >= 3)
+                if (kvp.Value >= 3)
                 {
-                    foreach (var tileId in group)
+                    foreach (var tile in currentSlotTiles.FindAll(t => t.type == kvp.Key))
                     {
-                        if (slotItems.ContainsKey(tileId))
+                        if (slotItems.ContainsKey(tile.id))
                         {
-                            Image img = slotItems[tileId].GetComponent<Image>();
-                            if (img != null)
-                            {
-                                img.color = matchColor;
-                            }
+                            Image img = slotItems[tile.id].GetComponent<Image>();
+                            if (img != null) img.color = new Color(1f, 0.85f, 0.85f); // 匹配提示色
                         }
                     }
                 }
@@ -129,140 +136,57 @@ namespace UnityGame.UI
         }
 
         /// <summary>
-        /// 添加卡牌到槽位（带动画）
+        /// 创建圆角矩形Sprite
         /// </summary>
-        public void AddTileToSlot(Tile tile, Vector3 fromPosition)
+        private Sprite CreateRoundedRectSprite()
         {
-            if (slotItemPrefab == null) return;
-
-            // 创建卡牌
-            GameObject slotItem = Instantiate(slotItemPrefab, slotContainer);
-            int index = currentSlotTiles.Count;
-            
-            // 设置位置
-            RectTransform rectTransform = slotItem.GetComponent<RectTransform>();
-            if (rectTransform != null)
+            Texture2D tex = new Texture2D(64, 64, TextureFormat.RGBA32, false);
+            for (int x = 0; x < 64; x++)
             {
-                rectTransform.anchoredPosition = new Vector2(index * slotSpacing, 0);
-            }
-
-            // 设置卡牌图片
-            Image slotImage = slotItem.GetComponent<Image>();
-            if (slotImage != null)
-            {
-                Sprite tileSprite = GetTileSprite(tile.type);
-                if (tileSprite != null)
+                for (int y = 0; y < 64; y++)
                 {
-                    slotImage.sprite = tileSprite;
+                    bool edgeX = x < 4 || x >= 60;
+                    bool edgeY = y < 4 || y >= 60;
+                    tex.SetPixel(x, y, (edgeX && edgeY) ? Color.clear : Color.white);
                 }
             }
-
-            // 存储引用
-            slotItems[tile.id] = slotItem;
-            currentSlotTiles.Add(tile);
-
-            // 播放飞行动画
-            StartCoroutine(FlyToSlotAnimation(slotItem, fromPosition));
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f));
         }
 
         /// <summary>
-        /// 飞行动画：卡牌从棋盘飞到槽位
+        /// 创建文字标签
         /// </summary>
-        private System.Collections.IEnumerator FlyToSlotAnimation(GameObject slotItem, Vector3 fromPosition)
+        private void CreateLabel(GameObject parent, string text, Vector2 offset, int fontSize = 14)
         {
-            RectTransform rectTransform = slotItem.GetComponent<RectTransform>();
-            if (rectTransform == null) yield break;
-
-            // 转换为屏幕坐标
-            Vector3 startPos = Camera.main.ScreenToWorldPoint(fromPosition);
-            Vector3 endPos = rectTransform.position;
-
-            float duration = 0.3f;
-            float elapsed = 0f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = elapsed / duration;
-                
-                // 使用平滑曲线
-                t = t * t * (3f - 2f * t); // Smoothstep
-                
-                rectTransform.position = Vector3.Lerp(startPos, endPos, t);
-                
-                yield return null;
-            }
-
-            rectTransform.position = endPos;
-        }
-
-        /// <summary>
-        /// 从槽位移除卡牌（匹配消除时）
-        /// </summary>
-        public void RemoveTileFromSlot(Tile tile)
-        {
-            if (slotItems.ContainsKey(tile.id))
-            {
-                DestroyImmediate(slotItems[tile.id]);
-                slotItems.Remove(tile.id);
-            }
-
-            currentSlotTiles.Remove(tile);
+            GameObject label = new GameObject("Label");
+            label.transform.SetParent(parent.transform, false);
             
-            // 重新排列
-            RearrangeSlotItems();
+            RectTransform labelRect = label.AddComponent<RectTransform>();
+            labelRect.anchoredPosition = offset;
+            labelRect.sizeDelta = new Vector2(40, 20);
+
+            Text labelText = label.AddComponent<Text>();
+            labelText.text = text;
+            labelText.fontSize = fontSize;
+            labelText.fontStyle = FontStyle.Bold;
+            labelText.alignment = TextAnchor.MiddleCenter;
+            labelText.color = Color.white;
+
+            Font sysFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (sysFont == null) sysFont = Font.CreateDynamicFontFromOSFont("Microsoft YaHei", fontSize);
+            if (sysFont == null) sysFont = Font.CreateDynamicFontFromOSFont("Arial", fontSize);
+            if (sysFont != null) labelText.font = sysFont;
         }
 
-        /// <summary>
-        /// 重新排列槽位卡牌
-        /// </summary>
-        private void RearrangeSlotItems()
-        {
-            int index = 0;
-            foreach (var tile in currentSlotTiles)
-            {
-                if (slotItems.ContainsKey(tile.id))
-                {
-                    RectTransform rectTransform = slotItems[tile.id].GetComponent<RectTransform>();
-                    if (rectTransform != null)
-                    {
-                        rectTransform.anchoredPosition = new Vector2(index * slotSpacing, 0);
-                    }
-                }
-                index++;
-            }
-        }
-
-        /// <summary>
-        /// 清除槽位显示
-        /// </summary>
         private void ClearSlot()
         {
-            foreach (var slotItem in slotItems.Values)
+            foreach (var obj in slotItems.Values)
             {
-                if (slotItem != null)
-                {
-                    DestroyImmediate(slotItem);
-                }
+                if (obj != null) DestroyImmediate(obj);
             }
-
             slotItems.Clear();
             currentSlotTiles.Clear();
-        }
-
-        /// <summary>
-        /// 获取卡牌精灵图
-        /// </summary>
-        private Sprite GetTileSprite(int type)
-        {
-            // TODO: 从资源管理器获取对应类型的精灵图
-            // 临时：返回null，使用默认图片
-            return null;
-        }
-
-        void OnDestroy()
-        {
-            ClearSlot();
         }
     }
 }
