@@ -5,6 +5,11 @@ package com.example.sheeps.core.game
  */
 object SkinConstants {
 
+    /**
+     * 每套皮肤支持的最大样式种类（与 drawable 资源数量对齐）
+     */
+    const val MAX_TILE_TYPES = 12
+
     data class ProvinceSkin(val id: String, val name: String)
 
     val provinces = listOf(

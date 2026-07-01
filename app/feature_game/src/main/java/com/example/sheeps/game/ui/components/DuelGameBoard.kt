@@ -62,7 +62,15 @@ fun DuelGameBoard(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 450.dp
+    // 计算缩放比例，确保内容完全适应棋盘区域，预留少量边距 (8dp)
+    val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
+        val availableWidth = (boardWidth - 16.dp).value
+        val availableHeight = (boardHeight - 16.dp).value
 
+        val scaleW = if (contentWidth > availableWidth) availableWidth / contentWidth else 1f
+        val scaleH = if (contentHeight > availableHeight) availableHeight / contentHeight else 1f
+        minOf(scaleW, scaleH)
+    }
     Box(
         modifier = modifier
             .size(width = boardWidth, height = boardHeight)
@@ -78,7 +86,13 @@ fun DuelGameBoard(
 
         if (visibleTiles.isNotEmpty()) {
 
-            Box(modifier = Modifier.size(width = contentWidth.dp, height = contentHeight.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(width = contentWidth.dp, height = contentHeight.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
                         val isFlying = flyingTileIds.contains(tile.id)

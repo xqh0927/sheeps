@@ -12,6 +12,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
@@ -63,6 +64,16 @@ fun GameBoard(
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 450.dp
 
+    // 计算缩放比例，确保内容完全适应棋盘区域，预留少量边距 (8dp)
+    val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
+        val availableWidth = (boardWidth - 16.dp).value
+        val availableHeight = (boardHeight - 16.dp).value
+        
+        val scaleW = if (contentWidth > availableWidth) availableWidth / contentWidth else 1f
+        val scaleH = if (contentHeight > availableHeight) availableHeight / contentHeight else 1f
+        minOf(scaleW, scaleH)
+    }
+
     Box(
         modifier = modifier
             .size(width = boardWidth, height = boardHeight)
@@ -84,8 +95,14 @@ fun GameBoard(
         }
 
         if (visibleTiles.isNotEmpty()) {
-
-            Box(modifier = Modifier.size(width = contentWidth.dp, height = contentHeight.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(width = contentWidth.dp, height = contentHeight.dp)
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+            ) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
                         val isHighlighted = state.highlightedTileIds.contains(tile.id)

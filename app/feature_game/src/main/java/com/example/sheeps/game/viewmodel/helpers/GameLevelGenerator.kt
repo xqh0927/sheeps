@@ -1,5 +1,6 @@
 package com.example.sheeps.game.viewmodel.helpers
 
+import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.data.model.Tile
 import javax.inject.Inject
 import kotlin.math.abs
@@ -15,8 +16,8 @@ class GameLevelGenerator @Inject constructor() {
      * 采用反向生成算法：先生成布局，然后反向填充成对的卡牌类型
      */
     fun generateSolvableLevelLocal(levelId: Int): List<Tile> {
-        // 根据关卡ID计算难度（卡牌种类数）
-        val numTypes = if (levelId == 1) 3 else minOf(12, (3 + 3 * Math.log(levelId.toDouble())).toInt())
+        // 根据关卡ID计算难度（卡牌种类数），受限于美术资源总量
+        val numTypes = if (levelId == 1) 3 else minOf(SkinConstants.MAX_TILE_TYPES, (3 + 3 * Math.log(levelId.toDouble())).toInt())
 
         val coordinates = mutableListOf<Point3D>()
         if (levelId == 1) {
