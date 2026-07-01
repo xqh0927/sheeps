@@ -1,0 +1,1 @@
+int raw auspicious_loading 0x0

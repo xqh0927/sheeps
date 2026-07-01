@@ -1,0 +1,39 @@
+-- Merging decision tree log ---
+manifest
+ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:2:1-18:12
+INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:2:1-18:12
+	package
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:3:5-38
+		INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:2:11-69
+application
+ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:5:5-16:19
+activity#com.example.sheeps.game.GameActivity
+ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:6:9-10:78
+	android:screenOrientation
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:9:13-49
+	android:exported
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:8:13-37
+	android:theme
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:10:13-75
+	android:name
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:7:13-41
+activity#com.example.sheeps.game.DuelActivity
+ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:11:9-15:78
+	android:screenOrientation
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:14:13-49
+	android:exported
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:13:13-37
+	android:theme
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:15:13-75
+	android:name
+		ADDED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml:12:13-41
+uses-sdk
+INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml
+INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from E:\file\sheeps\app\feature_game\src\main\AndroidManifest.xml

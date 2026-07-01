@@ -1,0 +1,21 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.sheeps.leaderboard" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <application>
+7-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:5:5-11:19
+8        <activity
+8-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:6:9-10:78
+9            android:name="com.example.sheeps.leaderboard.LeaderboardActivity"
+9-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:7:13-48
+10            android:exported="false"
+10-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:8:13-37
+11            android:screenOrientation="portrait"
+11-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:9:13-49
+12            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+12-->E:\file\sheeps\app\feature_leaderboard\src\main\AndroidManifest.xml:10:13-75
+13    </application>
+14
+15</manifest>

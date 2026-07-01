@@ -1,0 +1,4 @@
+-keep,allowobfuscation,allowshrinking class com.example.sheeps.game.viewmodel.DuelViewModel
+-keep,allowobfuscation,allowshrinking class com.example.sheeps.game.viewmodel.DuelViewModel
+-keep,allowobfuscation,allowshrinking class com.example.sheeps.game.viewmodel.GameViewModel
+-keep,allowobfuscation,allowshrinking class com.example.sheeps.game.viewmodel.GameViewModel

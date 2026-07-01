@@ -1,0 +1,24 @@
+package a;
+
+/**
+ * Generated code, Don't modify!!!
+ * Created by kymjs, and APT Version is 1.3.2.
+ * JDK Version is 17.0.16.
+ */
+@androidx.annotation.Keep
+public class RouterMap__TheRouter__428451504 implements com.therouter.router.IRouterMapAPT {
+
+	public static final String TAG = "Created by kymjs, and APT Version is 1.3.2.";
+	public static final String THEROUTER_APT_VERSION = "1.3.2";
+	public static final String ROUTERMAP0 = "[{\"path\":\"/game/play\",\"className\":\"com.example.sheeps.game.GameActivity\",\"action\":\"\",\"description\":\"\",\"params\":{}},{\"path\":\"/game/duel\",\"className\":\"com.example.sheeps.game.DuelActivity\",\"action\":\"\",\"description\":\"\",\"params\":{}}]";
+	public static final String COUNT = "1";
+
+	public void init() { RouterMap__TheRouter__428451504.addRoute(); }
+
+	public static void addRoute() {
+		com.therouter.router.RouteItem item1 = new com.therouter.router.RouteItem("/game/play","com.example.sheeps.game.GameActivity","","");
+		com.therouter.router.RouteMapKt.addRouteItem(item1);
+		com.therouter.router.RouteItem item2 = new com.therouter.router.RouteItem("/game/duel","com.example.sheeps.game.DuelActivity","","");
+		com.therouter.router.RouteMapKt.addRouteItem(item2);
+	}
+}

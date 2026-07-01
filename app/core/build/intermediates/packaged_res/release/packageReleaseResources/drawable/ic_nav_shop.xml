@@ -1,0 +1,42 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 宝箱/聚宝盆 - 商城图标 -->
+    <!-- 箱盖 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/iconColor"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M3,10 Q3,7 6,7 L18,7 Q21,7 21,10 L21,11 L3,11 Z" />
+    <!-- 箱身 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/iconColor"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M3,11 L3,18 Q3,20 5,20 L19,20 Q21,20 21,18 L21,11 Z" />
+    <!-- 锁扣 -->
+    <path
+        android:fillColor="?attr/iconColor"
+        android:pathData="M10,14 Q10,11.5 12,11.5 Q14,11.5 14,14 Q14,15.5 12,15.5 Q10,15.5 10,14 Z"
+        android:strokeWidth="0" />
+    <!-- 装饰线条 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="?attr/iconColor"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M3,11 L21,11"
+        android:strokeAlpha="0.5" />
+    <!-- 金币溢出 -->
+    <path
+        android:fillColor="?attr/iconColor"
+        android:pathData="M8,7 Q8,5 10,5 Q12,5 12,7"
+        android:strokeWidth="0"
+        android:fillAlpha="0.4" />
+</vector>

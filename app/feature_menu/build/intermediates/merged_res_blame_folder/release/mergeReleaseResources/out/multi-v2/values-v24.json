@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.example.sheeps.menu.feature_menu-release-54:/values-v24/values-v24.xml",
+            "map": [
+                {
+                    "source": "E:\\Android\\.gradle\\caches\\9.1.0\\transforms\\0f460e1c26c37298cc5955baca464e68\\workspace\\transformed\\appcompat-1.6.1\\res\\values-v24\\values-v24.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,212",
+                        "endColumns": "156,134",
+                        "endOffsets": "207,342"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "com.example.sheeps.menu.feature_menu-mergeReleaseResources-52:/values-v24/values-v24.xml",
+            "map": [
+                {
+                    "source": "E:\\Android\\.gradle\\caches\\9.1.0\\transforms\\0f460e1c26c37298cc5955baca464e68\\workspace\\transformed\\appcompat-1.6.1\\res\\values-v24\\values-v24.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,212",
+                        "endColumns": "156,134",
+                        "endOffsets": "207,342"
+                    }
+                }
+            ]
+        }
+    ]
+}

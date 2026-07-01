@@ -154,7 +154,7 @@ namespace UnityGame.Editor
             
             RectTransform slotRect = slotObj.AddComponent<RectTransform>();
             slotRect.anchoredPosition = new Vector2(0, -350);
-            slotRect.sizeDelta = new Vector2(900, 120));
+            slotRect.sizeDelta = new Vector2(900, 120);
 
             // 添加SlotUI脚本
             slotObj.AddComponent<UnityGame.UI.SlotUI>();
