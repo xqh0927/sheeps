@@ -1,7 +1,9 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityGame.Data;
+using UnityGame.Game;
 
 namespace UnityGame.UI
 {
@@ -41,7 +43,6 @@ namespace UnityGame.UI
             {
                 GameManager.Instance.OnBoardChanged += OnBoardDataChanged;
                 GameManager.Instance.OnTilesHighlighted += OnTilesHighlighted;
-                GameManager.Instance.OnTileClicked += OnTileClickedHandler;
                 
                 // 立即更新显示
                 if (GameManager.Instance.boardTiles.Count > 0)
@@ -55,7 +56,6 @@ namespace UnityGame.UI
             {
                 GameManager.Instance.OnBoardChanged -= OnBoardDataChanged;
                 GameManager.Instance.OnTilesHighlighted -= OnTilesHighlighted;
-                GameManager.Instance.OnTileClicked -= OnTileClickedHandler;
             }
             ClearBoard();
         }
@@ -83,11 +83,6 @@ namespace UnityGame.UI
                         SetHighlight(tileObjects[tileId], true);
                 }
             }
-        }
-
-        private void OnTileClickedHandler(Tile tile)
-        {
-            Debug.Log($"[GameBoard] Tile clicked: {tile.id} type={tile.type}");
         }
 
         /// <summary>

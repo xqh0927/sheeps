@@ -1,7 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityGame.Data;
-using System.Collections.Generic;
+using UnityGame.Game;
 
 namespace UnityGame.UI
 {
