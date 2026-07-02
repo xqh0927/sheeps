@@ -62,15 +62,21 @@ fun DuelGameBoard(
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 450.dp
-    // 计算缩放比例，确保内容完全适应棋盘区域，预留少量边距 (8dp)
+    // 计算缩放比例，确保内容完全适应棋盘区域
+    // 预留边距：圆角(16) + 边框(1) + 呼吸(5) ≈ 22dp
     val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
-        val availableWidth = (boardWidth - 16.dp).value
-        val availableHeight = (boardHeight - 16.dp).value
+        val margin = 22.dp.value
+        val availableWidth = (boardWidth - margin.dp).value
+        val availableHeight = (boardHeight - margin.dp).value
 
         val scaleW = if (contentWidth > availableWidth) availableWidth / contentWidth else 1f
         val scaleH = if (contentHeight > availableHeight) availableHeight / contentHeight else 1f
         minOf(scaleW, scaleH)
     }
+
+    // 缩放后真实占位尺寸 —— Box 用这个尺寸，让 Alignment.Center 按真实大小居中
+    val displayedWidth = (contentWidth * scale).dp
+    val displayedHeight = (contentHeight * scale).dp
     Box(
         modifier = modifier
             .size(width = boardWidth, height = boardHeight)
@@ -80,19 +86,15 @@ fun DuelGameBoard(
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
         contentAlignment = Alignment.Center
     ) {
-        val visibleTiles = state.boardTiles.filter {
-            it.state == TileState.NORMAL || it.state == TileState.BLOCKED
+        val visibleTiles = remember(state.boardTiles) {
+            state.boardTiles.filter { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
         }
 
         if (visibleTiles.isNotEmpty()) {
-
+            // 关键修复：用"缩放后实际尺寸"作为 Box size
             Box(
-                modifier = Modifier
-                    .size(width = contentWidth.dp, height = contentHeight.dp)
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                    }) {
+                modifier = Modifier.size(width = displayedWidth, height = displayedHeight)
+            ) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
                         val isFlying = flyingTileIds.contains(tile.id)
@@ -100,12 +102,12 @@ fun DuelGameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = "classic",
-                            tileSize = tileSize.dp,
+                            tileSize = 48.dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             modifier = Modifier
                                 .offset(
-                                    x = ((tile.x - minX) * spacing).dp,
-                                    y = ((tile.y - minY) * spacing).dp
+                                    x = ((tile.x - minX) * spacing * scale).dp,
+                                    y = ((tile.y - minY) * spacing * scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .alpha(if (isFlying) 0f else 1f)

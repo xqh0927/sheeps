@@ -51,15 +51,26 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         // 保存配置到 config 表并主动删除旧缓存，保证后续读取能及时同步
         await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)').bind(body.key, body.value).run();
         await env.SHEEPS_CACHE.delete('admin_config_list');
+        await env.SHEEPS_CACHE.delete(`config_${body.key}`);
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
 
     // 4. 客户端 App 版本更新检测接口
     if (path === '/api/app/check-update' && request.method === 'GET') {
         const currentCodeStr = url.searchParams.get('version_code');
+        const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
+
+        // KV 缓存避免频繁 D1 + HEAD 探测
+        const cacheKey = `update_check_${currentCode}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached) return new Response(cached, { headers: corsHeaders });
+
         // 调用 update 模块进行 APK 的 HEAD 轻量级可用性探针检测与延迟缓存判定
-        const databaseUpdate = await getDatabaseAppUpdate(env, currentCodeStr ? parseInt(currentCodeStr, 10) : 1);
-        return new Response(JSON.stringify(databaseUpdate), { headers: corsHeaders });
+        const databaseUpdate = await getDatabaseAppUpdate(env, currentCode);
+        const responseData = JSON.stringify(databaseUpdate);
+        // 更新检测结果缓存 5 分钟（与 GitHub API 缓存对齐）
+        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });
+        return new Response(responseData, { headers: corsHeaders });
     }
 
     return null;

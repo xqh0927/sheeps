@@ -64,3 +64,34 @@ export interface PlayerSession {
   status: 'ACTIVE' | 'DISCONNECTED';
   disconnectTimer?: any;  // 断线重连倒计时器
 }
+
+/**
+ * 难度信息——getDifficultyForLevel 的返回结构
+ */
+export interface DifficultyInfo {
+  /** 难度系数 1~100 */
+  difficulty: number;
+
+  /** 当前关卡在本难度段内的序号（0-based） */
+  subIndex: number;
+
+  /** 本难度段共覆盖多少关（1 或 2，由用户种子决定） */
+  totalSubLevels: number;
+}
+
+/**
+ * 卡牌数量计算结果
+ */
+export interface CardCountResult {
+  /** 最终卡牌数量（3 的倍数） */
+  cardCount: number;
+
+  /** 是否为休息关卡 */
+  isRestLevel: boolean;
+
+  /** 难度星级 1~5 */
+  stars: number;
+
+  /** 难度标签文案 */
+  label: string;
+}

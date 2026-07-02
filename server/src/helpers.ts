@@ -45,3 +45,19 @@ export function getLangSuffix(request: Request): string {
   if (acceptLang.includes('ko')) return 'ko';
   return ''; // 默认简体中文无后缀
 }
+
+/**
+ * 读取系统配置值（优先 KV 缓存，未命中查 D1 并回填缓存）
+ * 用于签到奖励、解锁积分门槛等低频变更的配置项
+ */
+export async function getCachedConfig(env: Env, key: string, defaultValue: string): Promise<string> {
+  const cacheKey = `config_${key}`;
+  const cached = await env.SHEEPS_CACHE.get(cacheKey);
+  if (cached !== null && cached !== undefined) return cached;
+
+  const row = await env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(key).first<{ value: string }>();
+  const value = row?.value ?? defaultValue;
+  // 异步写 KV，不阻塞主流程
+  env.SHEEPS_CACHE.put(cacheKey, value, { expirationTtl: 600 }).catch(() => {});
+  return value;
+}

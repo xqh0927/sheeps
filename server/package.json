@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "tsc src/index.ts --target ES2022 --module commonjs --types @cloudflare/workers-types --skipLibCheck --outDir .tmp-test && node --test test/update.test.js"
+    "test": "tsc src/index.ts --target ES2022 --module commonjs --types @cloudflare/workers-types --skipLibCheck --outDir .tmp-test && node --test test/update.test.js && node --test test/level.test.js && node --test test/difficulty.test.js"
   },
   "keywords": [],
   "author": "",

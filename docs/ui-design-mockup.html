@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>秘境消消乐 - UI设计稿</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f5f5f5;
+            padding: 40px 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .page-title {
+            text-align: center;
+            font-size: 36px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .page-subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        /* 设计稿容器 */
+        .design-section {
+            margin-bottom: 60px;
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .section-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #E6A23C;
+        }
+        
+        /* 手机模拟器 */
+        .phone-mockup {
+            width: 375px;
+            height: 812px;
+            background: #0D1117;
+            border-radius: 40px;
+            padding: 20px;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: #0D1117;
+            border-radius: 25px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* 状态栏 */
+        .status-bar {
+            height: 44px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            color: #F0E6D3;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        /* 顶部应用栏 */
+        .top-app-bar {
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background: linear-gradient(135deg, rgba(200,36,35,0.2), rgba(230,162,60,0.1));
+        }
+        
+        .top-app-bar-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #F0E6D3;
+            font-family: 'Georgia', serif;
+        }
+        
+        /* 用户资料头部 */
+        .profile-header-mockup {
+            margin: 16px 20px;
+            background: linear-gradient(135deg, rgba(230,162,60,0.1), #161B22, #1C2333);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(230,162,60,0.3);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .avatar-mockup {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #C82423, #A01C1C);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #E6A23C;
+            font-weight: 700;
+            border: 2px solid #F5D698;
+            position: relative;
+        }
+        
+        .online-dot {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            border: 2px solid #161B22;
+        }
+        
+        .profile-info-mockup {
+            flex: 1;
+        }
+        
+        .profile-name-mockup {
+            font-size: 18px;
+            font-weight: 700;
+            color: #F0E6D3;
+            margin-bottom: 4px;
+        }
+        
+        .profile-points-mockup {
+            font-size: 14px;
+            color: #E6A23C;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* 游戏卡片网格 */
+        .game-grid {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .game-card-mockup {
+            background: linear-gradient(135deg, #C82423, #A01C1C);
+            border-radius: 16px;
+            padding: 20px;
+            color: white;
+            box-shadow: 0 4px 20px rgba(230,162,60,0.3);
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        
+        .game-card-title-mockup {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .game-card-desc-mockup {
+            font-size: 12px;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+        
+        .game-card-stats-mockup {
+            margin-top: 12px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* 底部导航 */
+        .bottom-nav-mockup {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 84px;
+            background: #161B22;
+            border-top: 1px solid rgba(230,162,60,0.2);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 20px 20px;
+        }
+        
+        .nav-item-mockup {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #8B8682;
+            font-size: 12px;
+        }
+        
+        .nav-item-mockup.active {
+            color: #E6A23C;
+        }
+        
+        .nav-icon-mockup {
+            font-size: 24px;
+        }
+        
+        /* 设计标注 */
+        .design-annotations {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        .annotation-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .annotation-list {
+            list-style: none;
+        }
+        
+        .annotation-list li {
+            padding: 8px 0;
+            color: #666;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        
+        .annotation-list li:before {
+            content: "📏 ";
+            margin-right: 8px;
+        }
+        
+        /* 色彩标注 */
+        .color-spec {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin: 0 4px;
+        }
+        
+        /* 双屏对比 */
+        .mockup-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 20px;
+        }
+        
+        .mockup-wrapper {
+            text-align: center;
+        }
+        
+        .mockup-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 16px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .label-before {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .label-after {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .mockup-compare {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="page-title">秘境消消乐 - UI设计稿</h1>
+        <p class="page-subtitle">专业设计图 · 类似蓝湖设计交付物</p>
+        
+        <!-- =============================================================================
+             菜单界面设计稿
+             ============================================================================= -->
+        <div class="design-section">
+            <h2 class="section-title">📱 菜单主界面设计稿</h2>
+            
+            <div class="mockup-compare">
+                <!-- 改进前 -->
+                <div class="mockup-wrapper">
+                    <div class="mockup-label label-before">❌ 改进前</div>
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="status-bar">
+                                <span>9:41</span>
+                                <span>🔋 100%</span>
+                            </div>
+                            
+                            <div class="top-app-bar">
+                                <span class="top-app-bar-title">秘境消消乐</span>
+                                <span style="color: #F0E6D3;">⚙️</span>
+                            </div>
+                            
+                            <!-- 简化的用户资料 -->
+                            <div style="margin: 12px 20px; padding: 12px; background: #161B22; border-radius: 8px; display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: #C82423; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">侠</div>
+                                <div>
+                                    <div style="color: #F0E6D3; font-size: 14px;">逑客云游</div>
+                                    <div style="color: #8B8682; font-size: 12px;">未登录</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 简单的按钮 -->
+                            <div style="padding: 20px;">
+                                <div style="background: #C82423; color: white; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 12px; font-size: 16px;">开始游戏</div>
+                                <div style="background: transparent; color: #E6A23C; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #E6A23C; font-size: 16px;">商店</div>
+                            </div>
+                            
+                            <div class="bottom-nav-mockup">
+                                <div class="nav-item-mockup active">
+                                    <span class="nav-icon-mockup">🏠</span>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">🎮</span>
+                                    <span>游戏</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">🏆</span>
+                                    <span>排行</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">👤</span>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 改进后 -->
+                <div class="mockup-wrapper">
+                    <div class="mockup-label label-after">✅ 改进后</div>
+                    <div class="phone-mockup">
+                        <div class="phone-screen">
+                            <div class="status-bar">
+                                <span>9:41</span>
+                                <span>🔋 100%</span>
+                            </div>
+                            
+                            <div class="top-app-bar">
+                                <span class="top-app-bar-title">秘境消消乐</span>
+                                <span style="color: #F0E6D3; font-size: 20px;">⚙️</span>
+                            </div>
+                            
+                            <!-- 重新设计的用户资料头部 -->
+                            <div class="profile-header-mockup">
+                                <div class="avatar-mockup">
+                                    侠
+                                    <div class="online-dot"></div>
+                                </div>
+                                <div class="profile-info-mockup">
+                                    <div class="profile-name-mockup">逑客云游</div>
+                                    <div class="profile-points-mockup">
+                                        ⭐ 1,234 积分
+                                    </div>
+                                </div>
+                                <button style="background: linear-gradient(135deg, #C82423, #A01C1C); color: white; border: none; padding: 8px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;">登录</button>
+                            </div>
+                            
+                            <!-- 游戏模式选择 -->
+                            <div class="game-grid">
+                                <div class="game-card-mockup">
+                                    <div>
+                                        <div class="game-card-title-mockup">🎯 经典模式</div>
+                                        <div class="game-card-desc-mockup">传统三消玩法<br>适合新手入门</div>
+                                    </div>
+                                    <div class="game-card-stats-mockup">
+                                        🏆 最高分: 2,580
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card-mockup" style="background: linear-gradient(135deg, #E6A23C, #C48A2E);">
+                                    <div>
+                                        <div class="game-card-title-mockup">⚡ 限时模式</div>
+                                        <div class="game-card-desc-mockup">60秒挑战<br>积分翻倍</div>
+                                    </div>
+                                    <div class="game-card-stats-mockup">
+                                        ⏱️ 60秒
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card-mockup" style="background: linear-gradient(135deg, #10b981, #059669);">
+                                    <div>
+                                        <div class="game-card-title-mockup">🌟 解谜模式</div>
+                                        <div class="game-card-desc-mockup">特殊关卡<br>策略挑战</div>
+                                    </div>
+                                    <div class="game-card-stats-mockup">
+                                        📊 进度: 15/30
+                                    </div>
+                                </div>
+                                
+                                <div class="game-card-mockup" style="background: linear-gradient(135deg, #6366f1, #4f46e5);">
+                                    <div>
+                                        <div class="game-card-title-mockup">👥 对战模式</div>
+                                        <div class="game-card-desc-mockup">实时PVP<br>全球匹配</div>
+                                    </div>
+                                    <div class="game-card-stats-mockup">
+                                        👤 在线: 1,234
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bottom-nav-mockup">
+                                <div class="nav-item-mockup active">
+                                    <span class="nav-icon-mockup">🏠</span>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">🎮</span>
+                                    <span>游戏</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">🏆</span>
+                                    <span>排行</span>
+                                </div>
+                                <div class="nav-item-mockup">
+                                    <span class="nav-icon-mockup">👤</span>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设计标注 -->
+            <div class="design-annotations">
+                <div class="annotation-title">📏 设计标注 - 菜单主界面</div>
+                <ul class="annotation-list">
+                    <li><strong>屏幕尺寸:</strong> 375 x 812 pt (iPhone X/11 Pro)</li>
+                    <li><strong>状态栏高度:</strong> 44pt</li>
+                    <li><strong>顶部应用栏高度:</strong> 56pt</li>
+                    <li><strong>用户资料头部:</strong> margin: 16pt, padding: 20pt, 圆角: 16pt</li>
+                    <li><strong>头像尺寸:</strong> 60 x 60pt, 圆角: 50%</li>
+                    <li><strong>在线指示器:</strong> 12 x 12pt, 圆角: 50%</li>
+                    <li><strong>游戏卡片:</strong> 网格布局 2列, gap: 16pt, 圆角: 16pt</li>
+                    <li><strong>底部导航高度:</strong> 84pt (包含安全区域)</li>
+                    <li><strong>主色调:</strong> <span class="color-spec" style="background: #C82423;"></span> #C82423 (朱砂红)</li>
+                    <li><strong>辅助色:</strong> <span class="color-spec" style="background: #E6A23C;"></span> #E6A23C (帝王金)</li>
+                    <li><strong>背景色:</strong> <span class="color-spec" style="background: #0D1117;"></span> #0D1117 (墨夜)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- =============================================================================
+             游戏界面设计稿
+             ============================================================================= -->
+        <div class="design-section">
+            <h2 class="section-title">🎮 游戏界面设计稿</h2>
+            
+            <div class="mockup-wrapper">
+                <div class="mockup-label label-after">✅ 重新设计 - 游戏主界面</div>
+                <div class="phone-mockup" style="margin-top: 20px;">
+                    <div class="phone-screen">
+                        <div class="status-bar">
+                            <span>9:41</span>
+                            <span>🔋 100%</span>
+                        </div>
+                        
+                        <!-- 游戏顶部信息栏 -->
+                        <div style="padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">⏱️</span>
+                                <span style="font-size: 24px; font-weight: 700; color: #F0E6D3;">60</span>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button style="background: rgba(230,162,60,0.2); border: 1px solid #E6A23C; color: #E6A23C; padding: 8px 16px; border-radius: 8px; font-size: 14px;">⏸️ 暂停</button>
+                                <button style="background: rgba(200,36,35,0.2); border: 1px solid #C82423; color: #C82423; padding: 8px 16px; border-radius: 8px; font-size: 14px;">🔄 重玩</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 分数显示 -->
+                        <div style="text-align: center; padding: 12px;">
+                            <div style="font-size: 14px; color: #8B8682; margin-bottom: 4px;">当前分数</div>
+                            <div style="font-size: 48px; font-weight: 700; color: #E6A23C; font-family: 'Georgia', serif;">1,234</div>
+                        </div>
+                        
+                        <!-- 游戏棋盘 (简化示意) -->
+                        <div style="margin: 20px; aspect-ratio: 1; background: linear-gradient(135deg, rgba(200,36,35,0.1), rgba(230,162,60,0.05)); border-radius: 16px; border: 2px solid rgba(230,162,60,0.3); display: flex; align-items: center; justify-content: center; position: relative;">
+                            <div style="text-align: center; color: #8B8682;">
+                                <div style="font-size: 48px; margin-bottom: 8px;">🎮</div>
+                                <div>游戏棋盘区域</div>
+                                <div style="font-size: 12px; margin-top: 4px;">8 x 8 格子</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 底部操作栏 -->
+                        <div style="padding: 20px; display: flex; gap: 12px;">
+                            <button style="flex: 1; background: linear-gradient(135deg, #C82423, #A01C1C); color: white; border: none; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(200,36,35,0.4);">使用道具</button>
+                            <button style="flex: 1; background: linear-gradient(135deg, #E6A23C, #C48A2E); color: white; border: none; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 12px rgba(230,162,60,0.4);">提示</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 设计标注 -->
+            <div class="design-annotations">
+                <div class="annotation-title">📏 设计标注 - 游戏界面</div>
+                <ul class="annotation-list">
+                    <li><strong>计时器:</strong> 字体大小 24pt, 颜色 #F0E6D3</li>
+                    <li><strong>分数显示:</strong> 字体大小 48pt, 颜色 <span class="color-spec" style="background: #E6A23C;"></span> #E6A23C</li>
+                    <li><strong>游戏棋盘:</strong> 1:1 宽高比, 圆角 16pt, 边框 2pt</li>
+                    <li><strong>操作按钮:</strong> 高度 52pt, 圆角 12pt, 全宽</li>
+                    <li><strong>按钮阴影:</strong> 4pt 模糊, 12pt 扩散, 颜色主色调 40% 透明度</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- =============================================================================
+             组件设计规范
+             ============================================================================= -->
+        <div class="design-section">
+            <h2 class="section-title">🧩 组件设计规范</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+                <!-- 按钮规范 -->
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px;">
+                    <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 12px;">🔘 按钮组件</div>
+                    <div style="font-size: 14px; color: #666; line-height: 2;">
+                        <div><strong>主按钮:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • 背景: 线性渐变 #C82423 → #A01C1C<br>
+                            • 文字颜色: #FFFFFF<br>
+                            • 圆角: 8pt<br>
+                            • 内边距: 12pt 24pt<br>
+                            • 阴影: 0 4pt 12pt rgba(200,36,35,0.4)
+                        </div>
+                        <div style="margin-top: 8px;"><strong>尺寸:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • Small: 高度 32pt, 字体 14pt<br>
+                            • Medium: 高度 44pt, 字体 16pt<br>
+                            • Large: 高度 52pt, 字体 18pt
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 卡片规范 -->
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px;">
+                    <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 12px;">🃏 卡片组件</div>
+                    <div style="font-size: 14px; color: #666; line-height: 2;">
+                        <div><strong>标准卡片:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • 背景: #161B22<br>
+                            • 圆角: 16pt<br>
+                            • 内边距: 20pt<br>
+                            • 阴影: 0 4pt 12pt rgba(0,0,0,0.3)
+                        </div>
+                        <div style="margin-top: 8px;"><strong>游戏卡片:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • 背景: 线性渐变 #C82423 → #A01C1C<br>
+                            • 圆角: 16pt<br>
+                            • 最小高度: 140pt<br>
+                            • 阴影: 0 4pt 20pt rgba(230,162,60,0.3)
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 间距规范 -->
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px;">
+                    <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 12px;">📏 间距系统</div>
+                    <div style="font-size: 14px; color: #666; line-height: 2;">
+                        <div><strong>基于 4pt 基准:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • space-1: 4pt<br>
+                            • space-2: 8pt<br>
+                            • space-3: 12pt<br>
+                            • space-4: 16pt<br>
+                            • space-6: 24pt<br>
+                            • space-8: 32pt
+                        </div>
+                        <div style="margin-top: 8px;"><strong>应用规范:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • 组件间距: 16pt<br>
+                            • 卡片间距: 16pt<br>
+                            • 内边距: 20pt<br>
+                            • 外边距: 20pt
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 字体规范 -->
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px;">
+                    <div style="font-size: 18px; font-weight: 700; color: #333; margin-bottom: 12px;">✏️ 字体系统</div>
+                    <div style="font-size: 14px; color: #666; line-height: 2;">
+                        <div><strong>字体家族:</strong> Georgia, SimSun, serif</div>
+                        <div style="margin-top: 8px;"><strong>字体层级:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • Display Large: 57pt<br>
+                            • Headline Large: 32pt<br>
+                            • Title Large: 22pt<br>
+                            • Body Large: 16pt<br>
+                            • Label Large: 14pt
+                        </div>
+                        <div style="margin-top: 8px;"><strong>字重:</strong></div>
+                        <div style="margin-left: 12px;">
+                            • Regular: 400<br>
+                            • Medium: 500<br>
+                            • Bold: 700
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- =============================================================================
+             底部说明
+             ============================================================================= -->
+        <div style="text-align: center; margin-top: 40px; padding: 20px; color: #666; font-size: 14px;">
+            <p>🎨 UI Designer · 秘境消消乐设计系统</p>
+            <p style="margin-top: 8px;">保留国风设计语言 · 朱砂红 + 帝王金 · WCAG AA 无障碍合规</p>
+            <p style="margin-top: 16px; color: #999;">类似蓝湖设计交付物 · 包含设计稿 + 标注 + 规范</p>
+        </div>
+    </div>
+</body>
+</html>

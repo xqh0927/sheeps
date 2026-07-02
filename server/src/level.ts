@@ -1,4 +1,5 @@
 import { Point3D, TileData } from './types';
+import { calculateCardCount } from './difficulty';
 
 /**
  * 根据关卡 ID 获取关卡的基础难度系数
@@ -31,11 +32,12 @@ export function lcg(seed: number) {
  * 生成保证必定有解（Solvable）的关卡卡牌三维布局数据
  * 算法原理：自底向上（Z轴）根据轮廓形状生成可用网格坐标，之后利用 LCG 反向模拟玩家消除步骤（反向从槽位拿牌放到棋盘上暴露位置）以填充花色。
  * 
+ * @param userId  用户唯一标识（用于难度曲线千人千面）
  * @param levelId 关卡 ID
- * @param seed LCG 随机数种子
+ * @param seed    LCG 随机数种子
  * @return 关卡所有卡牌的数据列表
  */
-export function generateSolvableLevel(levelId: number, seed: number): TileData[] {
+export function generateSolvableLevel(userId: number, levelId: number, seed: number): TileData[] {
   let coordinates: Point3D[] = [];
 
   // 第 1 关采用简单的新手引导固定布局
@@ -49,15 +51,16 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
       { x: 2.0, y: 1.0, z: 3 }, { x: 1.0, y: 2.0, z: 3 }, { x: 2.0, y: 2.0, z: 3 }
     ];
   } else {
-    // 关卡卡牌总数随关卡 ID 严格递增关系：24 + levelId * 12
-    const maxCards = 24 + levelId * 12;
+    // 关卡卡牌总数随难度系数曲线渐进增长：使用基于 (userId, levelId) 的确定性难度系统
+    const { cardCount: maxCards } = calculateCardCount(userId, levelId);
     const possibleCoords: Point3D[] = [];
 
     // 关卡层数随关卡 ID 对数增加：L = 12 - 8 / sqrt(levelId - 1)，最大限制为 12 层
     const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
 
-    // 棋盘基础网格大小，随关卡增加而变大
-    const baseSize = 6 + Math.floor(levelId / 20);
+    // 棋盘基础网格大小，随关卡增加而变大，确保有足够坐标生成最多 300 张卡牌
+    // 关卡 23+ 时 baseSize >= 17，保证最 restrictive 的形状（如 X 字形）也能生成 300+ 坐标
+    const baseSize = 6 + Math.floor(levelId / 2);
 
     // 根据种子从 18 种不同的关卡异形轮廓中随机挑选一种进行图形网格过滤
     const shapeType = seed % 18;
@@ -289,6 +292,31 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
 
   let randProps = lcg(seed + 200);
   const maxZ = Math.max(...nodes.map(n => n.coord.z));
+
+  // ===== 坐标归一化：质心对齐模式 =====
+  // 目的：确保 Android 客户端渲染时卡牌不会因坐标跨度过大而变得极小
+  // 使用质心（center-of-mass）归一化而非包围盒归一化，
+  // 保证圆环/圆等非对称形状的视觉重心精确落在棋盘中心，不会整体偏移
+  // 注意：归一化仅在最终输出时执行，不影响 blocks() 遮挡判定和花色分配逻辑（它们使用原始坐标）
+  const coordCount = coordinates.length;
+  const centroidX = coordinates.reduce((s, c) => s + c.x, 0) / coordCount;
+  const centroidY = coordinates.reduce((s, c) => s + c.y, 0) / coordCount;
+
+  // 计算相对于质心的最大半径（用于等比缩放）
+  let maxRadius = 0;
+  for (const c of coordinates) {
+    const dx = c.x - centroidX;
+    const dy = c.y - centroidY;
+    const r = Math.max(Math.abs(dx), Math.abs(dy));
+    if (r > maxRadius) maxRadius = r;
+  }
+  maxRadius = Math.max(maxRadius, 0.1); // 防止除零
+
+  // 目标参数：质心放在 (targetCenter, targetCenter)，最远卡牌距质心 targetRadius 单位
+  const targetCenter = 5.5;   // 棋盘中心坐标（输出范围约 [0.5, 10.5]）
+  const targetRadius = 4.8;   // 最大半径，留出边距避免裁切
+  const normScale2 = targetRadius / maxRadius;
+
   return nodes.map((node) => {
     let isBlind = false;
     let sealedCount = 0;
@@ -310,8 +338,8 @@ export function generateSolvableLevel(levelId: number, seed: number): TileData[]
 
     return {
       id: `tile_${node.index}`,
-      x: node.coord.x,
-      y: node.coord.y,
+      x: targetCenter + (node.coord.x - centroidX) * normScale2,
+      y: targetCenter + (node.coord.y - centroidY) * normScale2,
       z: node.coord.z,
       type: node.assignedType,
       isBlind,

@@ -30,19 +30,33 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const body: { phone: string; code: string; device_uuid?: string } = await request.json();
         if (!body.phone || !body.code) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
 
-        // 获取该手机号的最新验证码记录
-        const codeRecord = await env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone).first<{ code: string; created_at: number }>();
-        if (!codeRecord || codeRecord.code !== body.code) return new Response(JSON.stringify({ error: 'Verification code incorrect' }), { status: 400, headers: corsHeaders });
-        // 限制验证码 5 分钟内有效
-        if (Date.now() - codeRecord.created_at > 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Verification code expired' }), { status: 400, headers: corsHeaders });
+        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
-        // 验证通过，删除验证码，并查询用户信息
-        const [deleteTokenResult, userResult] = await env.DB.batch([
-            env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE phone = ?').bind(body.phone)
+        // ─── 合并查询：一次 D1 batch 完成所有读操作 ───
+        const [codeRecord, userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
+            env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
+            env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
+            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
+            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) ORDER BY sign_date DESC LIMIT 1').bind(body.phone)
         ]);
 
-        let user = userResult.results[0] as any;
+        const tokenRecord = codeRecord.results[0] as { code: string; created_at: number } | undefined;
+        if (!tokenRecord || tokenRecord.code !== body.code)
+            return new Response(JSON.stringify({ error: 'Verification code incorrect' }), { status: 400, headers: corsHeaders });
+        if (Date.now() - tokenRecord.created_at > 5 * 60 * 1000)
+            return new Response(JSON.stringify({ error: 'Verification code expired' }), { status: 400, headers: corsHeaders });
+
+        // 清除验证码（异步，不阻塞响应）
+        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+
+        let user = userRow.results[0] as any;
+        // 准备响应数据（默认使用预查询结果）
+        let finalLevels: number[] = unlockedResult.results.map((r: any) => r.level_id);
+        let finalItems: any[] = itemsResult.results;
+        let finalSigned = signTodayRow.results[0] !== null && signTodayRow.results[0] !== undefined;
+        let finalStreak: number = (lastSignResult.results[0] as any)?.streak || 0;
 
         // 如果用户不存在，说明是新用户，自动执行注册逻辑
         if (!user) {
@@ -60,6 +74,11 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             }
             await env.DB.batch(insertQueries);
             user = { id: uuid, phone: body.phone, username: defaultUsername, avatar: null, points: 0 };
+            // 新用户响应数据：手动构建，避免额外查询
+            finalLevels = [1];
+            finalItems = [{ item_type: 'UNDO', count: 1 }, { item_type: 'SHUFFLE', count: 1 }, { item_type: 'MOVEOUT', count: 1 }, { item_type: 'REVIVE', count: 1 }];
+            finalSigned = false;
+            finalStreak = 0;
         }
 
         // 游客合并逻辑：如果登录时传入了设备的游客 device_uuid，且与当前注册用户的 id 不同，需要合并积分、关卡进度及道具
@@ -76,9 +95,17 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
 
                 const mergeMutations = [env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(mergedPoints, user.id)];
                 // 合并关卡解锁记录（忽略重复的）
-                for (const row of guestLevelsResult.results as any[]) mergeMutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(user.id, row.level_id, Date.now()));
-                // 道具叠加更新
-                for (const row of guestItemsResult.results as any[]) mergeMutations.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?').bind(user.id, row.item_type, row.count, row.count));
+                for (const row of guestLevelsResult.results as any[]) {
+                    mergeMutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(user.id, row.level_id, Date.now()));
+                    if (!finalLevels.includes(row.level_id)) finalLevels.push(row.level_id);
+                }
+                // 道具叠加更新：合并游客道具到响应数据
+                for (const row of guestItemsResult.results as any[]) {
+                    mergeMutations.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?').bind(user.id, row.item_type, row.count, row.count));
+                    const existing = finalItems.find((i: any) => i.item_type === row.item_type);
+                    if (existing) existing.count += row.count;
+                    else finalItems.push({ item_type: row.item_type, count: row.count });
+                }
 
                 // 级联删除游客在各个业务表中的历史数据，防止外键冲突或脏数据残留
                 const tablesToDelete = ['level_unlock', 'user_items', 'leaderboard', 'point_record', 'exchange_record', 'sign_record', 'user_task', 'backup_save_log'];
@@ -92,21 +119,13 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
         const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
 
-        // 获取当天签到状况及连续签到次数
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const [unlockedResult, itemsResult, signTodayResult, lastSignResult] = await env.DB.batch([
-            env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(user.id),
-            env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(user.id),
-            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(user.id, chinaToday),
-            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(user.id)
-        ]);
-
+        // 直接使用已合并查询的结果（无需额外 D1 调用）
         return new Response(JSON.stringify({
             success: true, token, refreshToken, user,
-            unlocked_levels: unlockedResult.results.map((r: any) => r.level_id),
-            items: itemsResult.results,
-            today_signed: signTodayResult.results[0] !== null,
-            sign_streak: (lastSignResult.results[0] as any)?.streak || 0
+            unlocked_levels: finalLevels,
+            items: finalItems,
+            today_signed: finalSigned,
+            sign_streak: finalStreak
         }), { headers: corsHeaders });
     }
 

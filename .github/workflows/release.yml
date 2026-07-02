@@ -34,6 +34,21 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "Extracted Version: $VERSION_NAME"
 
+      - name: Upload APK to Cloudflare R2
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          APK_FILE=$(ls app/app/build/outputs/apk/release/*.apk | head -1)
+          echo "Uploading $APK_FILE to R2..."
+          npx wrangler r2 object put sheeps-apk/sheeps_${{ env.VERSION_NAME }}.apk \
+            --file="$APK_FILE" \
+            --remote \
+            --content-type "application/vnd.android.package-archive" \
+            --cache-control "public, max-age=31536000, immutable"
+          echo "R2 URL: https://apk.xqh.cc.cd/sheeps_${{ env.VERSION_NAME }}.apk"
+
       - name: List APK outputs
         run: ls -la app/app/build/outputs/apk/release/
 

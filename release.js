@@ -36,6 +36,9 @@ function run() {
     console.log(`  versionName = "${currentName}"`);
     console.log(`======================================\n`);
 
+    // ─── R2 APK 下载地址 ───
+    const R2_PUBLIC_BASE = 'https://apk.xqh.cc.cd';
+
     const nextCode = currentCode + 1;
     // 自动推荐下一个 versionName
     const parts = currentName.split('.');
@@ -74,7 +77,7 @@ function run() {
                         console.log("➔ build.gradle.kts 更新成功！");
 
                         // 2. 执行远程 D1 数据库插入
-                        const apkUrl = `https://github.com/xqh0927/sheeps-releases/releases/download/v${newName}/sheeps_${newName}.apk`;
+                        const apkUrl = `${R2_PUBLIC_BASE}/sheeps_${newName}.apk`;
                         const now = Date.now();
                         // 避免 SQL 语句因单引号报错
                         const escapedLog = updateLog.replace(/'/g, "''");
@@ -95,7 +98,8 @@ function run() {
 
                         console.log(`\n🎉 发布流程执行完毕！`);
                         console.log(`Tag 版本: v${newName}`);
-                        console.log(`新 APK 下载地址将在自动打包后生效: ${apkUrl}\n`);
+                        console.log(`R2 APK 下载: ${apkUrl}`);
+                        console.log(`GitHub Actions 将自动构建并上传 APK 到 R2\n`);
 
                     } catch (err) {
                         console.error("\n❌ 执行发布时发生错误:", err.message);
