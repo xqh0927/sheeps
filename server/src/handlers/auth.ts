@@ -13,7 +13,14 @@ import { generateJWT, verifyJWT } from '../crypto';
 export async function handleAuthRoutes(request: Request, env: Env, path: string): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 发送登录验证码接口
+    /**
+     * POST /api/auth/send-code — 发送验证码
+     *
+     * 请求体 (JSON):
+     *   @param {string} phone — 手机号
+     *
+     * 响应: { success: true, code: "123456" }
+     */
     if (path === '/api/auth/send-code' && request.method === 'POST') {
         const body: { phone: string } = await request.json();
         if (!body.phone) return new Response(JSON.stringify({ error: 'Missing phone number' }), { status: 400, headers: corsHeaders });
@@ -25,7 +32,16 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         return new Response(JSON.stringify({ success: true, code }), { headers: corsHeaders });
     }
 
-    // 2. 验证码登录/注册接口
+    /**
+     * POST /api/auth/login — 验证码登录/注册
+     *
+     * 请求体 (JSON):
+     *   @param {string} phone — 手机号
+     *   @param {string} code — 6位验证码
+     *   @param {string} [device_uuid] — 可选，游客设备ID（用于数据合并）
+     *
+     * 响应: { success, token, refreshToken, user, unlocked_levels, items, today_signed, sign_streak }
+     */
     if (path === '/api/auth/login' && request.method === 'POST') {
         const body: { phone: string; code: string; device_uuid?: string } = await request.json();
         if (!body.phone || !body.code) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
@@ -129,7 +145,14 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         }), { headers: corsHeaders });
     }
 
-    // 3. 双 Token 静默刷新接口
+    /**
+     * POST /api/auth/refresh — 刷新Token（双Token静默续期）
+     *
+     * 请求体 (JSON):
+     *   @param {string} refreshToken — 已有的 Refresh Token
+     *
+     * 响应: { success: true, token: "<new_access>", refreshToken: "<new_refresh>" }
+     */
     if (path === '/api/auth/refresh' && request.method === 'POST') {
         const body: { refreshToken: string } = await request.json();
         if (!body.refreshToken) return new Response(JSON.stringify({ error: 'Missing refresh token' }), { status: 400, headers: corsHeaders });

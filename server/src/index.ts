@@ -42,7 +42,12 @@ export default {
     const path = url.pathname;
     const lang = getLangSuffix(request);
 
-    // 2. 处理 WebSocket 联机对决协议升级路由
+    /**
+     * 2. WebSocket 联机对决协议升级路由
+     *
+     * 覆盖接口:
+     *   GET /api/ws?gameId=&playerId= — WebSocket 升级，用于双人实时对决通信
+     */
     if (path === '/api/ws' || request.headers.get('Upgrade') === 'websocket') {
       const gameId = url.searchParams.get('gameId');
       const playerId = url.searchParams.get('playerId');
@@ -61,18 +66,70 @@ export default {
     try {
       let response: Response | null = null;
 
+      /**
+       * 认证模块 — 覆盖接口:
+       *   POST /api/auth/send-code — 发送验证码
+       *   POST /api/auth/login — 验证码登录/注册
+       *   POST /api/auth/refresh — 刷新Token
+       */
       if (path.startsWith('/api/auth')) {
         response = await handleAuthRoutes(request, env, path);
+
+      /**
+       * 匹配模块 — 覆盖接口:
+       *   POST /api/match/join — 加入匹配队列
+       *   GET  /api/match/status — 轮询匹配状态
+       *   POST /api/match/leave — 离开匹配队列
+       */
       } else if (path.startsWith('/api/match')) {
         response = await handleMatchRoutes(request, env, path, url);
+
+      /**
+       * 用户模块 — 覆盖接口:
+       *   POST /api/user/sync — 端云数据同步
+       *   GET  /api/user/profile — 获取用户Profile
+       *   GET  /api/user/points-history — 积分流水查询
+       *   GET  /api/user/exchange-history — 兑换记录查询
+       *   POST /api/user/rename — 修改昵称
+       */
       } else if (path.startsWith('/api/user')) {
         response = await handleUserRoutes(request, env, path);
+
+      /**
+       * 商城模块 — 覆盖接口:
+       *   GET  /api/shop/items — 商品列表
+       *   POST /api/shop/exchange — 积分兑换道具
+       */
       } else if (path.startsWith('/api/shop')) {
         response = await handleShopRoutes(request, env, path, lang);
+
+      /**
+       * 任务模块 — 覆盖接口:
+       *   GET  /api/task/daily — 每日任务列表
+       *   POST /api/task/claim — 领取任务奖励
+       */
       } else if (path.startsWith('/api/task')) {
         response = await handleTaskRoutes(request, env, path, lang);
+
+      /**
+       * 系统模块 — 覆盖接口:
+       *   GET  /api/notice/list — 公告列表
+       *   GET  /api/admin/config — 获取管理员配置
+       *   POST /api/admin/config — 修改管理员配置
+       *   GET  /api/app/check-update — App版本更新检测
+       */
       } else if (path.startsWith('/api/admin') || path.startsWith('/api/app') || path.startsWith('/api/notice')) {
         response = await handleSystemRoutes(request, env, path, lang, url);
+
+      /**
+       * 游戏模块 — 覆盖接口:
+       *   GET  /api/level — 获取关卡布局
+       *   POST /api/level/unlock — 积分解锁关卡
+       *   POST /api/score/submit — 提交通关成绩
+       *   POST /api/sign/today — 每日签到
+       *   GET  /api/leaderboard — 排行榜查询
+       *   GET  /api/leaderboard/daily-popup — 每日弹窗
+       */
       } else if (path.startsWith('/api/level') || path.startsWith('/api/score') || path.startsWith('/api/sign') || path.startsWith('/api/leaderboard')) {
         response = await handleGameRoutes(request, env, path, url);
       }

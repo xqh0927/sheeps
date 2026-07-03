@@ -13,7 +13,19 @@ import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
 export async function handleUserRoutes(request: Request, env: Env, path: string): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 本地 Room 与云端 D1 数据库增量同步接口
+    /**
+     * POST /api/user/sync — 端云数据增量同步
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {number} [points] — 客户端当前积分
+     *   @param {number[]} [unlocked_levels] — 已解锁关卡ID列表
+     *   @param {Array<{item_type: string, count: number}>} [items] — 道具背包
+     *
+     * 响应: { success, user, unlocked_levels, items }
+     */
     if (path === '/api/user/sync' && request.method === 'POST') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -55,7 +67,14 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         return new Response(JSON.stringify({ success: true, user: updatedUserResult.results[0], unlocked_levels: updatedLevelsResult.results.map((r: any) => r.level_id), items: updatedItemsResult.results }), { headers: corsHeaders });
     }
 
-    // 2. 获取用户 Profile 资料与背包、签到综合进度接口
+    /**
+     * GET /api/user/profile — 获取用户完整Profile
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: { success, user, unlocked_levels, items, today_signed, sign_streak, highest_level_cleared }
+     */
     if (path === '/api/user/profile' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -76,7 +95,14 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         }), { headers: corsHeaders });
     }
 
-    // 3. 获取个人积分收支历史明细接口
+    /**
+     * GET /api/user/points-history — 查询积分收支明细
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: [{ type, amount, source, remaining_points, created_at }, ...] （最近50条）
+     */
     if (path === '/api/user/points-history' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -84,7 +110,14 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
 
-    // 4. 获取法宝道具兑换历史明细接口
+    /**
+     * GET /api/user/exchange-history — 查询道具兑换历史
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: [{ id, shop_item_id, item_type, count, points_cost, created_at }, ...] （最近50条）
+     */
     if (path === '/api/user/exchange-history' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -92,7 +125,15 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
 
-    // 5. 用户修改昵称接口
+    /**
+     * POST /api/user/rename — 修改用户昵称
+     *
+     * 请求体 (JSON):
+     *   @param {string} id — 用户ID
+     *   @param {string} new_username — 新昵称
+     *
+     * 响应: { success: true }
+     */
     if (path === '/api/user/rename' && request.method === 'POST') {
         const body: { id: string; new_username: string } = await request.json();
         if (!body.id || !body.new_username) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });

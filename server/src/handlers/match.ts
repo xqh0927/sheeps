@@ -14,7 +14,14 @@ import { getCorsHeaders } from '../helpers';
 export async function handleMatchRoutes(request: Request, env: Env, path: string, url: URL): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 玩家加入匹配队列接口
+    /**
+     * POST /api/match/join — 加入匹配队列（自动配对或等待对手）
+     *
+     * 请求体 (JSON):
+     *   @param {string} playerId — 玩家ID
+     *
+     * 响应: { status: "matched"|"waiting", gameId?, opponentId?, duelLevel?, gameSeed?, message? }
+     */
     if (path === '/api/match/join' && request.method === 'POST') {
         const body: { playerId: string } = await request.json();
         if (!body.playerId) return new Response(JSON.stringify({ error: 'Missing playerId' }), { status: 400, headers: corsHeaders });
@@ -47,7 +54,14 @@ export async function handleMatchRoutes(request: Request, env: Env, path: string
         }
     }
 
-    // 2. 轮询匹配状态接口
+    /**
+     * GET /api/match/status — 轮询匹配状态（含超时自动清理与主动配对尝试）
+     *
+     * Query 参数:
+     *   @param {string} playerId — 玩家ID
+     *
+     * 响应: { status: "matched"|"waiting"|"not_in_queue", gameId?, opponentId?, duelLevel?, gameSeed? }
+     */
     if (path === '/api/match/status' && request.method === 'GET') {
         const playerId = url.searchParams.get('playerId');
         if (!playerId) return new Response(JSON.stringify({ error: 'Missing playerId' }), { status: 400, headers: corsHeaders });
@@ -83,7 +97,14 @@ export async function handleMatchRoutes(request: Request, env: Env, path: string
         return new Response(JSON.stringify({ status: 'waiting' }), { headers: corsHeaders });
     }
 
-    // 3. 主动取消并离开匹配队列接口
+    /**
+     * POST /api/match/leave — 取消匹配，离开队列
+     *
+     * 请求体 (JSON):
+     *   @param {string} playerId — 玩家ID
+     *
+     * 响应: { status: "left" }
+     */
     if (path === '/api/match/leave' && request.method === 'POST') {
         const body: { playerId: string } = await request.json();
         if (body.playerId) await env.DB.prepare('DELETE FROM matchmaking_queue WHERE player_id = ?').bind(body.playerId).run();

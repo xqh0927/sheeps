@@ -14,7 +14,17 @@ import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
 export async function handleTaskRoutes(request: Request, env: Env, path: string, lang: string): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 查询每日任务列表及进度接口
+    /**
+     * GET /api/task/daily — 查询每日任务列表及当前进度
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * Query 参数（通过请求头 Accept-Language 解析）:
+     *   @param {string} [lang] — 语言标识
+     *
+     * 响应: [{ task_id, name, description, progress, target_count, is_completed, is_rewarded, points_reward }]
+     */
     if (path === '/api/task/daily' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -48,7 +58,17 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify(list), { headers: corsHeaders });
     }
 
-    // 2. 领取任务积分奖励接口
+    /**
+     * POST /api/task/claim — 领取任务积分奖励
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {string} task_id — 任务ID
+     *
+     * 响应: { success, current_points }
+     */
     if (path === '/api/task/claim' && request.method === 'POST') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });

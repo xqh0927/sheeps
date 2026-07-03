@@ -16,7 +16,14 @@ import { getDatabaseAppUpdate } from '../update';
 export async function handleSystemRoutes(request: Request, env: Env, path: string, lang: string, url: URL): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 公告列表查询接口（支持多语言与 KV 缓存）
+    /**
+     * GET /api/notice/list — 公告列表查询（支持多语言与KV缓存）
+     *
+     * Query 参数（通过请求头 Accept-Language 解析）:
+     *   @param {string} [lang] — 语言标识
+     *
+     * 响应: [{ id, title, content, type, created_at }]
+     */
     if (path === '/api/notice/list' && request.method === 'GET') {
         const cacheKey = `notices_${lang}`;
         // 读取公告 KV 缓存，默认缓存 1 小时以降低 D1 读负荷
@@ -32,7 +39,11 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         return new Response(jsonStr, { headers: corsHeaders });
     }
 
-    // 2. 获取管理员配置接口（常用于读取签到配置、解锁积分门槛等）
+    /**
+     * GET /api/admin/config — 获取管理员配置列表
+     *
+     * 响应: [{ key, value }] 所有配置项
+     */
     if (path === '/api/admin/config' && request.method === 'GET') {
         const cached = await env.SHEEPS_CACHE.get('admin_config_list');
         if (cached) return new Response(cached, { headers: corsHeaders });
@@ -43,7 +54,15 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         return new Response(jsonStr, { headers: corsHeaders });
     }
 
-    // 3. 写入/修改管理员配置接口
+    /**
+     * POST /api/admin/config — 写入/修改管理员配置项
+     *
+     * 请求体 (JSON):
+     *   @param {string} key — 配置键名
+     *   @param {string} value — 配置值
+     *
+     * 响应: { success: true }
+     */
     if (path === '/api/admin/config' && request.method === 'POST') {
         const body: { key: string; value: string } = await request.json();
         if (!body.key || !body.value) return new Response(JSON.stringify({ error: 'Missing config key or value' }), { status: 400, headers: corsHeaders });
@@ -55,7 +74,14 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
 
-    // 4. 客户端 App 版本更新检测接口
+    /**
+     * GET /api/app/check-update — 客户端App版本更新检测
+     *
+     * Query 参数:
+     *   @param {number} version_code — 当前客户端版本号
+     *
+     * 响应: { has_update, latest_version, download_url, update_info }
+     */
     if (path === '/api/app/check-update' && request.method === 'GET') {
         const currentCodeStr = url.searchParams.get('version_code');
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;

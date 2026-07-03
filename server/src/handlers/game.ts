@@ -18,7 +18,16 @@ const CACHE_STAGE_CONFIG = new Map<number | string, string>();
 export async function handleGameRoutes(request: Request, env: Env, path: string, url: URL): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
-    // 1. 获取关卡布局数据接口
+    /**
+     * GET /api/level — 获取关卡布局数据
+     *
+     * Query 参数:
+     *   @param {number} id — 关卡编号（必填）
+     *   @param {number} [seed] — 可选，随机种子（不传则服务端随机生成）
+     *   @param {number} [userId] — 可选，游客用户ID
+     *
+     * 响应: Tile[] 瓦片布局数组
+     */
     if (path === '/api/level' && request.method === 'GET') {
         const levelIdStr = url.searchParams.get('id');
         if (!levelIdStr) return new Response(JSON.stringify({ error: 'Missing level ID' }), { status: 400, headers: corsHeaders });
@@ -72,7 +81,17 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(layoutJson, { headers: corsHeaders });
     }
 
-    // 2. 扣除积分以解锁新关卡接口
+    /**
+     * POST /api/level/unlock — 消耗积分解锁关卡
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {number} level_id — 目标关卡编号
+     *
+     * 响应: { success: true, current_points: <number> }
+     */
     if (path === '/api/level/unlock' && request.method === 'POST') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -107,7 +126,18 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify({ success: true, current_points: newPoints }), { headers: corsHeaders });
     }
 
-    // 3. 安全提交并校验通关成绩接口
+    /**
+     * POST /api/score/submit — 提交通关成绩（含防作弊签名校验）
+     *
+     * 请求体 (JSON):
+     *   @param {string} user_id — 用户ID
+     *   @param {number} level_id — 关卡编号
+     *   @param {number} clear_time_ms — 通关耗时（毫秒）
+     *   @param {number} score — 得分
+     *   @param {string} sign — SHA256 防作弊签名
+     *
+     * 响应: { success, first_clear, points_reward }
+     */
     if (path === '/api/score/submit' && request.method === 'POST') {
         const body: any = await request.json();
         if (!body.sign) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
@@ -152,7 +182,14 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
     }
 
-    // 4. 每日签到接口
+    /**
+     * POST /api/sign/today — 每日签到领取积分
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: { success, streak, reward_points, current_points }
+     */
     if (path === '/api/sign/today' && request.method === 'POST') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
@@ -192,7 +229,17 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints, current_points: newPoints }), { headers: corsHeaders });
     }
 
-    // 5. 排行榜列表查询接口
+    /**
+     * GET /api/leaderboard — 排行榜查询（分页、按时间维度筛选）
+     *
+     * Query 参数:
+     *   @param {number} level_id — 关卡编号（必填）
+     *   @param {string} [type="history"] — 排行类型：daily / weekly / history
+     *   @param {number} [page=1] — 页码
+     *   @param {number} [limit=20] — 每页条数
+     *
+     * 响应: { success, rankings: [{ username, avatar, clear_time_ms, score, achieved_at }] }
+     */
     if (path === '/api/leaderboard' && request.method === 'GET') {
         const levelIdStr = url.searchParams.get('level_id');
         if (!levelIdStr) return new Response(JSON.stringify({ error: 'Missing level_id' }), { status: 400, headers: corsHeaders });
@@ -227,7 +274,14 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(responseData, { headers: corsHeaders });
     }
 
-    // 6. 每日弹窗（返回昨日积分榜前三名 + 当前用户昨日排名）
+    /**
+     * GET /api/leaderboard/daily-popup — 每日弹窗（昨日积分榜TOP3 + 当前用户排名）
+     *
+     * 请求头:
+     *   Authorization: Bearer <token> （可选，未登录返回 rank=0）
+     *
+     * 响应: { success, top3: [{ username, points }], yesterdayRank: <number> }
+     */
     if (path === '/api/leaderboard/daily-popup' && request.method === 'GET') {
         const authUser1 = await getAuthenticatedUser(request, env);
         const now1 = Date.now();
