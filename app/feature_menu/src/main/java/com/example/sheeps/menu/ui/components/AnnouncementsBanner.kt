@@ -63,7 +63,7 @@ fun AnnouncementsBanner(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = stringResource(id = R.string.notice_title),
-                    tint = Crimson_Primary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -72,7 +72,7 @@ fun AnnouncementsBanner(
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Serif,
                     fontSize = 13.sp,
-                    color = Gold_Primary
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
 

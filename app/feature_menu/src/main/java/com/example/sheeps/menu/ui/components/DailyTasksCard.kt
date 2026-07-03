@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,7 +17,6 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedTaskName
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
 
 /**
  * 每日任务卡片组件
@@ -43,7 +43,7 @@ fun DailyTasksCard(
                 text = stringResource(id = R.string.tasks_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 12.dp),
                 fontFamily = FontFamily.Serif
             )
@@ -105,7 +105,7 @@ private fun TaskItem(
                 onClick = { onClaimTask(task.task_id) },
                 enabled = task.is_completed,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = CrimsonRed,
+                    containerColor = MaterialTheme.colorScheme.primary,
                     disabledContainerColor = Color.LightGray
                 ),
                 contentPadding = PaddingValues(horizontal = 8.dp),

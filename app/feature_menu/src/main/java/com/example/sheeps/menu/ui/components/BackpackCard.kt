@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +30,6 @@ import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.core.utils.getLocalizedItemDesc
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.hjq.toast.Toaster
 
@@ -86,7 +85,7 @@ fun BackpackCard(
                 text = stringResource(id = R.string.backpack_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 12.dp),
                 fontFamily = FontFamily.Serif
             )
@@ -103,7 +102,7 @@ fun BackpackCard(
                     text = stringResource(id = R.string.backpack_magic_section),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    color = Gold_Primary,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
                 Row(
@@ -125,7 +124,7 @@ fun BackpackCard(
                     text = stringResource(id = R.string.backpack_skins_section),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    color = Gold_Primary,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
                 Row(
@@ -203,7 +202,7 @@ private fun BackpackItem(
             text = getLocalizedItemName(item.item_type),
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            color = CrimsonRed,
+            color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -282,7 +281,7 @@ private fun BackpackItemDetailDialog(
                     text = getLocalizedItemName(item.item_type),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = CrimsonRed,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
                 )
 

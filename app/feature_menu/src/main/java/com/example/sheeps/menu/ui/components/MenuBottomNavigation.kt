@@ -20,8 +20,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.theme.Crimson_PrimaryContainer
-import com.example.sheeps.theme.Gold_Primary
 
 @Composable
 fun MenuBottomNavigation(
@@ -61,23 +59,22 @@ fun MenuBottomNavigation(
                             contentDescription = label,
                             modifier = Modifier.scale(iconScale)
                         )
-                        // 金色选中指示点
                         if (selected) {
                             Spacer(Modifier.height(2.dp))
                             Box(
                                 modifier = Modifier
                                     .size(4.dp)
                                     .clip(CircleShape)
-                                    .background(Gold_Primary)
+                                    .background(MaterialTheme.colorScheme.secondary)
                             )
                         }
                     }
                 },
                 label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 11.sp) },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor   = Gold_Primary,
-                    selectedTextColor   = Gold_Primary,
-                    indicatorColor      = Crimson_PrimaryContainer.copy(alpha = 0.4f),
+                    selectedIconColor   = MaterialTheme.colorScheme.secondary,
+                    selectedTextColor   = MaterialTheme.colorScheme.secondary,
+                    indicatorColor      = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
 
 /**
  * 用户信息卡片组件
@@ -51,7 +51,7 @@ fun UserProfileCard(
                     Box(
                         modifier = Modifier
                             .size(56.dp)
-                            .background(CrimsonRed, CircleShape),
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -67,7 +67,7 @@ fun UserProfileCard(
                             text = if (state.isLoggedIn) state.username else stringResource(id = R.string.user_guest),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CrimsonRed,
+                            color = MaterialTheme.colorScheme.primary,
                             fontFamily = FontFamily.Serif
                         )
                         Text(
@@ -87,15 +87,15 @@ fun UserProfileCard(
                 ) {
                     Column {
                         Text(stringResource(id = R.string.points_balance_label), fontSize = 12.sp, color = Color.Gray)
-                        Text("${state.points}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                        Text("${state.points}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     Column {
                         Text(stringResource(id = R.string.streak_label), fontSize = 12.sp, color = Color.Gray)
-                        Text(stringResource(id = R.string.streak_days, state.signStreak), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                        Text(stringResource(id = R.string.streak_days, state.signStreak), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     Column {
                         Text(stringResource(id = R.string.highest_level_label), fontSize = 12.sp, color = Color.Gray)
-                        Text(stringResource(id = R.string.level_number, state.highestLevelCleared), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = CrimsonRed)
+                        Text(stringResource(id = R.string.level_number, state.highestLevelCleared), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
@@ -107,7 +107,7 @@ fun UserProfileCard(
                         onClick = onSignInClick,
                         enabled = !state.todaySigned,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = CrimsonRed,
+                            containerColor = MaterialTheme.colorScheme.primary,
                             disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
                         ),
                         modifier = Modifier.fillMaxWidth(),
@@ -121,7 +121,7 @@ fun UserProfileCard(
                 } else {
                     Button(
                         onClick = onLoginClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -140,7 +140,7 @@ fun UserProfileCard(
                 Icon(
                     imageVector = Icons.Default.HelpOutline,
                     contentDescription = stringResource(id = R.string.description_game_guide),
-                    tint = CrimsonRed.copy(alpha = 0.8f)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                 )
             }
         }

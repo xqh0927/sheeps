@@ -181,7 +181,7 @@ private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         text = { Text(stringResource(id = R.string.dialog_duel_exit_text)) },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(stringResource(id = R.string.dialog_duel_exit_confirm), color = Crimson_Primary, fontWeight = FontWeight.Bold)
+                Text(stringResource(id = R.string.dialog_duel_exit_confirm), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
@@ -209,7 +209,7 @@ private fun SpellMessageBar(state: DuelViewState) {
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Crimson_Primary.copy(alpha = 0.9f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -273,8 +273,8 @@ private fun DuelMatchingSlot(
                 Box(
                     modifier = Modifier
                         .weight(1f).aspectRatio(1f)
-                        .background(if (isLocked) Crimson_Primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .border(width = 1.dp, color = if (isLocked) Crimson_Primary else Color.Transparent, shape = RoundedCornerShape(8.dp))
+                        .background(if (isLocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .border(width = 1.dp, color = if (isLocked) MaterialTheme.colorScheme.primary else Color.Transparent, shape = RoundedCornerShape(8.dp))
                         .onGloballyPositioned { slotGlobalPositions[i] = it.positionInRoot() },
                     contentAlignment = Alignment.Center
                 ) {

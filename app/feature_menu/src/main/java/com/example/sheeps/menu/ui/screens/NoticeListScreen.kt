@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,8 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Notice
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.Gold_Primary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,7 +43,7 @@ fun NoticeListScreen(
                         text = stringResource(id = R.string.notice_list_title),
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Serif,
-                        color = CrimsonRed
+                        color = MaterialTheme.colorScheme.primary
                     )
                 },
                 navigationIcon = {
@@ -52,7 +51,7 @@ fun NoticeListScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = stringResource(id = R.string.btn_back),
-                            tint = CrimsonRed
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -109,7 +108,7 @@ fun NoticeListScreen(
                                         text = notice.title,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
-                                        color = CrimsonRed,
+                                        color = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.weight(1f)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -121,14 +120,14 @@ fun NoticeListScreen(
                                     Box(
                                         modifier = Modifier
                                             .background(
-                                                color = CrimsonRed.copy(alpha = 0.1f),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                                 shape = RoundedCornerShape(4.dp)
                                             )
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
                                             text = typeText,
-                                            color = CrimsonRed,
+                                            color = MaterialTheme.colorScheme.primary,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -156,7 +155,7 @@ fun NoticeListScreen(
                 Text(
                     text = notice.title,
                     fontWeight = FontWeight.Bold,
-                    color = CrimsonRed,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
                 )
             },
@@ -178,7 +177,7 @@ fun NoticeListScreen(
             },
             confirmButton = {
                 TextButton(onClick = { selectedNotice = null }) {
-                    Text(stringResource(id = R.string.dialog_prepare_close), color = CrimsonRed, fontWeight = FontWeight.Bold)
+                    Text(stringResource(id = R.string.dialog_prepare_close), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             },
             shape = RoundedCornerShape(16.dp)

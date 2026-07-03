@@ -52,9 +52,6 @@ import androidx.lifecycle.lifecycleScope
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Primary
-import com.example.sheeps.theme.Gold_Subtle
 import com.example.sheeps.theme.MoYe_Surface
 import com.example.sheeps.theme.MoYe_SurfaceVariant
 import com.example.sheeps.theme.ShapeLarge
@@ -164,6 +161,8 @@ class SplashActivity : BaseActivity() {
 // --- 粒子背景（随机浮动金色光点）---
 @Composable
 fun ParticleBackground() {
+    val themePrimary = MaterialTheme.colorScheme.primary
+    val themeSecondary = MaterialTheme.colorScheme.secondary
     val infiniteTransition = rememberInfiniteTransition(label = "particles")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -199,7 +198,7 @@ fun ParticleBackground() {
             val radius = sin(phase * speed * 0.5f + 2f) * 2f + 3f
 
             drawCircle(
-                color = Gold_Primary,
+                color = themeSecondary,
                 radius = radius,
                 center = Offset(xR * w, yR * h + offsetY),
                 alpha = alpha
@@ -209,7 +208,7 @@ fun ParticleBackground() {
         // 底部红色光晕
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Crimson_Primary.copy(alpha = 0.3f), Color.Transparent),
+                colors = listOf(themePrimary.copy(alpha = 0.3f), Color.Transparent),
                 center = Offset(w * 0.5f, h * 0.75f),
                 radius = w * 0.6f
             ),
@@ -222,6 +221,8 @@ fun ParticleBackground() {
 // --- Splash 主体视觉 ---
 @Composable
 fun SplashVisuals() {
+    val themePrimary = MaterialTheme.colorScheme.primary
+    val themeSecondary = MaterialTheme.colorScheme.secondary
     val infiniteTransition = rememberInfiniteTransition(label = "splash")
     val logoScale by infiniteTransition.animateFloat(
         initialValue = 0.97f,
@@ -261,7 +262,7 @@ fun SplashVisuals() {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Gold_Primary.copy(alpha = glowAlpha * 0.3f),
+                            themeSecondary.copy(alpha = glowAlpha * 0.3f),
                             Color.Transparent
                         )
                     ),
@@ -280,7 +281,7 @@ fun SplashVisuals() {
                         val x = cx + r * cos(angle).toFloat()
                         val y = cy + r * sin(angle).toFloat()
                         drawLine(
-                            color = Gold_Primary.copy(alpha = 0.6f),
+                            color = themeSecondary.copy(alpha = 0.6f),
                             start = Offset(cx, cy),
                             end = Offset(x, y),
                             strokeWidth = 1.5f,
@@ -288,16 +289,16 @@ fun SplashVisuals() {
                         )
                     }
                     drawCircle(
-                        color = Gold_Primary.copy(alpha = 0.4f),
+                        color = themeSecondary.copy(alpha = 0.4f),
                         radius = r * 0.6f,
                         style = Stroke(width = 1.5f)
                     )
                     drawCircle(
-                        color = Gold_Primary.copy(alpha = 0.2f),
+                        color = themeSecondary.copy(alpha = 0.2f),
                         radius = r,
                         style = Stroke(width = 1f)
                     )
-                    drawCircle(color = Crimson_Primary.copy(alpha = 0.8f), radius = 8f)
+                    drawCircle(color = themePrimary.copy(alpha = 0.8f), radius = 8f)
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -306,7 +307,7 @@ fun SplashVisuals() {
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_name),
                     fontSize = 38.sp,
-                    color = Gold_Primary,
+                    color = themeSecondary,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Serif,
                     textAlign = TextAlign.Center,
@@ -342,14 +343,14 @@ fun SplashVisuals() {
                                 Brush.horizontalGradient(
                                     colors = listOf(
                                         Color.Transparent,
-                                        Gold_Subtle.copy(alpha = 0.5f)
+                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
                                     )
                                 )
                             )
                     )
                     Text(
                         text = "  ✦  ",
-                        color = Gold_Subtle,
+                        color = themeSecondary.copy(alpha = 0.6f),
                         fontSize = 12.sp
                     )
                     Box(
@@ -359,7 +360,7 @@ fun SplashVisuals() {
                             .background(
                                 Brush.horizontalGradient(
                                     colors = listOf(
-                                        Gold_Subtle.copy(alpha = 0.5f),
+                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
                                         Color.Transparent
                                     )
                                 )
@@ -441,7 +442,7 @@ fun PrivacyComposeDialog(
                 .clip(ShapeLarge)
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(Gold_Subtle.copy(alpha = 0.15f), Color.Transparent)
+                        colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), Color.Transparent)
                     )
                 )
                 .background(MoYe_Surface)
@@ -458,7 +459,7 @@ fun PrivacyComposeDialog(
                     text = "用户服务与隐私协议",
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = Crimson_Primary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )

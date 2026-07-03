@@ -59,7 +59,7 @@ fun GameResultOverlay(
                     .border(
                         width = 1.5.dp,
                         brush = Brush.linearGradient(
-                            colors = listOf(Gold_Subtle, Gold_Primary.copy(alpha = 0.5f), Gold_Subtle)
+                            colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
                         ),
                         shape = ShapeLarge
                     )
@@ -101,6 +101,7 @@ private fun WonContent(
     onNextLevel: () -> Unit,
     onShowLeaderboard: () -> Unit
 ) {
+    val themeSecondary = MaterialTheme.colorScheme.secondary
     val infiniteTransition = rememberInfiniteTransition(label = "won")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -116,7 +117,7 @@ private fun WonContent(
     Canvas(modifier = Modifier.size(80.dp)) {
         drawCircle(
             brush  = Brush.radialGradient(
-                colors = listOf(Gold_Primary.copy(alpha = glowAlpha * 0.5f), Color.Transparent)
+                colors = listOf(themeSecondary.copy(alpha = glowAlpha * 0.5f), Color.Transparent)
             ),
             radius = this.size.width * 0.5f
         )
@@ -131,7 +132,7 @@ private fun WonContent(
         text       = stringResource(id = R.string.game_won_title),
         style      = MaterialTheme.typography.displaySmall,
         fontFamily = FontFamily.Serif,
-        color      = Gold_Primary,
+        color      = MaterialTheme.colorScheme.secondary,
         modifier   = Modifier.padding(bottom = 6.dp)
     )
     Text(
@@ -147,7 +148,7 @@ private fun WonContent(
             .fillMaxWidth()
             .clip(ShapeMedium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, Gold_Subtle.copy(alpha = 0.3f), ShapeMedium)
+            .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f), ShapeMedium)
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -159,7 +160,7 @@ private fun WonContent(
             )
             AnimatedCounter(
                 count = if (state.isDoublePointsActive) state.score * 2 else state.score,
-                style = MaterialTheme.typography.displayMedium.copy(color = Gold_Primary)
+                style = MaterialTheme.typography.displayMedium.copy(color = MaterialTheme.colorScheme.secondary)
             )
         }
     }
@@ -207,7 +208,7 @@ private fun LostContent(
         text       = stringResource(id = R.string.game_lost_title),
         style      = MaterialTheme.typography.headlineLarge,
         fontFamily = FontFamily.Serif,
-        color      = Crimson_PrimaryLight,
+        color      = MaterialTheme.colorScheme.primary,
         modifier   = Modifier.padding(bottom = 6.dp)
     )
     Text(

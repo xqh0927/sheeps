@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,7 +22,6 @@ import com.example.sheeps.menu.ui.components.CoinCanvas
 import com.example.sheeps.menu.ui.components.CompassCanvas
 import com.example.sheeps.menu.ui.components.GourdCanvas
 import com.example.sheeps.menu.ui.components.StarCanvas
-import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 
@@ -32,7 +32,7 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
@@ -43,7 +43,7 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                 text = stringResource(id = R.string.guide_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 fontFamily = FontFamily.Serif
             )
         },
@@ -126,8 +126,8 @@ fun GuideSectionCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(CrimsonRed.copy(alpha = 0.08f), CircleShape)
-                    .border(0.5.dp, CrimsonRed.copy(alpha = 0.3f), CircleShape),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape)
+                    .border(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 icon()
@@ -138,7 +138,7 @@ fun GuideSectionCard(
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = CrimsonRed,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
                 )
                 Spacer(modifier = Modifier.height(4.dp))

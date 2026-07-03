@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,8 +23,6 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.ShopItemCard
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.GoldenBronze
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.lazy.LazyRow
@@ -96,14 +95,14 @@ fun ShopScreen(
                     text = stringResource(id = R.string.shop_title),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = CrimsonRed,
+                    color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
                 )
                 Text(
                     text = stringResource(id = R.string.points_balance, state.points),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = CrimsonRed
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -111,7 +110,7 @@ fun ShopScreen(
             TabRow(
                 selectedTabIndex = selectedSubTab,
                 containerColor = Color.Transparent,
-                contentColor = CrimsonRed,
+                contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 12.dp)
             ) {
                 Tab(
@@ -133,7 +132,7 @@ fun ShopScreen(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = CrimsonRed)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 if (selectedSubTab == 0) {
@@ -165,8 +164,13 @@ fun ShopScreen(
                     val traditionalSkins = displayItems.filter {
                         it.item_type == "CLASSIC" || it.item_type == "SKIN_INK" || it.item_type == "SKIN_CYBER"
                     }
+                    val animatedSkins = displayItems.filter {
+                        it.item_type == "SKIN_KEAI" || it.item_type == "SKIN_DAIMENG"
+                    }
                     val provinceSkins = displayItems.filter {
-                        it.item_type.startsWith("SKIN_") && it.item_type != "SKIN_INK" && it.item_type != "SKIN_CYBER"
+                        it.item_type.startsWith("SKIN_") && 
+                        it.item_type != "SKIN_INK" && it.item_type != "SKIN_CYBER" &&
+                        it.item_type != "SKIN_KEAI" && it.item_type != "SKIN_DAIMENG"
                     }
 
                     Column(
@@ -180,7 +184,7 @@ fun ShopScreen(
                             text = stringResource(id = R.string.shop_section_traditional),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CrimsonRed,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                         LazyRow(
@@ -203,13 +207,41 @@ fun ShopScreen(
                             }
                         }
 
-                        // 区域 2：各省份美食特色皮肤
+                        // 区域 2：灵动动画系列
+                        if (animatedSkins.isNotEmpty()) {
+                            Text(
+                                text = stringResource(id = R.string.shop_section_animated),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                lazyItems(animatedSkins) { item ->
+                                    Box(modifier = Modifier.width(160.dp)) {
+                                        val backpackCount = state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
+                                        ShopItemCard(
+                                            item = item,
+                                            backpackCount = backpackCount,
+                                            currentSkin = state.currentSkin,
+                                            onExchange = { count -> onExchangeClick(item.id, count) },
+                                            onApplySkin = { skin -> onChangeSkin(skin) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 区域 3：各省份美食特色皮肤
                         if (provinceSkins.isNotEmpty()) {
                             Text(
                                 text = stringResource(id = R.string.shop_section_provinces),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = CrimsonRed,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 8.dp)
                             )
                             LazyRow(
@@ -247,7 +279,7 @@ fun ShopScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
-                    border = BorderStroke(1.dp, GoldenBronze),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(
@@ -257,7 +289,7 @@ fun ShopScreen(
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "锁定",
-                            tint = CrimsonRed,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(48.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -265,7 +297,7 @@ fun ShopScreen(
                             text = stringResource(id = R.string.shop_vault_locked),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            color = CrimsonRed,
+                            color = MaterialTheme.colorScheme.primary,
                             fontFamily = FontFamily.Serif
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -279,7 +311,7 @@ fun ShopScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = onLoginClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(stringResource(id = R.string.shop_btn_login_sync), color = Color.White)

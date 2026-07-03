@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +44,6 @@ import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.ui.animations.GameAnimations
-import com.example.sheeps.theme.Gold_Primary
 
 /**
  * 秘境消消乐 · 卡牌组件（重构版）
@@ -120,7 +120,7 @@ fun TileView(
             .size(tileSize)
             .border(
                 width = if (isShaking) 2.dp else if (isHighlighted) 2.5.dp else 0.dp,
-                color = if (isShaking) Color.Red else if (isHighlighted) Gold_Primary.copy(alpha = borderAlpha) else Color.Transparent,
+                color = if (isShaking) Color.Red else if (isHighlighted) MaterialTheme.colorScheme.secondary.copy(alpha = borderAlpha) else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable(

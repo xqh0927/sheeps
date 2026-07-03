@@ -28,6 +28,8 @@ fun TileCardBase(
     val (bgColor, borderColor, decorColor) = when (normalizedSkin) {
         "ink" -> Triple(Color(0xFFF2EFE9), Color(0xFF333333), Color(0xFF888888)) // 水墨风格
         "cyber" -> Triple(Color(0xFF0D0D0D), Color(0xFF00F2FE), Color(0xFFFF2A6D)) // 赛博朋克风格
+        "keai" -> Triple(Color(0xFFFFF8E1), Color(0xFFFF9800), Color(0xFFFFB74D)) // 萌趣卡通：暖黄底+橙色边框
+        "daimeng" -> Triple(Color(0xFFFCE4EC), Color(0xFFE91E63), Color(0xFFF48FB1)) // 呆萌手绘：粉底+玫红边框
         "classic" -> Triple(Color(0xFFFFFDF9), Color(0xFFCBAA6A), Color(0xFFD4AF37)) // 经典中国风
         else -> Triple(Color(0xFFFFFDF9), Color(0xFFCBAA6A), Color(0xFFD4AF37)) // 默认经典色调
     }

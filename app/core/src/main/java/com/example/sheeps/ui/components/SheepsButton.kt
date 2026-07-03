@@ -33,10 +33,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Light
-import com.example.sheeps.theme.Gold_Primary
-import com.example.sheeps.theme.Gold_Subtle
 import com.example.sheeps.theme.ShapeMedium
 import com.example.sheeps.theme.ShapeSmall
 import com.example.sheeps.theme.Text_Disabled_Dark
@@ -88,7 +84,7 @@ fun PrimaryButton(
             ButtonDefaults.TextButtonContentPadding
         },
         colors = ButtonDefaults.buttonColors(
-            containerColor = Crimson_Primary, // 红色主背景
+            containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Text_OnPrimary,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor = Text_Disabled_Dark
@@ -154,12 +150,12 @@ fun SecondaryButton(
             ButtonDefaults.TextButtonContentPadding
         },
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = Gold_Primary, // 金色文字
+            contentColor = MaterialTheme.colorScheme.secondary,
             disabledContentColor = Text_Disabled_Dark
         ),
         border = BorderStroke(
             width = 1.5.dp,
-            color = if (enabled) Gold_Subtle else Text_Disabled_Dark // 根据启用状态显示边框颜色
+            color = if (enabled) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f) else Text_Disabled_Dark
         ),
         shape = ShapeMedium
     ) {
@@ -168,7 +164,7 @@ fun SecondaryButton(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
-                tint = if (enabled) Gold_Primary else Text_Disabled_Dark
+                tint = if (enabled) MaterialTheme.colorScheme.secondary else Text_Disabled_Dark
             )
             Spacer(modifier = Modifier.width(6.dp))
         }
@@ -267,8 +263,8 @@ fun ToolItemButton(
         label = "toolButtonScale"
     )
 
-    val containerColor = if (enabled) Crimson_Primary else MaterialTheme.colorScheme.surfaceVariant
-    val contentColor = if (enabled) Gold_Primary else Text_Disabled_Dark
+    val containerColor = if (enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else Text_Disabled_Dark
 
     Button(
         onClick = onClick,
@@ -308,7 +304,7 @@ fun ToolItemButton(
             Text(
                 text = "×$count",
                 fontSize = 10.sp,
-                color = if (enabled) Gold_Light else Text_Disabled_Dark
+                color = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else Text_Disabled_Dark
             )
         }
     }

@@ -19,7 +19,6 @@ import androidx.compose.ui.zIndex
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.theme.Gold_Primary
 
 /**
  * 游戏主棋盘组件

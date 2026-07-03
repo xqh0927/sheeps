@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,8 +25,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.GoldenBronze
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.hjq.toast.Toaster
 import com.example.sheeps.core.R
@@ -78,7 +77,7 @@ fun PrepareGameDialog(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
                 border = BorderStroke(
                     2.dp,
-                    Brush.linearGradient(listOf(GoldenBronze, Color(0xFFEDD9A3), GoldenBronze))
+                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondary, Color(0xFFEDD9A3), MaterialTheme.colorScheme.secondary))
                 ),
                 shape = RoundedCornerShape(20.dp)
             ) {
@@ -91,7 +90,7 @@ fun PrepareGameDialog(
                     Text(
                         text = if (isLocked) stringResource(id = R.string.prepare_title_locked) else stringResource(id = R.string.prepare_title_unlocked, levelId),
                         fontWeight = FontWeight.Bold,
-                        color = CrimsonRed,
+                        color = MaterialTheme.colorScheme.primary,
                         fontSize = 18.sp,
                         fontFamily = FontFamily.Serif,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -122,7 +121,7 @@ fun PrepareGameDialog(
                                             Toaster.show(context.getString(R.string.prepare_locked_insufficient))
                                         }
                                     },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(stringResource(id = R.string.dialog_prepare_unlock), color = Color.White)
@@ -141,7 +140,7 @@ fun PrepareGameDialog(
                             if (hasBlind) {
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0EC)),
-                                    border = BorderStroke(1.dp, CrimsonRed.copy(alpha = 0.4f)),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 ) {
                                     Row(
@@ -150,7 +149,7 @@ fun PrepareGameDialog(
                                     ) {
                                         Text(
                                             text = "⚠️ 秘境深处迷雾重重！本关已启用「盲盒牌」，卡牌下方图案不可见，难度大幅提升！",
-                                            color = CrimsonRed,
+                                            color = MaterialTheme.colorScheme.primary,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             lineHeight = 15.sp
@@ -193,7 +192,7 @@ fun PrepareGameDialog(
                                                     .background(Color(0xFFFCFAF6), RoundedCornerShape(12.dp))
                                                     .border(
                                                         1.dp,
-                                                        if (selected > 0) CrimsonRed.copy(alpha = 0.5f) else Color(0xFFE5DDD3),
+                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color(0xFFE5DDD3),
                                                         RoundedCornerShape(12.dp)
                                                     )
                                                     .padding(vertical = 8.dp, horizontal = 4.dp),
@@ -237,7 +236,7 @@ fun PrepareGameDialog(
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowDown,
                                                             contentDescription = stringResource(id = R.string.prepare_desc_decrease),
-                                                            tint = if (selected > 0) CrimsonRed else Color.Gray,
+                                                            tint = if (selected > 0) MaterialTheme.colorScheme.primary else Color.Gray,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -257,7 +256,7 @@ fun PrepareGameDialog(
                                                             ),
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = if (selected > 0) CrimsonRed else Color.DarkGray
+                                                        color = if (selected > 0) MaterialTheme.colorScheme.primary else Color.DarkGray
                                                     )
 
                                                     val canIncrease = selected < stock && (selected > 0 || selectedTypesCount < 5)
@@ -272,7 +271,7 @@ fun PrepareGameDialog(
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowUp,
                                                             contentDescription = stringResource(id = R.string.prepare_desc_increase),
-                                                            tint = if (canIncrease) CrimsonRed else Color.Gray,
+                                                            tint = if (canIncrease) MaterialTheme.colorScheme.primary else Color.Gray,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -301,7 +300,7 @@ fun PrepareGameDialog(
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Button(
                                     onClick = { onConfirm(levelId) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(

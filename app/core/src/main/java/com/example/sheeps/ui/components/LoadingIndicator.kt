@@ -59,9 +59,10 @@ fun SheepsLoading(
         label = "innerLoadingRotation"
     )
 
-    val primaryColor = Crimson_Primary
-    val accentColor  = Gold_Primary
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val accentColor  = MaterialTheme.colorScheme.secondary
     val bgColor      = MaterialTheme.colorScheme.surfaceContainer
+    val innerColor   = MaterialTheme.colorScheme.onPrimaryContainer
 
     Canvas(
         modifier = modifier
@@ -98,7 +99,7 @@ fun SheepsLoading(
         val innerRadius = radius * 0.5f
         rotate(degrees = innerRotation, pivot = Offset(cx, cy)) {
             drawArc(
-                color      = Gold_Light,
+                color      = innerColor,
                 startAngle = 0f,
                 sweepAngle = 120f,
                 useCenter  = false,
@@ -165,7 +166,7 @@ fun ShimmerBox(
     val shimmerColors = listOf(
         MaterialTheme.colorScheme.surfaceVariant,
         MaterialTheme.colorScheme.surfaceContainer,
-        Gold_Primary.copy(alpha = 0.06f),
+        MaterialTheme.colorScheme.secondary.copy(alpha = 0.06f),
         MaterialTheme.colorScheme.surfaceContainer,
         MaterialTheme.colorScheme.surfaceVariant
     )

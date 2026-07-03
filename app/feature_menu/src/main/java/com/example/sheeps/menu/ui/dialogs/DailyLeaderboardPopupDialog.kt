@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.data.model.DailyPopupResponse
-import com.example.sheeps.theme.CrimsonRed
 
 @Composable
 fun DailyLeaderboardPopupDialog(
@@ -29,7 +29,7 @@ fun DailyLeaderboardPopupDialog(
         confirmButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
@@ -40,7 +40,7 @@ fun DailyLeaderboardPopupDialog(
                 text = stringResource(id = R.string.daily_leaderboard_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 fontFamily = FontFamily.Serif
             )
         },
@@ -82,8 +82,8 @@ fun DailyLeaderboardPopupDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(CrimsonRed.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                        .border(0.5.dp, CrimsonRed.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                        .border(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -95,7 +95,7 @@ fun DailyLeaderboardPopupDialog(
                         },
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = CrimsonRed
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }

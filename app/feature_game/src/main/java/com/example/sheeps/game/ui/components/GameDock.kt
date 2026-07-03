@@ -20,9 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Primary
-import com.example.sheeps.theme.Gold_Subtle
 
 /**
  * 游戏底部托盘/消除槽组件
@@ -78,7 +75,7 @@ private fun MovedOutTray(
         Text(
             text  = "— 置物架 —",
             style = MaterialTheme.typography.labelSmall,
-            color = Gold_Primary.copy(alpha = 0.7f)
+            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
         )
         Spacer(Modifier.height(4.dp))
         Row(
@@ -86,7 +83,7 @@ private fun MovedOutTray(
             modifier = Modifier
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
-                .border(1.dp, Gold_Subtle.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                 .padding(8.dp)
         ) {
             tiles.forEach { tile ->
@@ -134,7 +131,7 @@ private fun MatchingSlot(
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .border(
                 width = 1.dp,
-                color = Crimson_Primary.copy(alpha = slotBorderAlpha),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = slotBorderAlpha),
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(8.dp)

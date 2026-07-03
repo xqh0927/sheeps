@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,7 +16,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.theme.Gold_Primary
 
 // =============================================================================
 // 秘境消消乐 · 设计系统 - 数字滚动动画组件
@@ -33,7 +33,7 @@ fun AnimatedCounter(
     style: TextStyle = LocalTextStyle.current.copy(
         fontWeight = FontWeight.Bold,
         fontSize   = 22.sp,
-        color      = Gold_Primary
+        color      = MaterialTheme.colorScheme.secondary
     )
 ) {
     AnimatedContent(
@@ -70,12 +70,12 @@ fun PointsDisplay(
     numberStyle: TextStyle = LocalTextStyle.current.copy(
         fontWeight = FontWeight.Bold,
         fontSize   = 28.sp,
-        color      = Gold_Primary
+        color      = MaterialTheme.colorScheme.secondary
     ),
     unitStyle: TextStyle = LocalTextStyle.current.copy(
         fontWeight = FontWeight.Medium,
         fontSize   = 14.sp,
-        color      = Gold_Primary.copy(alpha = 0.7f)
+        color      = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
     )
 ) {
     Row(

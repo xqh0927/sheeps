@@ -3,7 +3,9 @@ package com.example.sheeps.menu.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,7 +21,6 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.theme.AppTheme
-import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.theme.ThemeManager
 
 /**
@@ -44,7 +45,7 @@ fun LanguageSettingsCard(
                 text = stringResource(id = R.string.language_settings),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 12.dp),
                 fontFamily = FontFamily.Serif
             )
@@ -94,33 +95,35 @@ fun ThemeSettingsCard(
                 text = stringResource(id = R.string.theme_settings_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 12.dp),
                 fontFamily = FontFamily.Serif
             )
             
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 val currentTheme = ThemeManager.currentTheme.collectAsState().value
                 val themes = listOf(
+                    AppTheme.FOREST to "🌿 森林绿",
                     AppTheme.QING_RI_CHUN to stringResource(id = R.string.theme_light),
                     AppTheme.MO_YE_GOLD to stringResource(id = R.string.theme_gold),
-                    AppTheme.DARK_MODE to stringResource(id = R.string.theme_dark)
+                    AppTheme.SAKURA to "🌸 樱花粉",
+                    AppTheme.COSMIC to "🌌 星空蓝",
+                    AppTheme.SUNSET to "🌅 暖阳橙"
                 )
-                
                 themes.forEach { (theme, name) ->
                     ThemeOption(
-                        name = name,
-                        isSelected = currentTheme == theme,
+                        name = name, isSelected = currentTheme == theme,
                         onClick = {
                             if (currentTheme != theme) {
-                                ThemeManager.setTheme(theme)
-                                onThemeChange()
+                                ThemeManager.setTheme(theme); onThemeChange()
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.widthIn(min = 80.dp)
                     )
                 }
             }
@@ -138,7 +141,7 @@ private fun LanguageOption(
     Box(
         modifier = modifier
             .background(
-                color = if (isSelected) CrimsonRed else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(6.dp)
             )
             .clickable(onClick = onClick)
@@ -164,7 +167,7 @@ private fun ThemeOption(
     Box(
         modifier = modifier
             .background(
-                color = if (isSelected) CrimsonRed else MaterialTheme.colorScheme.surfaceVariant,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(6.dp)
             )
             .clickable(onClick = onClick)

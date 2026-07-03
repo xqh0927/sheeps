@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,7 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.theme.Text_Secondary_Dark
 
 import androidx.compose.ui.res.stringResource
@@ -56,7 +56,7 @@ fun GameHeader(
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = stringResource(id = R.string.btn_back),
-                    tint = Gold_Primary
+                    tint = MaterialTheme.colorScheme.secondary
                 )
             }
 
@@ -65,7 +65,7 @@ fun GameHeader(
                 text = stringResource(id = R.string.prepare_title_unlocked, currentLevelId),
                 style = MaterialTheme.typography.titleLarge,
                 fontFamily = FontFamily.Serif,
-                color = Gold_Primary,
+                color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center
             )

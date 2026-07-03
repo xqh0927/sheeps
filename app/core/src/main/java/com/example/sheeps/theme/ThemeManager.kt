@@ -14,13 +14,16 @@ import kotlinx.coroutines.flow.asStateFlow
  * 应用支持的主题枚举
  */
 enum class AppTheme(val key: String, val displayName: String) {
-    MO_YE_GOLD("mo_ye_gold", "墨夜金"),    // 暗色，墨夜底色+帝王金
-    QING_RI_CHUN("qing_ri_chun", "清日春（默认）"),           // 浅色，宣纸白+朱砂
-    DARK_MODE("dark_mode", "暗黑模式");               // 纯暗色
+    FOREST("forest", "🌿 森林绿（默认）"),                   // 淡绿基调，治愈自然
+    QING_RI_CHUN("qing_ri_chun", "清日春"),                 // 浅色，宣纸白+朱砂
+    MO_YE_GOLD("mo_ye_gold", "墨夜金"),                     // 暗色，墨夜底色+帝王金
+    SAKURA("sakura", "🌸 樱花粉"),                          // 粉白基调，甜美女性向
+    COSMIC("cosmic", "🌌 星空蓝"),                           // 淡蓝紫基调，优雅神秘
+    SUNSET("sunset", "🌅 暖阳橙");                           // 暖黄基调，温暖活力
 
     companion object {
         fun fromKey(key: String): AppTheme =
-            values().find { it.key == key } ?: QING_RI_CHUN
+            values().find { it.key == key } ?: FOREST
     }
 }
 
@@ -31,13 +34,13 @@ enum class AppTheme(val key: String, val displayName: String) {
 object ThemeManager {
     private const val THEME_KEY = "app_current_theme"
 
-    private val _currentTheme = MutableStateFlow(AppTheme.QING_RI_CHUN)
+    private val _currentTheme = MutableStateFlow(AppTheme.FOREST)
     val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
 
     /** 在 App 启动时调用，从 MMKV 读取上次保存的主题 */
     fun init() {
         val kv = MMKV.defaultMMKV()
-        val savedKey = kv.decodeString(THEME_KEY, AppTheme.QING_RI_CHUN.key) ?: AppTheme.QING_RI_CHUN.key
+        val savedKey = kv.decodeString(THEME_KEY, AppTheme.FOREST.key) ?: AppTheme.FOREST.key
         _currentTheme.value = AppTheme.fromKey(savedKey)
     }
 
@@ -54,13 +57,16 @@ object ThemeManager {
     /** 获取 XML 主题的 Style 资源 ID */
     fun getThemeResId(theme: AppTheme = _currentTheme.value): Int {
         return when (theme) {
-            AppTheme.MO_YE_GOLD -> com.example.sheeps.core.R.style.Theme_Sheeps_MoYeGold
+            AppTheme.MO_YE_GOLD   -> com.example.sheeps.core.R.style.Theme_Sheeps_MoYeGold
             AppTheme.QING_RI_CHUN -> com.example.sheeps.core.R.style.Theme_Sheeps_QingRiChun
-            AppTheme.DARK_MODE -> com.example.sheeps.core.R.style.Theme_Sheeps_DarkMode
+            AppTheme.SAKURA       -> com.example.sheeps.core.R.style.Theme_Sheeps_Sakura
+            AppTheme.COSMIC       -> com.example.sheeps.core.R.style.Theme_Sheeps_Cosmic
+            AppTheme.SUNSET       -> com.example.sheeps.core.R.style.Theme_Sheeps_Sunset
+            AppTheme.FOREST       -> com.example.sheeps.core.R.style.Theme_Sheeps_Forest
         }
     }
 
     /** 是否为暗色主题 */
     fun isDarkTheme(theme: AppTheme = _currentTheme.value): Boolean =
-        theme == AppTheme.MO_YE_GOLD || theme == AppTheme.DARK_MODE
+        theme == AppTheme.MO_YE_GOLD
 }

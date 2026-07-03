@@ -252,10 +252,11 @@ private fun FlyingTilesLayer(
  */
 @Composable
 private fun GameBackgroundDecoration() {
+    val glowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
     Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(com.example.sheeps.theme.Crimson_Primary.copy(alpha = 0.12f), Color.Transparent),
+                colors = listOf(glowColor, Color.Transparent),
                 center = Offset(this.size.width * 0.5f, 0f),
                 radius = this.size.width * 0.7f
             ),

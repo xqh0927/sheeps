@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -11,7 +12,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
 
 /**
  * 个人中心底部操作按钮区域
@@ -34,20 +34,20 @@ fun ActionButtonsSection(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(
             onClick = onShowPointHistory,
-            border = BorderStroke(0.5.dp, CrimsonRed),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
         ) {
             Text(stringResource(id = R.string.btn_view_points_log))
         }
 
         OutlinedButton(
             onClick = onShowExchangeHistory,
-            border = BorderStroke(0.5.dp, CrimsonRed),
+            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = CrimsonRed)
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
         ) {
             Text(stringResource(id = R.string.btn_view_exchange_log))
         }
@@ -56,7 +56,7 @@ fun ActionButtonsSection(
 
         Button(
             onClick = onLogoutClick,
-            colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp)
         ) {

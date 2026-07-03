@@ -80,7 +80,7 @@ fun SheepsDialog(
                         .clip(ShapeLarge)
                         .background(
                             androidx.compose.ui.graphics.Brush.linearGradient(
-                                colors = listOf(Gold_Subtle, Gold_Primary.copy(alpha = 0.4f), Gold_Subtle)
+                                colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
                             )
                         )
                 )
@@ -102,7 +102,7 @@ fun SheepsDialog(
                         style      = MaterialTheme.typography.headlineSmall,
                         fontFamily = FontFamily.Serif,
                         fontWeight = FontWeight.Bold,
-                        color      = Crimson_Primary,
+                        color      = MaterialTheme.colorScheme.primary,
                         modifier   = Modifier.padding(bottom = 16.dp)
                     )
 

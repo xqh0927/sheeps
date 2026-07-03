@@ -57,6 +57,7 @@
     <string name="shop_vault_locked">金庫封鎖</string>
     <string name="shop_section_traditional">專屬特製卡牌主題</string>
     <string name="shop_section_provinces">華夏省味美食系列 (省份皮膚)</string>
+    <string name="shop_section_animated">靈動動畫系列 (自帶動畫效果)</string>
 
     <string name="task_play_3">小試牛刀</string>
     <string name="task_play_5">大顯身手</string>
@@ -214,7 +215,7 @@
     <string name="guide_sec5_desc">在天命對決模式中，每次熔煉消除卡牌將充盈能量（上限 10 點）。\n迷霧咒（消耗 3 能量）：令對手戰場黑霧彌漫，需點擊探照驅散（持續 6 秒）。\n鎖槽咒（消耗 6 能量）：封鎖對手消除槽至 6 格（持續 8 秒），槽滿立即判負。\n封印咒（消耗 10 能量）：瞬間給對手所有當前可點擊的暴露牌附加封印。</string>
 
     <string name="backpack_magic_section">法寶神器</string>
-    <string name="backpack_skins_section">主題皮膚</string>
+    <string name="backpack_skins_section">卡牌皮膚</string>
     <string name="prepare_title_locked">關卡結界未解</string>
     <string name="prepare_title_unlocked">整裝破局 (第 %1$d 關)</string>
     <string name="update_discovered">發現新版本 %1$s</string>
@@ -267,6 +268,10 @@
     <string name="item_skin_henan_desc">解鎖河南省特色美食圖標皮膚</string>
     <string name="item_skin_sichuan">四川·省味皮膚</string>
     <string name="item_skin_sichuan_desc">解鎖四川省特色美食圖標皮膚</string>
+    <string name="item_skin_keai">萌趣卡通皮膚</string>
+    <string name="item_skin_keai_desc">包含彈跳、旋轉、閃光等多種靈動效果的動畫卡牌皮膚</string>
+    <string name="item_skin_daimeng">呆萌手繪皮膚</string>
+    <string name="item_skin_daimeng_desc">俏皮可愛手繪風格，柔美色彩搭配溫暖動畫效果</string>
 
     <string name="leaderboard_data_error">數據獲取失敗</string>
     <string name="leaderboard_load_error">加載失敗，請檢查網絡</string>

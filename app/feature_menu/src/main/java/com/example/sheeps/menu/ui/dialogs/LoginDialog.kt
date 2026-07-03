@@ -3,6 +3,7 @@ package com.example.sheeps.menu.ui.dialogs
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -10,7 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.theme.CrimsonRed
 import com.hjq.toast.Toaster
 import kotlinx.coroutines.delay
 import com.example.sheeps.core.R
@@ -42,7 +42,7 @@ fun LoginDialog(
             Text(
                 text = stringResource(id = R.string.btn_login),
                 fontWeight = FontWeight.Bold,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 fontFamily = FontFamily.Serif
             )
         },
@@ -78,7 +78,7 @@ fun LoginDialog(
                             }
                         },
                         enabled = countdown == 0,
-                        colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.height(48.dp)
                     ) {
@@ -93,7 +93,7 @@ fun LoginDialog(
         confirmButton = {
             Button(
                 onClick = { onLogin(phone, code) },
-                colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text(stringResource(id = R.string.dialog_login_btn), color = Color.White)
             }

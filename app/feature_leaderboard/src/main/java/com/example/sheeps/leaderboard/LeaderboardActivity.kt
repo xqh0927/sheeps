@@ -54,9 +54,6 @@ import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.network.ApiService
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.GoldenBronze
-import com.example.sheeps.theme.ImperialYellow
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
@@ -141,7 +138,7 @@ class LeaderboardActivity : BaseActivity() {
                                     .fillMaxWidth(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator(color = CrimsonRed)
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             }
                         } else {
                             if (rankings.isEmpty()) {
@@ -194,7 +191,7 @@ fun LeaderboardAppBar(
             Text(
                 text = stringResource(id = R.string.leaderboard_title_format, levelId),
                 fontWeight = FontWeight.Bold,
-                color = CrimsonRed,
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 20.sp
             )
         },
@@ -203,7 +200,7 @@ fun LeaderboardAppBar(
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = stringResource(id = R.string.btn_back),
-                    tint = CrimsonRed
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         },
@@ -239,10 +236,10 @@ fun LeaderboardTabs(
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) CrimsonRed else Color.Transparent)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .border(
                         width = if (isSelected) 1.dp else 0.dp,
-                        color = if (isSelected) GoldenBronze else Color.Transparent,
+                        color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .clickable { onTabSelected(tabKey) }
@@ -251,7 +248,7 @@ fun LeaderboardTabs(
             ) {
                 Text(
                     text = tabLabel,
-                    color = if (isSelected) ImperialYellow else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
@@ -275,13 +272,13 @@ fun RankingRow(
 
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (isCurrentUser) CrimsonRed.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+        color = if (isCurrentUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         modifier = Modifier
             .fillMaxWidth()
             .border(
                 width = if (isCurrentUser) 1.dp else 0.dp,
-                color = if (isCurrentUser) CrimsonRed else Color.Transparent,
+                color = if (isCurrentUser) MaterialTheme.colorScheme.primary else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
     ) {
@@ -302,7 +299,7 @@ fun RankingRow(
             ) {
                 Text(
                     text = (index + 1).toString(),
-                    color = if (index < 3) CrimsonRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (index < 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
@@ -315,7 +312,7 @@ fun RankingRow(
                     text = entry.username,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isCurrentUser) CrimsonRed else MaterialTheme.colorScheme.onSurface
+                    color = if (isCurrentUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = stringResource(
@@ -329,12 +326,12 @@ fun RankingRow(
 
             Box(
                 modifier = Modifier
-                    .border(1.dp, CrimsonRed.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = stringResource(id = R.string.leaderboard_score_format, entry.score),
-                    color = CrimsonRed,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )

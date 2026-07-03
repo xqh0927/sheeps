@@ -25,7 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
-import com.example.sheeps.theme.*
+import com.example.sheeps.theme.ShapeLarge
+import com.example.sheeps.theme.ShapeMedium
+import com.example.sheeps.theme.ShapeSmall
+import com.example.sheeps.theme.Text_Disabled_Dark
 
 @Composable
 fun LevelItemRow(
@@ -67,9 +70,9 @@ fun LevelItemRow(
                 brush = if (isUnlocked) {
                     Brush.linearGradient(
                         colors = listOf(
-                            Gold_Subtle.copy(alpha = 0.5f),
-                            Gold_Primary.copy(alpha = 0.25f),
-                            Gold_Subtle.copy(alpha = 0.5f)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
                         )
                     )
                 } else {
@@ -91,14 +94,12 @@ fun LevelItemRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // 左侧：关卡编号 + 难度
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                // 关卡编号圆标
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (isUnlocked) Crimson_PrimaryContainer.copy(alpha = 0.5f)
+                            if (isUnlocked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                             else MaterialTheme.colorScheme.surfaceContainer,
                             shape = ShapeMedium
                         ),
@@ -110,7 +111,7 @@ fun LevelItemRow(
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
                             fontSize   = 18.sp,
-                            color      = Gold_Primary
+                            color      = MaterialTheme.colorScheme.secondary
                         )
                     } else {
                         Icon(
@@ -129,7 +130,7 @@ fun LevelItemRow(
                         text       = stringResource(id = R.string.level_number, levelId),
                         style      = MaterialTheme.typography.titleMedium,
                         fontFamily = FontFamily.Serif,
-                        color      = if (isUnlocked) Text_Primary_Dark else Text_Disabled_Dark
+                        color      = if (isUnlocked) MaterialTheme.colorScheme.onBackground else Text_Disabled_Dark
                     )
                     Text(
                         text  = when (levelId) {
@@ -139,46 +140,41 @@ fun LevelItemRow(
                             else -> stringResource(id = R.string.level_desc_other)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isUnlocked) Text_Secondary_Dark else Text_Disabled_Dark.copy(alpha = 0.6f)
+                        color = if (isUnlocked) MaterialTheme.colorScheme.onSurfaceVariant else Text_Disabled_Dark.copy(alpha = 0.6f)
                     )
                 }
             }
 
             Spacer(Modifier.width(8.dp))
 
-            // 右侧：排行榜按钮 + 状态指示 (未解锁时不显示任何按钮或重合文字)
             if (isUnlocked) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // 榜单按钮
                     IconButton(
                         onClick = onShowLeaderboard,
                         modifier = Modifier
                             .size(36.dp)
                             .background(
-                                color = Crimson_Primary.copy(alpha = 0.1f),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                 shape = CircleShape
                             )
                             .border(
                                 0.5.dp,
-                                Gold_Primary.copy(alpha = 0.5f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
                                 CircleShape
                             )
                     ) {
-                        Text(
-                            text = "🏆",
-                            fontSize = 14.sp
-                        )
+                        Text(text = "🏆", fontSize = 14.sp)
                     }
 
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(ShapeSmall)
-                            .background(Crimson_Primary.copy(alpha = 0.15f))
-                            .border(0.5.dp, Crimson_Primary.copy(alpha = 0.3f), ShapeSmall)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                            .border(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), ShapeSmall)
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Text(
@@ -186,13 +182,13 @@ fun LevelItemRow(
                             fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.SemiBold,
                             fontSize   = 13.sp,
-                            color      = Gold_Primary
+                            color      = MaterialTheme.colorScheme.secondary
                         )
                         Spacer(Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
                             contentDescription = null,
-                            tint = Gold_Primary,
+                            tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(16.dp)
                         )
                     }

@@ -60,6 +60,7 @@
     <string name="shop_vault_locked">Vault Locked</string>
     <string name="shop_section_traditional">Special Card Themes</string>
     <string name="shop_section_provinces">China Province Gourmet Series</string>
+    <string name="shop_section_animated">Animation Series (smooth animated effects)</string>
     
     <string name="task_play_3">First Steps</string>
     <string name="task_play_5">Master Show</string>
@@ -217,7 +218,7 @@
     <string name="guide_sec5_desc">In Destiny Duel, matches charge up your energy (max 10 points).\nMist spell (3 energy): Blinds opponent with black fog. They must tap to search (lasts 6s).\nSlot Lock (6 energy): Locks opponent\'s tray to 6 slots (lasts 8s).\nSeal spell (10 energy): Instantly applies a seal lock to all opponent\'s selectable cards.</string>
 
     <string name="backpack_magic_section">Magic Items</string>
-    <string name="backpack_skins_section">Skins</string>
+    <string name="backpack_skins_section">Card Skin</string>
     <string name="prepare_title_locked">Level Sealed</string>
     <string name="prepare_title_unlocked">Prepare for Level %1$d</string>
     <string name="update_discovered">New version %1$s</string>
@@ -267,6 +268,10 @@
     <string name="item_skin_henan_desc">Unlock Henan local gourmet icon skin</string>
     <string name="item_skin_sichuan">Sichuan Gourmet Skin</string>
     <string name="item_skin_sichuan_desc">Unlock Sichuan local gourmet icon skin</string>
+    <string name="item_skin_keai">Cute Cartoon Skin</string>
+    <string name="item_skin_keai_desc">Animated card skin with bouncy, spin &amp; sparkle effects</string>
+    <string name="item_skin_daimeng">Doodle Sketch Skin</string>
+    <string name="item_skin_daimeng_desc">Playful hand-drawn style with soft colors &amp; warm animation</string>
 
     <string name="leaderboard_data_error">Data fetch failed</string>
     <string name="leaderboard_load_error">Load failed, please check network</string>

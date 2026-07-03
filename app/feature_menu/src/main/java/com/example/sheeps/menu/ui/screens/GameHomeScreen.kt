@@ -77,7 +77,7 @@ fun GameHomeScreen(
                     .height(1.dp)
                     .background(
                         Brush.horizontalGradient(
-                            colors = listOf(Color.Transparent, Gold_Subtle.copy(alpha = 0.4f))
+                            colors = listOf(Color.Transparent, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f))
                         )
                     )
             )
@@ -85,7 +85,7 @@ fun GameHomeScreen(
                 text = stringResource(id = R.string.home_section_title),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Gold_Primary.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f),
                 fontFamily = FontFamily.Serif
             )
             Box(
@@ -94,7 +94,7 @@ fun GameHomeScreen(
                     .height(1.dp)
                     .background(
                         Brush.horizontalGradient(
-                            colors = listOf(Gold_Subtle.copy(alpha = 0.4f), Color.Transparent)
+                            colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), Color.Transparent)
                         )
                     )
             )
@@ -129,7 +129,7 @@ fun GameHomeScreen(
         Card(
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, CrimsonRed.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
@@ -146,19 +146,20 @@ fun GameHomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 太极小图标
+                val tp = MaterialTheme.colorScheme.primary
                 Canvas(modifier = Modifier.size(36.dp)) {
                     val r = size.width / 2f
                     val centerOffset = center
                     drawCircle(color = Color.White, radius = r, center = centerOffset)
                     drawArc(
-                        color = CrimsonRed,
+                        color = tp,
                         startAngle = -90f,
                         sweepAngle = 180f,
                         useCenter = true,
                         size = size
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = tp,
                         radius = r / 2f,
                         center = Offset(centerOffset.x, centerOffset.y - r / 2f)
                     )
@@ -173,12 +174,12 @@ fun GameHomeScreen(
                         center = Offset(centerOffset.x, centerOffset.y - r / 2f)
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = tp,
                         radius = r * 0.15f,
                         center = Offset(centerOffset.x, centerOffset.y + r / 2f)
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = tp,
                         radius = r,
                         center = centerOffset,
                         style = Stroke(width = 2.dp.toPx())
@@ -190,7 +191,7 @@ fun GameHomeScreen(
                         text = stringResource(id = R.string.home_match_title),
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp,
-                        color = CrimsonRed,
+                        color = MaterialTheme.colorScheme.primary,
                         fontFamily = FontFamily.Serif
                     )
                     Text(
@@ -202,7 +203,7 @@ fun GameHomeScreen(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
-                    tint = CrimsonRed.copy(alpha = 0.6f)
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                 )
             }
         }
@@ -267,9 +268,9 @@ fun GameHomeScreen(
                     Card(
                         shape = RoundedCornerShape(10.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Gold_Subtle.copy(alpha = 0.15f)
+                            containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
                         ),
-                        border = BorderStroke(1.dp, Gold_Primary.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 16.dp)
@@ -287,7 +288,7 @@ fun GameHomeScreen(
                                 text = stringResource(id = R.string.home_levels_unlocked_btn),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
-                                color = Gold_Primary,
+                                color = MaterialTheme.colorScheme.secondary,
                                 fontFamily = FontFamily.Serif
                             )
                         }
@@ -310,8 +311,8 @@ fun GameHomeScreen(
                     .align(Alignment.BottomEnd)
                     .padding(bottom = 24.dp, end = 8.dp)
                     .size(44.dp),
-                containerColor = CrimsonRed,
-                contentColor = ImperialYellow,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.secondary,
                 shape = CircleShape,
                 elevation = FloatingActionButtonDefaults.elevation(4.dp)
             ) {

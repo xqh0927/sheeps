@@ -70,30 +70,116 @@ private val QingRiChunColorScheme = lightColorScheme(
     scrim               = Overlay_Dark_Heavy
 )
 
-// --- 主题三：暗黑模式（深邃纯黑）---
-private val DarkModeColorScheme = darkColorScheme(
-    primary             = Crimson_PrimaryLight,
+// --- 主题四：🌸 樱花粉（女性向甜美）---
+private val SakuraColorScheme = lightColorScheme(
+    primary             = Sakura_Primary,
     onPrimary           = Text_OnPrimary,
-    primaryContainer    = Crimson_PrimaryDark,
-    onPrimaryContainer  = Crimson_PrimaryLight,
-    secondary           = Gold_Primary,
-    onSecondary         = Text_Primary_Light,
-    secondaryContainer  = Color(0xFF2A1E00),
-    onSecondaryContainer = Gold_Light,
+    primaryContainer    = Sakura_SurfaceVariant,
+    onPrimaryContainer  = Sakura_PrimaryDark,
+    secondary           = Sakura_PrimaryLight,
+    onSecondary         = Text_OnPrimary,
+    secondaryContainer  = Sakura_SurfaceContainer,
+    onSecondaryContainer = Sakura_PrimaryDark,
     tertiary            = Jade_Success,
-    onTertiary          = Text_Primary_Dark,
-    background          = Color(0xFF080B10),
-    onBackground        = Text_Primary_Dark,
-    surface             = Color(0xFF0E1219),
-    onSurface           = Text_Primary_Dark,
-    surfaceVariant      = Color(0xFF161C28),
-    onSurfaceVariant    = Text_Secondary_Dark,
-    surfaceContainer    = Color(0xFF1A2030),
-    outline             = Color(0xFF2E3650),
-    outlineVariant      = Color(0xFF212840),
+    onTertiary          = Text_OnPrimary,
+    tertiaryContainer   = Color(0xFFD0F5E0),
+    onTertiaryContainer = Color(0xFF003918),
+    background          = Sakura_Background,
+    onBackground        = Text_Primary_Light,
+    surface             = Sakura_Surface,
+    onSurface           = Text_Primary_Light,
+    surfaceVariant      = Sakura_SurfaceVariant,
+    onSurfaceVariant    = Sakura_Primary,
+    surfaceContainer    = Sakura_SurfaceContainer,
+    outline             = Sakura_Outline,
+    outlineVariant      = Sakura_OutlineVariant,
     error               = Vermilion_Error,
-    onError             = Text_Primary_Dark,
-    scrim               = Color(0xE6000000)
+    onError             = Text_OnPrimary,
+    scrim               = Overlay_Dark_Heavy
+)
+
+// --- 主题五：🌌 星空蓝（优雅神秘）---
+private val CosmicColorScheme = lightColorScheme(
+    primary             = Cosmic_Primary,
+    onPrimary           = Text_OnPrimary,
+    primaryContainer    = Cosmic_SurfaceVariant,
+    onPrimaryContainer  = Cosmic_PrimaryDark,
+    secondary           = Cosmic_PrimaryLight,
+    onSecondary         = Text_OnPrimary,
+    secondaryContainer  = Cosmic_SurfaceContainer,
+    onSecondaryContainer = Cosmic_PrimaryDark,
+    tertiary            = Jade_Success,
+    onTertiary          = Text_OnPrimary,
+    tertiaryContainer   = Color(0xFFD0F5E0),
+    onTertiaryContainer = Color(0xFF003918),
+    background          = Cosmic_Background,
+    onBackground        = Text_Primary_Light,
+    surface             = Cosmic_Surface,
+    onSurface           = Text_Primary_Light,
+    surfaceVariant      = Cosmic_SurfaceVariant,
+    onSurfaceVariant    = Cosmic_Primary,
+    surfaceContainer    = Cosmic_SurfaceContainer,
+    outline             = Cosmic_Outline,
+    outlineVariant      = Cosmic_OutlineVariant,
+    error               = Vermilion_Error,
+    onError             = Text_OnPrimary,
+    scrim               = Overlay_Dark_Heavy
+)
+
+// --- 主题六：🌅 暖阳橙（温暖活力）---
+private val SunsetColorScheme = lightColorScheme(
+    primary             = Sunset_Primary,
+    onPrimary           = Text_OnPrimary,
+    primaryContainer    = Sunset_SurfaceVariant,
+    onPrimaryContainer  = Sunset_PrimaryDark,
+    secondary           = Sunset_PrimaryLight,
+    onSecondary         = Text_OnPrimary,
+    secondaryContainer  = Sunset_SurfaceContainer,
+    onSecondaryContainer = Sunset_PrimaryDark,
+    tertiary            = Jade_Success,
+    onTertiary          = Text_OnPrimary,
+    tertiaryContainer   = Color(0xFFFFF3E0),
+    onTertiaryContainer = Color(0xFF003918),
+    background          = Sunset_Background,
+    onBackground        = Text_Primary_Light,
+    surface             = Sunset_Surface,
+    onSurface           = Text_Primary_Light,
+    surfaceVariant      = Sunset_SurfaceVariant,
+    onSurfaceVariant    = Sunset_Primary,
+    surfaceContainer    = Sunset_SurfaceContainer,
+    outline             = Sunset_Outline,
+    outlineVariant      = Sunset_OutlineVariant,
+    error               = Vermilion_Error,
+    onError             = Text_OnPrimary,
+    scrim               = Overlay_Dark_Heavy
+)
+
+// --- 主题七：🌿 森林绿（治愈自然）---
+private val ForestColorScheme = lightColorScheme(
+    primary             = Forest_Primary,
+    onPrimary           = Text_OnPrimary,
+    primaryContainer    = Forest_SurfaceVariant,
+    onPrimaryContainer  = Forest_PrimaryDark,
+    secondary           = Forest_PrimaryLight,
+    onSecondary         = Text_OnPrimary,
+    secondaryContainer  = Forest_SurfaceContainer,
+    onSecondaryContainer = Forest_PrimaryDark,
+    tertiary            = Jade_Success,
+    onTertiary          = Text_OnPrimary,
+    tertiaryContainer   = Color(0xFFD0F5E0),
+    onTertiaryContainer = Color(0xFF003918),
+    background          = Forest_Background,
+    onBackground        = Text_Primary_Light,
+    surface             = Forest_Surface,
+    onSurface           = Text_Primary_Light,
+    surfaceVariant      = Forest_SurfaceVariant,
+    onSurfaceVariant    = Forest_Primary,
+    surfaceContainer    = Forest_SurfaceContainer,
+    outline             = Forest_Outline,
+    outlineVariant      = Forest_OutlineVariant,
+    error               = Vermilion_Error,
+    onError             = Text_OnPrimary,
+    scrim               = Overlay_Dark_Heavy
 )
 
 // =============================================================================
@@ -111,7 +197,10 @@ fun SheepsTheme(
     val colorScheme = when (activeTheme) {
         AppTheme.MO_YE_GOLD    -> MoYeGoldColorScheme
         AppTheme.QING_RI_CHUN  -> QingRiChunColorScheme
-        AppTheme.DARK_MODE     -> DarkModeColorScheme
+        AppTheme.SAKURA        -> SakuraColorScheme
+        AppTheme.COSMIC        -> CosmicColorScheme
+        AppTheme.SUNSET        -> SunsetColorScheme
+        AppTheme.FOREST        -> ForestColorScheme
     }
 
     MaterialTheme(

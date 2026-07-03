@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,8 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.ConflictInfo
-import com.example.sheeps.theme.CrimsonRed
-import com.example.sheeps.theme.GoldenBronze
 
 @Composable
 fun ConflictDialog(
@@ -29,7 +28,7 @@ fun ConflictDialog(
             Text(
                 text = stringResource(id = R.string.dialog_conflict_title),
                 fontWeight = FontWeight.Bold,
-                color = CrimsonRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
@@ -51,14 +50,14 @@ fun ConflictDialog(
                             .padding(end = 8.dp)
                             .clickable { onChooseLocal() },
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F7F5)),
-                        border = BorderStroke(1.dp, GoldenBronze),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = stringResource(id = R.string.save_local),
                                 fontWeight = FontWeight.Bold,
-                                color = GoldenBronze,
+                                color = MaterialTheme.colorScheme.secondary,
                                 fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -82,14 +81,14 @@ fun ConflictDialog(
                             .padding(start = 8.dp)
                             .clickable { onChooseCloud() },
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F9F7)),
-                        border = BorderStroke(1.dp, CrimsonRed),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(
                                 text = stringResource(id = R.string.save_cloud),
                                 fontWeight = FontWeight.Bold,
-                                color = CrimsonRed,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))

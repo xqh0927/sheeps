@@ -57,6 +57,7 @@
     <string name="shop_vault_locked">보물고 잠김</string>
     <string name="shop_section_traditional">특수 카드 스킨</string>
     <string name="shop_section_provinces">중국 지역별 미식 시리즈 스킨</string>
+    <string name="shop_section_animated">애니메이션 시리즈 (애니메이션 효과 포함)</string>
 
     <string name="task_play_3">첫걸음</string>
     <string name="task_play_5">기량 발휘</string>
@@ -214,7 +215,7 @@
     <string name="guide_sec5_desc">대결 모드에서는 카드 제거 시 게이지가 차오릅니다 (최대 10).\n안개 주문 (소모 3): 상대방 화면에 안개를 생성합니다 (6초 지속).\n트레이 제한 (소모 6): 상대의 트레이를 6칸으로 제한합니다 (8초 지속).\n봉인 주문 (소모 10): 상대의 활성화된 카드를 모두 봉인합니다.</string>
 
     <string name="backpack_magic_section">마법 도구</string>
-    <string name="backpack_skins_section">테마 스킨</string>
+    <string name="backpack_skins_section">카드 스킨</string>
     <string name="prepare_title_locked">결계가 풀리지 않음</string>
     <string name="prepare_title_unlocked">출전 준비 (제 %1$d 관)</string>
     <string name="update_discovered">새 버전 %1$s 발견</string>
@@ -267,6 +268,10 @@
     <string name="item_skin_henan_desc">허난성 특색 미식 아이콘 스킨 해제</string>
     <string name="item_skin_sichuan">쓰촨성 맛 스킨</string>
     <string name="item_skin_sichuan_desc">쓰촨성 특색 미식 아이콘 스킨 해제</string>
+    <string name="item_skin_keai">귀여운 카툰 스킨</string>
+    <string name="item_skin_keai_desc">바운스, 회전, 반짝임 효과의 애니메이션 카드 스킨</string>
+    <string name="item_skin_daimeng">두들 스케치 스킨</string>
+    <string name="item_skin_daimeng_desc">부드러운 색감의 장난기 있는 손그림 스타일과 따뜻한 애니메이션</string>
 
     <string name="leaderboard_data_error">데이터 가져오기 실패</string>
     <string name="leaderboard_load_error">로드 실패, 네트워크를 확인해 주세요</string>

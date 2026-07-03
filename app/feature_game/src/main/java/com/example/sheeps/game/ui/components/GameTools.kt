@@ -24,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.theme.Text_Disabled_Dark
 import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.ItemAnimationIcon
@@ -96,7 +95,7 @@ private fun CarriedItemsSection(state: GameViewState, onToolClick: (String) -> U
         Text(
             text = stringResource(id = R.string.carried_magic_items),
             style = MaterialTheme.typography.labelSmall,
-            color = Gold_Primary,
+            color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(6.dp))

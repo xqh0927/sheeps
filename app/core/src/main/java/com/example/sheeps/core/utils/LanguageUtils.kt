@@ -19,6 +19,8 @@ fun getLocalizedItemName(itemType: String): String {
         "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber)
         "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan)
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan)
+        "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai)
+        "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng)
         "CLASSIC" -> stringResource(id = R.string.item_skin_classic)
         else -> itemType
     }
@@ -39,6 +41,8 @@ fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
         "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber_desc)
         "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan_desc)
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan_desc)
+        "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai_desc)
+        "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng_desc)
         "CLASSIC" -> stringResource(id = R.string.item_skin_classic_desc)
         else -> defaultDesc ?: stringResource(id = R.string.default_item_desc)
     }

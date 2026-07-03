@@ -184,10 +184,35 @@ class MenuViewModel @Inject constructor(
         return try {
             val remoteItems = apiService.getShopItems()
             val remoteTypes = remoteItems.map { it.item_type }.toSet()
+
+            // 本地注册动画系列皮肤（客户端生成，无需服务端配置）
+            val localAnimatedSkins = listOf(
+                ShopItem(
+                    id = -100,
+                    name = context.getString(com.example.sheeps.core.R.string.item_skin_keai),
+                    description = context.getString(com.example.sheeps.core.R.string.item_skin_keai_desc),
+                    image_url = "",
+                    item_type = "SKIN_KEAI",
+                    points_price = 200,
+                    stock = 9999
+                ),
+                ShopItem(
+                    id = -101,
+                    name = context.getString(com.example.sheeps.core.R.string.item_skin_daimeng),
+                    description = context.getString(com.example.sheeps.core.R.string.item_skin_daimeng_desc),
+                    image_url = "",
+                    item_type = "SKIN_DAIMENG",
+                    points_price = 200,
+                    stock = 9999
+                )
+            )
+            val animatedTypes = localAnimatedSkins.map { it.item_type }.toSet()
+            val allExistingTypes = remoteTypes + animatedTypes
+
             val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
                 ShopItem(1000 + index, "${province.name}美食", "解锁${province.name}省特色美食图标皮肤", "", "SKIN_${province.id.uppercase()}", 200, 9999)
-            }.filter { it.item_type !in remoteTypes }
-            remoteItems + gourmetSkins
+            }.filter { it.item_type !in allExistingTypes }
+            remoteItems + localAnimatedSkins + gourmetSkins
         } catch (e: Exception) {
             currentState.shopItems
         }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,8 +21,6 @@ import com.example.sheeps.core.R
 import com.example.sheeps.core.multiplayer.WebSocketManager
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.DuelViewState
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Primary
 
 /**
  * 对决模式顶部状态栏
@@ -42,7 +41,7 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
             Text(
                 text = stringResource(id = R.string.duel_title),
                 style = MaterialTheme.typography.titleMedium,
-                color = Gold_Primary,
+                color = MaterialTheme.colorScheme.secondary,
                 fontFamily = FontFamily.Serif
             )
             
@@ -93,7 +92,7 @@ private fun DuelProgressBars(state: DuelViewState) {
             LinearProgressIndicator(
                 progress = { 1f - (remaining.toFloat() / totalTiles.toFloat()).coerceIn(0f, 1f) },
                 modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = Gold_Primary,
+                color = MaterialTheme.colorScheme.secondary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
@@ -103,7 +102,7 @@ private fun DuelProgressBars(state: DuelViewState) {
             LinearProgressIndicator(
                 progress = { state.opponentProgress.coerceIn(0f, 1f) },
                 modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
-                color = Crimson_Primary,
+                color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }

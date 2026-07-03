@@ -57,6 +57,7 @@
     <string name="shop_vault_locked">宝物庫ロック</string>
     <string name="shop_section_traditional">特製カードスキン</string>
     <string name="shop_section_provinces">中華グルメシリーズ (省別スキン)</string>
+    <string name="shop_section_animated">アニメシリーズ (アニメーション効果付き)</string>
     
     <string name="task_play_3">初めの一歩</string>
     <string name="task_play_5">実力発揮</string>
@@ -214,7 +215,7 @@
     <string name="guide_sec5_desc">対戦モードでは、カードを消去するとエネルギー（最大10）が溜まります。\n霧の呪い（消費3）：相手の視界を霧で覆います（6秒間）。\nロック呪い（消費6）：相手のトレイを6スロットに制限します（8秒間）。\n封印の呪い（消費10）：相手の表向きのカードをすべて封印します。</string>
 
     <string name="backpack_magic_section">法宝神器</string>
-    <string name="backpack_skins_section">テーマスキン</string>
+    <string name="backpack_skins_section">カードスキン</string>
     <string name="prepare_title_locked">結界未解除</string>
     <string name="prepare_title_unlocked">出陣準備 (ステージ %1$d)</string>
     <string name="update_discovered">新バージョン %1$s 発見</string>
@@ -267,6 +268,10 @@
     <string name="item_skin_henan_desc">河南省の特色ある美食アイコンスキンをアンロック</string>
     <string name="item_skin_sichuan">四川・省味スキン</string>
     <string name="item_skin_sichuan_desc">四川省の特色ある美食アイコンスキンをアンロック</string>
+    <string name="item_skin_keai">萌えカートゥーンスキン</string>
+    <string name="item_skin_keai_desc">バウンス・回転・キラキラのアニメーションカードスキン</string>
+    <string name="item_skin_daimeng">手描きスケッチスキン</string>
+    <string name="item_skin_daimeng_desc">遊び心ある手描きスタイル、ソフトな色合いと温かいアニメーション</string>
 
     <string name="leaderboard_data_error">データ取得失敗</string>
     <string name="leaderboard_load_error">読み込み失敗、ネットワーク接続を確認してください</string>

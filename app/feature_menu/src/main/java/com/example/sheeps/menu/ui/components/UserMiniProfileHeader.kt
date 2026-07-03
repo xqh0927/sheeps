@@ -31,6 +31,7 @@ fun UserMiniProfileHeader(
     state: MenuViewState,
     onLoginClick: () -> Unit
 ) {
+    val themeSecondary = MaterialTheme.colorScheme.secondary
     val infiniteTransition = rememberInfiniteTransition(label = "avatarGlow")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.4f,
@@ -49,7 +50,7 @@ fun UserMiniProfileHeader(
             .background(
                 Brush.linearGradient(
                     colors = listOf(
-                        Gold_Subtle.copy(alpha = 0.12f),
+                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
                         MaterialTheme.colorScheme.surfaceVariant,
                         MaterialTheme.colorScheme.surfaceContainer
                     )
@@ -59,7 +60,7 @@ fun UserMiniProfileHeader(
                 BorderStroke(
                     1.dp,
                     Brush.linearGradient(
-                        colors = listOf(Gold_Subtle.copy(alpha = 0.6f), Gold_Primary.copy(alpha = 0.3f), Gold_Subtle.copy(alpha = 0.6f))
+                        colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
                     )
                 ),
                 shape = ShapeLarge
@@ -74,7 +75,7 @@ fun UserMiniProfileHeader(
                     modifier = Modifier.size(60.dp)
                 ) {
                     drawCircle(
-                        color  = Gold_Primary.copy(alpha = glowAlpha * 0.3f),
+                        color  = themeSecondary.copy(alpha = glowAlpha * 0.3f),
                         radius = this.size.width * 0.45f
                     )
                 }
@@ -84,19 +85,19 @@ fun UserMiniProfileHeader(
                         .size(52.dp)
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(Crimson_Primary, Crimson_PrimaryDark)
+                                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
                             ),
                             shape = CircleShape
                         )
                         .border(
-                            BorderStroke(1.5.dp, Gold_Subtle.copy(alpha = glowAlpha)),
+                            BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary.copy(alpha = glowAlpha)),
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text       = if (state.username.isNotEmpty()) state.username.first().toString() else "侠",
-                        color      = Gold_Primary,
+                        color      = MaterialTheme.colorScheme.secondary,
                         fontFamily = FontFamily.Serif,
                         fontWeight = FontWeight.Bold,
                         fontSize   = 22.sp
@@ -119,18 +120,18 @@ fun UserMiniProfileHeader(
                         Icon(
                             imageVector = Icons.Default.Star,
                             contentDescription = null,
-                            tint = Gold_Primary,
+                            tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(Modifier.width(4.dp))
                         AnimatedCounter(
                             count = state.points,
-                            style = MaterialTheme.typography.titleSmall.copy(color = Gold_Primary)
+                            style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.secondary)
                         )
                         Text(
                             text  = " 积分",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Gold_Primary.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
                         )
                     }
                 } else {

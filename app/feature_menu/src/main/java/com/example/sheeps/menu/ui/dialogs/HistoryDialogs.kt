@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,7 +18,6 @@ import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.core.utils.getLocalizedSource
 import com.example.sheeps.data.model.ExchangeRecord
 import com.example.sheeps.data.model.PointRecord
-import com.example.sheeps.theme.CrimsonRed
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,7 +35,7 @@ fun PointHistoryDialog(
             Text(
                 text = stringResource(id = R.string.points_history_title),
                 fontWeight = FontWeight.Bold,
-                color = CrimsonRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
@@ -72,7 +72,7 @@ fun ExchangeHistoryDialog(
             Text(
                 text = stringResource(id = R.string.exchange_history_title),
                 fontWeight = FontWeight.Bold,
-                color = CrimsonRed
+                color = MaterialTheme.colorScheme.primary
             )
         },
         text = {
@@ -118,7 +118,7 @@ private fun PointRecordItem(record: PointRecord) {
         }
         Text(
             text = if (record.type == "IN") "+${record.amount}" else "-${record.amount}",
-            color = if (record.type == "IN") Color(0xFF4CAF50) else CrimsonRed,
+            color = if (record.type == "IN") Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
         )
@@ -152,7 +152,7 @@ private fun ExchangeRecordItem(record: ExchangeRecord) {
         }
         Text(
             text = "-${record.points_cost}",
-            color = CrimsonRed,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             fontSize = 14.sp
         )

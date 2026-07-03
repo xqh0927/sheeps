@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
@@ -29,6 +29,7 @@ fun DuelMatchDialog(
     onLeave: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val themePrimary = MaterialTheme.colorScheme.primary
     val infiniteTransition = rememberInfiniteTransition(label = "taichiSpin")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -67,7 +68,7 @@ fun DuelMatchDialog(
             if (state.matchStatus == "error") {
                 Button(
                     onClick = { onJoin() },
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                    colors = ButtonDefaults.buttonColors(containerColor = themePrimary),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(stringResource(id = R.string.dialog_match_re), color = Color.White)
@@ -84,7 +85,7 @@ fun DuelMatchDialog(
                 text = stringResource(id = R.string.home_match_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = CrimsonRed,
+                color = themePrimary,
                 fontFamily = FontFamily.Serif
             )
         },
@@ -102,14 +103,14 @@ fun DuelMatchDialog(
                     val centerOffset = center
                     drawCircle(color = Color.White, radius = r, center = centerOffset)
                     drawArc(
-                        color = CrimsonRed,
+                        color = themePrimary,
                         startAngle = -90f,
                         sweepAngle = 180f,
                         useCenter = true,
                         size = size
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = themePrimary,
                         radius = r / 2f,
                         center = Offset(centerOffset.x, centerOffset.y - r / 2f)
                     )
@@ -124,12 +125,12 @@ fun DuelMatchDialog(
                         center = Offset(centerOffset.x, centerOffset.y - r / 2f)
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = themePrimary,
                         radius = r * 0.15f,
                         center = Offset(centerOffset.x, centerOffset.y + r / 2f)
                     )
                     drawCircle(
-                        color = CrimsonRed,
+                        color = themePrimary,
                         radius = r,
                         center = centerOffset,
                         style = Stroke(width = 2.dp.toPx())
@@ -150,7 +151,7 @@ fun DuelMatchDialog(
                     color = when (state.matchStatus) {
                         "matched" -> Color(0xFF2E7D32)
                         "error" -> Color.Gray
-                        else -> CrimsonRed.copy(alpha = 0.8f)
+                        else -> themePrimary.copy(alpha = 0.8f)
                     },
                     fontFamily = FontFamily.Serif
                 )

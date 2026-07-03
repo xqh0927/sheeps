@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="sug" cx="0.4" cy="0.3">
+      <stop offset="0%" stop-color="#FFF9C4"/>
+      <stop offset="100%" stop-color="#FF8F00"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="28" fill="#FFF8E1" opacity="0.4"/>
+  <circle cx="32" cy="30" r="22" fill="url(#sug)" stroke="#E65100" stroke-width="2"/>
+  <!-- rays -->
+  <line x1="32" y1="4" x2="32" y2="8" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="32" y1="56" x2="32" y2="60" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="8" y1="30" x2="12" y2="30" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="52" y1="30" x2="56" y2="30" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="14" y1="14" x2="17" y2="17" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="47" y1="43" x2="50" y2="46" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="47" y1="17" x2="50" y2="14" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <line x1="14" y1="46" x2="17" y2="43" stroke="#FFB300" stroke-width="3" stroke-linecap="round"/>
+  <!-- face -->
+  <circle cx="26" cy="29" r="2.2" fill="#E65100"/>
+  <circle cx="38" cy="29" r="2.2" fill="#E65100"/>
+  <circle cx="32" cy="37" r="6" fill="none" stroke="#E65100" stroke-width="2"/>
+  <ellipse cx="22" cy="34" rx="2.5" ry="1.8" fill="#FF7043" opacity="0.5"/>
+  <ellipse cx="42" cy="34" rx="2.5" ry="1.8" fill="#FF7043" opacity="0.5"/>
+</svg>

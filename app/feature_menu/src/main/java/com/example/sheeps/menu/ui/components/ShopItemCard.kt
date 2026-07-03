@@ -18,6 +18,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -31,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.ShopItem
-import com.example.sheeps.theme.CrimsonRed
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
@@ -70,7 +70,7 @@ fun ShopItemCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER"
+            val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER" && item.item_type != "SKIN_KEAI" && item.item_type != "SKIN_DAIMENG"
             if (isSkin && isProvinceSkin) {
                 val context = LocalContext.current
                 val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
@@ -124,7 +124,7 @@ fun ShopItemCard(
                     text = if (isSkin && isUnlocked) stringResource(id = R.string.skin_unlocked) else stringResource(id = R.string.points_suffix, item.points_price),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = CrimsonRed
+                    color = MaterialTheme.colorScheme.primary
                 )
                 if (!isSkin) {
                     Text(
@@ -142,7 +142,7 @@ fun ShopItemCard(
                     onClick = { onApplySkin(skinKey) },
                     enabled = !isCurrentlyApplied,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isCurrentlyApplied) Color.Gray else CrimsonRed,
+                        containerColor = if (isCurrentlyApplied) Color.Gray else MaterialTheme.colorScheme.primary,
                         disabledContainerColor = Color(0xFFE0E0E0),
                         disabledContentColor = Color.Gray
                     ),
@@ -161,7 +161,7 @@ fun ShopItemCard(
             } else {
                 Button(
                     onClick = { onExchange(1) },
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonRed),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                     shape = RoundedCornerShape(6.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     modifier = Modifier

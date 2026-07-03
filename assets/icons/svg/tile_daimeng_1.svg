@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFF176"/>
+      <stop offset="100%" stop-color="#FFB300"/>
+    </linearGradient>
+  </defs>
+  <!-- glow -->
+  <circle cx="32" cy="30" r="28" fill="#FFF59D" opacity="0.3"/>
+  <!-- star -->
+  <polygon points="32,4 39,23 59,23 43,35 49,56 32,44 15,56 21,35 5,23 25,23" fill="url(#sg)" stroke="#E65100" stroke-width="2" stroke-linejoin="round"/>
+  <!-- cute face -->
+  <circle cx="26" cy="30" r="2.5" fill="#E65100"/>
+  <circle cx="38" cy="30" r="2.5" fill="#E65100"/>
+  <path d="M26 38 Q32 44 38 38" fill="none" stroke="#E65100" stroke-width="2" stroke-linecap="round"/>
+  <!-- cheek blush -->
+  <ellipse cx="21" cy="36" rx="3" ry="2" fill="#FF8A65" opacity="0.5"/>
+  <ellipse cx="43" cy="36" rx="3" ry="2" fill="#FF8A65" opacity="0.5"/>
+</svg>

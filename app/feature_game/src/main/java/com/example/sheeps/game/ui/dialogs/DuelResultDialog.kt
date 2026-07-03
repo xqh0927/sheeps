@@ -13,8 +13,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.game.state.DuelViewState
 import com.example.sheeps.game.state.GameStatus
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Primary
 import com.example.sheeps.ui.components.PrimaryButton
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
@@ -46,7 +44,7 @@ fun DuelResultDialog(
             Text(
                 text = if (state.gameStatus == GameStatus.WON) stringResource(id = R.string.duel_won_title) else stringResource(id = R.string.duel_lost_title),
                 style = MaterialTheme.typography.headlineMedium,
-                color = if (state.gameStatus == GameStatus.WON) Gold_Primary else Crimson_Primary
+                color = if (state.gameStatus == GameStatus.WON) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
             )
             
             Spacer(Modifier.height(16.dp))

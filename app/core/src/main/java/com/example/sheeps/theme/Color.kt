@@ -71,6 +71,58 @@ val Leaderboard_Silver      = Color(0xFFC0C0C0) // 银牌
 val Leaderboard_Bronze      = Color(0xFFCD7F32) // 铜牌
 
 // =============================================================================
+// 四套女性向主题色版：樱花粉 / 星空蓝 / 暖阳橙 / 森林绿
+// =============================================================================
+
+// --- 樱花粉 (Sakura) ---
+val Sakura_Primary          = Color(0xFFEC407A)
+val Sakura_PrimaryLight     = Color(0xFFF06292)
+val Sakura_PrimaryDark      = Color(0xFFC2185B)
+val Sakura_Background       = Color(0xFFFFF5F8)
+val Sakura_Surface          = Color(0xFFFFFAFC)
+val Sakura_SurfaceVariant   = Color(0xFFFFF0F5)
+val Sakura_SurfaceContainer = Color(0xFFFCE4EC)
+val Sakura_Outline          = Color(0xFFF8BBD0)
+val Sakura_OutlineVariant   = Color(0xFFFCE4EC)
+val Sakura_Gold_Subtle      = Color(0xFFFF4081)
+
+// --- 星空蓝 (Cosmic) ---
+val Cosmic_Primary          = Color(0xFF3F51B5)
+val Cosmic_PrimaryLight     = Color(0xFF5C6BC0)
+val Cosmic_PrimaryDark      = Color(0xFF303F9F)
+val Cosmic_Background       = Color(0xFFEEF0FA)
+val Cosmic_Surface          = Color(0xFFF8F9FD)
+val Cosmic_SurfaceVariant   = Color(0xFFE8EAF6)
+val Cosmic_SurfaceContainer = Color(0xFFE8EAF6)
+val Cosmic_Outline          = Color(0xFFC5CAE9)
+val Cosmic_OutlineVariant   = Color(0xFFE8EAF6)
+val Cosmic_Gold_Subtle      = Color(0xFF7986CB)
+
+// --- 暖阳橙 (Sunset) ---
+val Sunset_Primary          = Color(0xFFFF9800)
+val Sunset_PrimaryLight     = Color(0xFFFFB74D)
+val Sunset_PrimaryDark      = Color(0xFFE65100)
+val Sunset_Background       = Color(0xFFFFF8E1)
+val Sunset_Surface          = Color(0xFFFFFDF5)
+val Sunset_SurfaceVariant   = Color(0xFFFFF3E0)
+val Sunset_SurfaceContainer = Color(0xFFFFF3E0)
+val Sunset_Outline          = Color(0xFFFFE0B2)
+val Sunset_OutlineVariant   = Color(0xFFFFF3E0)
+val Sunset_Gold_Subtle      = Color(0xFFFFB74D)
+
+// --- 森林绿 (Forest) ---
+val Forest_Primary          = Color(0xFF4CAF50)
+val Forest_PrimaryLight     = Color(0xFF81C784)
+val Forest_PrimaryDark      = Color(0xFF2E7D32)
+val Forest_Background       = Color(0xFFF1F8E9)
+val Forest_Surface          = Color(0xFFF8FBF5)
+val Forest_SurfaceVariant   = Color(0xFFE8F5E9)
+val Forest_SurfaceContainer = Color(0xFFE8F5E9)
+val Forest_Outline          = Color(0xFFC8E6C9)
+val Forest_OutlineVariant   = Color(0xFFE8F5E9)
+val Forest_Gold_Subtle      = Color(0xFF81C784)
+
+// =============================================================================
 // 向后兼容别名（保留旧名称引用，避免大规模重命名编译错误）
 // =============================================================================
 val CrimsonRed      = Crimson_Primary

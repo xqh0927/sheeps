@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -22,7 +23,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.theme.CrimsonRed
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -33,6 +33,7 @@ fun ItemAnimationIcon(
     size: Dp = 64.dp,
     isGray: Boolean = false
 ) {
+    val themePrimary = MaterialTheme.colorScheme.primary
     val infiniteTransition = rememberInfiniteTransition(label = "item_icon")
     
     // 旋转动画
@@ -120,7 +121,7 @@ fun ItemAnimationIcon(
                             size = Size(radius * 2, radius * 2)
                         )
                         drawArc(
-                            color = CrimsonRed,
+                            color = themePrimary,
                             startAngle = 90f,
                             sweepAngle = 180f,
                             useCenter = true,
@@ -134,13 +135,13 @@ fun ItemAnimationIcon(
                             center = Offset(cx, cy - radius / 2f)
                         )
                         drawCircle(
-                            color = CrimsonRed,
+                            color = themePrimary,
                             radius = radius / 2f,
                             center = Offset(cx, cy + radius / 2f)
                         )
                         // 绘制阴阳鱼眼
                         drawCircle(
-                            color = CrimsonRed,
+                            color = themePrimary,
                             radius = radius * 0.12f,
                             center = Offset(cx, cy - radius / 2f)
                         )
@@ -172,7 +173,7 @@ fun ItemAnimationIcon(
                             moveTo(cx - radius * 0.7f, cy + radius * 0.1f)
                             quadraticTo(cx - radius * 0.2f, cy + radius * 0.4f, cx + radius * 0.5f, cy + radius * 0.1f)
                         }
-                        drawPath(ribbon, color = CrimsonRed, style = Stroke(width = 3f))
+                        drawPath(ribbon, color = themePrimary, style = Stroke(width = 3f))
                     }
                 }
                 "SHUFFLE" -> { // 流沙契：金色星盘与颤动的指针
@@ -200,13 +201,13 @@ fun ItemAnimationIcon(
                     val shake = rotation * 2.5f
                     rotate(shake, pivot = Offset(cx, cy)) {
                         drawLine(
-                            color = CrimsonRed,
+                            color = themePrimary,
                             start = Offset(cx, cy + radius * 0.2f),
                             end = Offset(cx, cy - radius * 0.75f),
                             strokeWidth = 4f,
                             cap = StrokeCap.Round
                         )
-                        drawCircle(CrimsonRed, radius * 0.15f, Offset(cx, cy))
+                        drawCircle(themePrimary, radius * 0.15f, Offset(cx, cy))
                         drawCircle(Color.White, radius * 0.06f, Offset(cx, cy))
                     }
                 }
@@ -219,7 +220,7 @@ fun ItemAnimationIcon(
                     )
                     // 仙丹球体
                     val grad = Brush.radialGradient(
-                        colors = listOf(Color(0xFFFFF099), Color(0xFFE5B55F), CrimsonRed),
+                        colors = listOf(Color(0xFFFFF099), Color(0xFFE5B55F), themePrimary),
                         center = Offset(cx - pulseRadius * 0.2f, cy - pulseRadius * 0.2f),
                         radius = pulseRadius
                     )
@@ -244,7 +245,7 @@ fun ItemAnimationIcon(
                     
                     // 天眼瞳孔（太极珠，闪烁）
                     drawCircle(
-                        color = CrimsonRed.copy(alpha = flashAlpha),
+                        color = themePrimary.copy(alpha = flashAlpha),
                         radius = radius * 0.35f,
                         center = Offset(cx, cy)
                     )
@@ -396,14 +397,59 @@ fun ItemAnimationIcon(
                         quadraticTo(cx - radius * 0.6f, cy, cx - radius * 0.4f, cy - radius * 0.5f)
                         close()
                     }
-                    drawPath(lampPath, color = CrimsonRed)
+                    drawPath(lampPath, color = themePrimary)
                     drawPath(lampPath, color = Color(0xFFCBAA6A), style = Stroke(width = 3f))
                     drawLine(Color(0xFFCBAA6A), Offset(cx, cy - radius * 0.8f), Offset(cx, cy - radius * 0.5f), strokeWidth = 3f)
-                    drawLine(CrimsonRed, Offset(cx, cy + radius * 0.5f), Offset(cx, cy + radius * 0.85f), strokeWidth = 4f)
+                    drawLine(themePrimary, Offset(cx, cy + radius * 0.5f), Offset(cx, cy + radius * 0.85f), strokeWidth = 4f)
+                }
+                // keai 萌趣卡通：星星弹跳动画
+                "SKIN_KEAI" -> {
+                    val starColor = Color(0xFFFFB300)
+                    // 绘制星星弹跳
+                    for (i in 0 until 5) {
+                        val angle = rotation + i * 72f
+                        val dist = 20f + floatOffset * 0.5f
+                        val sx = cx + dist * cos(Math.toRadians(angle.toDouble())).toFloat()
+                        val sy = cy + dist * sin(Math.toRadians(angle.toDouble())).toFloat()
+                        val r = 6f + scale * 3f
+                        drawStar(sx, sy, r, starColor)
+                    }
+                // 中心笑脸
+                drawCircle(color = Color(0xFFFFF176), radius = 12f, center = Offset(cx, cy))
+                drawCircle(color = Color(0xFFE65100), radius = 2f, center = Offset(cx - 4f, cy - 2f))
+                drawCircle(color = Color(0xFFE65100), radius = 2f, center = Offset(cx + 4f, cy - 2f))
+                drawArc(
+                    color = Color(0xFFE65100),
+                    startAngle = 0f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = Offset(cx - 5f, cy),
+                    size = Size(10f, 5f),
+                    style = Stroke(1.5f)
+                )
+                }
+                // daimeng 呆萌手绘：爱心脉动
+                "SKIN_DAIMENG" -> {
+                    val heartScale = 0.9f + (scale - 0.9f) * 1.5f
+                    val hr = 16f * heartScale
+                drawCircle(color = Color(0xFFFF5252), radius = hr, center = Offset(cx - 6f, cy - 3f))
+                drawCircle(color = Color(0xFFFF5252), radius = hr, center = Offset(cx + 6f, cy - 3f))
+                    drawPath(
+                        Path().apply {
+                            moveTo(cx - hr * 2, cy + 2f)
+                            lineTo(cx + hr * 2, cy + 2f)
+                            lineTo(cx, cy + hr * 1.5f)
+                            close()
+                        },
+                        Color(0xFFFF5252)
+                    )
+                    // 爱心高光
+                drawCircle(color = Color(0xFFFF8A80).copy(alpha = flashAlpha), radius = 5f, center = Offset(cx - 10f, cy - 8f))
+                drawCircle(color = Color(0xFFFF8A80).copy(alpha = flashAlpha), radius = 5f, center = Offset(cx + 10f, cy - 8f))
                 }
                 else -> { // 默认显示红色圆环
                     drawCircle(
-                        color = CrimsonRed,
+                        color = themePrimary,
                         radius = radius,
                         style = Stroke(width = 4f)
                     )
@@ -445,4 +491,33 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCoin(
         size = Size(size * 2, size * 2),
         style = Stroke(width = 2f)
     )
+}
+
+/**
+ * 绘制五角星形状。
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStar(
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    color: Color
+) {
+    val path = Path()
+    val innerRadius = radius * 0.4f
+    for (i in 0 until 5) {
+        val outerAngle = Math.toRadians((-90 + i * 72).toDouble())
+        val innerAngle = Math.toRadians((-90 + 36 + i * 72).toDouble())
+        val ox = cx + radius * cos(outerAngle).toFloat()
+        val oy = cy + radius * sin(outerAngle).toFloat()
+        val ix = cx + innerRadius * cos(innerAngle).toFloat()
+        val iy = cy + innerRadius * sin(innerAngle).toFloat()
+        if (i == 0) {
+            path.moveTo(ox, oy)
+        } else {
+            path.lineTo(ox, oy)
+        }
+        path.lineTo(ix, iy)
+    }
+    path.close()
+    drawPath(path, color)
 }

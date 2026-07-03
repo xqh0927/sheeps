@@ -3,6 +3,7 @@ package com.example.sheeps.game.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -12,8 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.DuelViewState
-import com.example.sheeps.theme.Crimson_Primary
-import com.example.sheeps.theme.Gold_Primary
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
 
@@ -47,8 +46,8 @@ fun DuelSpellPanel(
             SpellInfo("FOG", 3, Color(0xFF8C7B70)),
             SpellInfo("SILENCE", 4, Color(0xFF7E57C2)),
             SpellInfo("SHUFFLE", 5, Color(0xFF26A69A)),
-            SpellInfo("SHRINK", 6, Crimson_Primary),
-            SpellInfo("SEAL_ALL", 10, Gold_Primary)
+            SpellInfo("SHRINK", 6, MaterialTheme.colorScheme.primary),
+            SpellInfo("SEAL_ALL", 10, MaterialTheme.colorScheme.secondary)
         )
 
         spells.forEach { spell ->
