@@ -115,9 +115,9 @@ object NetworkModule {
 
                     // 同步阻塞发起刷新 Token 请求
                     val client = OkHttpClient.Builder()
-                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                        .connectTimeout(10, TimeUnit.SECONDS)
+                        .readTimeout(10, TimeUnit.SECONDS)
+                        .writeTimeout(10, TimeUnit.SECONDS)
                         .build()
                     val mediaType = "application/json".toMediaType()
                     val requestBody =

@@ -272,13 +272,13 @@ fun ShopScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = 0.85f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
                     shape = RoundedCornerShape(16.dp)
                 ) {
@@ -304,7 +304,7 @@ fun ShopScreen(
                         Text(
                             text = stringResource(id = R.string.shop_login_prompt),
                             fontSize = 13.sp,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             lineHeight = 18.sp
                         )
@@ -314,7 +314,7 @@ fun ShopScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(stringResource(id = R.string.shop_btn_login_sync), color = Color.White)
+                            Text(stringResource(id = R.string.shop_btn_login_sync), color = MaterialTheme.colorScheme.onPrimary)
                         }
                     }
                 }

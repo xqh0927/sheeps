@@ -75,6 +75,8 @@ class GameLogicDelegate @Inject constructor() {
         // ����Э�̱հ������ state.slotTiles �Ǿɿ��գ��Ḳ�ǵ��˴�����ȷ״̬
         var newSlot: List<Tile>? = null
         if (tile.state != TileState.MOVED_OUT && tile.sealedCount == 0) {
+            // 盲盒牌进入卡槽后立刻揭示图案
+            tile.isBlind = false
             tile.state = TileState.IN_SLOT
             newSlot = insertIntoSlot(state.slotTiles, tile)
             updateState {
@@ -90,7 +92,7 @@ class GameLogicDelegate @Inject constructor() {
                 // ���������ܵ��
                 val updatedBoard = state.boardTiles
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = insertIntoSlot(state.slotTiles, tile.copy(state = TileState.IN_SLOT))
+                val newSlot = insertIntoSlot(state.slotTiles, tile.copy(state = TileState.IN_SLOT, isBlind = false))
 
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                 processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
@@ -163,11 +165,6 @@ class GameLogicDelegate @Inject constructor() {
 
         if (matched) {
             setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
-            // ÿ�ϲ�һ���Զ�����һ�������ϵ�ä����
-            val blindTile = finalBoard.firstOrNull { it.isBlind }
-            if (blindTile != null) {
-                blindTile.isBlind = false
-            }
         }
 
         val remainingOnBoard =

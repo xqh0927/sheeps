@@ -52,7 +52,7 @@ class DuelActionDelegate @Inject constructor() {
                 // 从置物架点击
                 val updatedBoard = state.boardTiles
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = state.slotTiles + tile.copy(state = TileState.IN_SLOT)
+                val newSlot = state.slotTiles + tile.copy(state = TileState.IN_SLOT, isBlind = false)
 
                 setEffect(DuelViewEffect.PlaySound(SoundType.CLICK))
                 processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
@@ -65,7 +65,8 @@ class DuelActionDelegate @Inject constructor() {
                     setEffect(DuelViewEffect.Vibrate)
                     updateState { copy(boardTiles = calculateBlockedStates(state.boardTiles)) }
                 } else {
-                    // 移入槽位
+                    // 盲盒牌进入卡槽后立刻揭示图案
+                    tile.isBlind = false
                     tile.state = TileState.IN_SLOT
                     val updatedBoard = state.boardTiles
                     val newSlot = state.slotTiles + tile
@@ -122,11 +123,6 @@ class DuelActionDelegate @Inject constructor() {
 
         if (matched) {
             setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
-            // 每合并一个自动解锁一个棋盘上的对决模式盲盒牌
-            val blindTile = finalBoard.firstOrNull { it.isBlind }
-            if (blindTile != null) {
-                blindTile.isBlind = false
-            }
             onMatchSuccess(eliminatedIds)
         } else if (slot.size > state.slotTiles.size) {
             // 新增了牌但未消除，重置连击

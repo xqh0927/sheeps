@@ -1,5 +1,5 @@
 import { Point3D, TileData } from './types';
-import { calculateCardCount } from './difficulty';
+import { calculateCardCount, isRestLevel } from './difficulty';
 
 /**
  * 根据关卡 ID 获取关卡的基础难度系数
@@ -274,15 +274,15 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     }
   }
 
-  // 基于 LCG 种子计算关卡附加类型：40% 正常关卡、40% 封印关卡、20% 盲盒关卡
-  let randType = lcg(seed + 500);
-  const typeRoll = randType();
-  // 盲盒关卡只在第 3 关及以上启用，概率为 20%
-  const isBlindLevel = levelId >= 3 && typeRoll < 0.20;
-  // 封印关卡在第 2 关及以上启用，概率为 40% (即 0.20 <= typeRoll < 0.60)
-  const isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60;
+  // ===== 固定关卡类型规则（替代随机，与 Android 端对齐） =====
+  // 休息关（levelId % 5 == 0，levelId >= 5）：卡牌数量打八折
+  // 盲盒关（levelId % 3 == 0，levelId >= 3）：底层卡牌部分变盲盒
+  // 封印关（levelId % 2 == 0）：每张卡有概率带封印
+  // 优先级: 休息 > 盲盒 > 封印 > 普通
+  const isRest = isRestLevel(levelId);
+  const isBlindLevel = !isRest && levelId >= 3 && levelId % 3 === 0;
+  const isSealedLevel = !isRest && !isBlindLevel && levelId >= 2 && levelId % 2 === 0;
 
-  let randProps = lcg(seed + 200);
   const maxZ = Math.max(...nodes.map(n => n.coord.z));
 
   // ===== 坐标归一化：质心对齐模式 =====
@@ -309,21 +309,33 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
   const targetRadius = 4.8;   // 最大半径，留出边距避免裁切
   const normScale2 = targetRadius / maxRadius;
 
+  // 盲盒关卡：均匀分布固定数量的盲盒牌
+  let blindIndices: Set<number>;
+  if (isBlindLevel) {
+    const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
+    const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
+    const eligible = nodes.filter((n) => n.coord.z < limitZ);
+    const count = Math.max(1, Math.floor(eligible.length * blindProb));
+    // Fisher–Yates 洗牌取前 count 个
+    const indices = eligible.map((_, i) => i);
+    const randShuffle = lcg(seed + 200);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(randShuffle() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    blindIndices = new Set(indices.slice(0, count).map(i => eligible[i].index));
+  } else {
+    blindIndices = new Set();
+  }
+
+  let randProps = lcg(seed + 300);
+
   return nodes.map((node) => {
-    let isBlind = false;
+    const isBlind = blindIndices.has(node.index);
     let sealedCount = 0;
 
-    const r = randProps();
-    if (isBlindLevel) {
-      const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
-      // 开局可读性保护：最表层 2~3 层卡牌禁止设为盲盒牌，保证前 3-5 步有可见消除入口
-      const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
-      if (r < blindProb && node.coord.z < limitZ) {
-        isBlind = true;
-      }
-    } else if (isSealedLevel) {
-      // 封印关卡中有 30% 概率给卡牌贴上解封符纸
-      if (r < 0.30) {
+    if (!isBlindLevel && isSealedLevel) {
+      if (randProps() < 0.30) {
         sealedCount = 1;
       }
     }

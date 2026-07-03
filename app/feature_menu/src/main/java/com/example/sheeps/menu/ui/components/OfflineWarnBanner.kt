@@ -25,7 +25,7 @@ fun OfflineWarnBanner() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFFBEBEB))
+            .background(MaterialTheme.colorScheme.errorContainer)
             .clickable {
                 try {
                     val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)

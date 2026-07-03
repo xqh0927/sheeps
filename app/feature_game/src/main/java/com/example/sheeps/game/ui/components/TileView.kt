@@ -36,6 +36,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.ImageLoader
+import coil.decode.ImageDecoderDecoder
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileCardBase
@@ -130,6 +134,15 @@ fun TileView(
     ) {
         val context = LocalContext.current
 
+        // Coil ImageLoader 用于渲染动画 WebP（灵动动画系列皮肤）
+        val imageLoader = remember {
+            ImageLoader.Builder(context)
+                .components {
+                    add(ImageDecoderDecoder.Factory())
+                }
+                .build()
+        }
+
         Box(
             modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
@@ -142,15 +155,28 @@ fun TileView(
                 )
             } else {
                 // 情况 2：显示正面图标，若被压制则降低透明度
+                // 灵动动画系列皮肤（keai / daimeng）使用 Coil AsyncImage 渲染动画 WebP
+                val isAnimatedSkin = currentSkin == "keai" || currentSkin == "daimeng"
                 val iconResId = TileIconProvider.getIconResource(context, currentSkin, tile.type)
                 if (iconResId != 0) {
-                    Image(
-                        painter = painterResource(id = iconResId),
-                        contentDescription = "Tile Icon",
-                        modifier = Modifier
-                            .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) mask else 1f)
-                    )
+                    if (isAnimatedSkin) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(iconResId).build(),
+                            contentDescription = "Tile Icon",
+                            imageLoader = imageLoader,
+                            modifier = Modifier
+                                .size(tileSize * 0.9f)
+                                .alpha(if (isBlocked) mask else 1f)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = iconResId),
+                            contentDescription = "Tile Icon",
+                            modifier = Modifier
+                                .size(tileSize * 0.9f)
+                                .alpha(if (isBlocked) mask else 1f)
+                        )
+                    }
                 } else {
                     // 资源缺失：显示类型编号作为占位符
                     if (tile.z >= 1) {
@@ -165,7 +191,7 @@ fun TileView(
                     ) {
                         Text(
                             text = tile.type.toString(),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )

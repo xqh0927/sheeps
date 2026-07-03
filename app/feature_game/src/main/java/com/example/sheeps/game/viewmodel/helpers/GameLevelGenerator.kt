@@ -169,28 +169,41 @@ class GameLevelGenerator @Inject constructor() {
             normCx = 0f; normCy = 0f; normScale = 1.0f
         }
 
-        // 关卡类型全局概率分布计算 (20% 盲盒, 40% 封印, 40% 正常)
-        val randType = lcg(levelId * 1000L + 500)
-        val typeRoll = randType()
-        // 只有 levelId >= 3 才能生成盲盒关卡，概率为 20%
-        val isBlindLevel = levelId >= 3 && typeRoll < 0.20
-        // 关卡为 Level 2 及以上时，40% 的概率为封印关卡 (即 0.20 <= typeRoll < 0.60)
-        val isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60
+        // ===== 固定关卡类型规则（替代随机） =====
+        // 休息关（levelId % 5 == 0，levelId >= 5）：卡牌数量打八折
+        // 盲盒关（levelId % 3 == 0，levelId >= 3）：底层卡牌部分变盲盒
+        // 封印关（levelId % 2 == 0）：每张卡有概率带封印
+        // 优先级: 休息 > 盲盒 > 封印 > 普通
+        val isRest = isRestLevel(levelId)
+        val isBlindLevel = !isRest && levelId >= 3 && levelId % 3 == 0
+        val isSealedLevel = !isRest && !isBlindLevel && levelId >= 2 && levelId % 2 == 0
 
-        val randProps = lcg(levelId * 1000L + 200)
         val maxZ = coordinates.maxOfOrNull { it.z } ?: 0
+        // 盲盒关卡：均匀分布固定数量的盲盒牌
+        val blindIndices = if (isBlindLevel) {
+            val blindProb = minOf(0.20, 0.10 + (levelId - 3) * 0.015)
+            val limitZ = if (maxZ >= 4) (maxZ - 2) else (maxZ - 1)
+            val eligible = nodes.filter { it.coord.z < limitZ }
+            val count = maxOf(1, (eligible.size * blindProb).toInt())
+            // 对 eligible 名单洗牌后取前 count 个作为盲盒牌
+            val indices = eligible.indices.toMutableList()
+            val randShuffle = lcg(levelId * 1000L + 200)
+            for (i in indices.indices.reversed()) {
+                val j = (randShuffle() * (i + 1)).toInt()
+                val tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp
+            }
+            indices.take(count).map { eligible[it].index }.toSet()
+        } else {
+            emptySet()
+        }
+
+        val randProps = lcg(levelId * 1000L + 300)
         return nodes.map { node ->
-            var isBlind = false
+            var isBlind = node.index in blindIndices
             var sealed = 0
 
-            val r = randProps()
-            if (isBlindLevel) {
-                val blindProb = minOf(0.20, 0.10 + (levelId - 3) * 0.015)
-                val limitZ = if (maxZ >= 4) (maxZ - 2) else (maxZ - 1)
-                if (r < blindProb && node.coord.z < limitZ) {
-                    isBlind = true
-                }
-            } else if (isSealedLevel) {
+            if (!isBlindLevel && isSealedLevel) {
+                val r = randProps()
                 if (r < 0.30) {
                     sealed = 1
                 }

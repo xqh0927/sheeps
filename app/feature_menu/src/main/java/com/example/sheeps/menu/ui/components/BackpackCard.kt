@@ -187,7 +187,7 @@ private fun BackpackItem(
                     )
                 } else {
                     Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                        Text("?", fontSize = 16.sp, color = Color.Gray)
+                        Text("?", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -210,7 +210,7 @@ private fun BackpackItem(
             text = stringResource(id = R.string.backpack_stock, item.count),
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
-            color = Color.DarkGray
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -292,7 +292,7 @@ private fun BackpackItemDetailDialog(
                     text = stringResource(id = R.string.backpack_stock, item.count),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -345,9 +345,9 @@ private fun BackpackItemDetailDialog(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF9E1F1F),
-                                contentColor = Color.White,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
                                 disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                disabledContentColor = Color.Gray
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             modifier = Modifier.weight(1.2f)
                         ) {
@@ -366,7 +366,7 @@ private fun BackpackItemDetailDialog(
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF9E1F1F),
-                                contentColor = Color.White
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier.weight(1.2f)
                         ) {

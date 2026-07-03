@@ -113,7 +113,7 @@ private fun PointRecordItem(record: PointRecord) {
             Text(
                 text = formatTimestamp(record.created_at),
                 fontSize = 10.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(
@@ -147,7 +147,7 @@ private fun ExchangeRecordItem(record: ExchangeRecord) {
             Text(
                 text = formatTimestamp(record.created_at),
                 fontSize = 10.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Text(

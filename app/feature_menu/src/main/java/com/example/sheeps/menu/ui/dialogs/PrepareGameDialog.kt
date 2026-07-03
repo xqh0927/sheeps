@@ -45,15 +45,9 @@ fun PrepareGameDialog(
     val isLocked = levelId > state.unlockedLevel
     val cost = if (levelId == 2) 50 else if (levelId == 3) 100 else 200
 
-    val hasBlind = remember(levelId) {
-        if (levelId >= 3) {
-            // 模拟 LCG 算法判断关卡类型是否为盲盒关卡（概率 20%）
-            var s = levelId * 1000L + 500L
-            s = (s * 1664525L + 1013904223L) % 4294967296L
-            val typeRoll = s.toDouble() / 4294967296.0
-            typeRoll < 0.20
-        } else false
-    }
+    val isRest = levelId >= 5 && levelId % 5 == 0
+    val isBlind = !isRest && levelId >= 3 && levelId % 3 == 0
+    val isSealed = !isRest && !isBlind && levelId >= 2 && levelId % 2 == 0
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -74,7 +68,7 @@ fun PrepareGameDialog(
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }) { /* Block click propagation */ },
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF9)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     2.dp,
                     Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondary, Color(0xFFEDD9A3), MaterialTheme.colorScheme.secondary))
@@ -102,7 +96,7 @@ fun PrepareGameDialog(
                                 text = stringResource(id = R.string.prepare_locked_desc, cost, state.points),
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,
-                                color = Color.DarkGray
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                             Row(
@@ -110,7 +104,7 @@ fun PrepareGameDialog(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text(stringResource(id = R.string.dialog_prepare_back), color = Color.Gray)
+                                    Text(stringResource(id = R.string.dialog_prepare_back), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Button(
@@ -124,7 +118,7 @@ fun PrepareGameDialog(
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(stringResource(id = R.string.dialog_prepare_unlock), color = Color.White)
+                                    Text(stringResource(id = R.string.dialog_prepare_unlock), color = MaterialTheme.colorScheme.onPrimary)
                                 }
                             }
                         }
@@ -133,13 +127,13 @@ fun PrepareGameDialog(
                             Text(
                                 text = stringResource(id = R.string.prepare_setup_desc),
                                 fontSize = 12.sp,
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 16.sp
                             )
 
-                            if (hasBlind) {
+                            if (isBlind) {
                                 Card(
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF0EC)),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 ) {
@@ -148,8 +142,29 @@ fun PrepareGameDialog(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "⚠️ 秘境深处迷雾重重！本关已启用「盲盒牌」，卡牌下方图案不可见，难度大幅提升！",
+                                            text = stringResource(id = R.string.prepare_blind_warning),
                                             color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            lineHeight = 15.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (isSealed) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(id = R.string.prepare_sealed_warning),
+                                            color = MaterialTheme.colorScheme.secondary,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             lineHeight = 15.sp
@@ -189,10 +204,10 @@ fun PrepareGameDialog(
                                             Column(
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .background(Color(0xFFFCFAF6), RoundedCornerShape(12.dp))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
                                                     .border(
                                                         1.dp,
-                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color(0xFFE5DDD3),
+                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant,
                                                         RoundedCornerShape(12.dp)
                                                     )
                                                     .padding(vertical = 8.dp, horizontal = 4.dp),
@@ -208,13 +223,13 @@ fun PrepareGameDialog(
                                                     text = name,
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.DarkGray,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     maxLines = 1
                                                 )
                                                 Text(
                                                     stringResource(id = R.string.stock_prefix, stock),
                                                     fontSize = 9.sp,
-                                                    color = Color.Gray,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1
                                                 )
 
@@ -229,14 +244,14 @@ fun PrepareGameDialog(
                                                         modifier = Modifier
                                                             .size(22.dp)
                                                             .clip(CircleShape)
-                                                            .background(if (selected > 0) Color(0xFFFFF0EC) else Color(0xFFF5F5F5))
+                                                            .background(if (selected > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
                                                             .clickable(enabled = selected > 0) { onUpdateItem(type, -1) },
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowDown,
                                                             contentDescription = stringResource(id = R.string.prepare_desc_decrease),
-                                                            tint = if (selected > 0) MaterialTheme.colorScheme.primary else Color.Gray,
+                                                            tint = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -256,7 +271,7 @@ fun PrepareGameDialog(
                                                             ),
                                                         fontSize = 11.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        color = if (selected > 0) MaterialTheme.colorScheme.primary else Color.DarkGray
+                                                        color = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                     )
 
                                                     val canIncrease = selected < stock && (selected > 0 || selectedTypesCount < 5)
@@ -264,14 +279,14 @@ fun PrepareGameDialog(
                                                         modifier = Modifier
                                                             .size(22.dp)
                                                             .clip(CircleShape)
-                                                            .background(if (canIncrease) Color(0xFFFFF0EC) else Color(0xFFF5F5F5))
+                                                            .background(if (canIncrease) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
                                                             .clickable(enabled = canIncrease) { onUpdateItem(type, 1) },
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowUp,
                                                             contentDescription = stringResource(id = R.string.prepare_desc_increase),
-                                                            tint = if (canIncrease) MaterialTheme.colorScheme.primary else Color.Gray,
+                                                            tint = if (canIncrease) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -295,7 +310,7 @@ fun PrepareGameDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text(stringResource(id = R.string.dialog_prepare_close), color = Color.Gray)
+                                    Text(stringResource(id = R.string.dialog_prepare_close), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Button(
@@ -305,7 +320,7 @@ fun PrepareGameDialog(
                                 ) {
                                     Text(
                                         stringResource(id = R.string.prepare_btn_start),
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }

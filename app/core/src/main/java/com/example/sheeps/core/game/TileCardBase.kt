@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,16 +23,17 @@ fun TileCardBase(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit // 卡牌正面的图标内容
 ) {
+    val cs = MaterialTheme.colorScheme
     val normalizedSkin = skin.lowercase()
     
     // 根据皮肤类型定义背景色、边框色和装饰线颜色
     val (bgColor, borderColor, decorColor) = when (normalizedSkin) {
-        "ink" -> Triple(Color(0xFFF2EFE9), Color(0xFF333333), Color(0xFF888888)) // 水墨风格
-        "cyber" -> Triple(Color(0xFF0D0D0D), Color(0xFF00F2FE), Color(0xFFFF2A6D)) // 赛博朋克风格
-        "keai" -> Triple(Color(0xFFFFF8E1), Color(0xFFFF9800), Color(0xFFFFB74D)) // 萌趣卡通：暖黄底+橙色边框
-        "daimeng" -> Triple(Color(0xFFFCE4EC), Color(0xFFE91E63), Color(0xFFF48FB1)) // 呆萌手绘：粉底+玫红边框
-        "classic" -> Triple(Color(0xFFFFFDF9), Color(0xFFCBAA6A), Color(0xFFD4AF37)) // 经典中国风
-        else -> Triple(Color(0xFFFFFDF9), Color(0xFFCBAA6A), Color(0xFFD4AF37)) // 默认经典色调
+        "ink" -> Triple(cs.surface, cs.onSurface.copy(alpha = 0.3f), cs.onSurface.copy(alpha = 0.5f)) // 水墨风格
+        "cyber" -> Triple(cs.surface, Color(0xFF00F2FE), Color(0xFFFF2A6D)) // 赛博朋克风格：赛博色保留
+        "keai" -> Triple(cs.surface, cs.primary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.4f)) // 萌趣卡通
+        "daimeng" -> Triple(cs.surface, cs.secondary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.5f)) // 呆萌手绘
+        "classic" -> Triple(cs.surface, cs.primary, cs.secondary) // 经典中国风
+        else -> Triple(cs.surface, cs.primary, cs.secondary) // 默认经典色调
     }
 
     Box(
@@ -53,10 +55,10 @@ fun TileCardBase(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 根据皮肤绘制边角的装饰线（区分经典风格和赛博风格）
-            if (normalizedSkin == "classic" || normalizedSkin != "cyber") {
+            // 根据皮肤绘制边角的装饰线（所有非赛博皮肤走经典装饰，赛博皮肤保留霓虹）
+            if (normalizedSkin != "cyber") {
                 val decorLen = 12.dp.toPx()
-                // 绘制四个角的折线装饰
+                // 绘制四个角的折线装饰，颜色从 decorColor 读取
                 // 左上角
                 drawLine(decorColor, Offset(0f, decorLen), Offset(0f, 0f), strokeWidth)
                 drawLine(decorColor, Offset(0f, 0f), Offset(decorLen, 0f), strokeWidth)

@@ -218,6 +218,8 @@
     <string name="backpack_skins_section">卡牌皮肤</string>
     <string name="prepare_title_locked">关卡结界未解</string>
     <string name="prepare_title_unlocked">整装破局 (第 %1$d 关)</string>
+    <string name="prepare_blind_warning">⚠️ 本关为「盲盒关卡」！部分卡牌图案不可见，进入卡槽后才会揭示。考验眼力和运气！</string>
+    <string name="prepare_sealed_warning">🔒 本关为「封印关卡」！部分卡牌带有封印，需要多消除一次才能揭开。谨慎操作！</string>
     <string name="update_discovered">发现新版本 %1$s</string>
     <string name="update_log_title">更新日志：</string>
     <string name="update_default_log">全新版本，优化游戏操作体验。</string>

@@ -1,313 +1,512 @@
-# 遮挡检测深度分析报告
+# 秘境消消乐 · 主题配置完善 — 系统架构设计 + 任务分解
 
-## Part A: 系统分析
+> **设计者**：Bob (Architect)
+> **日期**：2025-07-11
+> **版本**：v1.0
 
-### 1. 核心分析结论
+---
 
-经过对全部关键代码路径的深入分析（GameEngine.kt、GameBoard.kt、GameLogicDelegate.kt、TileView.kt、TileCardBase.kt、level.ts、GameLevelGenerator.kt），得出以下结论：
+## Part A: 系统设计
 
-#### 根因定位
+### 1. 实现方案
 
-**根本原因：同层（same-z）卡牌视觉重叠 + 遮挡判定排除同层卡牌**
+#### 1.1 核心挑战
 
-具体机制如下：
+| 挑战 | 描述 | 解决方案 |
+|------|------|----------|
+| **Canvas 颜色提取** | `Canvas` 的 `DrawScope` 无法访问 `MaterialTheme.colorScheme`（因为 `DrawScope` 不在 `@Composable` 作用域内） | 在 `@Composable` 函数体内提前提取需要的颜色为局部变量，传入 `Canvas {}` lambda |
+| **TileCardBase 皮肤差异化** | 四种皮肤（ink/cyber/keai/daimeng）需要保留辨识度，但基础色必须来自主题 | 背景/边框/装饰色改用 `MaterialTheme.colorScheme` 的语义 token，在此基础上叠加 alpha 变换保持 skin 特征 |
+| **游戏道具图标色** | `ItemAnimationIcon.kt` 中大量游戏视觉标识色（金、霓虹、暗色）不宜全部替换为主题色 | 仅替换符合"通用 UI 色彩"规则的硬编码值（White、Gray、DarkGray、near-white backgrounds），保留游戏美术设计色 |
+| **模块分散** | 14 个文件分散在 5 个 Gradle 模块中 | 按模块 + 功能分组，同一模块内相似文件批量处理 |
 
-1. **SPACING(46) < TILE(48)**：相邻卡牌在渲染时中心距 46dp，牌宽 48dp，产生 2dp 逻辑重叠。加上 4dp shadow → 视觉重叠 ~9dp（在 scale≈0.5 时约占牌面的 ~40%）。
+#### 1.2 框架与库（无需新增）
 
-2. **遮挡判定跳过同层卡牌**：`GameEngine.isTileBlocked()` / `blocking()` 使用 `if (o.z <= tile.z) continue`，同层卡牌从不被视为遮挡者。
+本次为纯代码改造，不引入新依赖。使用的现有框架：
 
-3. **渲染顺序导致"上下层"错觉**：同层卡牌按 `boardTiles` 列表顺序渲染（来源于关卡生成时的 row-major 顺序）。后渲染的卡牌通过 Compose `zIndex` 同值时的组合顺序覆盖先渲染的卡牌，从用户视角看就像是"上层卡牌盖住了下层卡牌"。
+- **Jetpack Compose**：UI 框架，`MaterialTheme.colorScheme` 为核心改造入口
+- **Material3**：`ColorScheme` 提供语义化颜色 token（primary, secondary, surface, onSurface 等）
+- **MMKV**：主题持久化（已由 `ThemeManager` 管理，无需改动）
 
-4. **复杂形状加剧问题**：在星形/花朵等密集形状（如 180 张牌的大关卡）中，每个 z 层可能有 ~15-18 张牌密集排列，相邻同层卡牌大量视觉重叠。
+#### 1.3 架构模式
 
-#### 为什么之前的修复没有解决
+本次改造遵循 **MVVM + Compose Declarative UI** 模式，不改动架构层次：
 
-| 之前修复 | 为什么无关 |
-|----------|-----------|
-| `updateState` 合并策略（基于 `currentState`） | 涉及状态更新传播，与重叠检测公式无关 |
-| 服务端/客户端 `blocks()` 面积→逐轴判定 | 只影响边界阈值情况（ox/oy 接近 0.25），与同层重叠无关 |
-| 编译错误修复 | 纯语法问题 |
-
-**这三个修复都没有触及"同层卡牌不参与遮挡判定"这一核心设计决策。**
-
-### 2. 关键代码路径分析
-
-#### 2.1 遮挡判定（GameEngine.kt）
-
-```kotlin
-// 行 88-97：核心碰撞判定
-private fun blocking(a: Tile, b: Tile): Boolean {
-    if (b.z <= a.z) return false  // ← 同层直接跳过！
-    val ox = TILE - abs(b.x - a.x) * SPACING  // 48 - dx*46
-    val oy = TILE - abs(b.y - a.y) * SPACING
-    return ox > OVERLAP_MARGIN && oy > OVERLAP_MARGIN
-}
+```
+┌─────────────────────────────────────────┐
+│  @Composable 函数                        │
+│  ├─ val cs = MaterialTheme.colorScheme   │  ← 提取颜色变量
+│  ├─ Canvas { ... cs.surface ... }        │  ← Canvas 内使用局部变量
+│  └─ 其他 Composable 组件                 │
+└─────────────────────────────────────────┘
+         ↓ 读取
+┌─────────────────────────────────────────┐
+│  MaterialTheme.colorScheme               │
+│  ← SheepsTheme() 根据 AppTheme 注入      │
+└─────────────────────────────────────────┘
+         ↓ 管理
+┌─────────────────────────────────────────┐
+│  ThemeManager (MMKV 持久化)              │
+└─────────────────────────────────────────┘
 ```
 
-#### 2.2 渲染布局（GameBoard.kt）
+### 2. 文件列表
 
-```kotlin
-val tileSize = 48   // dp
-val spacing = 46    // dp：中心间距
+#### 2.1 P0 — TileCardBase 主题适配
 
-// 行 127-130：渲染偏移
-.offset(
-    x = ((tile.x - minX) * spacing * scale).dp,
-    y = ((tile.y - minY) * spacing * scale).dp
-)
-.zIndex(tile.z.toFloat())   // 同 z 则按列表顺序渲染
-```
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| TileCardBase.kt | `app/core/src/main/java/com/example/sheeps/core/game/TileCardBase.kt` | **修改** |
 
-#### 2.3 视觉尺寸 vs 逻辑尺寸（TileCardBase.kt）
+#### 2.2 P1 — 残留硬编码清理
 
-```kotlin
-.shadow(4.dp, RoundedCornerShape(8.dp))  // 向外扩展 4dp
-// Canvas 边框 2dp（内向）
-```
+**core 模块：**
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| ItemAnimationIcon.kt | `app/core/src/main/java/com/example/sheeps/ui/components/ItemAnimationIcon.kt` | **修改** |
 
-视觉有效尺寸 ≈ 48 + 4×2 = **56dp**，而逻辑 TILE = **48**。差异 = 8dp。
+**feature_menu 模块：**
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| ShopScreen.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/screens/ShopScreen.kt` | **修改** |
+| ShopItemCard.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/ShopItemCard.kt` | **修改** |
+| BackpackCard.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/BackpackCard.kt` | **修改** |
+| OfflineWarnBanner.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/OfflineWarnBanner.kt` | **修改** |
+| DuelMatchDialog.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/DuelMatchDialog.kt` | **修改** |
+| DailyLeaderboardPopupDialog.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/DailyLeaderboardPopupDialog.kt` | **修改** |
+| ConflictDialog.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/ConflictDialog.kt` | **修改** |
+| AppUpdateDialog.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/AppUpdateDialog.kt` | **修改** |
+| HistoryDialogs.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/HistoryDialogs.kt` | **修改** |
+| PrepareGameDialog.kt | `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/PrepareGameDialog.kt` | **修改** |
 
-#### 2.4 点击处理（GameLogicDelegate.kt）
+**feature_game 模块：**
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| DuelHeader.kt | `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/DuelHeader.kt` | **修改** |
+| DuelSpellPanel.kt | `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/DuelSpellPanel.kt` | **修改** |
+| TileView.kt | `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/TileView.kt` | **修改** |
 
-```kotlin
-// 行 35：双重检查
-val isBlocked = tile.state == TileState.BLOCKED
-    || isTileBlocked(tile, state.boardTiles)
-```
+**feature_splash 模块：**
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| SplashActivity.kt | `app/feature_splash/src/main/java/com/example/sheeps/splash/SplashActivity.kt` | **修改** |
 
-`isTileBlocked` 做 O(N²) 实时检测，但同样使用 `blocking()` → 同层被跳过。
+#### 2.3 P2 — 死代码删除 + 注释更新
 
-### 3. 数据流与类图
+| 文件 | 路径 | 操作 |
+|------|------|------|
+| Theme.kt (旧) | `app/core/src/main/java/com/example/sheeps/core/theme/Theme.kt` | **删除** |
+| Theme.kt (新) | `app/core/src/main/java/com/example/sheeps/theme/Theme.kt` | **修改**（注释） |
+
+### 3. 数据结构和接口
+
+本改造不新增类/接口，仅使用现有架构。核心数据流：
 
 ```mermaid
 classDiagram
-    class Tile {
-        +String id
-        +Int type
-        +Float x
-        +Float y
-        +Int z
-        +TileState state
-        +Boolean isBlind
-        +Int sealedCount
-    }
-
-    class TileState {
+    class AppTheme {
         <<enumeration>>
-        NORMAL
-        BLOCKED
-        IN_SLOT
-        MOVED_OUT
+        FOREST
+        QING_RI_CHUN
+        MO_YE_GOLD
+        SAKURA
+        COSMIC
+        SUNSET
+        +fromKey(key: String) AppTheme
     }
 
-    class GameEngine {
-        +isTileBlocked(tile, board) Boolean$
-        +getBlockingTiles(tile, board) List~Tile~$
-        +calculateBlockedStates(board) List~Tile~$
-        -blocking(a, b) Boolean$
-        -buildGrid(board) Map$
-        -isBlockedGrid(tile, grid) Boolean$
-        -TILE: 48f$
-        -SPACING: 46f$
-        -OVERLAP_MARGIN: 0.25f$
+    class ThemeManager {
+        <<object>>
+        +currentTheme: StateFlow~AppTheme~
+        +init()
+        +setTheme(theme: AppTheme)
+        +getCurrentTheme() AppTheme
+        +getThemeResId() Int
+        +isDarkTheme() Boolean
     }
 
-    class GameBoard {
-        +GameBoard(state, flyingTileIds, ...)
-        -tileSize: 48
-        -spacing: 46
+    class SheepsTheme {
+        <<Composable function>>
+        +forceTheme: AppTheme?
+        +content: @Composable () -> Unit
     }
 
-    class TileView {
-        +TileView(tile, onClick, ...)
-        -isBlocked: Boolean
-        -alpha(0.45f if blocked)
+    class ColorScheme {
+        <<Material3>>
+        +primary
+        +secondary
+        +surface
+        +onSurface
+        +surfaceVariant
+        +onSurfaceVariant
+        +outline
+        +outlineVariant
+        +scrim
+        +background
+        +error
     }
 
     class TileCardBase {
-        +TileCardBase(skin, modifier, content)
-        -shadow(4.dp)
-        -border(2.dp)
+        <<Composable function>>
+        +skin: String
+        +modifier: Modifier
+        +content: @Composable () -> Unit
     }
 
-    class GameLogicDelegate {
-        +handleClickTile(...)
-        +processSlotMatchAndCheckEndGame(...)
-        -insertIntoSlot(slot, tile)
+    class TileView {
+        <<Composable function>>
+        +tile: Tile
+        +onClick: () -> Unit
+        +currentSkin: String
+        +tileSize: Dp
     }
 
-    class GameLevelGenerator {
-        +generateSolvableLevelLocal(levelId) List~Tile~$
-        -blocks(a, b) Boolean
-    }
-
-    GameBoard --> TileView : renders
-    TileView --> TileCardBase : wraps
-    TileView --> Tile : data
-    GameLogicDelegate --> GameEngine : uses
-    GameEngine --> Tile : computes
-    GameLevelGenerator --> Tile : generates
-    Tile --> TileState : has
+    ThemeManager --> AppTheme : manages
+    SheepsTheme --> ThemeManager : reads currentTheme
+    SheepsTheme --> ColorScheme : injects into MaterialTheme
+    TileCardBase --> ColorScheme : reads via MaterialTheme
+    TileView --> TileCardBase : composes
 ```
 
-### 4. 点击流程时序图
+### 4. 程序调用流
+
+#### 4.1 TileCardBase 主题适配流程
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant GameBoard as GameBoard (UI)
-    participant GLD as GameLogicDelegate
-    participant GE as GameEngine
-    participant State as GameViewState
+    participant App as App Entry
+    participant ST as SheepsTheme()
+    participant TM as ThemeManager
+    participant M3 as MaterialTheme
+    participant TCB as TileCardBase()
+    participant Canvas as Canvas DrawScope
 
-    User->>GameBoard: 点击卡牌 A (z=2)
-    GameBoard->>GLD: handleClickTile(tileA)
+    App->>TM: init() 从 MMKV 读取主题
+    App->>ST: SheepsTheme { content }
+    ST->>TM: currentTheme.collectAsState()
+    TM-->>ST: AppTheme (e.g. SAKURA)
+    ST->>M3: MaterialTheme(colorScheme = SakuraColorScheme)
+    Note over M3: colorScheme 注入 CompositionLocal
 
-    Note over GLD: 第一步：遮挡检查
-    GLD->>GE: isTileBlocked(tileA, boardTiles)
-    GE->>GE: for o in board: if o.z<=2 skip
-    Note over GE: 同层卡牌 (z=2) 被跳过！
-    Note over GE: 高层卡牌 (z=3+) 若无重叠 → false
-    GE-->>GLD: false (未被遮挡)
-    GLD->>GLD: tile.state 不是 BLOCKED
-
-    Note over GLD: 第二步：状态检查通过
-    Note over GLD: 第三步：标记 IN_SLOT + 入槽
-
-    GLD->>State: updateState (异步协程)
-    Note over State: processSlotMatchAndCheckEndGame
-    State->>GE: calculateBlockedStates(board)
-    State->>State: 合并 boardTiles 状态
-
-    Note over GameBoard: 重新渲染 boardTiles
-    Note over GameBoard: visibleTiles = filter(NORMAL|BLOCKED)
+    App->>TCB: TileCardBase(skin = "cyber")
+    TCB->>M3: val cs = MaterialTheme.colorScheme
+    Note over TCB: 提取 cs.surface, cs.onSurface 等到局部变量
+    TCB->>Canvas: Canvas { drawRoundRect(surfaceVariant), drawLine(onSurfaceVariant) }
+    Note over Canvas: Canvas 内使用闭包捕获的局部变量
 ```
 
-### 5. 坐标归一化影响分析
+#### 4.2 皮肤差异化决策流程
 
-**结论：归一化不影响遮挡检测的正确性。**
+```mermaid
+sequenceDiagram
+    participant TCB as TileCardBase()
+    participant M3 as MaterialTheme.colorScheme
 
-归一化（`targetCenter=5.5, targetRadius=4.8`）是均匀缩放变换：
-- 原始 dx=0.5 → 归一化 dx=0.5×normScale（normScale ≤ 1.0）
-- `ox = 48 - dx_norm × 46`：dx 缩小 → ox 放大 → 遮挡检测更敏感，不会漏检
-- 渲染使用相同归一化坐标 → 视觉重叠与逻辑重叠成比例
+    TCB->>TCB: val cs = MaterialTheme.colorScheme
+    TCB->>TCB: when(normalizedSkin) { ... }
 
-### 6. 哈希网格精度分析
+    alt skin == "ink"
+        Note over TCB: bgColor = cs.surfaceVariant.copy(alpha = 0.3f)<br/>borderColor = cs.onSurface.copy(alpha = 0.8f)<br/>decorColor = cs.onSurfaceVariant
+    else skin == "cyber"
+        Note over TCB: bgColor = cs.surface (深色模式为 dark)<br/>borderColor = cs.primary<br/>decorColor = cs.secondary
+    else skin == "keai"
+        Note over TCB: bgColor = cs.surfaceVariant<br/>borderColor = cs.secondary<br/>decorColor = cs.secondary.copy(alpha = 0.7f)
+    else skin == "daimeng"
+        Note over TCB: bgColor = cs.surfaceVariant<br/>borderColor = cs.primary.copy(alpha = 0.8f)<br/>decorColor = cs.primary.copy(alpha = 0.5f)
+    else classic/default
+        Note over TCB: bgColor = cs.surface<br/>borderColor = cs.secondary<br/>decorColor = cs.secondary.copy(alpha = 0.5f)
+    end
+```
 
-**结论：哈希网格 ±2 搜索范围足够，不会遗漏遮挡关系。**
+#### 4.3 P1 硬编码替换通用流程
 
-- 归一化坐标范围 ~[0.7, 10.3]，分桶键 = floor(x)
-- 搜索范围 ±2：覆盖 5×5 = 25 个桶
-- 如果遮挡卡牌在搜索范围外（dx > 2.5），则 `ox = 48 - 2.5×46 = -67 < 0.25`，本身就不满足遮挡条件
-- 因此在搜索范围内未找到 = 不存在遮挡
+```mermaid
+sequenceDiagram
+    participant Comp as @Composable fn
+    participant M3 as MaterialTheme.colorScheme
+    participant Widget as UI Widget/Canvas
+
+    Comp->>M3: val cs = MaterialTheme.colorScheme
+    Note over Comp: 遵循映射规则提取颜色
+
+    alt Color.White / Color(0xFFFFFDF9) / Color(0xFFFCFAF6)
+        Note over Comp: → cs.surface
+    else Color(0xFFE5DDD3) / 浅灰边框
+        Note over Comp: → cs.outlineVariant
+    else Color.DarkGray / Color(0xFF333333) / Color(0xFF1C1A17)
+        Note over Comp: → cs.onSurface
+    else Color.Gray / Color(0xFF888888)
+        Note over Comp: → cs.onSurfaceVariant
+    else Color.Black.copy(alpha = 0.5f)
+        Note over Comp: → cs.scrim
+    else Color(0xFF00E5FF) / Color(0xFF0288D1) / 等 —— 游戏标识色
+        Note over Comp: 保持不变（游戏视觉标识）
+    end
+
+    Comp->>Widget: 传入提取后的颜色
+```
+
+### 5. 待明确事项
+
+| # | 问题 | 假设 |
+|---|------|------|
+| 1 | `core/theme/ThemeManager.kt` 和 `core/theme/ThemeSwitchDialog.kt` 是否也是死代码？ | 按 PRD 要求，仅删除 `core/theme/Theme.kt`，保留另两个文件。后续如需清理，另开任务。 |
+| 2 | `ItemAnimationIcon.kt` 中 `Color(0xFFCBAA6A)` 等金色系是否应替换？ | 不替换。这些是游戏美术标识色（太极图金、铜钱金），不属于通用 UI 色彩，不在映射规则内。 |
+| 3 | `SplashActivity.kt` 的渐变背景色 `Color(0xFF0D1117)` / `Color(0xFF1A0A0A)` / `Color(0xFF2D0808)` 如何映射？ | 这是 splash 专属暗红色渐变特效。`Color(0xFF0D1117)` → `MaterialTheme.colorScheme.background` 为基础，叠加 primary 透明度渐变。保留视觉意图但使用主题 token。 |
+| 4 | `DuelSpellPanel.kt` 的法术颜色（`Color(0xFF8C7B70)` 等）是否替换？ | 部分替换。FOG/SILENCE/SHUFFLE 的颜色转为从 `primary`/`secondary` 的 alpha 变体派生，保持辨识度；SHRINK 和 SEAL_ALL 已使用主题色，不变。 |
+| 5 | `Color(0xFF2E7D32)` (matched 状态绿色) 映射目标？ | 已使用 `Jade_Success` → `MaterialTheme.colorScheme.tertiary` |
 
 ---
 
-## Part B: 修复方案
+## Part B: 任务分解
 
-### 6. 推荐修复方案
+### 6. 所需依赖包
 
-#### 方案 A（推荐，最小改动）：增大渲染间距以消除同层视觉重叠
+无需新增依赖。所有改造基于现有依赖：
 
-**改动范围**：仅 GameBoard.kt（1 行）
-
-```kotlin
-// GameBoard.kt 第 53 行
-val spacing = 48   // 原值 46
+```
+- org.jetbrains.compose.material3:material3 (现有)
+- androidx.compose.ui:ui (现有)
+- com.tencent.mmkv:mmkv (现有，ThemeManager 使用)
 ```
 
-**效果**：
-- 同层相邻卡牌 (dx=1.0)：中心距 48dp，牌宽 48dp → 恰好相切，无重叠
-- 跨层卡牌 (dx=0.5)：中心距 24dp，牌宽 48dp → 重叠 24dp，遮挡正确
-- 跨层卡牌 (dx=1.5)：中心距 72dp，牌宽 48dp → 间距 24dp，无遮挡
-- **棋盘宽度增加约 4.3%**，对大多数关卡影响可忽略
+### 7. 任务列表（按依赖顺序）
 
-**优点**：简单、安全、不改动核心逻辑
+---
 
-**缺点**：轻微改变视觉效果（卡牌间距增大 2dp）
+#### T01: Core 模块主题基础设施 + P0 P2 改造
 
-#### 方案 B（备选）：增大 TILE 常量以匹配视觉范围
+| 属性 | 值 |
+|------|------|
+| **Task ID** | T01 |
+| **Priority** | P0 |
+| **Dependencies** | 无 |
 
-**改动范围**：仅 GameEngine.kt（1 行）
+**源文件**：
+1. `app/core/src/main/java/com/example/sheeps/core/game/TileCardBase.kt` — **修改**
+2. `app/core/src/main/java/com/example/sheeps/ui/components/ItemAnimationIcon.kt` — **修改**
+3. `app/core/src/main/java/com/example/sheeps/core/theme/Theme.kt` — **删除**
+4. `app/core/src/main/java/com/example/sheeps/theme/Theme.kt` — **修改**（注释）
+
+**范围**：
+- **TileCardBase.kt**：将 `when(normalizedSkin)` 内所有硬编码 Color 替换为 `MaterialTheme.colorScheme` 的语义化 token。在 Composable 入口处提取 `val cs = MaterialTheme.colorScheme`，Canvas lambda 内使用闭包捕获的局部变量。
+  - `bgColor`：ink→`cs.surfaceVariant.copy(alpha=0.3f)`, cyber→`cs.surface`, keai→`cs.surfaceVariant`, daimeng→`cs.surfaceVariant`, classic/default→`cs.surface`
+  - `borderColor`：ink→`cs.onSurface.copy(alpha=0.8f)`, cyber→`cs.primary`, keai→`cs.secondary`, daimeng→`cs.primary.copy(alpha=0.8f)`, classic/default→`cs.secondary`
+  - `decorColor`：ink→`cs.onSurfaceVariant`, cyber→`cs.secondary`, keai→`cs.secondary.copy(alpha=0.7f)`, daimeng→`cs.primary.copy(alpha=0.5f)`, classic/default→`cs.secondary.copy(alpha=0.5f)`
+  - 赛博装饰渐变 `listOf(Color(0xFF00F2FE), Color(0xFFFF2A6D))` → `listOf(cs.primary, cs.secondary)`
+- **ItemAnimationIcon.kt**：仅替换符合"通用 UI 色彩"规则的硬编码值：
+  - `Color(0xFFFCFAF6)` (背景) → `MaterialTheme.colorScheme.surface`
+  - `Color.White` (太极图/Cavas) → `MaterialTheme.colorScheme.surface`
+  - `Color(0xFFFFFDF9)` (天眼高光) → `MaterialTheme.colorScheme.surface`
+  - 保留所有金色系 (`0xFFCBAA6A`, `0xFFE5B55F`, `0xFFFFD60A`)、霓虹色系 (`0xFF00F2FE`, `0xFFFF2A6D`)、暗灰色系 (`0xFF2C2F33`, `0xFF5A6065`) 等游戏标识色
+- **core/theme/Theme.kt**：删除整个文件（已被 `theme/Theme.kt` + `ThemeManager` 取代）
+- **theme/Theme.kt**：第 14 行注释更新为 `// 支持森林绿 / 清日春 / 墨夜金 / 樱花粉 / 星空蓝 / 暖阳橙 六套主题`
+
+---
+
+#### T02: 菜单模块屏幕与卡片组件
+
+| 属性 | 值 |
+|------|------|
+| **Task ID** | T02 |
+| **Priority** | P1 |
+| **Dependencies** | T01 |
+
+**源文件**：
+1. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/screens/ShopScreen.kt` — **修改**
+2. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/ShopItemCard.kt` — **修改**
+3. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/BackpackCard.kt` — **修改**
+4. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/components/OfflineWarnBanner.kt` — **修改**
+
+**范围**（遵循 §8 共享约定中的映射规则）：
+- **ShopScreen.kt**：
+  - `Color.Transparent` → 保留（语义透明）
+  - `Color.White.copy(alpha = 0.85f)` → `MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)`
+  - `Color(0xFFFFFDF9)` → `MaterialTheme.colorScheme.surface`
+  - `Color.Gray` → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Button` 的 `Color.White` content → `MaterialTheme.colorScheme.onPrimary`
+- **ShopItemCard.kt**：
+  - `Color.White` (Card container) → `MaterialTheme.colorScheme.surface`
+  - `Color(0xFFE5DDD3)` → `MaterialTheme.colorScheme.outlineVariant`
+  - `Color.Gray` (placeholder, desc, stock) → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color.DarkGray` (title) → `MaterialTheme.colorScheme.onSurface`
+  - `Color(0xFFE0E0E0)` (disabled) → `MaterialTheme.colorScheme.outlineVariant`
+  - `Color.White` (button text) → `MaterialTheme.colorScheme.onPrimary`
+- **BackpackCard.kt**：
+  - `Color.Gray` (背包物品计数、详情) → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color.DarkGray` (库存) → `MaterialTheme.colorScheme.onSurface`
+  - `Color(0xFFCBAA6A)` (黄金边框) → `MaterialTheme.colorScheme.secondary`（此色为 UI 装饰边框，非游戏标识）
+  - `Color(0xFF9E1F1F)` (主要按钮容器色) → `MaterialTheme.colorScheme.primary`
+  - `Color.White` (按钮文字) → `MaterialTheme.colorScheme.onPrimary`
+- **OfflineWarnBanner.kt**：
+  - `Color(0xFFFBEBEB)` (背景) → `MaterialTheme.colorScheme.errorContainer`（淡红警告背景）
+
+---
+
+#### T03: 菜单模块弹窗组件
+
+| 属性 | 值 |
+|------|------|
+| **Task ID** | T03 |
+| **Priority** | P1 |
+| **Dependencies** | T01 |
+
+**源文件**：
+1. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/DuelMatchDialog.kt` — **修改**
+2. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/DailyLeaderboardPopupDialog.kt` — **修改**
+3. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/ConflictDialog.kt` — **修改**
+4. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/AppUpdateDialog.kt` — **修改**
+5. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/HistoryDialogs.kt` — **修改**
+6. `app/feature_menu/src/main/java/com/example/sheeps/menu/ui/dialogs/PrepareGameDialog.kt` — **修改**
+
+**范围**（遵循 §8 共享约定）：
+- **DuelMatchDialog.kt**：
+  - `Color.White` (太极图白色半圆) → `MaterialTheme.colorScheme.surface`
+  - `Color.Gray` → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color(0xFF2E7D32)` (匹配成功绿色) → `MaterialTheme.colorScheme.tertiary`
+  - `Color.White` (按钮文字) → `MaterialTheme.colorScheme.onPrimary`
+- **DailyLeaderboardPopupDialog.kt**：
+  - `Color.White` (按钮文字) → `MaterialTheme.colorScheme.onPrimary`
+  - `Color(0xFFFCFAF6)` → `MaterialTheme.colorScheme.surface`
+  - `Color(0xFFE5DDD3)` → `MaterialTheme.colorScheme.outlineVariant`
+  - `Color.DarkGray` → `MaterialTheme.colorScheme.onSurface`
+- **ConflictDialog.kt**：
+  - `Color.DarkGray` → `MaterialTheme.colorScheme.onSurface`
+  - `Color.Gray` → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color(0xFFF9F7F5)` / `Color(0xFFF5F9F7)` → `MaterialTheme.colorScheme.surfaceVariant`
+- **AppUpdateDialog.kt**：
+  - `Color.White` → `MaterialTheme.colorScheme.onPrimary`
+  - `Color(0xFFFF9800)` (权限提示) → 保留（系统级警告色，非主题色）
+- **HistoryDialogs.kt**：
+  - `Color.Gray` → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color(0xFF4CAF50)` (入账绿色) → `MaterialTheme.colorScheme.tertiary`
+- **PrepareGameDialog.kt**：
+  - `Color.Black.copy(alpha = 0.5f)` (遮罩) → `MaterialTheme.colorScheme.scrim`
+  - `Color(0xFFFFFDF9)` → `MaterialTheme.colorScheme.surface`
+  - `Color.DarkGray` / `Color.Gray` → `MaterialTheme.colorScheme.onSurface` / `onSurfaceVariant`
+  - `Color(0xFFFCFAF6)` → `MaterialTheme.colorScheme.surface`
+  - `Color(0xFFE5DDD3)` → `MaterialTheme.colorScheme.outlineVariant`
+  - `Color(0xFFFFF0EC)` / `Color(0xFFF0F4FF)` → `MaterialTheme.colorScheme.surfaceVariant` + alpha
+  - `Color(0xFFF5F5F5)` → `MaterialTheme.colorScheme.surfaceVariant`
+  - `Color.White` (按钮文字) → `MaterialTheme.colorScheme.onPrimary`
+  - `Color(0xFFEDD9A3)` (渐变边框) → 保留（装饰性渐变，非主题色）
+
+---
+
+#### T04: 游戏模块 + 启动页
+
+| 属性 | 值 |
+|------|------|
+| **Task ID** | T04 |
+| **Priority** | P1 |
+| **Dependencies** | T01 |
+
+**源文件**：
+1. `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/DuelHeader.kt` — **修改**
+2. `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/DuelSpellPanel.kt` — **修改**
+3. `app/feature_game/src/main/java/com/example/sheeps/game/ui/components/TileView.kt` — **修改**
+4. `app/feature_splash/src/main/java/com/example/sheeps/splash/SplashActivity.kt` — **修改**
+
+**范围**（遵循 §8 共享约定）：
+- **DuelHeader.kt**：
+  - `Color.Green` / `Color.Yellow` / `Color.Red` (连接状态) → 保留（系统状态指示色，语义明确，非主题色）
+  - `Color(0xFF00E5FF)` / `Color(0xFF0288D1)` (能量条渐变) → 保留（游戏视觉标识）或替换为 `cs.primary` / `cs.tertiary` 渐变 → **保留**（Duel 视觉标识色）
+- **DuelSpellPanel.kt**：
+  - `Color(0xFF8C7B70)` (FOG) → `MaterialTheme.colorScheme.onSurfaceVariant`
+  - `Color(0xFF7E57C2)` (SILENCE) → `MaterialTheme.colorScheme.tertiary`
+  - `Color(0xFF26A69A)` (SHUFFLE) → `MaterialTheme.colorScheme.primary.copy(alpha=0.7f)`
+  - 已使用主题色的 SHRINK 和 SEAL_ALL 不变
+  - `Color.White` / `Color.Gray` (按钮文字) → `MaterialTheme.colorScheme.onPrimary` / `onSurfaceVariant`
+- **TileView.kt**：
+  - `Color.Red` / `Color.Blue` (DEBUG label) → 保留（仅 debug 可见）
+  - `Color.Transparent` → 保留
+  - `Color.White` (占位文字) → `MaterialTheme.colorScheme.onSurface`
+  - `Color(0xBB2C3E50)` (封印底色) → 保留（游戏内特殊状态特效，非 UI 主题色）
+  - `Color(0xFFF1C40F)` (封印边框+计数) → 保留（游戏内封印特效标识色）
+  - `Color(0xFFF1C40F).copy(alpha = 0.8f)` (封印边框) → 保留
+  - `isShaking` 红色边框 `Color.Red` → 保留（紧急状态指示，语义固定）
+- **SplashActivity.kt**：
+  - 渐变背景：`listOf(Color(0xFF0D1117), Color(0xFF1A0A0A), Color(0xFF2D0808))` → `listOf(cs.background, cs.primary.copy(alpha=0.15f), cs.primary.copy(alpha=0.25f))`
+  - `Color(0xFF00C853)` (适龄徽章) → `MaterialTheme.colorScheme.tertiary`
+  - `Color.White` (徽章文字) → `MaterialTheme.colorScheme.onTertiary`
+  - 注意：此文件已大量使用 `MoYe_Surface` 等主题色，需小心不要破坏现有的 `themePrimary`/`themeSecondary` 局部变量的使用
+
+---
+
+### 8. 共享约定
+
+以下规则适用于所有文件的改造，确保一致性：
+
+#### 8.1 硬编码颜色 → 主题色映射表
+
+| 硬编码颜色 | 主题 Token | 语义说明 |
+|-----------|-----------|---------|
+| `Color.White` / `Color(0xFFFFFDF9)` / `Color(0xFFFCFAF6)` | `MaterialTheme.colorScheme.surface` | 卡片/面板表面色 |
+| `Color(0xFFE5DDD3)` / 浅灰边框 | `MaterialTheme.colorScheme.outlineVariant` | 次级边框 |
+| `Color.DarkGray` / `Color(0xFF333333)` / `Color(0xFF1C1A17)` | `MaterialTheme.colorScheme.onSurface` | 主要内容文字 |
+| `Color.Gray` / `Color(0xFF888888)` | `MaterialTheme.colorScheme.onSurfaceVariant` | 次要/辅助文字 |
+| `Color.Black.copy(alpha = 0.5f)` | `MaterialTheme.colorScheme.scrim` | 遮罩层 |
+| `Color(0xFFE0E0E0)` (disabled) | `MaterialTheme.colorScheme.outlineVariant` | 禁用状态 |
+| `Color.White` (Button text) | `MaterialTheme.colorScheme.onPrimary` | 主按钮上的文字 |
+
+#### 8.2 Canvas 颜色提取模式
 
 ```kotlin
-// GameEngine.kt 第 18 行
-private const val TILE = 56f   // 原值 48f（匹配视觉尺寸：48dp + 4dp×2 shadow）
-```
-
-同时在 `blocking()` 中添加同层支持：
-
-```kotlin
-private fun blocking(a: Tile, b: Tile, board: List<Tile>): Boolean {
-    if (b.z < a.z) return false
+@Composable
+fun MyCanvasComponent() {
+    val cs = MaterialTheme.colorScheme  // ← 在 @Composable 作用域提取
     
-    // 同层：b 必须在 a 之后（渲染在上层）才算遮挡
-    if (b.z == a.z) {
-        val aIdx = board.indexOfFirst { it.id == a.id }
-        val bIdx = board.indexOfFirst { it.id == b.id }
-        if (bIdx <= aIdx) return false
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        // 使用闭包捕获的 cs 变量
+        drawCircle(color = cs.surface, radius = 10f)
+        drawLine(cs.onSurfaceVariant, start, end, strokeWidth = 2f)
     }
-    
-    val ox = TILE - abs(b.x - a.x) * SPACING
-    val oy = TILE - abs(b.y - a.y) * SPACING
-    return ox > OVERLAP_MARGIN && oy > OVERLAP_MARGIN
 }
 ```
 
-**效果**：
-- 视觉有效尺寸 56dp = TILE 逻辑值 56，完全匹配
-- 同层相邻 (dx=1.0)：`ox = 56 - 46 = 10`，满足 > 0.25 → **被遮挡** ✓
-- 但会导致大量同层卡牌被遮挡 → 可玩性下降
+#### 8.3 不替换的颜色类别
 
-**优点**：精确匹配视觉预期
+以下类别的硬编码颜色 **保持不变**：
+1. **游戏美术标识色**：金色系 (`0xFFCBAA6A`, `0xFFE5B55F`, `0xFFFFD60A`, `0xFFD4AF37`, `0xFFF1C40F`)、赛博霓虹 (`0xFF00F2FE`, `0xFFFF2A6D`, `0xFF05D9E8`)
+2. **游戏特殊状态色**：封印冰蓝 (`0xBB2C3E50`)、炸弹暗色 (`0xFF2C2F33`)、迷雾特效
+3. **Android 系统语义色**：`Color.Green`/`Color.Yellow`/`Color.Red`（连接状态指示）、`Color.Transparent`
+4. **DEBUG 模式专用色**：`Color.Red`/`Color.Blue`（仅在 `if (BuildConfig.DEBUG)` 块中）
+5. **装饰性渐变**：用于纯装饰目的的 gradient（如金色边框渐变 `listOf(cs.secondary, Color(0xFFEDD9A3), cs.secondary)`）
 
-**缺点**：改动较大，需调 `blocking()` 签名和所有调用点；可能导致大量同层卡牌被锁
-
-#### 方案 C（权衡方案）：仅增大 TILE，不改同层逻辑
+#### 8.4 Button 文字颜色约定
 
 ```kotlin
-// GameEngine.kt
-private const val TILE = 52f   // 原值 48f
+// 主按钮文字
+Button(colors = ButtonDefaults.buttonColors(containerColor = cs.primary)) {
+    Text("确定", color = cs.onPrimary)  // Color.White → cs.onPrimary
+}
+
+// 文本按钮
+TextButton(onClick = {}) {
+    Text("取消", color = cs.onSurfaceVariant)  // Color.Gray → cs.onSurfaceVariant
+}
 ```
 
-**效果**：使跨层遮挡判定更敏感。对于 `dx=1.5` 原始间距（经归一化后约 0.75-1.05）：`ox = 52 - 1.05×46 = 3.7 > 0.25` → 被遮挡。之前 TILE=48 时 `ox = -0.3` → 不被遮挡。
+#### 8.5 主题切换验证清单
 
-**优点**：改动最小（1 行），不影响同层行为
+每个任务完成后，在以下主题下各做一次快速视觉检查：
+- 🌿 森林绿（默认浅色）
+- 🌃 墨夜金（暗色）
+- 🌸 樱花粉（浅色女性向）
 
-**缺点**：不解决同层重叠问题；可能引入新的过度遮挡
+### 9. 任务依赖图
+
+```mermaid
+graph TD
+    T01["T01: Core 主题基础设施<br/>TileCardBase + ItemAnimationIcon<br/>+ 死代码删除 + 注释更新"]
+    T02["T02: 菜单屏幕与卡片<br/>ShopScreen + ShopItemCard<br/>+ BackpackCard + OfflineWarnBanner"]
+    T03["T03: 菜单弹窗组件<br/>DuelMatchDialog + DailyLeaderboard<br/>+ ConflictDialog + AppUpdateDialog<br/>+ HistoryDialogs + PrepareGameDialog"]
+    T04["T04: 游戏模块 + 启动页<br/>DuelHeader + DuelSpellPanel<br/>+ TileView + SplashActivity"]
+
+    T01 --> T02
+    T01 --> T03
+    T01 --> T04
+```
 
 ---
 
-### 7. 推荐实施方案：方案 A（渲染间距调整）
-
-**修改文件**：`E:\file\sheeps\app\feature_game\src\main\java\com\example\sheeps\game\ui\components\GameBoard.kt`
-
-**具体修改**（第 53 行）：
-
-```diff
-- val spacing = 46
-+ val spacing = 48
-```
-
-**验证方法**：
-
-1. **视觉验证**：进入高级关卡（如第 15+ 关，星形/花朵形状），观察同层相邻卡牌是否还有重叠
-2. **功能验证**：点击被跨层卡牌遮挡的下层卡牌，确认抖动和被拒绝
-3. **回归验证**：确认棋盘缩放（scale 计算）仍然正确，卡牌不超出边界
-4. **边界验证**：第 1 关固定布局（含同层相邻卡牌如 z=0 的 4 张）确认布局正常
-
-**为什么不需要改 GameEngine.kt**：
-
-渲染间距调整只影响视觉布局，不影响逻辑判定。遮挡引擎仍然使用 `SPACING=46` 的公式，跨层遮挡检测完全不受影响。
-
----
-
-### 8. 其他发现
-
-#### 8.1 潜在的性能问题
-
-`GameViewState.boardTiles` 在每次消除后合并时，已消除的 IN_SLOT 卡牌不会被移除，`boardTiles` 列表随时间增长。对于 180 张牌的关卡，每消除一组（3 张），列表保留 3 个 IN_SLOT 引用。消除全部 180 张后，列表将有 180 个 IN_SLOT 条目。`isTileBlocked` 的 O(N²) 循环中虽然会跳过它们，但仍需遍历。
-
-#### 8.2 Tile 可变性风险
-
-`Tile` 是 `data class` 但包含 `var state`、`var isBlind`、`var sealedCount`。在 `handleClickTile` 中直接 `tile.state = TileState.IN_SLOT` 会改变共享引用。当前代码由 `updateState { copy(boardTiles = state.boardTiles) }` 传递同一引用，在协程中依赖这个可变性传递 IN_SLOT 状态。虽然当前工作正常，但未来维护风险较高。
+*本文档由 Bob (Architect) 生成，基于 PRD v1.0 及代码库现场分析。*

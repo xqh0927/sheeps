@@ -36,7 +36,7 @@ fun ConflictDialog(
                 Text(
                     text = stringResource(id = R.string.dialog_conflict_desc),
                     fontSize = 14.sp,
-                    color = Color.DarkGray
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(
@@ -49,7 +49,7 @@ fun ConflictDialog(
                             .weight(1f)
                             .padding(end = 8.dp)
                             .clickable { onChooseLocal() },
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF9F7F5)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -64,12 +64,12 @@ fun ConflictDialog(
                             Text(
                                 text = stringResource(id = R.string.save_level, info.localLevel),
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = stringResource(id = R.string.save_points, info.localPoints),
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -80,7 +80,7 @@ fun ConflictDialog(
                             .weight(1f)
                             .padding(start = 8.dp)
                             .clickable { onChooseCloud() },
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F9F7)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -95,12 +95,12 @@ fun ConflictDialog(
                             Text(
                                 text = stringResource(id = R.string.save_level, info.cloudLevel),
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = stringResource(id = R.string.save_points, info.cloudPoints),
                                 fontSize = 12.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

@@ -1,68 +1,131 @@
 classDiagram
-    class Tile {
-        +String id
-        +Int type
-        +Float x
-        +Float y
-        +Int z
-        +TileState state
-        +Boolean isBlind
-        +Int sealedCount
-    }
-
-    class TileState {
+    class AppTheme {
         <<enumeration>>
-        NORMAL
-        BLOCKED
-        IN_SLOT
-        MOVED_OUT
+        FOREST
+        QING_RI_CHUN
+        MO_YE_GOLD
+        SAKURA
+        COSMIC
+        SUNSET
+        +fromKey(key: String) AppTheme
     }
 
-    class GameEngine {
-        +isTileBlocked(tile, board) Boolean$
-        +getBlockingTiles(tile, board) List~Tile~$
-        +calculateBlockedStates(board) List~Tile~$
-        -blocking(a, b) Boolean$
-        -buildGrid(board) Map$
-        -isBlockedGrid(tile, grid) Boolean$
-        -TILE: 48f$
-        -SPACING: 46f$
-        -OVERLAP_MARGIN: 0.25f$
+    class ThemeManager {
+        <<object>>
+        +currentTheme: StateFlow~AppTheme~
+        +init()
+        +setTheme(theme: AppTheme)
+        +getCurrentTheme() AppTheme
+        +getThemeResId() Int
+        +isDarkTheme() Boolean
     }
 
-    class GameBoard {
-        +GameBoard(state, flyingTileIds, ...)
-        -tileSize: 48
-        -spacing: 46
+    class ColorScheme {
+        <<Material3 system>>
+        +primary: Color
+        +secondary: Color
+        +tertiary: Color
+        +surface: Color
+        +onSurface: Color
+        +surfaceVariant: Color
+        +onSurfaceVariant: Color
+        +outline: Color
+        +outlineVariant: Color
+        +scrim: Color
+        +background: Color
+        +error: Color
+        +errorContainer: Color
+        +onPrimary: Color
+        +onTertiary: Color
     }
 
-    class TileView {
-        +TileView(tile, onClick, ...)
-        -isBlocked: Boolean
-        -alpha(0.45f if blocked)
+    class SheepsTheme {
+        <<Composable function>>
+        +forceTheme: AppTheme?
+        +content: @Composable () -> Unit
+        -MoYeGoldColorScheme
+        -QingRiChunColorScheme
+        -SakuraColorScheme
+        -CosmicColorScheme
+        -SunsetColorScheme
+        -ForestColorScheme
     }
 
     class TileCardBase {
-        +TileCardBase(skin, modifier, content)
-        -shadow(4.dp)
-        -border(2.dp)
+        <<Composable function>>
+        +skin: String
+        +modifier: Modifier
+        +content: @Composable () -> Unit
     }
 
-    class GameLogicDelegate {
-        +handleClickTile(...)
-        +processSlotMatchAndCheckEndGame(...)
-        -insertIntoSlot(slot, tile)
+    class ItemAnimationIcon {
+        <<Composable function>>
+        +itemType: String
+        +modifier: Modifier
+        +size: Dp
+        +isGray: Boolean
     }
 
-    class GameLevelGenerator {
-        +generateSolvableLevelLocal(levelId) List~Tile~$
-        -blocks(a, b) Boolean
+    class TileView {
+        <<Composable function>>
+        +tile: Tile
+        +onClick: () -> Unit
+        +currentSkin: String
+        +tileSize: Dp
+        +isShaking: Boolean
+        +isHighlighted: Boolean
     }
 
-    GameBoard --> TileView : renders
-    TileView --> TileCardBase : wraps
-    TileView --> Tile : data
-    GameLogicDelegate --> GameEngine : uses
-    GameEngine --> Tile : computes
-    GameLevelGenerator --> Tile : generates
-    Tile --> TileState : has
+    class ShopScreen {
+        <<Composable function>>
+        +state: MenuViewState
+        +onLoginClick: () -> Unit
+        +onExchangeClick: (Int, Int) -> Unit
+        +onChangeSkin: (String) -> Unit
+    }
+
+    class ShopItemCard {
+        <<Composable function>>
+        +item: ShopItem
+        +backpackCount: Int
+        +currentSkin: String
+        +onExchange: (Int) -> Unit
+        +onApplySkin: (String) -> Unit
+    }
+
+    class DuelMatchDialog {
+        <<Composable function>>
+        +state: MenuViewState
+        +onJoin: () -> Unit
+        +onLeave: () -> Unit
+        +onDismiss: () -> Unit
+    }
+
+    class PrepareGameDialog {
+        <<Composable function>>
+        +levelId: Int
+        +state: MenuViewState
+        +onDismiss: () -> Unit
+        +onConfirm: (Int) -> Unit
+        +onUpdateItem: (String, Int) -> Unit
+        +onUnlock: (Int) -> Unit
+    }
+
+    class SplashActivity {
+        <<Android Activity>>
+        -userPrefs: UserPreferences
+        +initView()
+        -showSplashContent()
+        -navigateToMenu()
+    }
+
+    SheepsTheme --> ThemeManager : reads currentTheme
+    SheepsTheme --> ColorScheme : injects via MaterialTheme
+    ThemeManager --> AppTheme : manages
+    TileCardBase --> ColorScheme : reads via MaterialTheme.colorScheme
+    ItemAnimationIcon --> ColorScheme : reads via MaterialTheme.colorScheme
+    TileView --> TileCardBase : composes
+    ShopScreen --> ShopItemCard : composes
+    ShopScreen --> ItemAnimationIcon : uses
+    PrepareGameDialog --> ItemAnimationIcon : uses
+    SplashActivity --> SheepsTheme : sets content

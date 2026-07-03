@@ -71,13 +71,13 @@ fun DuelMatchDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = themePrimary),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(stringResource(id = R.string.dialog_match_re), color = Color.White)
+                    Text(stringResource(id = R.string.dialog_match_re), color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.dialog_match_exit), color = Color.Gray)
+                Text(stringResource(id = R.string.dialog_match_exit), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         title = {
@@ -150,7 +150,7 @@ fun DuelMatchDialog(
                     fontSize = 14.sp,
                     color = when (state.matchStatus) {
                         "matched" -> Color(0xFF2E7D32)
-                        "error" -> Color.Gray
+                        "error" -> MaterialTheme.colorScheme.onSurfaceVariant
                         else -> themePrimary.copy(alpha = 0.8f)
                     },
                     fontFamily = FontFamily.Serif
@@ -161,7 +161,7 @@ fun DuelMatchDialog(
                 Text(
                     text = stringResource(id = R.string.duel_match_cultivator, state.phone),
                     fontSize = 11.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (state.matchStatus == "matched" && state.matchedGameId != null) {
@@ -169,7 +169,7 @@ fun DuelMatchDialog(
                     Text(
                         text = "对局号: ${state.matchedGameId.takeLast(10)}",
                         fontSize = 10.sp,
-                        color = Color.Gray.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
             }

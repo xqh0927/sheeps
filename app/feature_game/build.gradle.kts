@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    }
+}
 
 android {
     namespace = "com.example.sheeps.game"
@@ -41,6 +41,10 @@ dependencies {
     kapt(libs.therouter.apt)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // Coil 图片加载库 — 支持动画 WebP（灵动动画系列皮肤）
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
 }
 
 

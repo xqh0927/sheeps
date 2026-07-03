@@ -103,14 +103,14 @@ private fun SpellButton(
                 text = buttonText,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isEnabled) Color.White else Color.Gray,
+                color = if (isEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(id = R.string.spell_energy_cost, info.cost),
                 fontSize = 9.sp,
-                color = if (isEnabled) Color.White.copy(alpha = 0.8f) else Color.Gray,
+                color = if (isEnabled) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }

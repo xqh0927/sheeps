@@ -34,6 +34,7 @@ fun ItemAnimationIcon(
     isGray: Boolean = false
 ) {
     val themePrimary = MaterialTheme.colorScheme.primary
+    val cs = MaterialTheme.colorScheme
     val infiniteTransition = rememberInfiniteTransition(label = "item_icon")
     
     // 旋转动画
@@ -84,7 +85,7 @@ fun ItemAnimationIcon(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFFCFAF6))
+            .background(cs.surface)
             .then(
                 if (isGray) {
                     Modifier.drawWithContent {

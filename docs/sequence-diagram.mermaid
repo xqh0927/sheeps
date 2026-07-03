@@ -1,30 +1,40 @@
 sequenceDiagram
-    participant User
-    participant GameBoard as GameBoard (UI)
-    participant GLD as GameLogicDelegate
-    participant GE as GameEngine
-    participant State as GameViewState
+    participant App as App Entry
+    participant ST as SheepsTheme()
+    participant TM as ThemeManager
+    participant M3 as MaterialTheme
+    participant TCB as TileCardBase()
+    participant Canvas as Canvas DrawScope
 
-    User->>GameBoard: 点击卡牌 A (z=2)
-    GameBoard->>GLD: handleClickTile(tileA)
+    App->>TM: init() 从 MMKV 读取主题
+    App->>ST: SheepsTheme { content }
+    ST->>TM: currentTheme.collectAsState()
+    TM-->>ST: AppTheme (e.g. SAKURA)
+    ST->>M3: MaterialTheme(colorScheme = SakuraColorScheme)
+    Note over M3: colorScheme 注入 CompositionLocal
 
-    Note over GLD: 第一步：遮挡检查
-    GLD->>GE: isTileBlocked(tileA, boardTiles)
-    GE->>GE: for o in board: if o.z<=2 skip
-    Note over GE: ❌ 同层卡牌 (z=2) 被跳过！
-    Note over GE: 高层卡牌 (z=3+) 若无重叠 → false
-    GE-->>GLD: false (未被遮挡)
-    GLD->>GLD: tile.state 不是 BLOCKED
+    App->>TCB: TileCardBase(skin = "cyber")
+    TCB->>M3: val cs = MaterialTheme.colorScheme
+    Note over TCB: 提取 cs.surface, cs.onSurface 等到局部变量
+    TCB->>TCB: when(normalizedSkin) { bgColor, borderColor, decorColor }
+    TCB->>Canvas: Canvas { drawRoundRect(cs.surfaceVariant), drawLine(cs.onSurfaceVariant) }
+    Note over Canvas: Canvas 内使用闭包捕获的局部变量
 
-    Note over GLD: 第二步：状态检查通过
-    Note over GLD: 第三步：标记 IN_SLOT + 入槽
+    rect rgb(200, 230, 255)
+        Note over TCB: 皮肤差异化决策
+        TCB->>TCB: ink → cs.surfaceVariant / onSurface(0.8f) / onSurfaceVariant
+        TCB->>TCB: cyber → cs.surface / primary / secondary
+        TCB->>TCB: keai → cs.surfaceVariant / secondary / secondary(0.7f)
+        TCB->>TCB: daimeng → cs.surfaceVariant / primary(0.8f) / primary(0.5f)
+        TCB->>TCB: classic → cs.surface / secondary / secondary(0.5f)
+    end
 
-    GLD->>State: updateState (异步协程)
-    Note over State: processSlotMatchAndCheckEndGame
-    State->>GE: calculateBlockedStates(board)
-    State->>State: 合并 boardTiles 状态
-
-    Note over GameBoard: 重新渲染 boardTiles
-    Note over GameBoard: visibleTiles = filter(NORMAL|BLOCKED)
-
-    Note over User,State: 关键：同层视觉重叠 ≠ 逻辑遮挡
+    rect rgb(255, 240, 220)
+        Note over App,Canvas: P1 通用替换流程
+        Note over App,Canvas: Color.White/FFFFFDF9/FCFAF6 → cs.surface
+        Note over App,Canvas: Color(0xFFE5DDD3) → cs.outlineVariant
+        Note over App,Canvas: Color.DarkGray/333333/1C1A17 → cs.onSurface
+        Note over App,Canvas: Color.Gray/888888 → cs.onSurfaceVariant
+        Note over App,Canvas: Color.Black.copy(0.5f) → cs.scrim
+        Note over App,Canvas: Color.White (Button text) → cs.onPrimary
+    end

@@ -5,30 +5,54 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 import com.example.sheeps.core.update.UpdateDownloadManager
 import com.example.sheeps.core.update.UpdateStatus
 import com.example.sheeps.data.model.AppUpdateResponse
-import androidx.compose.ui.res.stringResource
-import com.example.sheeps.core.R
 
 @Composable
 fun AppUpdateDialog(
@@ -71,7 +95,6 @@ fun AppUpdateDialog(
                 downloadManager.cancel() // 仅取消下载 job，保留文件
             }
         }
-    }
     }
 
     Dialog(
@@ -119,7 +142,10 @@ fun AppUpdateDialog(
 
                 // 标题
                 Text(
-                    text = stringResource(id = R.string.update_discovered, updateInfo.version_name ?: ""),
+                    text = stringResource(
+                        id = R.string.update_discovered,
+                        updateInfo.version_name ?: ""
+                    ),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -145,7 +171,8 @@ fun AppUpdateDialog(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = updateInfo.update_log ?: stringResource(id = R.string.update_default_log),
+                            text = updateInfo.update_log
+                                ?: stringResource(id = R.string.update_default_log),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                             lineHeight = 18.sp
@@ -200,11 +227,15 @@ fun AppUpdateDialog(
                             UpdateStatus.Error -> {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 TextButton(onClick = {
-                                    downloadManager.downloadAndInstall(context, updateInfo.apk_url ?: "")
+                                    downloadManager.downloadAndInstall(
+                                        context,
+                                        updateInfo.apk_url ?: ""
+                                    )
                                 }) {
                                     Text("重新下载", color = MaterialTheme.colorScheme.primary)
                                 }
                             }
+
                             UpdateStatus.NeedPermission -> {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Button(
@@ -214,9 +245,14 @@ fun AppUpdateDialog(
                                     ),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text("安装更新", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "安装更新",
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
+
                             else -> {}
                         }
                     }
@@ -240,7 +276,10 @@ fun AppUpdateDialog(
                             ),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text(text = stringResource(id = R.string.update_btn_later), fontSize = 14.sp)
+                            Text(
+                                text = stringResource(id = R.string.update_btn_later),
+                                fontSize = 14.sp
+                            )
                         }
                     }
 
@@ -252,9 +291,11 @@ fun AppUpdateDialog(
                                 downloadState.status == UpdateStatus.NeedPermission -> {
                                     downloadManager.tryInstallApk(context)
                                 }
+
                                 downloadState.status == UpdateStatus.Completed -> {
                                     // 已完成但未安装（可能用户没注意到）
                                 }
+
                                 else -> {
                                     val url = updateInfo.apk_url
                                     if (!url.isNullOrEmpty() && !showProgress) {
@@ -268,7 +309,7 @@ fun AppUpdateDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = Color.White,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
                             disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         ),
                         modifier = Modifier.weight(1f)
@@ -277,10 +318,13 @@ fun AppUpdateDialog(
                             text = when {
                                 downloadState.status == UpdateStatus.Downloading ->
                                     "${downloadState.progress}%"
+
                                 downloadState.status == UpdateStatus.Completed ->
                                     stringResource(id = R.string.update_install_success)
+
                                 downloadState.status == UpdateStatus.NeedPermission ->
                                     "授权后安装"
+
                                 else -> stringResource(id = R.string.update_btn_now)
                             },
                             fontSize = 14.sp,

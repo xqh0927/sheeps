@@ -32,7 +32,7 @@ fun DailyLeaderboardPopupDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
+                Text(stringResource(id = R.string.dialog_guide_ok), color = MaterialTheme.colorScheme.onPrimary)
             }
         },
         title = {
@@ -62,8 +62,8 @@ fun DailyLeaderboardPopupDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFFCFAF6), RoundedCornerShape(8.dp))
-                            .border(0.5.dp, Color(0xFFE5DDD3), RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -71,12 +71,12 @@ fun DailyLeaderboardPopupDialog(
                             text = rankText,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.DarkGray
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
 
-                HorizontalDivider(color = Color(0xFFE5DDD3))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 // 展示玩家个人昨日的最终天梯排名
                 Box(

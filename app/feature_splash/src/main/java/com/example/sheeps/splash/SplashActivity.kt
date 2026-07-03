@@ -397,7 +397,7 @@ fun SplashVisuals() {
                         .background(Color(0xFF00C853)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("8", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("8", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(

@@ -62,16 +62,18 @@ fun ShopItemCard(
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(0.5.dp, Color(0xFFE5DDD3)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER" && item.item_type != "SKIN_KEAI" && item.item_type != "SKIN_DAIMENG"
-            if (isSkin && isProvinceSkin) {
+            // 所有皮肤类型（包括 CLASSIC、SKIN_INK、SKIN_CYBER、SKIN_KEAI、SKIN_DAIMENG 以及省份皮肤）
+            // 都用第一张 tile 图片做封面预览
+            val isAnySkin = isSkin
+            if (isAnySkin) {
                 val context = LocalContext.current
                 val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
                 if (iconRes != 0) {
@@ -85,7 +87,7 @@ fun ShopItemCard(
                         modifier = Modifier.size(64.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("?", fontSize = 24.sp, color = Color.Gray)
+                        Text("?", fontSize = 24.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -101,13 +103,13 @@ fun ShopItemCard(
                 text = getLocalizedItemName(item.item_type),
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = Color.DarkGray
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
                 text = getLocalizedItemDesc(item.item_type, item.description),
                 fontSize = 11.sp,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 minLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp)
@@ -130,7 +132,7 @@ fun ShopItemCard(
                     Text(
                         text = stringResource(id = R.string.stock_prefix, item.stock),
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -142,9 +144,9 @@ fun ShopItemCard(
                     onClick = { onApplySkin(skinKey) },
                     enabled = !isCurrentlyApplied,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isCurrentlyApplied) Color.Gray else MaterialTheme.colorScheme.primary,
-                        disabledContainerColor = Color(0xFFE0E0E0),
-                        disabledContentColor = Color.Gray
+                        containerColor = if (isCurrentlyApplied) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.outlineVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     shape = RoundedCornerShape(6.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -155,7 +157,7 @@ fun ShopItemCard(
                     Text(
                         text = if (isCurrentlyApplied) stringResource(id = R.string.skin_applied) else stringResource(id = R.string.skin_apply),
                         fontSize = 11.sp,
-                        color = if (isCurrentlyApplied) Color.DarkGray else Color.White
+                        color = if (isCurrentlyApplied) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary
                     )
                 }
             } else {
@@ -168,7 +170,7 @@ fun ShopItemCard(
                         .fillMaxWidth()
                         .height(30.dp)
                 ) {
-                    Text(stringResource(id = R.string.btn_exchange), fontSize = 11.sp, color = Color.White)
+                    Text(stringResource(id = R.string.btn_exchange), fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
         }
