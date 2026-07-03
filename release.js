@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const readline = require('readline');
-const https = require('https'); // ⚠️ 修复：删除了重复的 require
+const https = require('https');
 
 // 引入代理库（如果没安装则降级为直连）
 let HttpsProxyAgent;
@@ -29,7 +29,8 @@ async function withRetry(fn, retries = 3, delay = 2000, actionName = "任务") {
 }
 
 /**
- * 使用 Google Translate 免费接口翻译文本 (修复了代理参数传入问题)
+ * 使用 Google Translate 免费接口翻译文本 (通过代理出墙 + 修复参数传入)
+ * 繁体中文代码为: zh-TW
  */
 function translateText(text, targetLang) {
     return new Promise((resolve, reject) => {
@@ -41,7 +42,6 @@ function translateText(text, targetLang) {
             options.agent = new HttpsProxyAgent(PROXY_URL);
         }
 
-        // ⚠️ 修复：必须把 options 传进 https.get 作为第二个参数！
         https.get(url, options, (res) => {
             if (res.statusCode !== 200) {
                 return reject(new Error(`HTTP 状态码异常: ${res.statusCode}`));
@@ -95,11 +95,8 @@ function run() {
 
     const R2_PUBLIC_BASE = 'https://apk.xqh.cc.cd';
     const nextCode = currentCode + 1;
-    const parts = currentName.split('.');
-    if (parts.length >= 3) {
-        parts[parts.length - 1] = parseInt(parts[parts.length - 1], 10) + 1;
-    }
-    const nextName = parts.join('.');
+    // 正则定位末尾数字自增，兼容 1.0.6 和 1.0.6-beta1
+    const nextName = currentName.replace(/(\d+)(?=[^\d]*$)/, (m) => parseInt(m, 10) + 1);
 
     rl.question(`请输入新的 versionCode [回车默认: ${nextCode}]: `, (codeAns) => {
         const newCode = codeAns.trim() ? parseInt(codeAns.trim(), 10) : nextCode;
@@ -111,7 +108,7 @@ function run() {
                 const updateLog = logAns.trim() ? logAns.trim() : "常规性能优化与问题修复";
 
                 console.log(`\n准备执行以下【安全发布流水线】:`);
-                console.log(`1. 自动翻译升级日志（已开启代理配置 + 异常自动降级）`);
+                console.log(`1. 自动翻译升级日志（包含繁体中文、英文、日文、韩文）`);
                 console.log(`2. 预写版本与公告数据至 Cloudflare D1 & KV（带重试与防脚本注入）`);
                 console.log(`3. 确认数据库全部成功后，更新 gradle 文件并将全部本地代码 Push 触发编译`);
 
@@ -126,12 +123,28 @@ function run() {
                     const tempSqlPath = path.join(__dirname, 'temp_release_query.sql');
                     const tempKvPath = path.join(__dirname, 'temp_kv_payload.json');
 
+                    // ─── Git 前置安全校验 ───
+                    console.log("➔ 正在校验 Git 工作区...");
                     try {
-                        // ─── 第一步：网络翻译 (加入重试 + 降级兜底) ───
+                        const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { stdio: 'pipe' }).toString().trim();
+                        if (currentBranch !== 'main') {
+                            console.error(`\n❌ 当前在 [${currentBranch}] 分支，发版必须在 [main] 分支！`);
+                            rl.close(); process.exit(1);
+                        }
+                        // 先拉取远程最新代码，避免 push 时发生冲突导致 D1 已写入
+                        execSync('git pull origin main --rebase', { stdio: 'pipe' });
+                        console.log("   ✓ 分支检查通过，已同步远程最新代码");
+                    } catch (gitErr) {
+                        console.error(`\n❌ Git 前置检查失败: ${gitErr.message}`);
+                        console.error("   请先解决冲突或切换回 main 分支后再试。");
+                        rl.close(); process.exit(1);
+                    }
+
+                    try {
+                        // ─── 第一步：网络翻译 (加入重试 + 降级兜底 + 增加繁体中文) ───
                         console.log("\n➔ [1/4] 正在连接 Google Translate 自动翻译版本日志...");
                         const versionTitle = `v${newName} 版本更新 / Version Update`;
 
-                        // 安全翻译包装：如果3次通过代理还超时的，直接返回原文（中文），绝对不卡死发版！
                         const safeTranslate = async (text, targetLang, actionName) => {
                             try {
                                 return await withRetry(() => translateText(text, targetLang), 3, 1000, actionName);
@@ -141,15 +154,18 @@ function run() {
                             }
                         };
 
-                        const [titleEn, titleJa, titleKo, contentEn, contentJa, contentKo] = await Promise.all([
+                        // ⚠️ 修复：增加了 'zh-TW' 繁体中文翻译
+                        const [titleTw, titleEn, titleJa, titleKo, contentTw, contentEn, contentJa, contentKo] = await Promise.all([
+                            safeTranslate(versionTitle, 'zh-TW', "翻译标题-繁体"),
                             safeTranslate(versionTitle, 'en', "翻译标题-英文"),
                             safeTranslate(versionTitle, 'ja', "翻译标题-日文"),
                             safeTranslate(versionTitle, 'ko', "翻译标题-韩文"),
+                            safeTranslate(updateLog, 'zh-TW', "翻译日志-繁体"),
                             safeTranslate(updateLog, 'en', "翻译日志-英文"),
                             safeTranslate(updateLog, 'ja', "翻译日志-日文"),
                             safeTranslate(updateLog, 'ko', "翻译日志-韩文")
                         ]);
-                        console.log("   ✔ 多语言文本处理完毕");
+                        console.log("   ✔ 多语言（含繁体中文）文本处理完毕");
 
                         // ─── 第二步：更新 D1 数据库 ───
                         console.log("➔ [2/4] 正在更新云端 D1 数据库...");
@@ -157,9 +173,10 @@ function run() {
                         const now = Date.now();
                         const escSql = (s) => s.replace(/'/g, "''");
 
+                        // ⚠️ 修复：在 SQL 语句的 INSERT 字段和 VALUES 中全部加入了 _tw 对应的值
                         const sqlContent = [
                             `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escSql(updateLog)}', 0, ${now});`,
-                            `INSERT INTO notice (title, title_en, title_ja, title_ko, content, content_en, content_ja, content_ko, type, created_at) VALUES ('${escSql(versionTitle)}', '${escSql(titleEn)}', '${escSql(titleJa)}', '${escSql(titleKo)}', '${escSql(updateLog)}', '${escSql(contentEn)}', '${escSql(contentJa)}', '${escSql(contentKo)}', 'update', ${now});`
+                            `INSERT INTO notice (title, title_tw, title_en, title_ja, title_ko, content, content_tw, content_en, content_ja, content_ko, type, created_at) VALUES ('${escSql(versionTitle)}', '${escSql(titleTw)}', '${escSql(titleEn)}', '${escSql(titleJa)}', '${escSql(titleKo)}', '${escSql(updateLog)}', '${escSql(contentTw)}', '${escSql(contentEn)}', '${escSql(contentJa)}', '${escSql(contentKo)}', 'update', ${now});`
                         ].join('\n');
 
                         fs.writeFileSync(tempSqlPath, sqlContent, 'utf8');
@@ -178,8 +195,11 @@ function run() {
                         // ─── 第三步：更新 KV 边缘缓存 ───
                         console.log("➔ [3/4] 正在同步多语言 KV 缓存板...");
                         const kvNsId = '784104ac67eb4f3c83a92e9dcc91b673';
+
+                        // ⚠️ 修复：增加了 'tw' 繁体中文 KV 缓存组
                         const noticesByLang = {
                             '': { title: versionTitle, content: updateLog },
+                            'tw': { title: titleTw, content: contentTw },
                             'en': { title: titleEn, content: contentEn },
                             'ja': { title: titleJa, content: contentJa },
                             'ko': { title: titleKo, content: contentKo },
