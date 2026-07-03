@@ -1,0 +1,30 @@
+sequenceDiagram
+    participant User
+    participant GameBoard as GameBoard (UI)
+    participant GLD as GameLogicDelegate
+    participant GE as GameEngine
+    participant State as GameViewState
+
+    User->>GameBoard: 点击卡牌 A (z=2)
+    GameBoard->>GLD: handleClickTile(tileA)
+
+    Note over GLD: 第一步：遮挡检查
+    GLD->>GE: isTileBlocked(tileA, boardTiles)
+    GE->>GE: for o in board: if o.z<=2 skip
+    Note over GE: ❌ 同层卡牌 (z=2) 被跳过！
+    Note over GE: 高层卡牌 (z=3+) 若无重叠 → false
+    GE-->>GLD: false (未被遮挡)
+    GLD->>GLD: tile.state 不是 BLOCKED
+
+    Note over GLD: 第二步：状态检查通过
+    Note over GLD: 第三步：标记 IN_SLOT + 入槽
+
+    GLD->>State: updateState (异步协程)
+    Note over State: processSlotMatchAndCheckEndGame
+    State->>GE: calculateBlockedStates(board)
+    State->>State: 合并 boardTiles 状态
+
+    Note over GameBoard: 重新渲染 boardTiles
+    Note over GameBoard: visibleTiles = filter(NORMAL|BLOCKED)
+
+    Note over User,State: 关键：同层视觉重叠 ≠ 逻辑遮挡

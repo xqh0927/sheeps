@@ -109,7 +109,7 @@ fun DuelScreen(
                 tileGlobalPositions = tileGlobalPositions,
                 onTileClick = { tile ->
                     val isBlocked = tile.state == TileState.BLOCKED || 
-                            (tile.state == TileState.NORMAL && GameEngine.isTileBlocked(tile, state.boardTiles))
+                            GameEngine.isTileBlocked(tile, state.boardTiles)
                     val isSealed = tile.sealedCount > 0
 
                     if (isBlocked || isSealed) {

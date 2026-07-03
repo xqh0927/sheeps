@@ -16,7 +16,7 @@ object GameEngine {
 
     // 卡牌的基础尺寸参数
     private const val TILE = 48f
-    private const val SPACING = 48f
+    private const val SPACING = 46f
 
     // 【碰撞判定容差】
     // 遮挡判定阈值：单位为逻辑像素。
@@ -67,8 +67,9 @@ object GameEngine {
         val grid = buildGrid(board)
         return board.map { tile ->
             // 已被消除的卡牌保持状态不变
-            if (tile.state != TileState.NORMAL && tile.state != TileState.BLOCKED) tile
-            else {
+            if (tile.state != TileState.NORMAL && tile.state != TileState.BLOCKED) {
+                tile
+            } else {
                 // 重新判定该卡牌状态
                 val blocked = isBlockedGrid(tile, grid)
                 tile.copy(state = if (blocked) TileState.BLOCKED else TileState.NORMAL)

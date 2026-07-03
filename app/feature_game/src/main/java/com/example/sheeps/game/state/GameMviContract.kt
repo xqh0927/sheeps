@@ -39,6 +39,16 @@ enum class SoundType {
  * 游戏界面状态模型（MVI 中的 State）。
  * 包含了维持游戏运行所需的所有 UI 数据。
  */
+/**
+ * 棋盘边界信息，加载关卡时计算一次，保证缩放和居中基于正确的完整布局
+ */
+data class BoardBounds(
+    val minX: Float = 0f,
+    val maxX: Float = 0f,
+    val minY: Float = 0f,
+    val maxY: Float = 0f
+)
+
 data class GameViewState(
     /** 是否正在加载关卡数据 */
     val isLoading: Boolean = false,
@@ -52,6 +62,8 @@ data class GameViewState(
     val currentLevelId: Int = 1,
     /** 棋盘上所有的卡牌列表 */
     val boardTiles: List<Tile> = emptyList(),
+    /** 棋盘卡牌边界（加载关卡时计算，避免 Compose remember 缓存时序问题） */
+    val boardBounds: BoardBounds = BoardBounds(),
     /** 消除槽（七格槽位）中的卡牌列表 */
     val slotTiles: List<Tile> = emptyList(),
     /** 已使用“移出”道具暂时存放的卡牌列表 */

@@ -1,24 +1,28 @@
 package com.example.sheeps.game.viewmodel.delegates
 
+import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.core.game.GameEngine.getBlockingTiles
 import com.example.sheeps.core.game.GameEngine.isTileBlocked
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
-import com.example.sheeps.game.state.*
+import com.example.sheeps.game.state.GameStatus
+import com.example.sheeps.game.state.GameViewEffect
+import com.example.sheeps.game.state.GameViewState
+import com.example.sheeps.game.state.SoundType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * ÓÎÏ·ºËÐÄÂß¼­Î¯ÍÐÀà
- * ´¦Àí¿¨ÅÆµã»÷¡¢Æ¥Åä¼ì²â¡¢ÊäÓ®ÅÐ¶¨
+ * ï¿½ï¿½Ï·ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½Î¯ï¿½ï¿½ï¿½ï¿½
+ * ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½ï¿½â¡¢ï¿½ï¿½Ó®ï¿½Ð¶ï¿½
  */
 class GameLogicDelegate @Inject constructor() {
 
     /**
-     * ´¦Àí¿¨ÅÆµã»÷
+     * ï¿½ï¿½ï¿½ï¿½ï¿½Æµï¿½ï¿½
      */
     fun handleClickTile(
         scope: CoroutineScope,
@@ -31,8 +35,17 @@ class GameLogicDelegate @Inject constructor() {
     ) {
         if (state.gameStatus != GameStatus.PLAYING) return
 
-        // ÅÐ¶¨¿¨ÅÆÊÇ·ñ±»ÕÚµ²
-        val isBlocked = tile.state == TileState.BLOCKED || (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles))
+        // ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½Úµï¿½ï¿½ï¿½spacing=46ï¿½ï¿½ï¿½Øµï¿½>0.25pxï¿½ï¿½Îªï¿½Úµï¿½ï¿½ï¿½
+        val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
+        LogUtils.d(
+            "BlockingDebug+ç‚¹å‡» ${tile.id}: state=${tile.state}, isBlockedByEngine=${
+                isTileBlocked(
+                    tile,
+                    state.boardTiles
+                )
+            }, æœ€ç»ˆisBlocked=$isBlocked"
+        )
+
         if (isBlocked) {
             val blockers = getBlockingTiles(tile, state.boardTiles)
             val minZ = blockers.minOfOrNull { it.z }
@@ -52,14 +65,14 @@ class GameLogicDelegate @Inject constructor() {
         if (tile.state != TileState.NORMAL && tile.state != TileState.MOVED_OUT) return
 
         onAddHistory()
-        
-        // Òþ²Øµ±Ç°µÄ¸ßÁÁÌáÊ¾
+
+        // ï¿½ï¿½ï¿½Øµï¿½Ç°ï¿½Ä¸ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾
         updateState { copy(highlightedTileIds = emptySet()) }
 
-        // Í¬²½Ö´ÐÐ£ºÁ¢¼´½«ÅÆ±ê¼ÇÎª IN_SLOT ²¢¸üÐÂ StateFlow£¬
-        // ±ÜÃâÐ­³ÌÄÚµÄ×´Ì¬¸üÐÂÍíÓÚ·ÉÐÐ¶¯»­½áÊø£¬µ¼ÖÂ¿¨ÅÆÔÚÔ­Î»ÉÁÏÖ
-        // newSlot ÐèÒªÔÚÍâ²ãÉùÃ÷£¬¹©Ð­³ÌÄÚµÄ processSlotMatch Ê¹ÓÃ£¬
-        // ·ñÔòÐ­³Ì±Õ°ü²¶»ñµÄ state.slotTiles ÊÇ¾É¿ìÕÕ£¬»á¸²¸Çµô´Ë´¦µÄÕýÈ·×´Ì¬
+        // Í¬ï¿½ï¿½Ö´ï¿½Ð£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ±ï¿½ï¿½Îª IN_SLOT ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ StateFlowï¿½ï¿½
+        // ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½ï¿½Úµï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ï¿½Ð¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¿ï¿½ï¿½ï¿½ï¿½ï¿½Ô­Î»ï¿½ï¿½ï¿½ï¿½
+        // newSlot ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½ï¿½Úµï¿½ processSlotMatch Ê¹ï¿½Ã£ï¿½
+        // ï¿½ï¿½ï¿½ï¿½Ð­ï¿½Ì±Õ°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ state.slotTiles ï¿½Ç¾É¿ï¿½ï¿½Õ£ï¿½ï¿½á¸²ï¿½Çµï¿½ï¿½Ë´ï¿½ï¿½ï¿½ï¿½ï¿½È·×´Ì¬
         var newSlot: List<Tile>? = null
         if (tile.state != TileState.MOVED_OUT && tile.sealedCount == 0) {
             tile.state = TileState.IN_SLOT
@@ -74,7 +87,7 @@ class GameLogicDelegate @Inject constructor() {
 
         scope.launch {
             if (tile.state == TileState.MOVED_OUT) {
-                // ´¦Àí´ÓÖÃÎï¼Üµã»÷
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Üµï¿½ï¿½
                 val updatedBoard = state.boardTiles
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
                 val newSlot = insertIntoSlot(state.slotTiles, tile.copy(state = TileState.IN_SLOT))
@@ -82,9 +95,9 @@ class GameLogicDelegate @Inject constructor() {
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                 processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
             } else {
-                // ´¦Àí´ÓÆåÅÌµã»÷
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ìµï¿½ï¿½
                 if (tile.sealedCount > 0) {
-                    // ½âËø·âÓ¡
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó¡
                     tile.sealedCount--
                     setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
                     setEffect(GameViewEffect.Vibrate)
@@ -92,18 +105,22 @@ class GameLogicDelegate @Inject constructor() {
                         copy(boardTiles = calculateBlockedStates(state.boardTiles))
                     }
                 } else {
-                    // Õý³£ÒÆÈë²ÛÎ» ¡ª tile.state Óë updateState ÒÑÔÚÐ­³ÌÍâÍ¬²½Íê³É
+                    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î» ï¿½ï¿½ tile.state ï¿½ï¿½ updateState ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½ï¿½ï¿½
                     setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                    processSlotMatch(state.boardTiles, newSlot ?: state.slotTiles, state.movedOutTiles)
+                    processSlotMatch(
+                        state.boardTiles,
+                        newSlot ?: state.slotTiles,
+                        state.movedOutTiles
+                    )
                 }
             }
         }
     }
 
     /**
-     * Ö´ÐÐ²ÛÎ»Æ¥Åä¼ì²âÓëÊäÓ®ÅÐ¶¨
+     * Ö´ï¿½Ð²ï¿½Î»Æ¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ó®ï¿½Ð¶ï¿½
      * 
-     * @return ×îÖÕµÄµÃ·ÖÔö¼ÓÖµ
+     * @return ï¿½ï¿½ï¿½ÕµÄµÃ·ï¿½ï¿½ï¿½ï¿½ï¿½Öµ
      */
     suspend fun processSlotMatchAndCheckEndGame(
         board: List<Tile>,
@@ -119,15 +136,15 @@ class GameLogicDelegate @Inject constructor() {
         val finalSlot = slot.toMutableList()
         var scoreAdd = 0
 
-        // ²»ÐèÒª½øÐÐÈ«¾ÖÅÅÐò£¬ÒÔ±ã¿¨²ÛÖÐµÄ¿¨ÅÆ±£³ÖË³ÐòÒÀ´Î×·¼Ó£¬²¢ÔÚ²åÈëÏàÍ¬¿¨ÅÆºóÃæºóÄÜ¹»½øÐÐÆ½»¬ÒÆ¶¯¶¯»­
-        // ¶Ô¿¨²Û½øÐÐ»¨É«ÅÅÐòµÄ·ÏÆúÂß¼­£ºfinalSlot.sortBy { it.type }
+        // ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½È«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô±ã¿¨ï¿½ï¿½ï¿½ÐµÄ¿ï¿½ï¿½Æ±ï¿½ï¿½ï¿½Ë³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×·ï¿½Ó£ï¿½ï¿½ï¿½ï¿½Ú²ï¿½ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ï¿½ï¿½Æºï¿½ï¿½ï¿½ï¿½ï¿½Ü¹ï¿½ï¿½ï¿½ï¿½ï¿½Æ½ï¿½ï¿½ï¿½Æ¶ï¿½ï¿½ï¿½ï¿½ï¿½
+        // ï¿½Ô¿ï¿½ï¿½Û½ï¿½ï¿½Ð»ï¿½É«ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½finalSlot.sortBy { it.type }
 
-        // ÐÞ¸´Bug #1£ºÊ¹ÓÃwhileÑ­»·£¬³ÖÐø¼ì²éÖ±µ½Ã»ÓÐ¸ü¶àÆ¥Åä
+        // ï¿½Þ¸ï¿½Bug #1ï¿½ï¿½Ê¹ï¿½ï¿½whileÑ­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½Ã»ï¿½Ð¸ï¿½ï¿½ï¿½Æ¥ï¿½ï¿½
         var matched = true
         while (matched) {
             matched = false
             val counts = finalSlot.groupBy { it.type }
-            
+
             for ((type, items) in counts) {
                 if (items.size >= 3) {
                     var removedCount = 0
@@ -139,21 +156,22 @@ class GameLogicDelegate @Inject constructor() {
                     }
                     scoreAdd += if (isDoublePoints) 200 else 100
                     matched = true
-                    break  // Ïû³ýÒ»×éºóÖØÐÂ¼ì²é
+                    break  // ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â¼ï¿½ï¿½
                 }
             }
         }
 
         if (matched) {
             setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
-            // Ã¿ºÏ²¢Ò»¸ö×Ô¶¯½âËøÒ»¸öÆåÅÌÉÏµÄÃ¤ºÐÅÆ
+            // Ã¿ï¿½Ï²ï¿½Ò»ï¿½ï¿½ï¿½Ô¶ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½Ã¤ï¿½ï¿½ï¿½ï¿½
             val blindTile = finalBoard.firstOrNull { it.isBlind }
             if (blindTile != null) {
                 blindTile.isBlind = false
             }
         }
 
-        val remainingOnBoard = finalBoard.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
+        val remainingOnBoard =
+            finalBoard.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
         val remainingInMovedOut = movedOut.size
 
         val newStatus = when {
@@ -162,31 +180,45 @@ class GameLogicDelegate @Inject constructor() {
                 onVictory()
                 GameStatus.WON
             }
+
             finalSlot.size >= 7 -> {
                 setEffect(GameViewEffect.PlaySound(SoundType.LOSE))
                 GameStatus.LOST
             }
+
             else -> GameStatus.PLAYING
         }
 
         val totalScore = currentScore + scoreAdd
         updateState {
+            // ï¿½Ï²ï¿½ï¿½ï¿½ï¿½Ô£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Âµï¿½ state (this)ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ tile ï¿½ï¿½ï¿½Úµï¿½×´Ì¬
+            val mergedBoard = boardTiles.map { currentTile ->
+                val recomputed = finalBoard.find { it.id == currentTile.id }
+                if (recomputed != null &&
+                    (currentTile.state == TileState.NORMAL || currentTile.state == TileState.BLOCKED) &&
+                    recomputed.state != currentTile.state
+                ) {
+                    currentTile.copy(state = recomputed.state)
+                } else {
+                    currentTile
+                }
+            }
             copy(
-                boardTiles = finalBoard,
+                boardTiles = mergedBoard,
                 slotTiles = finalSlot,
                 movedOutTiles = movedOut,
                 score = totalScore,
                 gameStatus = newStatus
             )
         }
-        
+
         return scoreAdd
     }
 
     /**
-     * ¸¨Öúº¯Êý£ºÏò¿¨²ÛÖÐ×·¼Ó¿¨ÅÆ¡£
-     * Èç¹û¿¨²ÛÖÐÒÑ´æÔÚÏàÍ¬Í¼°¸µÄÅÆ£¬Ôò²åÈëµ½×îºóÒ»¸öÏàÍ¬ÅÆµÄºóÃæ£»
-     * ·ñÔò£¬Ö±½Ó×·¼Óµ½¿¨²ÛÎ²²¿¡£
+     * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ò¿¨²ï¿½ï¿½ï¿½×·ï¿½Ó¿ï¿½ï¿½Æ¡ï¿½
+     * ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ñ´ï¿½ï¿½ï¿½ï¿½ï¿½Í¬Í¼ï¿½ï¿½ï¿½ï¿½ï¿½Æ£ï¿½ï¿½ï¿½ï¿½ï¿½ëµ½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½Í¬ï¿½ÆµÄºï¿½ï¿½æ£»
+     * ï¿½ï¿½ï¿½ï¿½Ö±ï¿½ï¿½×·ï¿½Óµï¿½ï¿½ï¿½ï¿½ï¿½Î²ï¿½ï¿½ï¿½ï¿½
      */
     private fun insertIntoSlot(slot: List<Tile>, newTile: Tile): List<Tile> {
         val result = slot.toMutableList()

@@ -5,6 +5,7 @@ import com.example.sheeps.data.model.Tile
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * 本地关卡生成器
@@ -23,7 +24,10 @@ class GameLevelGenerator @Inject constructor() {
      */
     fun generateSolvableLevelLocal(levelId: Int): List<Tile> {
         // 根据关卡ID计算难度（卡牌种类数），受限于美术资源总量
-        val numTypes = if (levelId == 1) 3 else minOf(SkinConstants.MAX_TILE_TYPES, (3 + 3 * Math.log(levelId.toDouble())).toInt())
+        val numTypes = if (levelId == 1) 3 else minOf(
+            SkinConstants.MAX_TILE_TYPES,
+            (3 + 3 * Math.log(levelId.toDouble())).toInt()
+        )
 
         // 使用难度系数系统计算卡牌总数（本地模式 userId=0）
         val maxCards = calculateCardCount(0, levelId)
@@ -31,19 +35,29 @@ class GameLevelGenerator @Inject constructor() {
         val coordinates = mutableListOf<Point3D>()
         if (levelId == 1) {
             // 第一关采用固定简单的布局（12张牌）
-            coordinates.addAll(listOf(
-                Point3D(1.0f, 1.0f, 0), Point3D(2.0f, 1.0f, 0),
-                Point3D(1.0f, 2.0f, 0), Point3D(2.0f, 2.0f, 0),
-                Point3D(1.5f, 1.5f, 1), Point3D(2.5f, 1.5f, 1),
-                Point3D(1.5f, 2.5f, 1), Point3D(2.5f, 2.5f, 1),
-                Point3D(2.0f, 2.0f, 2),
-                Point3D(2.0f, 1.0f, 3), Point3D(1.0f, 2.0f, 3), Point3D(2.0f, 2.0f, 3)
-            ))
+            coordinates.addAll(
+                listOf(
+                    Point3D(0.0f, 0.0f, 0),
+                    Point3D(0.0f, 2.5f, 0),
+                    Point3D(2.5f, 0.0f, 0),
+                    Point3D(2.5f, 2.5f, 0),
+
+                    Point3D(0.4f, 0.4f, 1),
+                    Point3D(0.4f, 2.9f, 1),
+                    Point3D(2.9f, 0.4f, 1),
+                    Point3D(2.9f, 2.9f, 1),
+
+                    Point3D(0.8f, 0.8f, 2),
+                    Point3D(0.8f, 3.3f, 2),
+                    Point3D(3.3f, 0.8f, 2),
+                    Point3D(3.3f, 3.3f, 2)
+                )
+            )
         } else {
             // 后续关卡根据算法生成堆叠布局
             // 与后端 server/src/level.ts 完全对齐：maxCards 来自难度曲线、baseSize 按 levelId/2 增长
             val possible = mutableListOf<Point3D>()
-            val layersCount = minOf(12, (12 - 8 / Math.sqrt((levelId - 1).toDouble())).toInt())
+            val layersCount = minOf(12, (12 - 8 / sqrt((levelId - 1).toDouble())).toInt())
 
             val baseSize = 6 + levelId / 2
             for (z in 0 until layersCount) {
@@ -90,7 +104,7 @@ class GameLevelGenerator @Inject constructor() {
                 val dy = abs(a.y - b.y)
                 val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
                 val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
-                ox * oy > 230.4f
+                ox > 0.25f && oy > 0.25f
             }
         }
 
@@ -297,7 +311,11 @@ class GameLevelGenerator @Inject constructor() {
 
     private data class Point3D(val x: Float, val y: Float, val z: Int)
     private data class LocalNode(val index: Int, val coord: Point3D, var assignedType: Int)
-    private data class DifficultyInfo(val difficulty: Int, val subIndex: Int, val totalSubLevels: Int)
+    private data class DifficultyInfo(
+        val difficulty: Int,
+        val subIndex: Int,
+        val totalSubLevels: Int
+    )
 
     /**
      * 简单的线性同余生成器，用于生成确定性的随机序列。

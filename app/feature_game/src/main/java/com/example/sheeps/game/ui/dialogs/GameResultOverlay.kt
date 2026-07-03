@@ -168,7 +168,7 @@ private fun WonContent(
 
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         SecondaryButton(
             text     = stringResource(id = R.string.btn_leaderboard),
@@ -183,7 +183,7 @@ private fun WonContent(
         PrimaryButton(
             text     = stringResource(id = R.string.btn_next_level),
             onClick  = onNextLevel,
-            modifier = Modifier.weight(1.2f)
+            modifier = Modifier.weight(1.5f)
         )
     }
 }

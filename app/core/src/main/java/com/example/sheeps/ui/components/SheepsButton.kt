@@ -1,25 +1,47 @@
 package com.example.sheeps.ui.components
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.theme.*
+import com.example.sheeps.theme.Crimson_Primary
+import com.example.sheeps.theme.Gold_Light
+import com.example.sheeps.theme.Gold_Primary
+import com.example.sheeps.theme.Gold_Subtle
+import com.example.sheeps.theme.ShapeMedium
+import com.example.sheeps.theme.ShapeSmall
+import com.example.sheeps.theme.Text_Disabled_Dark
+import com.example.sheeps.theme.Text_OnPrimary
+import com.example.sheeps.theme.Vermilion_Error
 
 // =============================================================================
 // 秘境消消乐 · 设计系统 - 按钮组件
@@ -42,13 +64,13 @@ fun PrimaryButton(
     // 按钮互动源：用于监听按钮按压状态以实现缩放动画
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    
+
     // 弹簧动画：提供 Q 弹的按压反馈
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium
         ),
         label = "primaryButtonScale"
     )
@@ -60,11 +82,16 @@ fun PrimaryButton(
             .height(height)
             .scale(scale), // 应用缩放动画
         interactionSource = interactionSource,
+        contentPadding = if (icon != null) {
+            ButtonDefaults.ButtonWithIconContentPadding
+        } else {
+            ButtonDefaults.TextButtonContentPadding
+        },
         colors = ButtonDefaults.buttonColors(
-            containerColor      = Crimson_Primary, // 红色主背景
-            contentColor        = Text_OnPrimary,
+            containerColor = Crimson_Primary, // 红色主背景
+            contentColor = Text_OnPrimary,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledContentColor   = Text_Disabled_Dark
+            disabledContentColor = Text_Disabled_Dark
         ),
         shape = ShapeMedium,
         elevation = ButtonDefaults.buttonElevation(
@@ -82,9 +109,10 @@ fun PrimaryButton(
             Spacer(modifier = Modifier.width(6.dp))
         }
         Text(
-            text       = text,
+            text = text,
             fontWeight = FontWeight.Bold,
-            fontSize   = 15.sp
+            fontSize = 15.sp,
+            maxLines = 1
         )
     }
 }
@@ -107,7 +135,7 @@ fun SecondaryButton(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMedium
         ),
         label = "secondaryButtonScale"
     )
@@ -120,8 +148,13 @@ fun SecondaryButton(
             .height(height)
             .scale(scale),
         interactionSource = interactionSource,
+        contentPadding = if (icon != null) {
+            ButtonDefaults.ButtonWithIconContentPadding
+        } else {
+            ButtonDefaults.TextButtonContentPadding
+        },
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor        = Gold_Primary, // 金色文字
+            contentColor = Gold_Primary, // 金色文字
             disabledContentColor = Text_Disabled_Dark
         ),
         border = BorderStroke(
@@ -140,9 +173,10 @@ fun SecondaryButton(
             Spacer(modifier = Modifier.width(6.dp))
         }
         Text(
-            text       = text,
+            text = text,
             fontWeight = FontWeight.SemiBold,
-            fontSize   = 15.sp
+            fontSize = 15.sp,
+            maxLines = 1
         )
     }
 }
@@ -164,14 +198,15 @@ fun GhostButton(
         enabled = enabled,
         modifier = modifier,
         colors = ButtonDefaults.textButtonColors(
-            contentColor        = color,
+            contentColor = color,
             disabledContentColor = Text_Disabled_Dark
         )
     ) {
         Text(
-            text       = text,
+            text = text,
             fontWeight = FontWeight.Medium,
-            fontSize   = 14.sp
+            fontSize = 14.sp,
+            maxLines = 1
         )
     }
 }
@@ -202,13 +237,13 @@ fun DangerButton(
             .scale(scale),
         interactionSource = interactionSource,
         colors = ButtonDefaults.outlinedButtonColors(
-            contentColor        = Vermilion_Error, // 红色错误色
+            contentColor = Vermilion_Error, // 红色错误色
             disabledContentColor = Text_Disabled_Dark
         ),
         border = BorderStroke(1.dp, Vermilion_Error.copy(alpha = 0.7f)),
         shape = ShapeMedium
     ) {
-        Text(text = text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text(text = text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1)
     }
 }
 
@@ -233,7 +268,7 @@ fun ToolItemButton(
     )
 
     val containerColor = if (enabled) Crimson_Primary else MaterialTheme.colorScheme.surfaceVariant
-    val contentColor   = if (enabled) Gold_Primary else Text_Disabled_Dark
+    val contentColor = if (enabled) Gold_Primary else Text_Disabled_Dark
 
     Button(
         onClick = onClick,
@@ -243,13 +278,13 @@ fun ToolItemButton(
             .widthIn(min = 64.dp), // 最小宽度保证视觉统一
         interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
-            containerColor      = containerColor,
-            contentColor        = contentColor,
+            containerColor = containerColor,
+            contentColor = contentColor,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-            disabledContentColor   = Text_Disabled_Dark
+            disabledContentColor = Text_Disabled_Dark
         ),
         shape = ShapeSmall,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 3.dp)
     ) {
         // 使用 Column 实现图标、名称、数量的纵向排列
         Column(
@@ -265,15 +300,15 @@ fun ToolItemButton(
                 Spacer(Modifier.height(2.dp))
             }
             Text(
-                text       = label,
-                fontSize   = 12.sp,
+                text = label,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                maxLines   = 1
+                maxLines = 1
             )
             Text(
-                text     = "×$count",
+                text = "×$count",
                 fontSize = 10.sp,
-                color    = if (enabled) Gold_Light else Text_Disabled_Dark
+                color = if (enabled) Gold_Light else Text_Disabled_Dark
             )
         }
     }

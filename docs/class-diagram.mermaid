@@ -1,0 +1,68 @@
+classDiagram
+    class Tile {
+        +String id
+        +Int type
+        +Float x
+        +Float y
+        +Int z
+        +TileState state
+        +Boolean isBlind
+        +Int sealedCount
+    }
+
+    class TileState {
+        <<enumeration>>
+        NORMAL
+        BLOCKED
+        IN_SLOT
+        MOVED_OUT
+    }
+
+    class GameEngine {
+        +isTileBlocked(tile, board) Boolean$
+        +getBlockingTiles(tile, board) List~Tile~$
+        +calculateBlockedStates(board) List~Tile~$
+        -blocking(a, b) Boolean$
+        -buildGrid(board) Map$
+        -isBlockedGrid(tile, grid) Boolean$
+        -TILE: 48f$
+        -SPACING: 46f$
+        -OVERLAP_MARGIN: 0.25f$
+    }
+
+    class GameBoard {
+        +GameBoard(state, flyingTileIds, ...)
+        -tileSize: 48
+        -spacing: 46
+    }
+
+    class TileView {
+        +TileView(tile, onClick, ...)
+        -isBlocked: Boolean
+        -alpha(0.45f if blocked)
+    }
+
+    class TileCardBase {
+        +TileCardBase(skin, modifier, content)
+        -shadow(4.dp)
+        -border(2.dp)
+    }
+
+    class GameLogicDelegate {
+        +handleClickTile(...)
+        +processSlotMatchAndCheckEndGame(...)
+        -insertIntoSlot(slot, tile)
+    }
+
+    class GameLevelGenerator {
+        +generateSolvableLevelLocal(levelId) List~Tile~$
+        -blocks(a, b) Boolean
+    }
+
+    GameBoard --> TileView : renders
+    TileView --> TileCardBase : wraps
+    TileView --> Tile : data
+    GameLogicDelegate --> GameEngine : uses
+    GameEngine --> Tile : computes
+    GameLevelGenerator --> Tile : generates
+    Tile --> TileState : has

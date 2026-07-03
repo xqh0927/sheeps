@@ -30,8 +30,8 @@ class DuelActionDelegate @Inject constructor() {
     ) {
         if (state.gameStatus != GameStatus.PLAYING) return
 
-        // 遮挡检测
-        val isBlocked = tile.state == TileState.BLOCKED || (tile.state == TileState.NORMAL && isTileBlocked(tile, state.boardTiles))
+        // 遮挡检测（spacing=46，重叠>0.25px即为遮挡）
+        val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
         if (isBlocked) {
             val blockers = getBlockingTiles(tile, state.boardTiles)
             val blockerIds = blockers.map { it.id }.toSet()
@@ -149,8 +149,18 @@ class DuelActionDelegate @Inject constructor() {
         }
 
         updateState {
+            val mergedBoard = boardTiles.map { currentTile ->
+                val recomputed = finalBoard.find { it.id == currentTile.id }
+                if (recomputed != null &&
+                    (currentTile.state == TileState.NORMAL || currentTile.state == TileState.BLOCKED) &&
+                    recomputed.state != currentTile.state) {
+                    currentTile.copy(state = recomputed.state)
+                } else {
+                    currentTile
+                }
+            }
             copy(
-                boardTiles = finalBoard,
+                boardTiles = mergedBoard,
                 slotTiles = finalSlot,
                 movedOutTiles = movedOut,
                 gameStatus = newStatus,

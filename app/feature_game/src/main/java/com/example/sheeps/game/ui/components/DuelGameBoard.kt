@@ -39,35 +39,37 @@ fun DuelGameBoard(
     onTileClick: (Tile) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val minX = remember(state.gameId, state.boardTiles.isEmpty()) {
-        state.boardTiles.minOfOrNull { it.x } ?: 0f
-    }
-    val maxX = remember(state.gameId, state.boardTiles.isEmpty()) {
-        state.boardTiles.maxOfOrNull { it.x } ?: 0f
-    }
-    val minY = remember(state.gameId, state.boardTiles.isEmpty()) {
-        state.boardTiles.minOfOrNull { it.y } ?: 0f
-    }
-    val maxY = remember(state.gameId, state.boardTiles.isEmpty()) {
-        state.boardTiles.maxOfOrNull { it.y } ?: 0f
-    }
+    // 边界优先用 ViewModel 计算好的 boardBounds，再用当前 boardTiles 兜底，防止旧缓存导致偏移
+    val actualMinX = state.boardTiles.minOfOrNull { it.x } ?: 0f
+    val actualMaxX = state.boardTiles.maxOfOrNull { it.x } ?: 0f
+    val actualMinY = state.boardTiles.minOfOrNull { it.y } ?: 0f
+    val actualMaxY = state.boardTiles.maxOfOrNull { it.y } ?: 0f
+
+    val minX = minOf(state.boardBounds.minX, actualMinX)
+    val maxX = maxOf(state.boardBounds.maxX, actualMaxX)
+    val minY = minOf(state.boardBounds.minY, actualMinY)
+    val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
 
     val tileSize = 48
-    val spacing = 46
+    val spacing = 48
     // 计算卡片内容边界尺寸
     val contentWidth = (maxX - minX) * spacing + tileSize
     val contentHeight = (maxY - minY) * spacing + tileSize
 
     // 棋盘自适应宽度：保证左右比屏幕边缘少 16dp
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
     val boardWidth = screenWidth - 32.dp
-    val boardHeight = 450.dp
-    // 计算缩放比例，确保内容完全适应棋盘区域
-    // 预留边距：圆角(16) + 边框(1) + 呼吸(5) ≈ 22dp
+    val boardHeight = 420.dp
+
+    // 预留边距需覆盖卡牌 4dp shadow + 2dp 边框外沿，确保视觉边距仍有 16dp
+    val horizontalPadding = 42.dp
+    val verticalPadding = 42.dp
+
+    // 计算缩放比例：优先按宽度缩放，同时受高度限制
     val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
-        val margin = 22.dp.value
-        val availableWidth = (boardWidth - margin.dp).value
-        val availableHeight = (boardHeight - margin.dp).value
+        val availableWidth = (boardWidth - horizontalPadding).value
+        val availableHeight = (boardHeight - verticalPadding).value
 
         val scaleW = if (contentWidth > availableWidth) availableWidth / contentWidth else 1f
         val scaleH = if (contentHeight > availableHeight) availableHeight / contentHeight else 1f

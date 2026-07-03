@@ -80,10 +80,30 @@ class DuelViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val tiles = calculateBlockedStates(apiService.getLevel(levelId, seed).map { it.copy(state = TileState.NORMAL) })
-                updateState { copy(isLoading = false, boardTiles = tiles, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
+                val bounds = if (tiles.isEmpty()) {
+                    com.example.sheeps.game.state.BoardBounds()
+                } else {
+                    com.example.sheeps.game.state.BoardBounds(
+                        minX = tiles.minOf { it.x },
+                        maxX = tiles.maxOf { it.x },
+                        minY = tiles.minOf { it.y },
+                        maxY = tiles.maxOf { it.y }
+                    )
+                }
+                updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
             } catch (e: Exception) {
                 val tiles = calculateBlockedStates(levelGenerator.generateDuelLevel())
-                updateState { copy(isLoading = false, boardTiles = tiles, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
+                val bounds = if (tiles.isEmpty()) {
+                    com.example.sheeps.game.state.BoardBounds()
+                } else {
+                    com.example.sheeps.game.state.BoardBounds(
+                        minX = tiles.minOf { it.x },
+                        maxX = tiles.maxOf { it.x },
+                        minY = tiles.minOf { it.y },
+                        maxY = tiles.maxOf { it.y }
+                    )
+                }
+                updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
             }
         }
     }

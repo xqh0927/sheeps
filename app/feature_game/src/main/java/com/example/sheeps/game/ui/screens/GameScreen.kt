@@ -130,8 +130,9 @@ fun GameScreen(
                     flyingTileIds = flyingTileIds,
                     tileGlobalPositions = tileGlobalPositions,
                     onTileClick = { tile ->
+                        // 双层防护：先看 state 标记，再用引擎实时重算（spacing=46，重叠>0.25px即为遮挡）
                         val isBlocked = tile.state == TileState.BLOCKED || 
-                                (tile.state == TileState.NORMAL && GameEngine.isTileBlocked(tile, state.boardTiles))
+                                GameEngine.isTileBlocked(tile, state.boardTiles)
                         val isSealed = tile.sealedCount > 0
 
                         if (isBlocked || isSealed) {

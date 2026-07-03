@@ -228,7 +228,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     const dy = Math.abs(a.y - b.y);
     const ox = Math.max(0, 48.0 - dx * 46.0);
     const oy = Math.max(0, 48.0 - dy * 46.0);
-    return ox * oy > 230.4; // 重合面积必须大于 10% 单张牌面积 (48 * 48 = 2304)
+    return ox > 0.25 && oy > 0.25;
   };
 
   const unassigned = new Set<Node>(nodes);

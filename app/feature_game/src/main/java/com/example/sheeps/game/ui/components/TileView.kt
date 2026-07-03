@@ -1,34 +1,5 @@
 package com.example.sheeps.game.ui.components
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import com.example.sheeps.core.R
-import com.example.sheeps.core.game.TileCardBase
-import com.example.sheeps.core.game.TileIconProvider
-import com.example.sheeps.data.model.Tile
-import com.example.sheeps.data.model.TileState
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.Text
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-
 /**
  * 秘境消消乐 · 卡牌组件（重构版）
  * 负责渲染棋盘中的单张卡牌，处理视觉反馈、点击状态及状态叠加效果（封印、迷雾、锁定）。
@@ -39,6 +10,48 @@ import androidx.compose.ui.unit.sp
  * @param tileSize 卡牌的渲染尺寸（默认 52dp）
  * @param isShaking 是否处于被锁定且不可选中的“抖动”状态
  */
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.apkfuns.logutils.LogUtils
+import com.example.sheeps.core.R
+import com.example.sheeps.core.game.TileCardBase
+import com.example.sheeps.core.game.TileIconProvider
+import com.example.sheeps.data.model.Tile
+import com.example.sheeps.data.model.TileState
+import com.example.sheeps.game.ui.animations.GameAnimations
 import com.example.sheeps.theme.Gold_Primary
 
 /**
@@ -65,23 +78,33 @@ fun TileView(
 ) {
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
-    val isBlind = tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
-    val isSealed = tile.sealedCount > 0
 
+    val isBlind =
+        tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
+    val isSealed = tile.sealedCount > 0
+    if (tile.z >= 1) {
+        LogUtils.d("BlockingDebug+渲染 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) 0.45 else 1.0}")
+    }
     // 处理交互源：用于捕获按压状态以实现弹性缩放
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
     // 提示符高亮与按压相关的动画，均提取自 GameAnimations 工具类
-    val pulseScale by com.example.sheeps.game.ui.animations.GameAnimations.rememberPulseScale(isHighlighted)
-    val borderAlpha by com.example.sheeps.game.ui.animations.GameAnimations.rememberHighlightBorderAlpha(isHighlighted)
-    val scale by com.example.sheeps.game.ui.animations.GameAnimations.rememberPressScale(interactionSource, isBlocked)
+    val pulseScale by GameAnimations.rememberPulseScale(
+        isHighlighted
+    )
+    val borderAlpha by GameAnimations.rememberHighlightBorderAlpha(
+        isHighlighted
+    )
+    val scale by GameAnimations.rememberPressScale(
+        interactionSource, isBlocked
+    )
 
     // 被阻止点击时的水平抖动动画：给玩家明确的“不可点击”视觉暗示
     val shakeOffset = remember { Animatable(0f) }
     LaunchedEffect(isShaking) {
         if (isShaking) {
-            com.example.sheeps.game.ui.animations.GameAnimations.runTileShakeAnimation(shakeOffset)
+            GameAnimations.runTileShakeAnimation(shakeOffset)
         }
     }
 
@@ -94,8 +117,7 @@ fun TileView(
 
     // 基础容器包装：处理皮肤边框和整体交互逻辑
     TileCardBase(
-        skin = currentSkin,
-        modifier = modifier
+        skin = currentSkin, modifier = modifier
             .offset(x = shakeOffset.value.dp)
             .graphicsLayer(
                 scaleX = if (isShaking) scaleByJiggle else (scale * pulseScale),
@@ -108,17 +130,14 @@ fun TileView(
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable(
-                interactionSource = interactionSource,
-                indication = null, // 移除系统默认水波纹，以自定义缩放为主
-                enabled = true,
-                onClick = onClick
+                interactionSource = interactionSource, indication = null, // 移除系统默认水波纹，以自定义缩放为主
+                enabled = true, onClick = onClick
             )
     ) {
         val context = LocalContext.current
 
         Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
             if (isBlind) {
                 // 情况 1：迷雾牌，显示牌背
@@ -136,10 +155,14 @@ fun TileView(
                         contentDescription = "Tile Icon",
                         modifier = Modifier
                             .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) 0.45f else 1f)
+                            .alpha(if (isBlocked) 0.45f else 1f)//临时加上被遮挡的卡牌临时不可见
                     )
                 } else {
                     // 资源缺失：显示类型编号作为占位符
+                    if (tile.z >= 1) {
+                        LogUtils.d("BlockingDebug+渲染1 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) 0.45 else 1.0}")
+                    }
+
                     Box(
                         modifier = Modifier
                             .size(tileSize * 0.9f)
@@ -155,6 +178,17 @@ fun TileView(
                     }
                 }
 
+                // 临时加上在没有被遮挡的卡牌上显示 tile.id
+//                if (!isBlocked && !isBlind) {
+//                    Text(
+//                        text = tile.id.removePrefix("tile_"),
+//                        color = Color.Red,
+//                        fontSize = 8.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp)
+//                    )
+//                }
+
                 // 叠加层：封印效果 (方案 A：半透明灰蓝色冰封网格 + 金色锁头图标 + 剩余解封次数)
                 if (isSealed) {
                     Box(
@@ -162,7 +196,11 @@ fun TileView(
                             .fillMaxSize()
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xBB2C3E50)) // 半透明灰蓝色冰封底色
-                            .border(1.5.dp, Color(0xFFF1C40F).copy(alpha = 0.8f), RoundedCornerShape(8.dp)), // 金色微光边框
+                            .border(
+                                1.5.dp,
+                                Color(0xFFF1C40F).copy(alpha = 0.8f),
+                                RoundedCornerShape(8.dp)
+                            ), // 金色微光边框
                         contentAlignment = Alignment.Center
                     ) {
                         Column(

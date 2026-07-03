@@ -20,6 +20,8 @@ data class DuelViewState(
     
     /** 本地棋盘卡牌列表 */
     val boardTiles: List<Tile> = emptyList(),
+    /** 本地棋盘卡牌边界（加载对局时计算，避免 Compose remember 缓存时序问题） */
+    val boardBounds: com.example.sheeps.game.state.BoardBounds = com.example.sheeps.game.state.BoardBounds(),
     /** 本地消除槽卡牌列表 */
     val slotTiles: List<Tile> = emptyList(),
     /** 本地已移出暂存区的卡牌列表 */
