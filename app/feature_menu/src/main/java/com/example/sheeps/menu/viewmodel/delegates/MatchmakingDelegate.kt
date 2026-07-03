@@ -71,32 +71,40 @@ class MatchmakingDelegate @Inject constructor(
         currentState: MenuViewState,
         updateState: (MenuViewState.() -> MenuViewState) -> Unit
     ) {
+        // 用可变引用跟踪匹配状态，避免捕获的 currentState 参数值不变导致的死循环
+        var matched = false
         repeat(20) {
+            if (matched) return@repeat
             delay(1500)
-            // 如果用户已经取消匹配或匹配成功，则停止轮询
-            if (currentState.matchStatus != "searching") return@repeat
 
             try {
                 val statusResponse = apiService.getMatchStatus(playerId)
-                if (statusResponse.status == "matched") {
-                    updateState {
-                        copy(
-                            matchStatus = "matched",
-                            matchedGameId = statusResponse.gameId,
-                            matchedOpponentId = statusResponse.opponentId,
-                            duelLevel = statusResponse.duelLevel ?: 2,
-                            gameSeed = statusResponse.gameSeed ?: 0
-                        )
+                when (statusResponse.status) {
+                    "matched" -> {
+                        matched = true
+                        updateState {
+                            copy(
+                                matchStatus = "matched",
+                                matchedGameId = statusResponse.gameId,
+                                matchedOpponentId = statusResponse.opponentId,
+                                duelLevel = statusResponse.duelLevel ?: 2,
+                                gameSeed = statusResponse.gameSeed ?: 0
+                            )
+                        }
                     }
-                    return@repeat
+                    "not_in_queue" -> {
+                        matched = true
+                        updateState { copy(matchStatus = "error") }
+                    }
+                    // "waiting" → 继续轮询
                 }
             } catch (e: Exception) {
                 // 轮询中的单次错误暂不中断
             }
         }
-        
+
         // 超时未匹配到
-        if (currentState.matchStatus == "searching") {
+        if (!matched) {
             updateState { copy(matchStatus = "error") }
         }
     }
