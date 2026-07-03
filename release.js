@@ -2,6 +2,30 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const readline = require('readline');
+const https = require('https');
+
+/**
+ * 使用 Google Translate 免费接口翻译文本
+ * 目标语言映射：en=英语, ja=日语, ko=韩语
+ */
+function translateText(text, targetLang) {
+    return new Promise((resolve, reject) => {
+        const encoded = encodeURIComponent(text);
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encoded}`;
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                try {
+                    // Google Translate 返回 [[["trans1","orig1",...],["trans2",...],...]]
+                    const result = JSON.parse(data);
+                    const translated = result[0].map(seg => seg[0]).join('');
+                    resolve(translated);
+                } catch { resolve(text); } // 翻译失败回退原文
+            });
+        }).on('error', () => resolve(text)); // 网络失败回退原文
+    });
+}
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -61,7 +85,7 @@ function run() {
                 console.log(`2. 自动生成云端 D1 数据库 SQL 记录并执行插入`);
                 console.log(`3. 自动 Git Commit 并 Push 提交到 GitHub 触发 CI 发布`);
                 
-                rl.question(`\n确认开始发布？(y/n): `, (confirm) => {
+                rl.question(`\n确认开始发布？(y/n): `, async (confirm) => {
                     if (confirm.toLowerCase() !== 'y' && confirm.toLowerCase() !== 'yes') {
                         console.log("发布已取消。");
                         rl.close();
@@ -80,18 +104,59 @@ function run() {
                         const apkUrl = `${R2_PUBLIC_BASE}/sheeps_${newName}.apk`;
                         const now = Date.now();
                         // 避免 SQL 语句因单引号报错
-                        const escapedLog = updateLog.replace(/'/g, "''");
-                        const sql = `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escapedLog}', 0, ${now});`;
+                        const esc = (s) => s.replace(/'/g, "''");
+                        const escapedLog = esc(updateLog);
+                        const versionTitle = `v${newName} 版本更新`;
+                        
+                        // ─── 自动翻译标题和更新日志到多语言 ───
+                        console.log("➔ 正在翻译公告内容...");
+                        const [titleEn, titleJa, titleKo, contentEn, contentJa, contentKo] = await Promise.all([
+                            translateText(versionTitle, 'en'),
+                            translateText(versionTitle, 'ja'),
+                            translateText(versionTitle, 'ko'),
+                            translateText(updateLog, 'en'),
+                            translateText(updateLog, 'ja'),
+                            translateText(updateLog, 'ko')
+                        ]);
+                        console.log(`   en: ${titleEn}`);
+                        console.log(`   ja: ${titleJa}`);
+                        console.log(`   ko: ${titleKo}`);
+                        
+                        // 同时写入 app_version 和 notice 公告表（含多语言列）
+                        const sql = [
+                            `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escapedLog}', 0, ${now});`,
+                            `INSERT INTO notice (title, title_en, title_ja, title_ko, content, content_en, content_ja, content_ko, type, created_at) VALUES ('${esc(versionTitle)}', '${esc(titleEn)}', '${esc(titleJa)}', '${esc(titleKo)}', '${escapedLog}', '${esc(contentEn)}', '${esc(contentJa)}', '${esc(contentKo)}', 'update', ${now});`
+                        ].join(' ');
                         
                         console.log("➔ 正在执行远程 D1 数据库更新...");
-                        // 运行 wrangler
                         const serverDir = path.join(__dirname, 'server');
                         execSync(`npx wrangler d1 execute my-app-db --remote --command="${sql}"`, { cwd: serverDir, stdio: 'inherit' });
                         console.log("➔ D1 数据库记录写入成功！");
+                        // 追加各语言 KV 缓存（即时生效）
+                        const kvNsId = '784104ac67eb4f3c83a92e9dcc91b673';
+                        const noticesByLang = {
+                            '':    { title: versionTitle, content: updateLog },
+                            'en':  { title: titleEn,      content: contentEn },
+                            'ja':  { title: titleJa,      content: contentJa },
+                            'ko':  { title: titleKo,      content: contentKo },
+                        };
+                        for (const [l, t] of Object.entries(noticesByLang)) {
+                            const cacheKey = `notices_${l}`;
+                            try {
+                                const existing = execSync(`npx wrangler kv key get "${cacheKey}" --namespace-id ${kvNsId} --remote --text`, { cwd: serverDir, stdio: 'pipe', timeout: 10000 }).toString().trim();
+                                if (existing && existing !== 'null' && existing !== 'undefined') {
+                                    const list = JSON.parse(existing);
+                                    list.unshift({ title: t.title, content: t.content, type: 'update', created_at: now });
+                                    execSync(`npx wrangler kv key put "${cacheKey}" --namespace-id ${kvNsId} --remote --path=/dev/stdin`, {
+                                        cwd: serverDir, stdio: 'pipe', input: JSON.stringify(list)
+                                    });
+                                }
+                            } catch {}
+                        }
 
                         // 3. 执行 Git 提交与 Push
                         console.log("➔ 正在提交代码到 Git 远程仓库...");
-                        execSync('git add app/app/build.gradle.kts .github/workflows/release.yml release.js app/app/proguard-rules.pro', { cwd: __dirname, stdio: 'inherit' });
+                        execSync('git add -A', { cwd: __dirname, stdio: 'inherit' });
                         execSync(`git commit -m "chore(release): bump version to v${newName} and update release info"`, { cwd: __dirname, stdio: 'inherit' });
                         execSync('git push origin main', { cwd: __dirname, stdio: 'inherit' });
                         console.log("➔ 代码已成功推送到远程 main 分支，正在触发 GitHub Actions 编译发布...");
