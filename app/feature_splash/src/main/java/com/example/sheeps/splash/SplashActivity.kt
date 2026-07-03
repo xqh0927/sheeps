@@ -2,34 +2,67 @@ package com.example.sheeps.splash
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
-import com.blankj.utilcode.util.LogUtils
+import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.theme.*
-import com.example.sheeps.ui.components.PrimaryButton
+import com.example.sheeps.theme.Crimson_Primary
+import com.example.sheeps.theme.Gold_Primary
+import com.example.sheeps.theme.Gold_Subtle
+import com.example.sheeps.theme.MoYe_Surface
+import com.example.sheeps.theme.MoYe_SurfaceVariant
+import com.example.sheeps.theme.ShapeLarge
+import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.theme.Text_Disabled_Dark
+import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.GhostButton
+import com.example.sheeps.ui.components.PrimaryButton
 import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
@@ -40,11 +73,10 @@ import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.*
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.res.stringResource
 import javax.inject.Inject
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Route(path = "/splash/entry")
 @AndroidEntryPoint
@@ -113,6 +145,7 @@ class SplashActivity : BaseActivity() {
                 override fun onGranted(permissions: MutableList<String>, allGranted: Boolean) {
                     navigateToMenu()
                 }
+
                 override fun onDenied(permissions: MutableList<String>, doNotAskAgain: Boolean) {
                     navigateToMenu()
                 }
@@ -134,9 +167,9 @@ fun ParticleBackground() {
     val infiniteTransition = rememberInfiniteTransition(label = "particles")
     val phase by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue  = 2 * PI.toFloat(),
+        targetValue = 2 * PI.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation  = tween(8000, easing = LinearEasing),
+            animation = tween(8000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "particlePhase"
@@ -162,20 +195,20 @@ fun ParticleBackground() {
 
         particles.forEach { (xR, yR, speed) ->
             val offsetY = sin(phase * speed) * h * 0.04f
-            val alpha   = (sin(phase * speed * 0.7f + 1f) * 0.3f + 0.15f).coerceIn(0f, 0.5f)
-            val radius  = sin(phase * speed * 0.5f + 2f) * 2f + 3f
+            val alpha = (sin(phase * speed * 0.7f + 1f) * 0.3f + 0.15f).coerceIn(0f, 0.5f)
+            val radius = sin(phase * speed * 0.5f + 2f) * 2f + 3f
 
             drawCircle(
-                color  = Gold_Primary,
+                color = Gold_Primary,
                 radius = radius,
                 center = Offset(xR * w, yR * h + offsetY),
-                alpha  = alpha
+                alpha = alpha
             )
         }
 
         // 底部红色光晕
         drawCircle(
-            brush  = Brush.radialGradient(
+            brush = Brush.radialGradient(
                 colors = listOf(Crimson_Primary.copy(alpha = 0.3f), Color.Transparent),
                 center = Offset(w * 0.5f, h * 0.75f),
                 radius = w * 0.6f
@@ -192,29 +225,29 @@ fun SplashVisuals() {
     val infiniteTransition = rememberInfiniteTransition(label = "splash")
     val logoScale by infiniteTransition.animateFloat(
         initialValue = 0.97f,
-        targetValue  = 1.03f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(2000, easing = FastOutSlowInEasing),
+            animation = tween(2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "logoScale"
     )
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
-        targetValue  = 0.7f,
+        targetValue = 0.7f,
         animationSpec = infiniteRepeatable(
-            animation  = tween(1800, easing = FastOutSlowInEasing),
+            animation = tween(1800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "glowAlpha"
     )
 
     Column(
-        modifier              = Modifier
+        modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 32.dp, vertical = 48.dp),
-        horizontalAlignment   = Alignment.CenterHorizontally,
-        verticalArrangement   = Arrangement.SpaceBetween
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
         Spacer(Modifier.height(0.dp))
 
@@ -226,8 +259,11 @@ fun SplashVisuals() {
             // 金色光晕（Logo背后发光）
             Canvas(modifier = Modifier.size(240.dp)) {
                 drawCircle(
-                    brush  = Brush.radialGradient(
-                        colors = listOf(Gold_Primary.copy(alpha = glowAlpha * 0.3f), Color.Transparent)
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Gold_Primary.copy(alpha = glowAlpha * 0.3f),
+                            Color.Transparent
+                        )
                     ),
                     radius = this.size.width * 0.5f
                 )
@@ -238,21 +274,29 @@ fun SplashVisuals() {
                 Canvas(modifier = Modifier.size(80.dp)) {
                     val cx = this.size.width / 2f
                     val cy = this.size.height / 2f
-                    val r  = this.size.width * 0.45f
+                    val r = this.size.width * 0.45f
                     for (i in 0 until 6) {
                         val angle = Math.toRadians(60.0 * i)
                         val x = cx + r * cos(angle).toFloat()
                         val y = cy + r * sin(angle).toFloat()
                         drawLine(
-                            color       = Gold_Primary.copy(alpha = 0.6f),
-                            start       = Offset(cx, cy),
-                            end         = Offset(x, y),
+                            color = Gold_Primary.copy(alpha = 0.6f),
+                            start = Offset(cx, cy),
+                            end = Offset(x, y),
                             strokeWidth = 1.5f,
-                            cap         = StrokeCap.Round
+                            cap = StrokeCap.Round
                         )
                     }
-                    drawCircle(color = Gold_Primary.copy(alpha = 0.4f), radius = r * 0.6f, style = Stroke(width = 1.5f))
-                    drawCircle(color = Gold_Primary.copy(alpha = 0.2f), radius = r, style = Stroke(width = 1f))
+                    drawCircle(
+                        color = Gold_Primary.copy(alpha = 0.4f),
+                        radius = r * 0.6f,
+                        style = Stroke(width = 1.5f)
+                    )
+                    drawCircle(
+                        color = Gold_Primary.copy(alpha = 0.2f),
+                        radius = r,
+                        style = Stroke(width = 1f)
+                    )
                     drawCircle(color = Crimson_Primary.copy(alpha = 0.8f), radius = 8f)
                 }
 
@@ -260,12 +304,12 @@ fun SplashVisuals() {
 
                 // 游戏标题
                 Text(
-                    text       = stringResource(id = com.example.sheeps.core.R.string.app_name),
-                    fontSize   = 38.sp,
-                    color      = Gold_Primary,
+                    text = stringResource(id = com.example.sheeps.core.R.string.app_name),
+                    fontSize = 38.sp,
+                    color = Gold_Primary,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Serif,
-                    textAlign  = TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     letterSpacing = 4.sp
                 )
 
@@ -273,12 +317,12 @@ fun SplashVisuals() {
 
                 // 副标题
                 Text(
-                    text       = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
-                    fontSize   = 16.sp,
-                    color      = Text_Secondary_Dark,
+                    text = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
+                    fontSize = 16.sp,
+                    color = Text_Secondary_Dark,
                     fontWeight = FontWeight.Medium,
                     fontFamily = FontFamily.Serif,
-                    textAlign  = TextAlign.Center,
+                    textAlign = TextAlign.Center,
                     letterSpacing = 2.sp
                 )
 
@@ -286,9 +330,9 @@ fun SplashVisuals() {
 
                 // 分隔线
                 Row(
-                    modifier           = Modifier.fillMaxWidth(0.6f),
+                    modifier = Modifier.fillMaxWidth(0.6f),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment  = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
@@ -296,13 +340,16 @@ fun SplashVisuals() {
                             .height(1.dp)
                             .background(
                                 Brush.horizontalGradient(
-                                    colors = listOf(Color.Transparent, Gold_Subtle.copy(alpha = 0.5f))
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Gold_Subtle.copy(alpha = 0.5f)
+                                    )
                                 )
                             )
                     )
                     Text(
-                        text   = "  ✦  ",
-                        color  = Gold_Subtle,
+                        text = "  ✦  ",
+                        color = Gold_Subtle,
                         fontSize = 12.sp
                     )
                     Box(
@@ -311,7 +358,10 @@ fun SplashVisuals() {
                             .height(1.dp)
                             .background(
                                 Brush.horizontalGradient(
-                                    colors = listOf(Gold_Subtle.copy(alpha = 0.5f), Color.Transparent)
+                                    colors = listOf(
+                                        Gold_Subtle.copy(alpha = 0.5f),
+                                        Color.Transparent
+                                    )
                                 )
                             )
                     )
@@ -331,7 +381,7 @@ fun SplashVisuals() {
         ) {
             // 适龄提示徽章
             Row(
-                verticalAlignment     = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
@@ -350,8 +400,8 @@ fun SplashVisuals() {
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text     = "适龄提示：适合 8 岁及以上用户",
-                    color    = Text_Secondary_Dark,
+                    text = "适龄提示：适合 8 岁及以上用户",
+                    color = Text_Secondary_Dark,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -360,12 +410,12 @@ fun SplashVisuals() {
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text      = "健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。",
-                color     = Text_Disabled_Dark,
-                fontSize  = 10.sp,
+                text = "健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。",
+                color = Text_Disabled_Dark,
+                fontSize = 10.sp,
                 lineHeight = 15.sp,
                 textAlign = TextAlign.Center,
-                modifier  = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -379,7 +429,11 @@ fun PrivacyComposeDialog(
 ) {
     Dialog(
         onDismissRequest = {},
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
     ) {
         Box(
             modifier = Modifier
@@ -401,35 +455,35 @@ fun PrivacyComposeDialog(
                     .padding(24.dp)
             ) {
                 Text(
-                    text       = "用户服务与隐私协议",
+                    text = "用户服务与隐私协议",
                     fontWeight = FontWeight.Bold,
-                    fontSize   = 20.sp,
-                    color      = Crimson_Primary,
+                    fontSize = 20.sp,
+                    color = Crimson_Primary,
                     fontFamily = FontFamily.Serif,
-                    modifier   = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
 
                 Text(
-                    text      = "感谢您体验《秘境消消乐》！\n\n在您开始游戏前，请认真阅读并理解《用户协议》与《隐私政策》。\n\n点击‘同意并开始’表示您已了解并同意以上条款。",
-                    fontSize  = 14.sp,
+                    text = "感谢您体验《秘境消消乐》！\n\n在您开始游戏前，请认真阅读并理解《用户协议》与《隐私政策》。\n\n点击‘同意并开始’表示您已了解并同意以上条款。",
+                    fontSize = 14.sp,
                     lineHeight = 22.sp,
-                    color     = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                    modifier  = Modifier.padding(bottom = 24.dp)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(bottom = 24.dp)
                 )
 
                 Row(
-                    modifier              = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GhostButton(
-                        text     = "不同意并退出",
-                        onClick  = onDismiss,
+                        text = "不同意并退出",
+                        onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        color    = Text_Secondary_Dark
+                        color = Text_Secondary_Dark
                     )
                     PrimaryButton(
-                        text     = "同意并开始",
-                        onClick  = onConfirm,
+                        text = "同意并开始",
+                        onClick = onConfirm,
                         modifier = Modifier.weight(1f)
                     )
                 }

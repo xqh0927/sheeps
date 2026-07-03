@@ -1,15 +1,5 @@
 package com.example.sheeps.game.ui.components
 
-/**
- * 秘境消消乐 · 卡牌组件（重构版）
- * 负责渲染棋盘中的单张卡牌，处理视觉反馈、点击状态及状态叠加效果（封印、迷雾、锁定）。
- * * @param tile 当前卡牌的数据模型
- * @param onClick 点击事件回调
- * @param currentSkin 当前使用的皮肤主题
- * @param modifier 自定义修饰符
- * @param tileSize 卡牌的渲染尺寸（默认 52dp）
- * @param isShaking 是否处于被锁定且不可选中的“抖动”状态
- */
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -51,6 +41,7 @@ import com.example.sheeps.core.game.TileCardBase
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
+import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.ui.animations.GameAnimations
 import com.example.sheeps.theme.Gold_Primary
 
@@ -79,11 +70,14 @@ fun TileView(
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
 
+    //不可点击遮罩透明度
+    val mask = 0.35f
+
     val isBlind =
         tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
     val isSealed = tile.sealedCount > 0
     if (tile.z >= 1) {
-        LogUtils.d("BlockingDebug+渲染 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) 0.45 else 1.0}")
+        LogUtils.d("BlockingDebug：渲染 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) mask else 1.0}")
     }
     // 处理交互源：用于捕获按压状态以实现弹性缩放
     val interactionSource = remember { MutableInteractionSource() }
@@ -155,18 +149,18 @@ fun TileView(
                         contentDescription = "Tile Icon",
                         modifier = Modifier
                             .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) 0.45f else 1f)//临时加上被遮挡的卡牌临时不可见
+                            .alpha(if (isBlocked) mask else 1f)
                     )
                 } else {
                     // 资源缺失：显示类型编号作为占位符
                     if (tile.z >= 1) {
-                        LogUtils.d("BlockingDebug+渲染1 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) 0.45 else 1.0}")
+                        LogUtils.d("BlockingDebug：渲染1 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) mask else 1.0}")
                     }
 
                     Box(
                         modifier = Modifier
                             .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) 0.45f else 1f),
+                            .alpha(if (isBlocked) mask else 1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -178,16 +172,28 @@ fun TileView(
                     }
                 }
 
-                // 临时加上在没有被遮挡的卡牌上显示 tile.id
-//                if (!isBlocked && !isBlind) {
-//                    Text(
-//                        text = tile.id.removePrefix("tile_"),
-//                        color = Color.Red,
-//                        fontSize = 8.sp,
-//                        fontWeight = FontWeight.Bold,
-//                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 2.dp)
-//                    )
-//                }
+                // 临时显示 tile.id：NORMAL=红色，BLOCKED=蓝色，附带 z 层
+                if (BuildConfig.DEBUG) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 2.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = tile.id.removePrefix("tile_"),
+                            color = if (isBlocked) Color.Blue else Color.Red,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "z${tile.z}",
+                            color = if (isBlocked) Color.Blue else Color.Red,
+                            fontSize = 6.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
                 // 叠加层：封印效果 (方案 A：半透明灰蓝色冰封网格 + 金色锁头图标 + 剩余解封次数)
                 if (isSealed) {

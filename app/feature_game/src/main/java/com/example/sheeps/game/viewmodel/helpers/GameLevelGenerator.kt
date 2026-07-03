@@ -95,23 +95,28 @@ class GameLevelGenerator @Inject constructor() {
         val unassigned = nodes.toMutableSet()
         val randAssign = lcg(levelId * 1000L + 100)
 
-        // 判断卡牌遮挡关系的闭包，与运行时物理重叠规则完全对齐以保证可解性（重叠面积大于单张卡牌5%）
-        val blocks = { a: Point3D, b: Point3D ->
+        // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积
+        val overlapArea = { a: Point3D, b: Point3D ->
             if (a.z <= b.z) {
-                false
+                0f
             } else {
                 val dx = abs(a.x - b.x)
                 val dy = abs(a.y - b.y)
                 val ox = (48.0f - dx * 46.0f).coerceAtLeast(0f)
                 val oy = (48.0f - dy * 46.0f).coerceAtLeast(0f)
-                ox > 0.25f && oy > 0.25f
+                ox * oy
             }
         }
 
         // 反向分配卡牌类型，确保顶层总是存在可消除的组合
         while (unassigned.isNotEmpty()) {
+            // 覆盖面积累计：累计所有更高层卡牌的覆盖面积，超过 25% 即视为遮挡
             val exposed = unassigned.filter { node ->
-                unassigned.none { other -> other != node && blocks(other.coord, node.coord) }
+                val covered = unassigned
+                    .filter { other -> other != node && other.coord.z > node.coord.z }
+                    .sumOf { other -> overlapArea(other.coord, node.coord).toDouble() }
+                    .toFloat()
+                covered < 48.0f * 48.0f * 0.01f
             }
 
             if (exposed.size < 3) {

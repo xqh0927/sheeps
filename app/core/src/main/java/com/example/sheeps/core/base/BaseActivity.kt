@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
-import com.blankj.utilcode.util.LogUtils
+import com.apkfuns.logutils.LogUtils
 
 /**
  * 应用内所有 Activity 的基类。
@@ -16,7 +16,8 @@ abstract class BaseActivity : ComponentActivity() {
         val mmkvContext = newBase.applicationContext ?: newBase
         try {
             com.tencent.mmkv.MMKV.initialize(mmkvContext)
-        } catch (e: Exception) {}
+        } catch (e: Exception) {
+        }
         val lang = com.tencent.mmkv.MMKV.defaultMMKV()?.decodeString("language", "zh") ?: "zh"
         if (lang.isEmpty() || lang == "zh") {
             super.attachBaseContext(newBase)
@@ -41,17 +42,17 @@ abstract class BaseActivity : ComponentActivity() {
             setTheme(com.example.sheeps.theme.ThemeManager.getThemeResId())
         }
         super.onCreate(savedInstanceState)
-        
+
         // 设置状态栏图标颜色风格
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
         }
-        
+
         LogUtils.d("${javaClass.simpleName} onCreate")
-        
+
         // 开启全屏/沉浸式边缘到边缘支持
         enableEdgeToEdge()
-        
+
         // 初始化视图与数据
         initView(savedInstanceState)
         initData()

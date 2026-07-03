@@ -238,23 +238,23 @@ class GameViewModel @Inject constructor(
                 val blockedCount = finalTiles.count { it.state == TileState.BLOCKED }
                 val normalOnLayer1Plus =
                     finalTiles.filter { it.z >= 1 && it.state == TileState.NORMAL }
-                LogUtils.d("BlockingDebug+BLOCKED: $blockedCount / ${finalTiles.size}")
-                LogUtils.d("BlockingDebug+z>=1 but NORMAL: ${normalOnLayer1Plus.map { "${it.id}(${it.x},${it.y},z=${it.z})" }}")
+                LogUtils.d("BlockingDebug：BLOCKED: $blockedCount / ${finalTiles.size}")
+                LogUtils.d("BlockingDebug：z>=1 but NORMAL: ${normalOnLayer1Plus.map { "${it.id}(${it.x},${it.y},z=${it.z})" }}")
 
                 // 针对用户怀疑的 tile，打印上方所有可能的遮挡者
-                val suspectIds = setOf(59, 154, 101, 105, 125, 150, 121, 68)
+                val suspectIds = setOf(157, 138, 151, 93, 160)
                 for (tid in suspectIds) {
                     val suspect = finalTiles.find { it.id == "tile_$tid" } ?: continue
                     val above = finalTiles.filter { o ->
                         o.z > suspect.z && o.state == TileState.NORMAL
                     }
                     if (above.isEmpty()) {
-                        LogUtils.d("BlockingDebug+tile_$tid(z=${suspect.z},state=${suspect.state}): 上方无 NORMAL tile")
+                        LogUtils.d("BlockingDebug：tile_$tid(z=${suspect.z},state=${suspect.state}): 上方无 NORMAL tile")
                     } else {
                         for (a in above) {
                             val ox = 48f - kotlin.math.abs(a.x - suspect.x) * 46f
                             val oy = 48f - kotlin.math.abs(a.y - suspect.y) * 46f
-                            LogUtils.d("BlockingDebug+tile_$tid(z=${suspect.z}) ← ${a.id}(z=${a.z}): dx=${"%.2f".format(kotlin.math.abs(a.x - suspect.x))} dy=${"%.2f".format(kotlin.math.abs(a.y - suspect.y))} ox=$ox oy=$oy blocking=${ox > 0.25f && oy > 0.25f}")
+                            LogUtils.d("BlockingDebug：tile_$tid(z=${suspect.z}) ← ${a.id}(z=${a.z}): dx=${"%.2f".format(kotlin.math.abs(a.x - suspect.x))} dy=${"%.2f".format(kotlin.math.abs(a.y - suspect.y))} ox=$ox oy=$oy blocking=${ox > 0.25f && oy > 0.25f}")
                         }
                     }
                 }

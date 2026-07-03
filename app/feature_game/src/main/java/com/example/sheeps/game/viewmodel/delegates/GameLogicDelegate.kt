@@ -38,7 +38,7 @@ class GameLogicDelegate @Inject constructor() {
         // �ж������Ƿ��ڵ���spacing=46���ص�>0.25px��Ϊ�ڵ���
         val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
         LogUtils.d(
-            "BlockingDebug+点击 ${tile.id}: state=${tile.state}, isBlockedByEngine=${
+            "BlockingDebug：点击 ${tile.id}: state=${tile.state}, isBlockedByEngine=${
                 isTileBlocked(
                     tile,
                     state.boardTiles

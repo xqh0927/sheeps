@@ -219,16 +219,14 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     assignedType: -1
   }));
 
-  // 10% 物理重叠遮挡算法：用于判断 A 是否遮挡 B
-  const blocks = (a: Point3D, b: Point3D) => {
-    if (a.z <= b.z) {
-      return false;
-    }
+  // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积
+  const overlapArea = (a: Point3D, b: Point3D): number => {
+    if (a.z <= b.z) return 0;
     const dx = Math.abs(a.x - b.x);
     const dy = Math.abs(a.y - b.y);
     const ox = Math.max(0, 48.0 - dx * 46.0);
     const oy = Math.max(0, 48.0 - dy * 46.0);
-    return ox > 0.25 && oy > 0.25;
+    return ox * oy;
   };
 
   const unassigned = new Set<Node>(nodes);
@@ -240,19 +238,13 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
   // 3. 将这 3 张牌从待涂色集合中移除，它们下方被压住的卡牌随之“暴露”。
   // 4. 重复上述步骤，直至所有卡牌涂色完成。因为花色分配逻辑与消除步骤完全镜像对称，所以逆向消去必定有解。
   while (unassigned.size > 0) {
-    const exposedNodes: Node[] = [];
-    for (const node of unassigned) {
-      let isCovered = false;
-      for (const other of unassigned) {
-        if (other !== node && blocks(other.coord, node.coord)) {
-          isCovered = true;
-          break;
-        }
-      }
-      if (!isCovered) {
-        exposedNodes.push(node);
-      }
-    }
+    // 覆盖面积累计：累计所有更高层卡牌的覆盖面积，超过 25% 即视为遮挡
+    const exposedNodes = Array.from(unassigned).filter(node => {
+      const covered = Array.from(unassigned)
+        .filter(other => other !== node && other.coord.z > node.coord.z)
+        .reduce((sum, other) => sum + overlapArea(other.coord, node.coord), 0);
+      return covered < 48.0 * 48.0 * 0.01;
+    });
 
     // 若暴露的可用卡牌少于 3 张，进入回退容错：强制将余下全部卡牌 3 个一组随意涂上相同花色
     if (exposedNodes.length < 3) {
