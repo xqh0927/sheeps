@@ -1,16 +1,16 @@
 # ========== 后端 (Cloudflare Workers) ==========
 server/.wrangler/
-server/.tmp-test/
 server/node_modules/
 .env
-.DS_Store
+
+# ========== 根目录 ==========
+node_modules/
+*.log
+temp_*
 
 # ========== IDE ==========
 .idea/
 .vscode/
-*.suo
-*.userprefs
-*.sln.docstates
 
 # ========== Android Studio & Gradle ==========
 app/.idea/
@@ -25,34 +25,12 @@ app/feature_menu/build/
 app/feature_splash/build/
 app/local.properties
 app/.navigation/
-
-# ========== Unity ==========
-UnityGame/Library/
-UnityGame/Temp/
-UnityGame/Logs/
-UnityGame/UserSettings/
-UnityGame/obj/
-UnityGame/Builds/
-UnityGame/Assets/AssetStoreTools/
-
-# Unity generated project files
-*.csproj
-*.unityproj
-*.sln
-*.booproj
-
-# Unity build results
-[Uu]nity_[Cc]ached_[Aa]ssets/
-[Uu]nity[Pp]layer/
-[Uu]nity[Pp]lugin/[Rr]ider/
-
-# ========== Visual Studio / Rider ==========
-.vs/
-_ReSharper.*/
+*.apk
+*.ap_
+*.dex
 
 # ========== macOS ==========
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
@@ -61,27 +39,5 @@ _ReSharper.*/
 Thumbs.db
 desktop.ini
 
-# ========== Android 构建产物 ==========
-*.apk
-*.ap_
-*.dex
-
-# ========== iOS ==========
-*.ipa
-*.xcodeproj
-
-# ========== Crashlytics ==========
-crashlytics-build.properties
-crashlytics-dervs.properties
-crashlytics.properties
-
-# ========== Paket ==========
-.paket/
-
-# ========== FX Cop ==========
-FxCopResult.txt
-FxCop.Xml
-
 # End of File
-.workbuddy/
 .workbuddy/
