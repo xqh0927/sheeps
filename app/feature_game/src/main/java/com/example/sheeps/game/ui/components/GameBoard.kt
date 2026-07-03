@@ -95,9 +95,13 @@ fun GameBoard(
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp)),
         contentAlignment = Alignment.Center
     ) {
-        // 只当 boardTiles 列表引用变更时才重算 visibleTiles，避免每帧重组都 filter 300 张牌
-        val visibleTiles = remember(state.boardTiles) {
-            state.boardTiles.filter { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
+        // 当 boardTiles 引用或 flyingTileIds 变化时重算 visibleTiles
+        // flyingTileIds 加入 key 确保动画结束后 flyingTileIds 清空时正确重算
+        val visibleTiles = remember(state.boardTiles, flyingTileIds) {
+            state.boardTiles.filter { tile ->
+                (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) &&
+                tile.id !in flyingTileIds
+            }
         }
 
         if (visibleTiles.isNotEmpty()) {
@@ -125,7 +129,6 @@ fun GameBoard(
                                     y = ((tile.y - minY) * spacing * scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
-                                .alpha(if (isFlying) 0f else 1f)
                                 .onGloballyPositioned { coords ->
                                     val pos = coords.positionInRoot()
                                     val prev = tileGlobalPositions[tile.id]
