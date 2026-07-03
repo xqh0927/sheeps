@@ -74,6 +74,13 @@
   - 采用无服务器计算架构，无冷启动延迟。业务路由基于 TypeScript 构建，在全球数十个边缘节点就近响应客户端请求。
 * **边缘分布式 SQLite (Cloudflare D1)**：
   - 后端直接绑定 D1 分布式 SQLite 数据库，实现轻量高速的 SQL 查询。用户配置、关卡模板、实时排行榜、签到流水账等数据均在 D1 中原子落盘。
+* **KV 边缘缓存加速 (Cloudflare Workers KV)**：
+  - 公告、排行榜、关卡布局、商城道具、系统配置等读高频数据全部通过 KV 进行边缘持久化缓存（300s-24h TTL），大幅降低 D1 读取负载和 API 响应延迟。
+* **R2 对象存储 + 自定义域名 CDN (Cloudflare R2)**：
+  - APK 安装包托管于 R2（免费 10GB + 零出口流量费），经自定义域名 `apk.xqh.cc.cd` 全球 CDN 边缘分发，告别 GitHub Releases 国内下载缓慢问题。
+* **JWT 密钥 Cache + D1 查询合并优化**：
+  - WebCrypto `importKey` 从每次调用改为 Worker 实例级单例缓存，省 30-40% CPU；
+  - 登录接口 3 次独立 D1 batch 合并为 1 次读 + 最多 1 次写。
 
 
 ---
@@ -118,10 +125,16 @@
 │
 ├── server/                     # 后端服务代码 (Cloudflare Worker)
 │   ├── src/
-│   │   ├── index.ts            # Workers API 路由与业务逻辑实现 (包含注册、登录、关卡生成、排行榜、签到等)
-│   ├── wrangler.toml           # Cloudflare Wrangler 配置文件 (配置路由、D1 绑定、环境变量)
-│   ├── package.json
-│   └── tsconfig.json
+│   │   ├── index.ts            # Workers 路由入口
+│   │   ├── handlers/           # 业务路由 (auth/game/shop/system/user)
+│   │   ├── crypto.ts           # JWT 签发校验 + 防作弊签名
+│   │   ├── level.ts            # LCG 确定性关卡生成算法
+│   │   ├── difficulty.ts       # 100 级难度系数系统
+│   │   └── helpers.ts          # 通用辅助 (鉴权/CORS/KV配置缓存)
+│   ├── test/                   # 后端单元测试 (level/difficulty/update)
+│   ├── wrangler.jsonc          # Cloudflare Wrangler 配置 (Worker + D1 + KV + R2)
+│   ├── schema.sql              # D1 数据库初始化建表脚本
+│   └── package.json
 │
 └── docs/                       # 项目配套文档
 ```
@@ -142,52 +155,44 @@
    ```bash
    npx wrangler login
    ```
-3. 创建 D1 数据库绑定：
-   ```bash
-   npx wrangler d1 create sheeps-db
-   ```
-4. 将 `wrangler.toml` 中的 `database_id` 替换为创建生成的 UUID。
+3. 初始化 D1 + KV + R2（需提前在 Cloudflare Dashboard 创建）：
+   - D1 数据库名称：`my-app-db`
+   - KV 命名空间：`SHEEPS_CACHE`
+   - R2 存储桶：`sheeps-apk`
+4. 将 `wrangler.jsonc` 中的 `database_id`、`kv_namespaces[].id` 替换为创建生成的 UUID。
 5. 初始化数据库表结构：
-   在 `server/` 根目录执行初始化 SQL：
    ```bash
-   npx wrangler d1 execute sheeps-db --local --file=./schema.sql
-   npx wrangler d1 execute sheeps-db --remote --file=./schema.sql
+   npx wrangler d1 execute my-app-db --remote --file=./schema.sql
    ```
 6. 部署到 Cloudflare 全球网络：
    ```bash
-   npm run deploy
+   npx wrangler deploy
    ```
 
-### 2. 一键版本发布与 D1/CI 自动化同步脚本 (release.js)
-为了彻底规避客户端与云端版本不一致导致的“无限循环提示更新”死循环，项目在根目录下集成了高度自动化的发布系统：
+### 2. 一键版本发布脚本 (release.js)
+项目根目录下的 `node release.js` 实现全自动化发版流程：
 
-1. **工作原理**：
-   - 当需要打包发布新版本时，在根目录下运行 `node release.js` 交互式命令。
-   - 脚本自动解析 `build.gradle.kts` 当前版本并自动建议下个版本。您只需输入“更新说明日志”。
-   - 脚本自动修改本地版本配置，动态生成 SQL 并执行 `wrangler d1 execute` 插入到云端 D1 数据库中。
-   - 随后，脚本自动完成 Git Commit 并 Push 提交到 main 分支。
-2. **精细化 CI 触发过滤**：
-   - GitHub Actions 的 build 打包任务配置了消息过滤：`if: contains(github.event.head_commit.message, 'chore(release):')`。
-   - 任何日常手动 `git push`（不包含 `chore(release):` 的常规开发）都**不会触发**耗时的 App 构建；只有通过 `release.js` 发布的提交，才会精准触发 Actions 进行 Release 编译并以 `v${versionName}` 自动生成 Release Tag。
-3. **服务端 APK 延迟发布与多版本容错机制**：
-   - **HEAD 状态检测**：为避免 D1 数据库插入后、GitHub Actions 构建上传 APK 完成前，客户端因读取到高版本发起更新而导致下载 404 错误，Cloudflare Worker 端在检测到高版本时，会主动以 `HEAD` 轻量级报文请求对应版本 APK。只有当链接可达（200 OK）时才推送该版本更新。
-   - **多版本平滑过滤**：如果最新版本还在打包，Worker 会向下查找已编译完成的最近可用高版本进行推送；同时设置了内存缓存（200成功缓存 24 小时，404构建中缓存 60 秒）以优化检测效率并避免速率限制。
+1. **交互式版本管理**：自动解析 `build.gradle.kts` 当前版本并建议下个版本号。
+2. **Git 前置安全校验**：自动检查当前是否在 `main` 分支，并在提交前 `pull --rebase` 同步远程代码，防止冲突和误推。
+3. **多语言自动翻译**：通过 Google Translate API 将更新日志自动翻译为英语/日语/韩语。
+4. **D1 数据库同步**：将版本信息写入 `app_version` 表，同时插入多语言公告至 `notice` 表。
+5. **KV 缓存即时更新**：追加各语言公告缓存，确保客户端即刻可见最新公告。
+6. **全量代码提交**：`git add -A` + commit + push 到 main 分支，触发 GitHub Actions 编译打包。
+7. **R2 对象存储上传**：GitHub Actions 构建 APK 成功后自动上传到 Cloudflare R2（通过 S3 兼容 API），经 `apk.xqh.cc.cd` 自定义域名 CDN 分发。
 
 ### 3. Android 客户端编译与运行
 在 `app` 目录下：
 
 1. 确认配置：
-   - 检查 `app/core/src/main/java/com/example/sheeps/data/network/ApiService.kt` 中的 `BASE_URL` 指向您所部署的 Cloudflare Workers 域名（默认为：`http://xqh.cc.cd/`）。
+   - 检查 `app/core/src/main/java/com/example/sheeps/core/AppConfig.kt` 中的 `BASE_URL` 指向您所部署的 Cloudflare Workers 域名（默认为：`https://xqh.cc.cd/`）。
 2. 构建 Debug 安装包：
-   ```powershell
-   ./gradlew.bat :app:assembleDebug
+   ```bash
+   ./gradlew :app:assembleDebug
    ```
-3. 通过 ADB 部署到实体手机：
-   - 确保手机开启了 **USB调试** 并且连接正常（通过 `adb devices` 可查询到设备标识符，当前为 `40ece328`）。
-   - 执行安装并拉起应用命令：
-     ```powershell
-     android run --device=40ece328 --apks=C:\Users\15613\Documents\file\app\app\build\intermediates\apk\debug\app-debug.apk
-     ```
+3. 通过 ADB 安装到手机：
+   ```bash
+   adb install app/app/build/outputs/apk/debug/app-debug.apk
+   ```
 
 ---
 
