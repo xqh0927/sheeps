@@ -223,6 +223,7 @@
     <string name="update_default_log">全新版本，优化游戏操作体验。</string>
     <string name="update_btn_later">稍后更新</string>
     <string name="update_btn_now">立即更新</string>
+    <string name="update_install_success">即将安装</string>
     <string name="update_download_error">无法唤起浏览器下载，请检查链接配置</string>
     <string name="game_won_title">恭喜通关！</string>
     <string name="game_won_desc">名扬四海，金榜题名！</string>

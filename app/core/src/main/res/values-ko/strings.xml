@@ -223,6 +223,7 @@
     <string name="update_default_log">새로운 버전, 게임 플레이 최적화.</string>
     <string name="update_btn_later">나중에</string>
     <string name="update_btn_now">지금 업데이트</string>
+    <string name="update_install_success">即将安装</string>
     <string name="update_download_error">다운로드할 수 없습니다. URL을 확인해 주세요.</string>
     <string name="game_won_title">축하합니다! 통과!</string>
     <string name="game_won_desc">이름을 널리 알리고 합격하셨습니다!</string>
