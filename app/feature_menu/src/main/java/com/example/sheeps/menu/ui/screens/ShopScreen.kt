@@ -2,6 +2,8 @@ package com.example.sheeps.menu.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -29,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 
 /**
  * 道具商店界面。
@@ -267,11 +270,19 @@ fun ShopScreen(
             }
         }
 
-        // --- 未登录状态的锁定蒙层 ---
+        // --- 未登录状态的锁定蒙层（拦截所有触摸事件）---
         if (!state.isLoggedIn) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     .padding(32.dp),
                 contentAlignment = Alignment.Center

@@ -19,6 +19,8 @@ import com.example.sheeps.menu.viewmodel.delegates.AuthDelegate
 import com.example.sheeps.menu.viewmodel.delegates.MatchmakingDelegate
 import com.example.sheeps.menu.viewmodel.delegates.SocialActionDelegate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -116,7 +118,13 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.ResetPassword -> handleResetPassword(intent.phone, intent.code, intent.newPassword)
             is MenuViewIntent.SetPassword -> handleSetPassword(intent.password)
             is MenuViewIntent.CheckPassword -> handleCheckPassword()
-            is MenuViewIntent.Logout -> authDelegate.handleLogout(viewModelScope, { handleLoadData() }, ::setEffect)
+            is MenuViewIntent.Logout -> {
+                updateState { copy(isLoading = true) }
+                authDelegate.handleLogout(viewModelScope, {
+                    updateState { copy(isLoading = false) }
+                    handleLoadData()
+                }, ::setEffect)
+            }
             is MenuViewIntent.ResolveConflict -> authDelegate.handleResolveConflict(
                 viewModelScope, pendingLoginResponse, intent.useLocal,
                 onComplete = { pendingLoginResponse = null; handleLoadData() },
@@ -155,48 +163,61 @@ class MenuViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val shopItems = fetchShopItems()
-                val notices = try { apiService.getNotices() } catch (e: Exception) { currentState.notices }
+                coroutineScope {
+                    // 并行发起所有独立请求
+                    val shopItemsDef = async { fetchShopItems() }
+                    val noticesDef = async { try { apiService.getNotices() } catch (e: Exception) { currentState.notices } }
 
-                if (isLoggedIn && networkMonitor.isOnline()) {
-                    val authHeader = "Bearer ${prefs.getToken()}"
-                    syncRepository.syncDirtyData()
-                    syncRepository.pullCloudProfile()
+                    if (isLoggedIn && networkMonitor.isOnline()) {
+                        val authHeader = "Bearer ${prefs.getToken()}"
 
-                    val dailyTasks = try { apiService.getDailyTasks(authHeader) } catch (e: Exception) { emptyList() }
-                    val pointsHistory = try { apiService.getPointsHistory(authHeader) } catch (e: Exception) { emptyList() }
-                    val exchangeHistory = try { apiService.getExchangeHistory(authHeader) } catch (e: Exception) { emptyList() }
+                        // Sync（先推后拉，必须顺序）+ 拉取头像，合并为一条协程
+                        val profileDef = async {
+                            syncRepository.syncDirtyData()
+                            syncRepository.pullCloudProfile()
+                            try { apiService.getUserProfile(authHeader).avatarUrl ?: "" }
+                            catch (e: Exception) { prefs.getAvatarUrl() }
+                        }
+                        val dailyDef = async { try { apiService.getDailyTasks(authHeader) } catch (e: Exception) { emptyList() } }
+                        val pointsDef = async { try { apiService.getPointsHistory(authHeader) } catch (e: Exception) { emptyList() } }
+                        val exchangeDef = async { try { apiService.getExchangeHistory(authHeader) } catch (e: Exception) { emptyList() } }
 
-                    // 从服务器获取最新的 avatarUrl
-                    val profileAvatarUrl = try {
-                        apiService.getUserProfile(authHeader).avatarUrl ?: ""
-                    } catch (e: Exception) {
-                        prefs.getAvatarUrl()
-                    }
-                    if (profileAvatarUrl.isNotEmpty()) {
-                        prefs.setAvatarUrl(profileAvatarUrl)
-                    }
+                        // 等待全部完成
+                        val shopItems = shopItemsDef.await()
+                        val notices = noticesDef.await()
+                        val dailyTasks = dailyDef.await()
+                        val pointsHistory = pointsDef.await()
+                        val exchangeHistory = exchangeDef.await()
+                        val profileAvatarUrl = profileDef.await()
 
-                    updateState {
-                        copy(
-                            isLoading = false, isLoggedIn = true, phone = prefs.getPhone() ?: "",
-                            shopItems = shopItems, notices = notices, dailyTasks = dailyTasks,
-                            pointsHistory = pointsHistory, exchangeHistory = exchangeHistory,
-                            todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
-                            highestLevelCleared = prefs.getHighestLevelCleared(),
-                            avatarUrl = prefs.getAvatarUrl()
-                        )
-                    }
-                } else {
-                    updateState {
-                        copy(
-                            isLoading = false, isLoggedIn = isLoggedIn, phone = prefs.getPhone() ?: "",
-                            shopItems = shopItems, notices = notices, dailyTasks = emptyList(),
-                            pointsHistory = emptyList(), exchangeHistory = emptyList(),
-                            todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
-                            highestLevelCleared = prefs.getHighestLevelCleared(),
-                            avatarUrl = prefs.getAvatarUrl()
-                        )
+                        if (profileAvatarUrl.isNotEmpty()) {
+                            prefs.setAvatarUrl(profileAvatarUrl)
+                        }
+
+                        updateState {
+                            copy(
+                                isLoading = false, isLoggedIn = true, phone = prefs.getPhone() ?: "",
+                                username = prefs.getUsername(),
+                                shopItems = shopItems, notices = notices, dailyTasks = dailyTasks,
+                                pointsHistory = pointsHistory, exchangeHistory = exchangeHistory,
+                                todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
+                                highestLevelCleared = prefs.getHighestLevelCleared(),
+                                avatarUrl = prefs.getAvatarUrl()
+                            )
+                        }
+                    } else {
+                        val shopItems = shopItemsDef.await()
+                        val notices = noticesDef.await()
+                        updateState {
+                            copy(
+                                isLoading = false, isLoggedIn = false, username = "", phone = "",
+                                points = 0,
+                                shopItems = shopItems, notices = notices, dailyTasks = emptyList(),
+                                pointsHistory = emptyList(), exchangeHistory = emptyList(),
+                                todaySigned = false, signStreak = 0,
+                                highestLevelCleared = 0, avatarUrl = ""
+                            )
+                        }
                     }
                 }
             } catch (e: Exception) {

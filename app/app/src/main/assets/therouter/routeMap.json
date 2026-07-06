@@ -7,8 +7,50 @@
     "params": {}
   },
   {
+    "path": "/menu/userinfo",
+    "className": "com.example.sheeps.menu.UserInfoActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/settings",
+    "className": "com.example.sheeps.menu.SettingsActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/reset-password",
+    "className": "com.example.sheeps.menu.ResetPasswordActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/register",
+    "className": "com.example.sheeps.menu.RegisterActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/notices",
+    "className": "com.example.sheeps.menu.NoticeListActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
     "path": "/menu/main",
     "className": "com.example.sheeps.menu.MenuActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/login",
+    "className": "com.example.sheeps.menu.LoginActivity",
     "action": "",
     "description": "",
     "params": {}

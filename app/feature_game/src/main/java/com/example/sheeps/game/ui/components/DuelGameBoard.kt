@@ -104,7 +104,7 @@ fun DuelGameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = "classic",
-                            tileSize = 48.dp,
+                            tileSize = (48 * scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             modifier = Modifier
                                 .offset(

@@ -191,21 +191,15 @@ class AuthDelegate @Inject constructor(
             localDao.deleteAllItems()
             prefs.logout()
 
+            // 重新插入默认进度（仅等级 1，不插入 profile 以避免 observer 覆盖已清除的 state）
             val now = System.currentTimeMillis()
-            localDao.insertProfile(
-                UserProfileEntity(
-                    userId = prefs.getUserId(),
-                    username = prefs.getUsername(),
-                    points = 0,
-                    isDirty = false,
-                    updateTimestamp = now
-                )
-            )
             localDao.insertProgress(
                 UserProgressEntity(levelId = 1, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
             )
 
             setEffect(MenuViewEffect.ShowToast("已退出登录，清除本地缓存"))
+            // 确保加载指示器有足够渲染时间
+            kotlinx.coroutines.delay(400L)
             onComplete()
         }
     }

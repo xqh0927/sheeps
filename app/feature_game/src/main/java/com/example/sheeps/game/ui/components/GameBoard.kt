@@ -119,7 +119,7 @@ fun GameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = state.currentSkin,
-                            tileSize = 48.dp,
+                            tileSize = (48 * scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             isHighlighted = isHighlighted,
                             modifier = Modifier

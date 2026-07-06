@@ -1,9 +1,7 @@
 package com.example.sheeps.menu
 
 import android.os.Bundle
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -25,7 +23,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,11 +42,9 @@ import com.example.sheeps.menu.ui.components.OfflineWarnBanner
 import com.example.sheeps.menu.ui.dialogs.AppUpdateDialog
 import com.example.sheeps.menu.ui.dialogs.ConflictDialog
 import com.example.sheeps.menu.ui.dialogs.DailyLeaderboardPopupDialog
-import com.example.sheeps.menu.ui.dialogs.LoginDialog
 import com.example.sheeps.menu.ui.dialogs.PrepareGameDialog
 import com.example.sheeps.menu.ui.dialogs.SetPasswordDialog
 import com.example.sheeps.menu.ui.screens.GameHomeScreen
-import com.example.sheeps.menu.ui.screens.NoticeListScreen
 import com.example.sheeps.menu.ui.screens.PersonalScreen
 import com.example.sheeps.menu.ui.screens.ShopScreen
 import com.example.sheeps.menu.viewmodel.MenuViewModel
@@ -57,16 +52,13 @@ import com.example.sheeps.theme.Overlay_Dark_Medium
 import com.example.sheeps.theme.SheepsTheme
 import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.toast.Toaster
+import com.tencent.mmkv.MMKV
 import com.therouter.TheRouter
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import top.zibin.luban.api.compressTo
 
 /**
  * 游戏主入口菜单 Activity。
@@ -88,12 +80,13 @@ class MenuActivity : BaseActivity() {
     @Inject
     lateinit var userPrefs: UserPreferences
 
+    private var lastBackPressTime = 0L
+
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
             val state by viewModel.viewState.collectAsState()
 
             // --- 多语言动态刷新逻辑 ---
-            // 通过监听 State 中的 language 变化，动态创建并提供经过语言配置修正的 Context
             val currentLang = state.language
             val configuration = androidx.compose.ui.platform.LocalConfiguration.current
             val context = androidx.compose.ui.platform.LocalContext.current
@@ -116,56 +109,14 @@ class MenuActivity : BaseActivity() {
                 }
             }
 
-            // 使用 CompositionLocalProvider 将修正后的 Context 注入 Compose 树
             CompositionLocalProvider(androidx.compose.ui.platform.LocalContext provides localizedContext) {
                 SheepsTheme {
                     // --- 界面控制状态 ---
-                    var currentTab by remember { mutableStateOf("game") } // 当前选中的标签页：game, shop, me
-                    var showLoginDialog by remember { mutableStateOf(false) } // 登录弹窗显示控制
-                    var showPrepareDialog by remember { mutableStateOf<Int?>(null) } // 备战弹窗（传入关卡ID）
-                    var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) } // 存档冲突信息
-                    var showNoticeListScreen by remember { mutableStateOf(false) } // 公告列表全屏显示
+                    var currentTab by remember { mutableStateOf("game") }
+                    var showPrepareDialog by remember { mutableStateOf<Int?>(null) }
+                    var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) }
                     var showSetPasswordDialog by remember { mutableStateOf(false) }
-                    var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) } // 每日弹窗内容
-
-                    val scope = rememberCoroutineScope()
-
-                    // 【修改处 2】头像选择器（使用 Luban 2 同步压缩 → bytes → 直接上传 R2）
-                    val pickAvatarLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
-                    ) { uri ->
-                        uri?.let { imageUri ->
-                            scope.launch(Dispatchers.IO) {
-                                try {
-                                    // 使用 Luban 2 的 Kotlin 扩展函数直接压缩（自动处理临时目录与缓存）
-                                    val result = imageUri.compressTo(context)
-                                    val file = result.getOrNull()
-
-                                    if (file != null && file.exists() && file.canRead()) {
-                                        val bytes = file.readBytes()
-                                      withContext(Dispatchers.Main) {
-                                            viewModel.sendIntent(
-                                                MenuViewIntent.ChangeAvatar(
-                                                    bytes,
-                                                    file.name
-                                                )
-                                            )
-                                        }
-                                    } else {
-                                        val errorMsg =
-                                            result.exceptionOrNull()?.message ?: "图片处理失败"
-                                      withContext(Dispatchers.Main) {
-                                            Toaster.show(errorMsg)
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    withContext(Dispatchers.Main) {
-                                        Toaster.show("图片处理失败")
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) }
 
                     // 登录后检查每日弹窗
                     LaunchedEffect(state.isLoggedIn) {
@@ -199,13 +150,12 @@ class MenuActivity : BaseActivity() {
                                 }
 
                                 is MenuViewEffect.ShowLoginDialog -> {
-                                    showLoginDialog = true
+                                    TheRouter.build("/auth/login").navigation(this@MenuActivity)
                                 }
 
                                 is MenuViewEffect.NavigateToGame -> {
                                     showPrepareDialog = null
                                     viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
-                                    // 路由跳转至单机游戏
                                     TheRouter.build("/game/play")
                                         .withInt("levelId", effect.levelId)
                                         .withString("carryItemsJson", effect.carryItemsJson)
@@ -229,13 +179,7 @@ class MenuActivity : BaseActivity() {
                     }
 
                     // --- 页面内容布局 ---
-                    if (showNoticeListScreen) {
-                        NoticeListScreen(
-                            notices = state.notices,
-                            onBack = { showNoticeListScreen = false }
-                        )
-                    } else {
-                        Scaffold(
+                    Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
                                 if (state.networkStatus == com.example.sheeps.core.utils.NetworkStatus.OFFLINE) {
@@ -285,7 +229,7 @@ class MenuActivity : BaseActivity() {
                                                 state = state,
                                                 onLevelClick = { lvl ->
                                                     if (lvl > 3 && !state.isLoggedIn) {
-                                                        showLoginDialog = true
+                                                        TheRouter.build("/auth/login").navigation(this@MenuActivity)
                                                         Toaster.show("第四关及后续关卡需要登录解锁，请先登录！")
                                                     } else {
                                                         showPrepareDialog = lvl
@@ -296,8 +240,14 @@ class MenuActivity : BaseActivity() {
                                                         .withInt("levelId", lvl)
                                                         .navigation()
                                                 },
-                                                onNoticeClick = { showNoticeListScreen = true },
-                                                onLoginClick = { showLoginDialog = true },
+                                                onNoticeClick = {
+                                                    TheRouter.build("/menu/notices")
+                                                        .withString("noticesJson", json.encodeToString(state.notices))
+                                                        .navigation()
+                                                },
+                                                onLoginClick = {
+                                                    TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                                },
                                                 onJoinMatch = {
                                                     viewModel.sendIntent(
                                                         MenuViewIntent.JoinMatch(
@@ -325,7 +275,9 @@ class MenuActivity : BaseActivity() {
 
                                             "shop" -> ShopScreen(
                                                 state = state,
-                                                onLoginClick = { showLoginDialog = true },
+                                                onLoginClick = {
+                                                    TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                                },
                                                 onExchangeClick = { itemId, count ->
                                                     viewModel.sendIntent(
                                                         MenuViewIntent.ExchangeShopItem(
@@ -345,7 +297,9 @@ class MenuActivity : BaseActivity() {
 
                                             "me" -> PersonalScreen(
                                                 state = state,
-                                                onLoginClick = { showLoginDialog = true },
+                                                onLoginClick = {
+                                                    TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                                },
                                                 onLogoutClick = {
                                                     viewModel.sendIntent(
                                                         MenuViewIntent.Logout
@@ -361,24 +315,12 @@ class MenuActivity : BaseActivity() {
                                                         MenuViewIntent.ClaimTask(taskId)
                                                     )
                                                 },
-                                                onChangeLanguage = { lang ->
-                                                    viewModel.sendIntent(
-                                                        MenuViewIntent.ChangeLanguage(lang)
-                                                    )
-                                                },
-                                                onThemeChange = { recreate() },
                                                 onApplySkin = { skin ->
                                                     viewModel.sendIntent(
                                                         MenuViewIntent.ChangeSkin(skin)
                                                     )
                                                 },
-                                                onGoToPlay = { currentTab = "game" },
-                                                onChangeAvatar = { pickAvatarLauncher.launch("image/*") },
-                                                onUpdateNickname = { nickname ->
-                                                    viewModel.sendIntent(
-                                                        MenuViewIntent.UpdateNickname(nickname)
-                                                    )
-                                                }
+                                                onGoToPlay = { currentTab = "game" }
                                             )
                                         }
                                     }
@@ -415,54 +357,6 @@ class MenuActivity : BaseActivity() {
                                                 viewModel.sendIntent(
                                                     MenuViewIntent.UnlockLevelWithPoints(
                                                         lvl
-                                                    )
-                                                )
-                                            }
-                                        )
-                                    }
-
-                                    // 登录/注册弹窗
-                                    if (showLoginDialog) {
-                                        LoginDialog(
-                                            onDismiss = { showLoginDialog = false },
-                                            onSendCode = { phone ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.SendSmsCode(phone)
-                                                )
-                                            },
-                                            onLogin = { phone, code ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.LoginWithCode(
-                                                        phone,
-                                                        code
-                                                    )
-                                                )
-                                                showLoginDialog = false
-                                            },
-                                            onPasswordLogin = { phone, password ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.LoginWithPassword(
-                                                        phone,
-                                                        password
-                                                    )
-                                                )
-                                                showLoginDialog = false
-                                            },
-                                            onRegister = { phone, password, code ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.Register(
-                                                        phone,
-                                                        password,
-                                                        code
-                                                    )
-                                                )
-                                            },
-                                            onResetPassword = { phone, code, newPassword ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.ResetPassword(
-                                                        phone,
-                                                        code,
-                                                        newPassword
                                                     )
                                                 )
                                             }
@@ -569,7 +463,7 @@ class MenuActivity : BaseActivity() {
                 }
             }
         }
-    }
+
 
     override fun initData() {
         // ViewModel 在创建时自动加载初始数据
@@ -577,7 +471,34 @@ class MenuActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        val kv = MMKV.defaultMMKV()
+
+        // 检测从 SettingsActivity 返回后的主题变更
+        // ThemeManager 是全局 StateFlow，SheepsTheme 通过 collectAsState 自动响应，无需重建
+        if (kv.decodeBool("theme_changed_in_settings", false)) {
+            kv.removeValueForKey("theme_changed_in_settings")
+        }
+
+        // 检测从 SettingsActivity 返回后的语言变更
+        // 直接更新 ViewModel state 触发 remember(currentLang) 重建 localizedContext
+        if (kv.decodeBool("language_changed_in_settings", false)) {
+            kv.removeValueForKey("language_changed_in_settings")
+            viewModel.sendIntent(MenuViewIntent.ChangeLanguage(userPrefs.getLanguage()))
+            // handleLoadData 已在 ChangeLanguage 中调用，无需再发 LoadData
+            return
+        }
+
         // 每次回到前台刷新一次数据（如积分、体力等）
         viewModel.sendIntent(MenuViewIntent.LoadData)
+    }
+
+    override fun onBackPressed() {
+        val now = System.currentTimeMillis()
+        if (now - lastBackPressTime < 2000) {
+            super.onBackPressed()
+        } else {
+            lastBackPressTime = now
+            Toaster.show("再按一次退出")
+        }
     }
 }

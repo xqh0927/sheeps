@@ -19,6 +19,11 @@
 
         <!-- Activities will be merged from feature modules manifests -->
 
+        <!-- 移除库自动注册的 CropImageActivity（弃用，我们使用 CropImageView） -->
+        <activity
+            android:name="com.canhub.cropper.CropImageActivity"
+            tools:node="remove" />
+
         <!-- FileProvider: 用于 App 内更新安装 APK -->
         <provider
             android:name="androidx.core.content.FileProvider"

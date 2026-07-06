@@ -18,8 +18,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,10 +36,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import coil.ImageLoader
+import coil.compose.AsyncImage
 import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileCardBase
@@ -71,11 +71,14 @@ fun TileView(
     isShaking: Boolean = false,
     isHighlighted: Boolean = false
 ) {
+    // 计算缩放比率以自适应缩放字体和图标大小
+    val sizeRatio = tileSize.value / 48f
+
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
 
     //不可点击遮罩透明度
-    val mask = 0.35f
+    val mask = if (BuildConfig.DEBUG) 0f else 0.35f
 
     val isBlind =
         tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
@@ -124,7 +127,9 @@ fun TileView(
             .size(tileSize)
             .border(
                 width = if (isShaking) 2.dp else if (isHighlighted) 2.5.dp else 0.dp,
-                color = if (isShaking) Color.Red else if (isHighlighted) MaterialTheme.colorScheme.secondary.copy(alpha = borderAlpha) else Color.Transparent,
+                color = if (isShaking) Color.Red else if (isHighlighted) MaterialTheme.colorScheme.secondary.copy(
+                    alpha = borderAlpha
+                ) else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
             .clickable(
@@ -192,7 +197,7 @@ fun TileView(
                         Text(
                             text = tile.type.toString(),
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 16.sp,
+                            fontSize = (16 * sizeRatio).sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -209,13 +214,13 @@ fun TileView(
                         Text(
                             text = tile.id.removePrefix("tile_"),
                             color = if (isBlocked) Color.Blue else Color.Red,
-                            fontSize = 8.sp,
+                            fontSize = (8 * sizeRatio).sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "z${tile.z}",
                             color = if (isBlocked) Color.Blue else Color.Red,
-                            fontSize = 6.sp,
+                            fontSize = (6 * sizeRatio).sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -241,16 +246,16 @@ fun TileView(
                         ) {
                             Text(
                                 text = "🔒",
-                                fontSize = 18.sp,
+                                fontSize = (18 * sizeRatio).sp,
                                 modifier = Modifier.graphicsLayer(scaleX = 1.1f, scaleY = 1.1f)
                             )
                             if (tile.sealedCount > 1) {
                                 Text(
                                     text = "x${tile.sealedCount}",
                                     color = Color(0xFFF1C40F), // 金色字体
-                                    fontSize = 11.sp,
+                                    fontSize = (11 * sizeRatio).sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 1.dp)
+                                    modifier = Modifier.padding(top = (1 * sizeRatio).dp)
                                 )
                             }
                         }
