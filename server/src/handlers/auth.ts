@@ -1,6 +1,7 @@
 import { Env } from '../types';
 import { getCorsHeaders } from '../helpers';
 import { generateJWT, verifyJWT } from '../crypto';
+import { hashPassword, verifyPassword } from '../auth-utils';
 
 /**
  * 处理所有与身份认证相关的 HTTP 路由请求
@@ -23,7 +24,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/send-code' && request.method === 'POST') {
         const body: { phone: string } = await request.json();
-        if (!body.phone) return new Response(JSON.stringify({ error: 'Missing phone number' }), { status: 400, headers: corsHeaders });
+        if (!body.phone) return new Response(JSON.stringify({ error: '请填写手机号' }), { status: 400, headers: corsHeaders });
 
         // 生成 6 位随机数字验证码
         const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -44,14 +45,14 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/login' && request.method === 'POST') {
         const body: { phone: string; code: string; device_uuid?: string } = await request.json();
-        if (!body.phone || !body.code) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
+        if (!body.phone || !body.code) return new Response(JSON.stringify({ error: '请填写手机号和验证码' }), { status: 400, headers: corsHeaders });
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
         // ─── 合并查询：一次 D1 batch 完成所有读操作 ───
         const [codeRecord, userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
             env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT id, phone, username, avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
@@ -60,9 +61,9 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
 
         const tokenRecord = codeRecord.results[0] as { code: string; created_at: number } | undefined;
         if (!tokenRecord || tokenRecord.code !== body.code)
-            return new Response(JSON.stringify({ error: 'Verification code incorrect' }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: '验证码错误' }), { status: 400, headers: corsHeaders });
         if (Date.now() - tokenRecord.created_at > 5 * 60 * 1000)
-            return new Response(JSON.stringify({ error: 'Verification code expired' }), { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
 
         // 清除验证码（异步，不阻塞响应）
         env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
@@ -141,7 +142,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             unlocked_levels: finalLevels,
             items: finalItems,
             today_signed: finalSigned,
-            sign_streak: finalStreak
+            sign_streak: finalStreak,
+            hasPassword: !!(user?.password_hash)
         }), { headers: corsHeaders });
     }
 
@@ -155,17 +157,226 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/refresh' && request.method === 'POST') {
         const body: { refreshToken: string } = await request.json();
-        if (!body.refreshToken) return new Response(JSON.stringify({ error: 'Missing refresh token' }), { status: 400, headers: corsHeaders });
+        if (!body.refreshToken) return new Response(JSON.stringify({ error: '缺少刷新令牌' }), { status: 400, headers: corsHeaders });
 
         // 验证 Refresh Token 合法性与过期时间
         const payload = await verifyJWT(body.refreshToken);
-        if (!payload || payload.type !== 'refresh') return new Response(JSON.stringify({ error: 'Invalid or expired refresh token' }), { status: 401, headers: corsHeaders });
+        if (!payload || payload.type !== 'refresh') return new Response(JSON.stringify({ error: '登录凭证已过期，请重新登录' }), { status: 401, headers: corsHeaders });
 
         // 重新签发一组新的双 Token
         const newAccessToken = await generateJWT({ userId: payload.userId, phone: payload.phone, type: 'access', exp: Date.now() + 7200000 });
         const newRefreshToken = await generateJWT({ userId: payload.userId, phone: payload.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
 
         return new Response(JSON.stringify({ success: true, token: newAccessToken, refreshToken: newRefreshToken }), { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/auth/register — 密码注册
+     *
+     * 请求体 (JSON):
+     *   @param {string} phone — 手机号
+     *   @param {string} password — 密码（6-20位）
+     *   @param {string} code — 6位验证码
+     *
+     * 响应: { success: true, token, refreshToken, user, ... }
+     */
+    if (path === '/api/auth/register' && request.method === 'POST') {
+        const body: { phone: string; password: string; code: string } = await request.json();
+        if (!body.phone || !body.password || !body.code)
+            return new Response(JSON.stringify({ error: '请填写完整注册信息' }), { status: 400, headers: corsHeaders });
+
+        // 验证码校验
+        const codeRecord = await env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?')
+            .bind(body.phone).first<{ code: string; created_at: number }>();
+        if (!codeRecord || codeRecord.code !== body.code)
+            return new Response(JSON.stringify({ error: '验证码错误' }), { status: 400, headers: corsHeaders });
+        if (Date.now() - codeRecord.created_at > 5 * 60 * 1000)
+            return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
+
+        // 检查手机号是否已注册
+        const existingUser = await env.DB.prepare('SELECT id FROM users WHERE phone = ?')
+            .bind(body.phone).first<{ id: string }>();
+        if (existingUser)
+            return new Response(JSON.stringify({ error: '该手机号已注册' }), { status: 400, headers: corsHeaders });
+
+        // 清除验证码
+        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+
+        // 哈希密码
+        const pwHash = await hashPassword(body.password);
+
+        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
+        const uuid = crypto.randomUUID();
+        const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
+
+        const insertQueries = [
+            env.DB.prepare('INSERT INTO users (id, phone, username, avatar, points, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                .bind(uuid, body.phone, defaultUsername, null, 0, pwHash, Date.now()),
+            env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
+        ];
+        for (const item of ['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE']) {
+            insertQueries.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?)').bind(uuid, item, 1));
+        }
+        await env.DB.batch(insertQueries);
+
+        const user = { id: uuid, phone: body.phone, username: defaultUsername, avatar: null, points: 0 };
+        const token = await generateJWT({ userId: uuid, phone: body.phone, type: 'access', exp: Date.now() + 7200000 });
+        const refreshToken = await generateJWT({ userId: uuid, phone: body.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
+
+        return new Response(JSON.stringify({
+            success: true, token, refreshToken, user,
+            unlocked_levels: [1],
+            items: [{ item_type: 'UNDO', count: 1 }, { item_type: 'SHUFFLE', count: 1 }, { item_type: 'MOVEOUT', count: 1 }, { item_type: 'REVIVE', count: 1 }],
+            today_signed: false, sign_streak: 0, hasPassword: true
+        }), { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/auth/login-password — 密码登录
+     *
+     * 请求体 (JSON):
+     *   @param {string} phone — 手机号
+     *   @param {string} password — 密码
+     *
+     * 响应: { success, token, refreshToken, user, unlocked_levels, items, today_signed, sign_streak, hasPassword }
+     */
+    if (path === '/api/auth/login-password' && request.method === 'POST') {
+        const body: { phone: string; password: string } = await request.json();
+        if (!body.phone || !body.password)
+            return new Response(JSON.stringify({ error: '请填写手机号和密码' }), { status: 400, headers: corsHeaders });
+
+        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
+
+        const [userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
+            env.DB.prepare('SELECT id, phone, username, avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
+            env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
+            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
+            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) ORDER BY sign_date DESC LIMIT 1').bind(body.phone)
+        ]);
+
+        const user = userRow.results[0] as any;
+        if (!user)
+            return new Response(JSON.stringify({ error: '用户不存在' }), { status: 400, headers: corsHeaders });
+
+        // 验证密码
+        if (!user.password_hash)
+            return new Response(JSON.stringify({ error: '尚未设置密码，请使用验证码登录' }), { status: 400, headers: corsHeaders });
+
+        const pwValid = await verifyPassword(body.password, user.password_hash);
+        if (!pwValid)
+            return new Response(JSON.stringify({ error: '密码错误' }), { status: 400, headers: corsHeaders });
+
+        const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
+        const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
+
+        return new Response(JSON.stringify({
+            success: true, token, refreshToken, user,
+            unlocked_levels: unlockedResult.results.map((r: any) => r.level_id),
+            items: itemsResult.results,
+            today_signed: signTodayRow.results[0] !== null && signTodayRow.results[0] !== undefined,
+            sign_streak: (lastSignResult.results[0] as any)?.streak || 0,
+            hasPassword: true
+        }), { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/auth/reset-password — 重置密码
+     *
+     * 请求体 (JSON):
+     *   @param {string} phone — 手机号
+     *   @param {string} code — 6位验证码
+     *   @param {string} newPassword — 新密码
+     *
+     * 响应: { success: true }
+     */
+    if (path === '/api/auth/reset-password' && request.method === 'POST') {
+        const body: { phone: string; code: string; newPassword: string } = await request.json();
+        if (!body.phone || !body.code || !body.newPassword)
+            return new Response(JSON.stringify({ error: '请填写完整信息' }), { status: 400, headers: corsHeaders });
+
+        // 验证码校验
+        const codeRecord = await env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?')
+            .bind(body.phone).first<{ code: string; created_at: number }>();
+        if (!codeRecord || codeRecord.code !== body.code)
+            return new Response(JSON.stringify({ error: '验证码错误' }), { status: 400, headers: corsHeaders });
+        if (Date.now() - codeRecord.created_at > 5 * 60 * 1000)
+            return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
+
+        // 清除验证码
+        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+
+        const pwHash = await hashPassword(body.newPassword);
+        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE phone = ?').bind(pwHash, body.phone).run();
+
+        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+    }
+
+    /**
+     * GET /api/auth/check-password — 检查用户是否已设置密码
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: { hasPassword: boolean }
+     */
+    if (path === '/api/auth/check-password' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer '))
+            return new Response(JSON.stringify({ error: '未授权，请登录' }), { status: 401, headers: corsHeaders });
+
+        const token = authHeader.substring(7);
+        const payload = await verifyJWT(token);
+        if (!payload || payload.type !== 'access')
+            return new Response(JSON.stringify({ error: '未授权，请登录' }), { status: 401, headers: corsHeaders });
+
+        const user = await env.DB.prepare('SELECT password_hash FROM users WHERE id = ?')
+            .bind(payload.userId).first<{ password_hash: string | null }>();
+
+        return new Response(JSON.stringify({ hasPassword: !!(user?.password_hash) }), { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/auth/set-password — 设置密码（奖励 50 积分）
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {string} password — 新密码
+     *
+     * 响应: { success: true, reward_points: 50 }
+     */
+    if (path === '/api/auth/set-password' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer '))
+            return new Response(JSON.stringify({ error: '未授权，请登录' }), { status: 401, headers: corsHeaders });
+
+        const token = authHeader.substring(7);
+        const payload = await verifyJWT(token);
+        if (!payload || payload.type !== 'access')
+            return new Response(JSON.stringify({ error: '未授权，请登录' }), { status: 401, headers: corsHeaders });
+
+        const body: { password: string } = await request.json();
+        if (!body.password)
+            return new Response(JSON.stringify({ error: '请填写密码' }), { status: 400, headers: corsHeaders });
+
+        // 检查是否已设置密码
+        const user = await env.DB.prepare('SELECT password_hash, points FROM users WHERE id = ?')
+            .bind(payload.userId).first<{ password_hash: string | null; points: number }>();
+        if (user?.password_hash)
+            return new Response(JSON.stringify({ error: '密码已设置' }), { status: 400, headers: corsHeaders });
+
+        const pwHash = await hashPassword(body.password);
+        const newPoints = (user?.points || 0) + 50;
+
+        await env.DB.batch([
+            env.DB.prepare('UPDATE users SET password_hash = ?, points = ? WHERE id = ?').bind(pwHash, newPoints, payload.userId),
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+                .bind(payload.userId, 'IN', 50, 'SET_PASSWORD', newPoints, Date.now())
+        ]);
+
+        return new Response(JSON.stringify({ success: true, reward_points: 50, current_points: newPoints }), { headers: corsHeaders });
     }
 
     return null;

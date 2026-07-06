@@ -7,6 +7,7 @@ import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.utils.NetworkMonitor
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.LoginResponse
+import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.data.model.UserItem
 import com.example.sheeps.data.network.ApiService
@@ -21,6 +22,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import retrofit2.HttpException
 import javax.inject.Inject
 
 /**
@@ -82,7 +88,8 @@ class MenuViewModel @Inject constructor(
                 currentSkin = prefs.getCurrentSkin(),
                 todaySigned = prefs.getTodaySigned(),
                 signStreak = prefs.getSignStreak(),
-                highestLevelCleared = prefs.getHighestLevelCleared()
+                highestLevelCleared = prefs.getHighestLevelCleared(),
+                avatarUrl = prefs.getAvatarUrl()
             )
         }
         handleLoadData()
@@ -104,6 +111,11 @@ class MenuViewModel @Inject constructor(
                 setLoading = { updateState { copy(isLoading = it) } },
                 setEffect = ::setEffect
             )
+            is MenuViewIntent.LoginWithPassword -> handleLoginWithPassword(intent.phone, intent.password)
+            is MenuViewIntent.Register -> handleRegister(intent.phone, intent.password, intent.code)
+            is MenuViewIntent.ResetPassword -> handleResetPassword(intent.phone, intent.code, intent.newPassword)
+            is MenuViewIntent.SetPassword -> handleSetPassword(intent.password)
+            is MenuViewIntent.CheckPassword -> handleCheckPassword()
             is MenuViewIntent.Logout -> authDelegate.handleLogout(viewModelScope, { handleLoadData() }, ::setEffect)
             is MenuViewIntent.ResolveConflict -> authDelegate.handleResolveConflict(
                 viewModelScope, pendingLoginResponse, intent.useLocal,
@@ -130,6 +142,8 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.GoToGame -> setEffect(MenuViewEffect.NavigateToGame(intent.levelId, intent.carryItemsJson))
             is MenuViewIntent.ChangeLanguage -> handleChangeLanguage(intent.lang)
             is MenuViewIntent.ChangeSkin -> handleChangeSkin(intent.skin)
+            is MenuViewIntent.ChangeAvatar -> handleChangeAvatar(intent.imageBytes, intent.fileName)
+            is MenuViewIntent.UpdateNickname -> handleUpdateNickname(intent.nickname)
             is MenuViewIntent.DismissUpdate -> updateState { copy(appUpdateInfo = null) }
             is MenuViewIntent.ResetMatchStatus -> updateState { copy(matchStatus = "none") }
         }
@@ -153,13 +167,24 @@ class MenuViewModel @Inject constructor(
                     val pointsHistory = try { apiService.getPointsHistory(authHeader) } catch (e: Exception) { emptyList() }
                     val exchangeHistory = try { apiService.getExchangeHistory(authHeader) } catch (e: Exception) { emptyList() }
 
+                    // 从服务器获取最新的 avatarUrl
+                    val profileAvatarUrl = try {
+                        apiService.getUserProfile(authHeader).avatarUrl ?: ""
+                    } catch (e: Exception) {
+                        prefs.getAvatarUrl()
+                    }
+                    if (profileAvatarUrl.isNotEmpty()) {
+                        prefs.setAvatarUrl(profileAvatarUrl)
+                    }
+
                     updateState {
                         copy(
                             isLoading = false, isLoggedIn = true, phone = prefs.getPhone() ?: "",
                             shopItems = shopItems, notices = notices, dailyTasks = dailyTasks,
                             pointsHistory = pointsHistory, exchangeHistory = exchangeHistory,
                             todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
-                            highestLevelCleared = prefs.getHighestLevelCleared()
+                            highestLevelCleared = prefs.getHighestLevelCleared(),
+                            avatarUrl = prefs.getAvatarUrl()
                         )
                     }
                 } else {
@@ -169,7 +194,8 @@ class MenuViewModel @Inject constructor(
                             shopItems = shopItems, notices = notices, dailyTasks = emptyList(),
                             pointsHistory = emptyList(), exchangeHistory = emptyList(),
                             todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
-                            highestLevelCleared = prefs.getHighestLevelCleared()
+                            highestLevelCleared = prefs.getHighestLevelCleared(),
+                            avatarUrl = prefs.getAvatarUrl()
                         )
                     }
                 }
@@ -218,7 +244,129 @@ class MenuViewModel @Inject constructor(
         }
     }
 
-    private fun saveLoginData(response: LoginResponse) {
+    private fun handleLoginWithPassword(phone: String, password: String) {
+        viewModelScope.launch {
+            updateState { copy(isLoading = true) }
+            try {
+                val response = apiService.loginPassword(
+                    com.example.sheeps.data.model.PasswordLoginRequest(phone, password)
+                )
+                if (response.success) {
+                    saveLoginData(response)
+                } else {
+                    updateState { copy(isLoading = false) }
+                    setEffect(MenuViewEffect.ShowToast("登录失败"))
+                }
+            } catch (e: HttpException) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "登录失败，请稍后重试")))
+            } catch (e: Exception) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+            }
+        }
+    }
+
+    /**
+     * 解析认证接口错误响应体，直接提取服务端返回的 error 字段
+     */
+    private fun parseAuthError(e: HttpException, fallback: String): String {
+        return try {
+            val errorBody = e.response()?.errorBody()?.string() ?: ""
+            val errorJson = JSONObject(errorBody)
+            val error = errorJson.optString("error", "")
+            error.ifBlank { fallback }
+        } catch (_: Exception) {
+            fallback
+        }
+    }
+
+    private fun handleRegister(phone: String, password: String, code: String) {
+        viewModelScope.launch {
+            updateState { copy(isLoading = true) }
+            try {
+                val response = apiService.registerAuth(
+                    com.example.sheeps.data.model.RegisterAuthRequest(phone, password, code)
+                )
+                if (response.success) {
+                    setEffect(MenuViewEffect.ShowToast("注册成功，请登录"))
+                    updateState { copy(isLoading = false) }
+                } else {
+                    updateState { copy(isLoading = false) }
+                    setEffect(MenuViewEffect.ShowToast("注册失败"))
+                }
+            } catch (e: HttpException) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "注册失败，请稍后重试")))
+            } catch (e: Exception) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+            }
+        }
+    }
+
+    private fun handleResetPassword(phone: String, code: String, newPassword: String) {
+        viewModelScope.launch {
+            updateState { copy(isLoading = true) }
+            try {
+                val response = apiService.resetPassword(
+                    com.example.sheeps.data.model.ResetPasswordRequest(phone, code, newPassword)
+                )
+                updateState { copy(isLoading = false) }
+                if (response.success) {
+                    setEffect(MenuViewEffect.ShowToast("密码重置成功"))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast("密码重置失败"))
+                }
+            } catch (e: HttpException) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "密码重置失败，请稍后重试")))
+            } catch (e: Exception) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+            }
+        }
+    }
+
+    private fun handleSetPassword(password: String) {
+        viewModelScope.launch {
+            updateState { copy(isLoading = true) }
+            try {
+                val authHeader = "Bearer ${prefs.getToken()}"
+                val response = apiService.setPassword(
+                    authHeader,
+                    com.example.sheeps.data.model.SetPasswordRequest(password)
+                )
+                updateState { copy(isLoading = false) }
+                if (response.success) {
+                    setEffect(MenuViewEffect.ShowToast("密码设置成功！奖励 50 积分"))
+                    handleLoadData()
+                } else {
+                    setEffect(MenuViewEffect.ShowToast("密码设置失败"))
+                }
+            } catch (e: HttpException) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "密码设置失败，请稍后重试")))
+            } catch (e: Exception) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+            }
+        }
+    }
+
+    private fun handleCheckPassword() {
+        viewModelScope.launch {
+            try {
+                val authHeader = "Bearer ${prefs.getToken()}"
+                val response = apiService.checkPassword(authHeader)
+                if (!response.hasPassword) {
+                    setEffect(MenuViewEffect.ShowSetPasswordDialog)
+                }
+            } catch (_: Exception) { /* 静默失败 */ }
+        }
+    }
+
+    private fun saveLoginData(response: com.example.sheeps.data.model.LoginResponse) {
         viewModelScope.launch {
             try {
                 prefs.setToken(response.token)
@@ -264,6 +412,11 @@ class MenuViewModel @Inject constructor(
 
                 handleLoadData()
                 setEffect(MenuViewEffect.ShowToast("登录成功！"))
+
+                // 登录后检查是否已设置密码，若未设置则弹出强制设密对话框
+                if (!response.hasPassword) {
+                    setEffect(MenuViewEffect.ShowSetPasswordDialog)
+                }
             } catch (e: Exception) {
                 setEffect(MenuViewEffect.ShowToast("保存登录数据失败"))
             }
@@ -296,6 +449,41 @@ class MenuViewModel @Inject constructor(
     private fun handleChangeSkin(skin: String) {
         prefs.setCurrentSkin(skin)
         updateState { copy(currentSkin = skin) }
+    }
+
+    /**
+     * 处理头像变更请求
+     * Luban 压缩后的字节数组直接以 multipart/form-data 上传至 R2
+     */
+    private fun handleChangeAvatar(imageBytes: ByteArray, fileName: String) {
+        viewModelScope.launch {
+            updateState { copy(isLoading = true) }
+            try {
+                val authHeader = "Bearer ${prefs.getToken()}"
+                val requestBody = imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                val part = MultipartBody.Part.createFormData("avatar", fileName, requestBody)
+                val uploadResponse = apiService.uploadAvatar(authHeader, part)
+                val url = uploadResponse.avatarUrl ?: ""
+                prefs.setAvatarUrl(url)
+                updateState { copy(avatarUrl = url, isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("头像更新成功！"))
+            } catch (e: Exception) {
+                updateState { copy(isLoading = false) }
+                setEffect(MenuViewEffect.ShowToast("头像上传失败"))
+            }
+        }
+    }
+
+    private fun handleUpdateNickname(nickname: String) {
+        viewModelScope.launch {
+            try {
+                apiService.rename(RenameRequest(nickname))
+                updateState { copy(username = nickname) }
+                setEffect(MenuViewEffect.ShowToast("昵称修改成功！"))
+            } catch (e: Exception) {
+                setEffect(MenuViewEffect.ShowToast("昵称修改失败"))
+            }
+        }
     }
 
     private fun checkAppUpdateOnce() {

@@ -13,6 +13,8 @@ data class MenuViewState(
     val isLoggedIn: Boolean = false,
     /** 用户昵称 */
     val username: String = "",
+    /** 用户头像 URL（由 R2 存储代理返回） */
+    val avatarUrl: String = "",
     /** 用户绑定的手机号（UID） */
     val phone: String = "",
     /** 当前账户可用积分余额 */
@@ -91,6 +93,16 @@ sealed interface MenuViewIntent {
     data class SendSmsCode(val phone: String) : MenuViewIntent
     /** 执行手机号+验证码登录 */
     data class LoginWithCode(val phone: String, val code: String) : MenuViewIntent
+    /** 执行手机号+密码登录 */
+    data class LoginWithPassword(val phone: String, val password: String) : MenuViewIntent
+    /** 执行注册（手机号+密码+验证码） */
+    data class Register(val phone: String, val password: String, val code: String) : MenuViewIntent
+    /** 执行重置密码 */
+    data class ResetPassword(val phone: String, val code: String, val newPassword: String) : MenuViewIntent
+    /** 设置密码（登录后） */
+    data class SetPassword(val password: String) : MenuViewIntent
+    /** 检查是否已设置密码 */
+    object CheckPassword : MenuViewIntent
     /** 注销登录，清除本地缓存 */
     object Logout : MenuViewIntent
     /** 执行每日签到动作 */
@@ -115,6 +127,10 @@ sealed interface MenuViewIntent {
     object DismissUpdate : MenuViewIntent
     /** 切换当前全局使用的皮肤主题 */
     data class ChangeSkin(val skin: String) : MenuViewIntent
+    /** 修改用户头像（Luban 压缩后的字节数组 + 文件名，在 ViewModel 中直接以 multipart 上传至 R2） */
+    class ChangeAvatar(val imageBytes: ByteArray, val fileName: String) : MenuViewIntent
+    /** 修改用户昵称 */
+    data class UpdateNickname(val nickname: String) : MenuViewIntent
     
     // --- 联机匹配相关 ---
     /** 加入全球随机对战匹配队列 */
@@ -142,4 +158,6 @@ sealed interface MenuViewEffect {
         val cloudPoints: Int,
         val cloudLevel: Int
     ) : MenuViewEffect
+    /** 显示强制设置密码对话框 */
+    object ShowSetPasswordDialog : MenuViewEffect
 }

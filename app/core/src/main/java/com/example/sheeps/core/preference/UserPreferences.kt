@@ -107,6 +107,21 @@ class UserPreferences @Inject constructor(
         kv.encode("user_points", points)
     }
 
+    /**
+     * 获取用户头像的完整访问 URL
+     * 头像现已存储于 Cloudflare R2，通过 Worker 代理返回
+     */
+    fun getAvatarUrl(): String {
+        return kv.decodeString("avatar_url", "") ?: ""
+    }
+
+    /**
+     * 设置用户头像的完整访问 URL
+     */
+    fun setAvatarUrl(url: String) {
+        kv.encode("avatar_url", url)
+    }
+
     fun isLoggedIn(): Boolean {
         return getToken() != null
     }
@@ -117,8 +132,10 @@ class UserPreferences @Inject constructor(
         kv.encode("unlocked_level", 1)
         kv.removeValueForKey("username")
         kv.removeValueForKey("today_signed")
+        kv.removeValueForKey("today_signed_date")
         kv.removeValueForKey("sign_streak")
         kv.removeValueForKey("highest_level_cleared")
+        kv.removeValueForKey("avatar_url")
     }
 
     fun getCurrentSkin(): String {
@@ -130,11 +147,24 @@ class UserPreferences @Inject constructor(
     }
 
     fun getTodaySigned(): Boolean {
-        return kv.decodeBool("today_signed", false)
+        val signed = kv.decodeBool("today_signed", false)
+        if (!signed) return false
+        // 检查是否是今天的签到（防止旧数据永久锁定按钮）
+        val signDate = kv.decodeString("today_signed_date", "") ?: ""
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            .format(java.util.Date())
+        return signDate == today
     }
 
     fun setTodaySigned(signed: Boolean) {
         kv.encode("today_signed", signed)
+        if (signed) {
+            val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                .format(java.util.Date())
+            kv.encode("today_signed_date", today)
+        } else {
+            kv.removeValueForKey("today_signed_date")
+        }
     }
 
     fun getSignStreak(): Int {

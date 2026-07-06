@@ -17,5 +17,14 @@
       "binding": "SHEEPS_CACHE",
       "id": "784104ac67eb4f3c83a92e9dcc91b673"
     }
-  ]
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AVATAR_BUCKET",
+      "bucket_name": "sheeps-apk"
+    }
+  ],
+  "vars": {
+    "R2_PUBLIC_URL": "https://apk.xqh.cc.cd"
+  }
 }

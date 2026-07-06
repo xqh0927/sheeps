@@ -36,7 +36,9 @@ fun PersonalScreen(
     onChangeLanguage: (String) -> Unit,
     onThemeChange: () -> Unit,
     onApplySkin: (String) -> Unit,
-    onGoToPlay: () -> Unit
+    onGoToPlay: () -> Unit,
+    onChangeAvatar: () -> Unit = {},
+    onUpdateNickname: (String) -> Unit = {}
 ) {
     // 弹窗控制状态
     var showPointHistory by remember { mutableStateOf(false) }
@@ -81,7 +83,9 @@ fun PersonalScreen(
                 state = state,
                 onLoginClick = onLoginClick,
                 onSignInClick = onSignInClick,
-                onShowGameGuide = { showGameGuide = true }
+                onShowGameGuide = { showGameGuide = true },
+                onChangeAvatar = onChangeAvatar,
+                onUpdateNickname = onUpdateNickname
             )
         }
 

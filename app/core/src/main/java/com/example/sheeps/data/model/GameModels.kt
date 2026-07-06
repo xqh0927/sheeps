@@ -116,7 +116,8 @@ data class LoginResponse(
     val unlocked_levels: List<Int> = emptyList(),
     val items: List<UserItem> = emptyList(),
     val today_signed: Boolean = false,
-    val sign_streak: Int = 0
+    val sign_streak: Int = 0,
+    val hasPassword: Boolean = false
 )
 
 @Serializable
@@ -186,7 +187,38 @@ data class UserProfileResponse(
     val items: List<UserItem>,
     val today_signed: Boolean,
     val sign_streak: Int,
-    val highest_level_cleared: Int
+    val highest_level_cleared: Int,
+    val avatarUrl: String? = null
+)
+
+@Serializable
+data class RegisterAuthRequest(
+    val phone: String,
+    val password: String,
+    val code: String
+)
+
+@Serializable
+data class PasswordLoginRequest(
+    val phone: String,
+    val password: String
+)
+
+@Serializable
+data class ResetPasswordRequest(
+    val phone: String,
+    val code: String,
+    val newPassword: String
+)
+
+@Serializable
+data class SetPasswordRequest(
+    val password: String
+)
+
+@Serializable
+data class CheckPasswordResponse(
+    val hasPassword: Boolean
 )
 
 @Serializable
@@ -197,7 +229,6 @@ data class RegisterRequest(
 
 @Serializable
 data class RenameRequest(
-    val id: String,
     val new_username: String
 )
 
@@ -227,7 +258,8 @@ data class LeaderboardResponse(
 
 @Serializable
 data class GenericResponse(
-    val success: Boolean
+    val success: Boolean,
+    val avatarUrl: String? = null
 )
 
 @Serializable

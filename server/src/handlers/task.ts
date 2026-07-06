@@ -55,6 +55,19 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
 
         // 批量将缺失的进度条目插入 D1 数据库
         if (inserts.length > 0) await env.DB.batch(inserts);
+
+        // 修复：如果用户今天已签到但 SIGN_IN_ONCE 任务状态未同步（如老用户已签到但任务数据未更新），自动修复
+        const signInTask = list.find(t => t.task_id === 'SIGN_IN_ONCE');
+        if (signInTask && !signInTask.is_completed) {
+            const signRecord = await env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday).first();
+            if (signRecord) {
+                await env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 1).run();
+                signInTask.progress = 1;
+                signInTask.is_completed = true;
+                signInTask.is_rewarded = true;
+            }
+        }
+
         return new Response(JSON.stringify(list), { headers: corsHeaders });
     }
 

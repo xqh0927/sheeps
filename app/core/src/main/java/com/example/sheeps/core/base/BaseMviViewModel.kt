@@ -55,9 +55,7 @@ abstract class BaseMviViewModel<State, Intent, Effect>(initialState: State) : Vi
      * 发送一个副作用事件。
      */
     protected fun setEffect(effect: Effect) {
-        viewModelScope.launch {
-            _viewEffect.send(effect)
-        }
+        _viewEffect.trySend(effect)
     }
 
     /**

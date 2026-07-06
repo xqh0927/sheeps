@@ -1,40 +1,72 @@
 package com.example.sheeps.menu
 
 import android.os.Bundle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.menu.state.*
-import com.example.sheeps.menu.ui.components.*
-import com.example.sheeps.menu.ui.dialogs.*
-import com.example.sheeps.menu.ui.screens.*
+import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.data.model.DailyPopupResponse
+import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.menu.state.ConflictInfo
+import com.example.sheeps.menu.state.MenuViewEffect
+import com.example.sheeps.menu.state.MenuViewIntent
+import com.example.sheeps.menu.ui.components.MenuBottomNavigation
+import com.example.sheeps.menu.ui.components.OfflineWarnBanner
+import com.example.sheeps.menu.ui.dialogs.AppUpdateDialog
+import com.example.sheeps.menu.ui.dialogs.ConflictDialog
+import com.example.sheeps.menu.ui.dialogs.DailyLeaderboardPopupDialog
+import com.example.sheeps.menu.ui.dialogs.LoginDialog
+import com.example.sheeps.menu.ui.dialogs.PrepareGameDialog
+import com.example.sheeps.menu.ui.dialogs.SetPasswordDialog
+import com.example.sheeps.menu.ui.screens.GameHomeScreen
+import com.example.sheeps.menu.ui.screens.NoticeListScreen
+import com.example.sheeps.menu.ui.screens.PersonalScreen
+import com.example.sheeps.menu.ui.screens.ShopScreen
 import com.example.sheeps.menu.viewmodel.MenuViewModel
-import com.example.sheeps.theme.*
+import com.example.sheeps.theme.Overlay_Dark_Medium
+import com.example.sheeps.theme.SheepsTheme
 import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.toast.Toaster
 import com.therouter.TheRouter
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import com.example.sheeps.data.network.ApiService
-import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.data.model.DailyPopupResponse
+import top.zibin.luban.api.compressTo
 
 /**
  * 游戏主入口菜单 Activity。
@@ -59,7 +91,7 @@ class MenuActivity : BaseActivity() {
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
             val state by viewModel.viewState.collectAsState()
-            
+
             // --- 多语言动态刷新逻辑 ---
             // 通过监听 State 中的 language 变化，动态创建并提供经过语言配置修正的 Context
             val currentLang = state.language
@@ -93,13 +125,56 @@ class MenuActivity : BaseActivity() {
                     var showPrepareDialog by remember { mutableStateOf<Int?>(null) } // 备战弹窗（传入关卡ID）
                     var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) } // 存档冲突信息
                     var showNoticeListScreen by remember { mutableStateOf(false) } // 公告列表全屏显示
+                    var showSetPasswordDialog by remember { mutableStateOf(false) }
                     var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) } // 每日弹窗内容
+
+                    val scope = rememberCoroutineScope()
+
+                    // 【修改处 2】头像选择器（使用 Luban 2 同步压缩 → bytes → 直接上传 R2）
+                    val pickAvatarLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        uri?.let { imageUri ->
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    // 使用 Luban 2 的 Kotlin 扩展函数直接压缩（自动处理临时目录与缓存）
+                                    val result = imageUri.compressTo(context)
+                                    val file = result.getOrNull()
+
+                                    if (file != null && file.exists() && file.canRead()) {
+                                        val bytes = file.readBytes()
+                                      withContext(Dispatchers.Main) {
+                                            viewModel.sendIntent(
+                                                MenuViewIntent.ChangeAvatar(
+                                                    bytes,
+                                                    file.name
+                                                )
+                                            )
+                                        }
+                                    } else {
+                                        val errorMsg =
+                                            result.exceptionOrNull()?.message ?: "图片处理失败"
+                                      withContext(Dispatchers.Main) {
+                                            Toaster.show(errorMsg)
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        Toaster.show("图片处理失败")
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     // 登录后检查每日弹窗
                     LaunchedEffect(state.isLoggedIn) {
                         if (state.isLoggedIn) {
                             val token = userPrefs.getToken()
-                            val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                            val todayStr = java.text.SimpleDateFormat(
+                                "yyyy-MM-dd",
+                                java.util.Locale.getDefault()
+                            ).format(java.util.Date())
                             val lastShown = userPrefs.getLastShownDailyPopupDate()
                             if (lastShown != todayStr && token != null && token.isNotEmpty()) {
                                 try {
@@ -122,9 +197,11 @@ class MenuActivity : BaseActivity() {
                                 is MenuViewEffect.ShowToast -> {
                                     Toaster.show(effect.message)
                                 }
+
                                 is MenuViewEffect.ShowLoginDialog -> {
                                     showLoginDialog = true
                                 }
+
                                 is MenuViewEffect.NavigateToGame -> {
                                     showPrepareDialog = null
                                     viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
@@ -134,6 +211,7 @@ class MenuActivity : BaseActivity() {
                                         .withString("carryItemsJson", effect.carryItemsJson)
                                         .navigation()
                                 }
+
                                 is MenuViewEffect.ShowConflictDialog -> {
                                     showConflictInfo = ConflictInfo(
                                         localPoints = effect.localPoints,
@@ -141,6 +219,10 @@ class MenuActivity : BaseActivity() {
                                         cloudPoints = effect.cloudPoints,
                                         cloudLevel = effect.cloudLevel
                                     )
+                                }
+
+                                is MenuViewEffect.ShowSetPasswordDialog -> {
+                                    showSetPasswordDialog = true
                                 }
                             }
                         }
@@ -183,12 +265,18 @@ class MenuActivity : BaseActivity() {
                                         )
                                     )
                             ) {
-                                Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(paddingValues)
+                                ) {
                                     // 标签页切换动画
                                     AnimatedContent(
                                         targetState = currentTab,
                                         transitionSpec = {
-                                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                                            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(
+                                                animationSpec = tween(300)
+                                            )
                                         },
                                         label = "tabChange"
                                     ) { targetTab ->
@@ -210,8 +298,20 @@ class MenuActivity : BaseActivity() {
                                                 },
                                                 onNoticeClick = { showNoticeListScreen = true },
                                                 onLoginClick = { showLoginDialog = true },
-                                                onJoinMatch = { viewModel.sendIntent(MenuViewIntent.JoinMatch(state.phone)) },
-                                                onLeaveMatch = { viewModel.sendIntent(MenuViewIntent.LeaveMatch(state.phone)) },
+                                                onJoinMatch = {
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.JoinMatch(
+                                                            state.phone
+                                                        )
+                                                    )
+                                                },
+                                                onLeaveMatch = {
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.LeaveMatch(
+                                                            state.phone
+                                                        )
+                                                    )
+                                                },
                                                 onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
                                                 onNavigateToDuel = { gId, pId, levelId, seed ->
                                                     TheRouter.build("/game/duel")
@@ -222,26 +322,63 @@ class MenuActivity : BaseActivity() {
                                                         .navigation()
                                                 }
                                             )
+
                                             "shop" -> ShopScreen(
                                                 state = state,
                                                 onLoginClick = { showLoginDialog = true },
                                                 onExchangeClick = { itemId, count ->
-                                                    viewModel.sendIntent(MenuViewIntent.ExchangeShopItem(itemId, count))
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.ExchangeShopItem(
+                                                            itemId,
+                                                            count
+                                                        )
+                                                    )
                                                 },
                                                 onChangeSkin = { skin ->
-                                                    viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin))
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.ChangeSkin(
+                                                            skin
+                                                        )
+                                                    )
                                                 }
                                             )
+
                                             "me" -> PersonalScreen(
                                                 state = state,
                                                 onLoginClick = { showLoginDialog = true },
-                                                onLogoutClick = { viewModel.sendIntent(MenuViewIntent.Logout) },
-                                                onSignInClick = { viewModel.sendIntent(MenuViewIntent.SignIn) },
-                                                onClaimTask = { taskId -> viewModel.sendIntent(MenuViewIntent.ClaimTask(taskId)) },
-                                                onChangeLanguage = { lang -> viewModel.sendIntent(MenuViewIntent.ChangeLanguage(lang)) },
+                                                onLogoutClick = {
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.Logout
+                                                    )
+                                                },
+                                                onSignInClick = {
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.SignIn
+                                                    )
+                                                },
+                                                onClaimTask = { taskId ->
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.ClaimTask(taskId)
+                                                    )
+                                                },
+                                                onChangeLanguage = { lang ->
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.ChangeLanguage(lang)
+                                                    )
+                                                },
                                                 onThemeChange = { recreate() },
-                                                onApplySkin = { skin -> viewModel.sendIntent(MenuViewIntent.ChangeSkin(skin)) },
-                                                onGoToPlay = { currentTab = "game" }
+                                                onApplySkin = { skin ->
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.ChangeSkin(skin)
+                                                    )
+                                                },
+                                                onGoToPlay = { currentTab = "game" },
+                                                onChangeAvatar = { pickAvatarLauncher.launch("image/*") },
+                                                onUpdateNickname = { nickname ->
+                                                    viewModel.sendIntent(
+                                                        MenuViewIntent.UpdateNickname(nickname)
+                                                    )
+                                                }
                                             )
                                         }
                                     }
@@ -256,15 +393,30 @@ class MenuActivity : BaseActivity() {
                                                 viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
                                             },
                                             onConfirm = { lvl ->
-                                                val carryJson = json.encodeToString(state.selectedCarryItems)
+                                                val carryJson =
+                                                    json.encodeToString(state.selectedCarryItems)
                                                 viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
-                                                viewModel.sendIntent(MenuViewIntent.GoToGame(lvl, carryJson))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.GoToGame(
+                                                        lvl,
+                                                        carryJson
+                                                    )
+                                                )
                                             },
                                             onUpdateItem = { itemType, change ->
-                                                viewModel.sendIntent(MenuViewIntent.UpdateCarryItem(itemType, change))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.UpdateCarryItem(
+                                                        itemType,
+                                                        change
+                                                    )
+                                                )
                                             },
                                             onUnlock = { lvl ->
-                                                viewModel.sendIntent(MenuViewIntent.UnlockLevelWithPoints(lvl))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.UnlockLevelWithPoints(
+                                                        lvl
+                                                    )
+                                                )
                                             }
                                         )
                                     }
@@ -273,10 +425,60 @@ class MenuActivity : BaseActivity() {
                                     if (showLoginDialog) {
                                         LoginDialog(
                                             onDismiss = { showLoginDialog = false },
-                                            onSendCode = { phone -> viewModel.sendIntent(MenuViewIntent.SendSmsCode(phone)) },
+                                            onSendCode = { phone ->
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.SendSmsCode(phone)
+                                                )
+                                            },
                                             onLogin = { phone, code ->
-                                                viewModel.sendIntent(MenuViewIntent.LoginWithCode(phone, code))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.LoginWithCode(
+                                                        phone,
+                                                        code
+                                                    )
+                                                )
                                                 showLoginDialog = false
+                                            },
+                                            onPasswordLogin = { phone, password ->
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.LoginWithPassword(
+                                                        phone,
+                                                        password
+                                                    )
+                                                )
+                                                showLoginDialog = false
+                                            },
+                                            onRegister = { phone, password, code ->
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.Register(
+                                                        phone,
+                                                        password,
+                                                        code
+                                                    )
+                                                )
+                                            },
+                                            onResetPassword = { phone, code, newPassword ->
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.ResetPassword(
+                                                        phone,
+                                                        code,
+                                                        newPassword
+                                                    )
+                                                )
+                                            }
+                                        )
+                                    }
+
+                                    // 强制设置密码对话框
+                                    if (showSetPasswordDialog) {
+                                        SetPasswordDialog(
+                                            onSetPassword = { password ->
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.SetPassword(
+                                                        password
+                                                    )
+                                                )
+                                                showSetPasswordDialog = false
                                             }
                                         )
                                     }
@@ -286,11 +488,19 @@ class MenuActivity : BaseActivity() {
                                         ConflictDialog(
                                             info = showConflictInfo!!,
                                             onChooseLocal = {
-                                                viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = true))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.ResolveConflict(
+                                                        useLocal = true
+                                                    )
+                                                )
                                                 showConflictInfo = null
                                             },
                                             onChooseCloud = {
-                                                viewModel.sendIntent(MenuViewIntent.ResolveConflict(useLocal = false))
+                                                viewModel.sendIntent(
+                                                    MenuViewIntent.ResolveConflict(
+                                                        useLocal = false
+                                                    )
+                                                )
                                                 showConflictInfo = null
                                             }
                                         )
@@ -336,8 +546,16 @@ class MenuActivity : BaseActivity() {
                                             Box(
                                                 modifier = Modifier
                                                     .size(80.dp)
-                                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                                                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)),
+                                                    .clip(
+                                                        androidx.compose.foundation.shape.RoundedCornerShape(
+                                                            16.dp
+                                                        )
+                                                    )
+                                                    .background(
+                                                        MaterialTheme.colorScheme.surface.copy(
+                                                            alpha = 0.92f
+                                                        )
+                                                    ),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 SheepsLoading(size = 44.dp)

@@ -1,5 +1,6 @@
 package com.example.sheeps.menu.viewmodel.delegates
 
+import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
@@ -12,8 +13,11 @@ import com.example.sheeps.data.model.UnlockLevelRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.MenuViewEffect
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 
 /**
@@ -36,26 +40,56 @@ class SocialActionDelegate @Inject constructor(
         val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
 
         scope.launch {
-            try {
-                // 1. 本地先行：增加预估积分
-                val currentPoints = prefs.getPoints() + 20
-                updateLocalPoints(currentPoints, true)
-                prefs.setPoints(currentPoints)
+            // 1. 记录原始积分，用于发生异常或协程被取消时回滚
+            val originalPoints = prefs.getPoints()
+            val optimisticPoints = originalPoints + 20
 
-                // 2. 异步同步云端
+            // 标记服务端是否已成功处理
+            var isConfirmedByServer = false
+
+            try {
+                // 第1阶段：本地预扣（乐观更新 UI）
+                updateLocalPoints(optimisticPoints, true)
+                prefs.setPoints(optimisticPoints)
+
+                // 第2阶段：正常的 API 调用（绝不能用 NonCancellable 包裹，要允许网络取消！）
                 val response = apiService.signIn("Bearer $token")
-                if (response.success) {
+
+                if (!response.success) {
+                    setEffect(MenuViewEffect.ShowToast("签到失败"))
+                    return@launch // 直接返回，会触发 finally 里的回滚
+                }
+
+                // 第3阶段：服务端签到成功，本地持久化关键数据（这里的极短写文件操作才使用 NonCancellable）
+                withContext(NonCancellable) {
+                    isConfirmedByServer = true
+
                     setEffect(MenuViewEffect.ShowToast("签到成功！连续签到第 ${response.streak} 天，获得 ${response.reward_points} 积分！"))
                     updateLocalPoints(response.current_points, false)
                     prefs.setPoints(response.current_points)
                     prefs.setTodaySigned(true)
                     prefs.setSignStreak(response.streak)
-                } else {
-                    setEffect(MenuViewEffect.ShowToast("签到失败"))
                 }
+
+                // 第4阶段：刷新页面（非关键操作，移出 NonCancellable）
                 onComplete()
+
+            } catch (e: CancellationException) {
+                // 【遵循 Kotlin 协程规约】协程取消异常必须再次抛出，绝不能被普通的 Exception 吞掉
+                LogUtils.w("SignIn cancelled by user/lifecycle")
+                throw e
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("连接异常，积分已本地入账，后续将自动同步"))
+                LogUtils.e("SignIn failed: ${e::class.simpleName} — ${e.message}", e)
+                setEffect(MenuViewEffect.ShowToast("签到失败，请检查网络后重试"))
+            } finally {
+                // 【核心安全网】如果走到这里时，服务端没有确认成功（网络报错、接口返回false、或者用户关闭页面导致协程取消）
+                // 必须使用 NonCancellable 将预扣的 20 积分完美回滚！
+                if (!isConfirmedByServer) {
+                    withContext(NonCancellable) {
+                        updateLocalPoints(originalPoints, false)
+                        prefs.setPoints(originalPoints)
+                    }
+                }
             }
         }
     }
@@ -72,7 +106,8 @@ class SocialActionDelegate @Inject constructor(
         setEffect: (MenuViewEffect) -> Unit
     ) {
         val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
-        val item = shopItems.find { it.id == shopItemId } ?: return setEffect(MenuViewEffect.ShowToast("道具未找到"))
+        val item = shopItems.find { it.id == shopItemId }
+            ?: return setEffect(MenuViewEffect.ShowToast("道具未找到"))
 
         val totalCost = item.points_price * count
         if (prefs.getPoints() < totalCost) {
@@ -85,7 +120,7 @@ class SocialActionDelegate @Inject constructor(
                 // 1. 本地扣减
                 val currentPoints = prefs.getPoints() - totalCost
                 prefs.setPoints(currentPoints)
-                
+
                 val localItem = localDao.getAllItems().find { it.itemType == item.item_type }
                 val newCount = (localItem?.count ?: 0) + count
 
@@ -100,7 +135,8 @@ class SocialActionDelegate @Inject constructor(
                 )
 
                 // 2. 同步云端
-                val response = apiService.exchangeItem("Bearer $token", ExchangeRequest(shopItemId, count))
+                val response =
+                    apiService.exchangeItem("Bearer $token", ExchangeRequest(shopItemId, count))
                 if (response.success) {
                     setEffect(MenuViewEffect.ShowToast("兑换成功，已加入背包！"))
                     localDao.clearProfileDirty(prefs.getUserId())
@@ -162,13 +198,13 @@ class SocialActionDelegate @Inject constructor(
         setEffect: (MenuViewEffect) -> Unit
     ) {
         val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
-        
-        val cost = when(levelId) {
+
+        val cost = when (levelId) {
             2 -> 50
             3 -> 100
             else -> 200
         }
-        
+
         if (prefs.getPoints() < cost) {
             setEffect(MenuViewEffect.ShowToast("解锁失败，积分余额不足"))
             return
@@ -184,7 +220,13 @@ class SocialActionDelegate @Inject constructor(
                 val now = System.currentTimeMillis()
                 updateLocalPoints(currentPoints, true, now)
                 localDao.insertProgress(
-                    UserProgressEntity(levelId = levelId, score = 0, clearTime = 0, isDirty = true, updateTimestamp = now)
+                    UserProgressEntity(
+                        levelId = levelId,
+                        score = 0,
+                        clearTime = 0,
+                        isDirty = true,
+                        updateTimestamp = now
+                    )
                 )
 
                 val response = apiService.unlockLevel("Bearer $token", UnlockLevelRequest(levelId))
@@ -202,7 +244,11 @@ class SocialActionDelegate @Inject constructor(
         }
     }
 
-    private suspend fun updateLocalPoints(points: Int, isDirty: Boolean, timestamp: Long = System.currentTimeMillis()) {
+    private suspend fun updateLocalPoints(
+        points: Int,
+        isDirty: Boolean,
+        timestamp: Long = System.currentTimeMillis()
+    ) {
         localDao.insertProfile(
             UserProfileEntity(
                 userId = prefs.getUserId(),

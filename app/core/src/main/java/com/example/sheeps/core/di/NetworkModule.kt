@@ -3,6 +3,8 @@ package com.example.sheeps.core.di
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.core.network.EncryptionInterceptor
+import com.example.sheeps.core.network.RefreshTokenProvider
 import com.apkfuns.logutils.LogUtils
 import dagger.Module
 import dagger.Provides
@@ -96,7 +98,7 @@ object NetworkModule {
                     val currentToken = prefs.getToken()
                     val requestToken = request.header("Authorization")?.removePrefix("Bearer ")
 
-                    // 锁并发优化：如果另一个并发网络请求线程已经率先刷新了 Token，当前线程直接读新 Token 重试，不重复请求刷新 API
+                    // 锁并发优化：如果另一个并发网络请求线程已经率先刷新了 Token，当前线程直接读新 Token 重试
                     if (currentToken != requestToken && currentToken != null) {
                         response.close()
                         val newRequest = request.newBuilder()
@@ -113,48 +115,54 @@ object NetworkModule {
                         return@Interceptor response
                     }
 
-                    // 同步阻塞发起刷新 Token 请求
-                    val client = OkHttpClient.Builder()
-                        .connectTimeout(10, TimeUnit.SECONDS)
-                        .readTimeout(10, TimeUnit.SECONDS)
-                        .writeTimeout(10, TimeUnit.SECONDS)
-                        .build()
-                    val mediaType = "application/json".toMediaType()
-                    val requestBody =
-                        "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
-
-                    val refreshUrl =
-                        request.url.newBuilder().encodedPath("/api/auth/refresh").build()
-                    val refreshRequest = okhttp3.Request.Builder()
-                        .url(refreshUrl)
-                        .method("POST", requestBody)
-                        .build()
-
                     try {
-                        val refreshResponse = client.newCall(refreshRequest).execute()
-                        if (refreshResponse.isSuccessful) {
-                            val bodyStr = refreshResponse.body?.string() ?: ""
-                            val refreshRes =
-                                json.decodeFromString<com.example.sheeps.data.model.RefreshResponse>(
-                                    bodyStr
-                                )
-                            if (refreshRes.success && refreshRes.token != null) {
-                                prefs.setToken(refreshRes.token)
-                                prefs.setRefreshToken(refreshRes.refreshToken)
-
-                                response.close()
-                                val newRequest = request.newBuilder()
-                                    .header("Authorization", "Bearer ${refreshRes.token}")
-                                    .build()
-                                response = chain.proceed(newRequest)
-                                return@Interceptor response
+                        // 使用 RefreshTokenProvider 中的 ApiService 实例发起刷新请求
+                        val api = RefreshTokenProvider.apiService
+                        val refreshRes = if (api != null) {
+                            kotlinx.coroutines.runBlocking {
+                                api.refreshToken(mapOf("refreshToken" to refreshToken))
+                            }
+                        } else {
+                            // fallback：手动构建 HTTP 请求
+                            val client = OkHttpClient.Builder()
+                                .connectTimeout(10, TimeUnit.SECONDS)
+                                .readTimeout(10, TimeUnit.SECONDS)
+                                .writeTimeout(10, TimeUnit.SECONDS)
+                                .build()
+                            val mediaType = "application/json".toMediaType()
+                            val requestBody =
+                                "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
+                            val refreshUrl =
+                                request.url.newBuilder().encodedPath("/api/auth/refresh").build()
+                            val refreshRequest = okhttp3.Request.Builder()
+                                .url(refreshUrl)
+                                .method("POST", requestBody)
+                                .build()
+                            val rawResponse = client.newCall(refreshRequest).execute()
+                            if (rawResponse.isSuccessful) {
+                                val bodyStr = rawResponse.body?.string() ?: ""
+                                json.decodeFromString<com.example.sheeps.data.model.RefreshResponse>(bodyStr)
+                            } else {
+                                null
                             }
                         }
+
+                        if (refreshRes != null && refreshRes.success && refreshRes.token != null) {
+                            prefs.setToken(refreshRes.token)
+                            prefs.setRefreshToken(refreshRes.refreshToken)
+
+                            response.close()
+                            val newRequest = request.newBuilder()
+                                .header("Authorization", "Bearer ${refreshRes.token}")
+                                .build()
+                            response = chain.proceed(newRequest)
+                            return@Interceptor response
+                        }
                     } catch (e: Exception) {
-                        LogUtils.e( "刷新 Token 失败", e)
+                        LogUtils.e("刷新 Token 失败", e)
                     }
 
-                    // 刷新失败，强制退出登录并向主页发送单点登出总线事件以切换页面
+                    // 刷新失败，强制退出登录
                     prefs.logout()
                     com.example.sheeps.core.utils.AuthEventBus.post(com.example.sheeps.core.utils.AuthEvent.Logout)
                 }
@@ -162,7 +170,10 @@ object NetworkModule {
             response
         }
 
-        // 5. 弱网/服务器 5xx 故障自动指数退避重试拦截器：
+        // 5. 加密拦截器：请求体加密 + 响应体解密
+        val encryptionInterceptor = EncryptionInterceptor()
+
+        // 6. 弱网/服务器 5xx 故障自动指数退避重试拦截器：
         // 针对网络异常或后端服务器偶发性 502/504 故障，在 1~3 秒内进行退避重试，最大尝试 3 次，大幅提高不稳网络环境下的通关成绩提交成功率。
         val weakNetworkRetryInterceptor = Interceptor { chain ->
             val request = chain.request()
@@ -205,6 +216,7 @@ object NetworkModule {
             .addInterceptor(languageInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(tokenRefreshInterceptor)
+            .addInterceptor(encryptionInterceptor)
             .addInterceptor(weakNetworkRetryInterceptor)
             .addInterceptor(loggingInterceptor)
             .build()
@@ -227,6 +239,9 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService =
-        retrofit.create(ApiService::class.java)
+    fun provideApiService(retrofit: Retrofit): ApiService {
+        val service = retrofit.create(ApiService::class.java)
+        RefreshTokenProvider.apiService = service
+        return service
+    }
 }

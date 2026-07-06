@@ -2,23 +2,33 @@ package com.example.sheeps.menu.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import coil.compose.AsyncImage
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 
@@ -36,8 +46,12 @@ fun UserProfileCard(
     state: MenuViewState,
     onLoginClick: () -> Unit,
     onSignInClick: () -> Unit,
-    onShowGameGuide: () -> Unit
+    onShowGameGuide: () -> Unit,
+    onChangeAvatar: () -> Unit = {},
+    onUpdateNickname: (String) -> Unit = {}
 ) {
+    var showNicknameDialog by remember { mutableStateOf(false) }
+    var editNickname by remember { mutableStateOf(state.username) }
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -51,25 +65,55 @@ fun UserProfileCard(
                     Box(
                         modifier = Modifier
                             .size(56.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable(enabled = state.isLoggedIn) { onChangeAvatar() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Me",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        if (state.avatarUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = state.avatarUrl,
+                                contentDescription = "头像",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Me",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column {
-                        Text(
-                            text = if (state.isLoggedIn) state.username else stringResource(id = R.string.user_guest),
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontFamily = FontFamily.Serif
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (state.isLoggedIn) state.username else stringResource(id = R.string.user_guest),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontFamily = FontFamily.Serif
+                            )
+                            if (state.isLoggedIn) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = {
+                                        editNickname = state.username
+                                        showNicknameDialog = true
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "编辑昵称",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = if (state.isLoggedIn) "UID: ${state.phone}" else stringResource(id = R.string.user_not_logged_in),
                             fontSize = 12.sp,
@@ -142,6 +186,55 @@ fun UserProfileCard(
                     contentDescription = stringResource(id = R.string.description_game_guide),
                     tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                 )
+            }
+        }
+    }
+
+    // 昵称编辑对话框
+    if (showNicknameDialog) {
+        Dialog(onDismissRequest = { showNicknameDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "修改昵称",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = editNickname,
+                        onValueChange = { editNickname = it },
+                        label = { Text("新昵称") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showNicknameDialog = false }) {
+                            Text("取消")
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(
+                            onClick = {
+                                if (editNickname.isNotBlank()) {
+                                    onUpdateNickname(editNickname.trim())
+                                    showNicknameDialog = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("保存", color = Color.White)
+                        }
+                    }
+                }
             }
         }
     }

@@ -7,10 +7,10 @@ object AppConfig {
     /**
      * 后端服务接口的基础请求地址
      */
-    const val BASE_URL = "https://xqh.cc.cd/"
+    const val BASE_URL = "https://api.xqh.cc.cd/"
 
     /**
      * 后端服务实时同步的 WebSocket 地址
      */
-    const val WS_URL = "wss://xqh.cc.cd/api/ws"
+    const val WS_URL = "wss://api.xqh.cc.cd/api/ws"
 }

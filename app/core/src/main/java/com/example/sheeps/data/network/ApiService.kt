@@ -1,6 +1,7 @@
 package com.example.sheeps.data.network
 
 import com.example.sheeps.data.model.AppUpdateResponse
+import com.example.sheeps.data.model.CheckPasswordResponse
 import com.example.sheeps.data.model.DailyTask
 import com.example.sheeps.data.model.DailyPopupResponse
 import com.example.sheeps.data.model.ExchangeRecord
@@ -13,13 +14,17 @@ import com.example.sheeps.data.model.LoginResponse
 import com.example.sheeps.data.model.MatchJoinRequest
 import com.example.sheeps.data.model.MatchStatusResponse
 import com.example.sheeps.data.model.Notice
+import com.example.sheeps.data.model.PasswordLoginRequest
 import com.example.sheeps.data.model.PointRecord
 import com.example.sheeps.data.model.RefreshResponse
+import com.example.sheeps.data.model.RegisterAuthRequest
 import com.example.sheeps.data.model.RegisterRequest
 import com.example.sheeps.data.model.RenameRequest
+import com.example.sheeps.data.model.ResetPasswordRequest
 import com.example.sheeps.data.model.ScoreRequest
 import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.model.SendCodeResponse
+import com.example.sheeps.data.model.SetPasswordRequest
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.data.model.SignResponse
 import com.example.sheeps.data.model.SyncRequest
@@ -30,10 +35,14 @@ import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.UnlockLevelRequest
 import com.example.sheeps.data.model.UnlockLevelResponse
 import com.example.sheeps.data.model.UserProfileResponse
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Query
 
 interface ApiService {
@@ -112,6 +121,57 @@ interface ApiService {
      */
     @POST("/api/auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
+
+    /**
+     * 密码登录 — 通过手机号+密码完成登录
+     *
+     * @param request 密码登录请求体，包含手机号和密码
+     * @return LoginResponse 包含 token、refreshToken、用户信息等
+     */
+    @POST("/api/auth/login-password")
+    suspend fun loginPassword(@Body request: PasswordLoginRequest): LoginResponse
+
+    /**
+     * 用户注册 — 通过手机号+密码+验证码注册新账号
+     *
+     * @param request 注册请求体，包含手机号、密码、验证码
+     * @return GenericResponse 通用响应，包含 success 状态
+     */
+    @POST("/api/auth/register")
+    suspend fun registerAuth(@Body request: RegisterAuthRequest): GenericResponse
+
+    /**
+     * 重置密码 — 通过手机号+验证码+新密码重置
+     *
+     * @param request 重置密码请求体
+     * @return GenericResponse 通用响应
+     */
+    @POST("/api/auth/reset-password")
+    suspend fun resetPassword(@Body request: ResetPasswordRequest): GenericResponse
+
+    /**
+     * 检查是否已设置密码
+     *
+     * @param auth Authorization 请求头（Bearer Token）
+     * @return CheckPasswordResponse 包含 hasPassword 字段
+     */
+    @GET("/api/auth/check-password")
+    suspend fun checkPassword(
+        @Header("Authorization") auth: String
+    ): CheckPasswordResponse
+
+    /**
+     * 设置密码 — 登录后设置密码（奖励 50 积分）
+     *
+     * @param auth Authorization 请求头（Bearer Token）
+     * @param request 设置密码请求体
+     * @return GenericResponse 通用响应
+     */
+    @POST("/api/auth/set-password")
+    suspend fun setPassword(
+        @Header("Authorization") auth: String,
+        @Body request: SetPasswordRequest
+    ): GenericResponse
 
     /**
      * 刷新Token — 使用 Refresh Token 静默换取新的双 Token
@@ -216,12 +276,26 @@ interface ApiService {
      * 获取用户Profile — 查询用户完整资料、背包道具、签到进度及最高通关记录
      *
      * @param auth Authorization 请求头（Bearer Token）
-     * @return UserProfileResponse 包含用户信息、已解锁关卡、道具、签到状态、最高关卡
+     * @return UserProfileResponse 包含用户信息、已解锁关卡、道具、签到状态、最高关卡、头像URL
      */
     @GET("/api/user/profile")
     suspend fun getUserProfile(
         @Header("Authorization") auth: String
     ): UserProfileResponse
+
+    /**
+     * 上传头像 — 将头像图片通过 multipart/form-data 上传至 R2 存储
+     *
+     * @param auth Authorization 请求头（Bearer Token）
+     * @param avatar multipart 头像图片 Part
+     * @return GenericResponse 通用响应，包含 avatarUrl 字段
+     */
+    @Multipart
+    @POST("/api/user/avatar")
+    suspend fun uploadAvatar(
+        @Header("Authorization") auth: String,
+        @Part avatar: MultipartBody.Part
+    ): GenericResponse
 
     /**
      * 获取积分流水 — 查询个人积分收支历史明细（最近50条）

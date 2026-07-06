@@ -170,7 +170,7 @@ class GameViewModel @Inject constructor(
         updateState { copy(username = newName) }
         viewModelScope.launch {
             try {
-                apiService.rename(RenameRequest(prefs.getUserId(), newName))
+                apiService.rename(RenameRequest(newName))
                 setEffect(
                     GameViewEffect.ShowToast(
                         getLocalizedString(

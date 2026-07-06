@@ -34,6 +34,7 @@ lifecycle-process = "2.10.0"
 room = "2.6.1"
 securityCrypto = "1.1.0-alpha06"
 okhttp = "4.12.0"
+luban = "2.0.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -90,6 +91,7 @@ androidx-security-crypto = { module = "androidx.security:security-crypto", versi
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-logging = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "okhttp" }
 logutils-pengwei = { module = "com.apkfuns.logutils:library", version = "1.7.5" }
+luban = { module = "top.zibin:luban", version.ref = "luban" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

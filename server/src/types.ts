@@ -5,6 +5,8 @@
 export interface Env {
   DB: D1Database;          // D1 关系型数据库实例
   SHEEPS_CACHE: KVNamespace; // KV 键值对缓存实例
+  AVATAR_BUCKET: R2Bucket;   // R2 对象存储 bucket（用户头像）
+  R2_PUBLIC_URL: string;     // R2 公网自定义域名（如 https://apk.xqh.cc.cd）
 }
 
 /** GitHub Release 资源附件 */

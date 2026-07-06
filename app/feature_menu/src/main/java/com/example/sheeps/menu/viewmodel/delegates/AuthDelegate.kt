@@ -11,6 +11,7 @@ import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.state.MenuViewEffect
+import com.apkfuns.logutils.LogUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -46,6 +47,7 @@ class AuthDelegate @Inject constructor(
                     setEffect(MenuViewEffect.ShowToast("验证码发送失败"))
                 }
             } catch (e: Exception) {
+                LogUtils.e("sendCode失败", e)
                 setEffect(MenuViewEffect.ShowToast("网络错误，发送失败"))
             }
         }

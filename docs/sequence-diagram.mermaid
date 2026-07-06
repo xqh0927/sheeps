@@ -1,40 +1,116 @@
 sequenceDiagram
-    participant App as App Entry
-    participant ST as SheepsTheme()
-    participant TM as ThemeManager
-    participant M3 as MaterialTheme
-    participant TCB as TileCardBase()
-    participant Canvas as Canvas DrawScope
+    participant App as 业务代码
+    participant Retrofit as Retrofit/ApiService
+    participant OkHttp as OkHttpClient
+    participant TR as tokenRefreshInterceptor
+    participant RTP as RefreshTokenProvider
+    participant API as ApiService
+    participant Server as 服务端
 
-    App->>TM: init() 从 MMKV 读取主题
-    App->>ST: SheepsTheme { content }
-    ST->>TM: currentTheme.collectAsState()
-    TM-->>ST: AppTheme (e.g. SAKURA)
-    ST->>M3: MaterialTheme(colorScheme = SakuraColorScheme)
-    Note over M3: colorScheme 注入 CompositionLocal
+    App->>Retrofit: signIn() / 任意 API 调用
+    Retrofit->>OkHttp: execute(request)
+    OkHttp->>TR: intercept(chain)
+    TR->>OkHttp: chain.proceed(request)
+    OkHttp->>Server: HTTP 请求
+    Server-->>OkHttp: 401 Unauthorized
+    
+    TR->>TR: 检测 401 + 非 refresh 端点
+    TR->>RTP: 读取 apiService 引用
+    RTP-->>TR: ApiService 实例（非 null）
+    
+    TR->>API: refreshToken(mapOf("refreshToken" to rt))
+    API->>Server: POST /api/auth/refresh
+    Server-->>API: {success, token, refreshToken}
+    API-->>TR: RefreshResponse
+    
+    TR->>TR: prefs.setToken() / prefs.setRefreshToken()
+    TR->>OkHttp: 重试原始请求（新 Token）
+    OkHttp->>Server: 原始请求（Bearer newToken）
+    Server-->>OkHttp: 200 OK
+    OkHttp-->>App: 响应
 
-    App->>TCB: TileCardBase(skin = "cyber")
-    TCB->>M3: val cs = MaterialTheme.colorScheme
-    Note over TCB: 提取 cs.surface, cs.onSurface 等到局部变量
-    TCB->>TCB: when(normalizedSkin) { bgColor, borderColor, decorColor }
-    TCB->>Canvas: Canvas { drawRoundRect(cs.surfaceVariant), drawLine(cs.onSurfaceVariant) }
-    Note over Canvas: Canvas 内使用闭包捕获的局部变量
+    ---
 
-    rect rgb(200, 230, 255)
-        Note over TCB: 皮肤差异化决策
-        TCB->>TCB: ink → cs.surfaceVariant / onSurface(0.8f) / onSurfaceVariant
-        TCB->>TCB: cyber → cs.surface / primary / secondary
-        TCB->>TCB: keai → cs.surfaceVariant / secondary / secondary(0.7f)
-        TCB->>TCB: daimeng → cs.surfaceVariant / primary(0.8f) / primary(0.5f)
-        TCB->>TCB: classic → cs.surface / secondary / secondary(0.5f)
-    end
+    participant VM as ViewModel
+    participant EncInt as encryptionInterceptor
+    participant LogInt as loggingInterceptor
+    participant DecMW as decryptMiddleware
+    participant Handler as Route Handler
+    participant EncMW as encryptMiddleware
 
-    rect rgb(255, 240, 220)
-        Note over App,Canvas: P1 通用替换流程
-        Note over App,Canvas: Color.White/FFFFFDF9/FCFAF6 → cs.surface
-        Note over App,Canvas: Color(0xFFE5DDD3) → cs.outlineVariant
-        Note over App,Canvas: Color.DarkGray/333333/1C1A17 → cs.onSurface
-        Note over App,Canvas: Color.Gray/888888 → cs.onSurfaceVariant
-        Note over App,Canvas: Color.Black.copy(0.5f) → cs.scrim
-        Note over App,Canvas: Color.White (Button text) → cs.onPrimary
-    end
+    VM->>Retrofit: 调用 API（明文请求体）
+    Retrofit->>EncInt: 明文 JSON Body
+    
+    Note over EncInt: 1. 生成随机 12-byte IV
+    Note over EncInt: 2. AES-256-GCM 加密
+    Note over EncInt: 3. 组装 {encrypted: Base64(IV+cipher+tag)}
+    
+    EncInt->>LogInt: 密文请求体
+    Note over LogInt: Debug 模式可通过 EncInt 获取明文日志
+    LogInt->>Server: POST /api/xxx + 加密 Body
+    
+    Server->>DecMW: 解密中间件
+    Note over DecMW: 1. Base64 解码
+    Note over DecMW: 2. 提取 IV(前12字节)
+    Note over DecMW: 3. AES-256-GCM 解密
+    Note over DecMW: 4. 替换 request.body 为明文
+    
+    DecMW->>Handler: 明文 JSON Body
+    Handler->>Handler: 业务逻辑处理
+    Handler-->>EncMW: 明文 JSON 响应
+    
+    Note over EncMW: 1. 生成随机 12-byte IV
+    Note over EncMW: 2. AES-256-GCM 加密
+    Note over EncMW: 3. 返回 {encrypted: Base64(IV+cipher+tag)}
+    
+    EncMW-->>Server: 加密响应体
+    Server-->>LogInt: 加密响应
+    LogInt-->>EncInt: 加密响应
+    
+    Note over EncInt: 1. 解密响应
+    Note over EncInt: 2. 还原明文响应体
+    
+    EncInt-->>Retrofit: 明文 JSON Response
+    Retrofit-->>VM: 反序列化后的数据对象
+
+    ---
+
+    participant User as 用户
+    participant Dialog as SetPasswordDialog
+    participant D1 as D1 Database
+
+    User->>Dialog: 输入密码并确认
+    Dialog->>VM: SetPassword(password)
+    VM->>API: registerPassword(phone, password, code)
+    API->>Server: POST /api/auth/register-password (加密)
+    
+    Server->>Server: 1. 解密请求体
+    Server->>Server: 2. 验证验证码（复用 login_token）
+    Server->>Server: 3. PBKDF2 哈希密码
+    Server->>D1: UPDATE users SET password_hash = ?
+    Server->>D1: UPDATE users SET points = points + 50
+    Server->>D1: INSERT point_record (IN, 50, SET_PASSWORD)
+    Server-->>API: {success, token, refreshToken, bonusPoints: 50}
+    
+    API-->>VM: PasswordRegisterResponse
+    VM->>VM: prefs.setHasPassword(true)
+    VM->>VM: prefs.setPoints(points + 50)
+    VM->>User: Toast "密码设置成功！获得 50 积分奖励"
+
+    ---
+
+    participant Game as GameActivity
+
+    Game->>Server: POST /api/score/submit (通关成绩)
+    Server->>D1: 查询用户信息 + 通关次数 + 每日任务进度
+    D1-->>Server: tasksResult (PLAY_3_GAMES/PLAY_5_GAMES 当前进度)
+    
+    Server->>Server: 处理首次通关奖励 + 解锁下一关
+    Server->>D1: 写入排行榜 + 解锁关卡
+    
+    Note over Server: 【新增逻辑】遍历 tasksResult
+    Server->>Server: 对于 PLAY_ 前缀任务: progress += 1
+    Server->>Server: 若 progress >= target_count: is_completed = 1
+    Server->>D1: UPDATE user_task SET progress=?, is_completed=?
+    
+    Server-->>Game: {success, first_clear, points_reward}

@@ -1,131 +1,153 @@
 classDiagram
-    class AppTheme {
-        <<enumeration>>
-        FOREST
-        QING_RI_CHUN
-        MO_YE_GOLD
-        SAKURA
-        COSMIC
-        SUNSET
-        +fromKey(key: String) AppTheme
+    %% ── Android 端数据模型 ──
+    class EncryptedRequest {
+        +String encrypted
+    }
+    
+    class EncryptedResponse {
+        +String encrypted
+        +String error
     }
 
-    class ThemeManager {
+    class PasswordRegisterRequest {
+        +String phone
+        +String password
+        +String code
+    }
+
+    class PasswordLoginRequest {
+        +String phone
+        +String password
+    }
+
+    class PasswordResetRequest {
+        +String phone
+        +String code
+        +String newPassword
+    }
+
+    class HasPasswordResponse {
+        +Boolean success
+        +Boolean hasPassword
+    }
+
+    class PasswordRegisterResponse {
+        +Boolean success
+        +String token
+        +String refreshToken
+        +Int bonusPoints
+    }
+
+    class AvatarUploadRequest {
+        +String avatarBase64
+    }
+
+    class AvatarUploadResponse {
+        +Boolean success
+        +String avatarUrl
+    }
+
+    class SetPasswordRequest {
+        +String token
+        +String password
+    }
+
+    class SetPasswordResponse {
+        +Boolean success
+        +Int bonusPoints
+    }
+
+    %% LoginResponse 扩展字段
+    class LoginResponse {
+        +Boolean success
+        +String token
+        +String refreshToken
+        +UserInfo user
+        +List~Int~ unlocked_levels
+        +List~UserItem~ items
+        +Boolean today_signed
+        +Int sign_streak
+        +Boolean has_password
+    }
+
+    class UserInfo {
+        +String id
+        +String phone
+        +String username
+        +String avatar
+        +Int points
+    }
+
+    %% ── Android 基础设施 ──
+    class RefreshTokenProvider {
+        +ApiService apiService$ @Volatile
         <<object>>
-        +currentTheme: StateFlow~AppTheme~
-        +init()
-        +setTheme(theme: AppTheme)
-        +getCurrentTheme() AppTheme
-        +getThemeResId() Int
-        +isDarkTheme() Boolean
     }
 
-    class ColorScheme {
-        <<Material3 system>>
-        +primary: Color
-        +secondary: Color
-        +tertiary: Color
-        +surface: Color
-        +onSurface: Color
-        +surfaceVariant: Color
-        +onSurfaceVariant: Color
-        +outline: Color
-        +outlineVariant: Color
-        +scrim: Color
-        +background: Color
-        +error: Color
-        +errorContainer: Color
-        +onPrimary: Color
-        +onTertiary: Color
+    class CryptoUtil {
+        +String encrypt(String plaintext, String key)$
+        +String decrypt(String ciphertext, String key)$
+        <<object>>
     }
 
-    class SheepsTheme {
-        <<Composable function>>
-        +forceTheme: AppTheme?
-        +content: @Composable () -> Unit
-        -MoYeGoldColorScheme
-        -QingRiChunColorScheme
-        -SakuraColorScheme
-        -CosmicColorScheme
-        -SunsetColorScheme
-        -ForestColorScheme
+    class AppConfig {
+        +String AES_KEY$
+        +String BASE_URL$
+        +String WS_URL$
+        <<object>>
     }
 
-    class TileCardBase {
-        <<Composable function>>
-        +skin: String
-        +modifier: Modifier
-        +content: @Composable () -> Unit
+    class EncryptionInterceptor {
+        -String aesKey
+        -Boolean isDebug
+        +Response intercept(Chain chain)
     }
 
-    class ItemAnimationIcon {
-        <<Composable function>>
-        +itemType: String
-        +modifier: Modifier
-        +size: Dp
-        +isGray: Boolean
+    %% ── 服务端类型 ──
+    class Env {
+        +D1Database DB
+        +KVNamespace SHEEPS_CACHE
+        +String AES_KEY
     }
 
-    class TileView {
-        <<Composable function>>
-        +tile: Tile
-        +onClick: () -> Unit
-        +currentSkin: String
-        +tileSize: Dp
-        +isShaking: Boolean
-        +isHighlighted: Boolean
+    class CryptoHelpers {
+        +Promise~String~ hashPassword(String password)$
+        +Promise~Boolean~ verifyPassword(String password, String hash)$
+        +Promise~String~ aesEncrypt(String plaintext, String key)$
+        +Promise~String~ aesDecrypt(String ciphertext, String key)$
     }
 
-    class ShopScreen {
-        <<Composable function>>
-        +state: MenuViewState
-        +onLoginClick: () -> Unit
-        +onExchangeClick: (Int, Int) -> Unit
-        +onChangeSkin: (String) -> Unit
+    %% ── 服务端中间件 ──
+    class EncryptionMiddleware {
+        +MiddlewareHandler decryptBody()
+        +MiddlewareHandler encryptResponse()
     }
 
-    class ShopItemCard {
-        <<Composable function>>
-        +item: ShopItem
-        +backpackCount: Int
-        +currentSkin: String
-        +onExchange: (Int) -> Unit
-        +onApplySkin: (String) -> Unit
+    %% ── 服务端 Handler ──
+    class AuthHandler {
+        +handleRegisterPassword(Request, Env) Promise~Response~
+        +handleLoginPassword(Request, Env) Promise~Response~
+        +handleResetPassword(Request, Env) Promise~Response~
+        +handleCheckPassword(Request, Env) Promise~Response~
     }
 
-    class DuelMatchDialog {
-        <<Composable function>>
-        +state: MenuViewState
-        +onJoin: () -> Unit
-        +onLeave: () -> Unit
-        +onDismiss: () -> Unit
+    class UserHandler {
+        +handleRename(Request, Env) Promise~Response~
+        +handleAvatarUpload(Request, Env) Promise~Response~
     }
 
-    class PrepareGameDialog {
-        <<Composable function>>
-        +levelId: Int
-        +state: MenuViewState
-        +onDismiss: () -> Unit
-        +onConfirm: (Int) -> Unit
-        +onUpdateItem: (String, Int) -> Unit
-        +onUnlock: (Int) -> Unit
+    class GameHandler {
+        +handleScoreSubmit(Request, Env) Promise~Response~
+        +handleSignToday(Request, Env) Promise~Response~
     }
 
-    class SplashActivity {
-        <<Android Activity>>
-        -userPrefs: UserPreferences
-        +initView()
-        -showSplashContent()
-        -navigateToMenu()
-    }
-
-    SheepsTheme --> ThemeManager : reads currentTheme
-    SheepsTheme --> ColorScheme : injects via MaterialTheme
-    ThemeManager --> AppTheme : manages
-    TileCardBase --> ColorScheme : reads via MaterialTheme.colorScheme
-    ItemAnimationIcon --> ColorScheme : reads via MaterialTheme.colorScheme
-    TileView --> TileCardBase : composes
-    ShopScreen --> ShopItemCard : composes
-    ShopScreen --> ItemAnimationIcon : uses
-    PrepareGameDialog --> ItemAnimationIcon : uses
-    SplashActivity --> SheepsTheme : sets content
+    %% 关系
+    RefreshTokenProvider --> ApiService : 持有静态引用
+    CryptoUtil ..> AppConfig : 读取 AES_KEY
+    LoginResponse --> UserInfo : 包含
+    EncryptionMiddleware ..> CryptoHelpers : 调用
+    EncryptionInterceptor ..> CryptoUtil : 调用
+    NetworkModule --> EncryptionInterceptor : 创建并注册
+    NetworkModule --> RefreshTokenProvider : 注入引用
+    AuthHandler ..> CryptoHelpers : 密码哈希
+    AppConfig ..> EncryptionInterceptor : 提供 AES_KEY

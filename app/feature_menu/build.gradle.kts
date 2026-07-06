@@ -41,7 +41,8 @@ dependencies {
     kapt(libs.therouter.apt)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-}
+    implementation(libs.luban)
+ }
 
 
 

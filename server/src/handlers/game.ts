@@ -179,6 +179,25 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         mutations.push(env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, Date.now()));
 
         if (mutations.length > 0) await env.DB.batch(mutations);
+
+        // P0-1 修复：遍历用户任务，更新 PLAY_ 前缀的每日任务进度
+        const userTasks = tasksResult.results as any[];
+        if (userTasks && userTasks.length > 0) {
+            const taskMutations = [];
+            for (const ut of userTasks) {
+                if (ut.task_id.startsWith('PLAY_') && ut.is_completed === 0) {
+                    const newProgress = (ut.progress || 0) + 1;
+                    const targetCount = ut.target_count || 999;
+                    const completed = newProgress >= targetCount;
+                    taskMutations.push(
+                        env.DB.prepare('UPDATE user_task SET progress = ?, is_completed = ? WHERE user_id = ? AND task_id = ? AND task_date = ?')
+                            .bind(newProgress, completed ? 1 : 0, resolvedUserId, ut.task_id, chinaToday)
+                    );
+                }
+            }
+            if (taskMutations.length > 0) await env.DB.batch(taskMutations);
+        }
+
         return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
     }
 
@@ -218,15 +237,21 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const newPoints = ((userResult.results[0] as { points: number } | undefined)?.points || 0) + rewardPoints;
 
         // 签到事务原子入库
+        // P0-1 修复：签到成功后自动领取 SIGN_IN_ONCE 的 10 积分
+        const signInOnceReward = 10;
+        const totalNewPoints = newPoints + signInOnceReward;
+
         await env.DB.batch([
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
+            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(totalNewPoints, authUser.userId),
             env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)').bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()),
-            // 更新每日签到任务状态为已完成
-            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 0)
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', totalNewPoints, Date.now()),
+            // 签到任务积分自动领取
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', signInOnceReward, 'SIGN_IN_ONCE', totalNewPoints, Date.now()),
+            // 更新每日签到任务状态为已完成且已领取
+            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 1)
         ]);
 
-        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints, current_points: newPoints }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints + signInOnceReward, current_points: totalNewPoints }), { headers: corsHeaders });
     }
 
     /**

@@ -20,6 +20,8 @@ CREATE TABLE users (
     username TEXT NOT NULL,
     avatar TEXT,
     points INTEGER DEFAULT 0,
+    password_hash TEXT,
+    avatar_url TEXT,
     created_at INTEGER NOT NULL
 );
 
