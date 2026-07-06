@@ -62,8 +62,9 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     // 关卡 23+ 时 baseSize >= 17，保证最 restrictive 的形状（如 X 字形）也能生成 300+ 坐标
     const baseSize = Math.min(6, 6 + Math.floor(levelId / 2));
 
-    // 根据种子从 18 种不同的关卡异形轮廓中随机挑选一种进行图形网格过滤
-    const shapeType = seed % 18;
+    // 引入关卡固定的布局种子，确保相同 levelId 产生完全一致的卡牌排布和总数量
+    const layoutSeed = levelId * 1000;
+    const shapeType = layoutSeed % 18;
 
     for (let z = 0; z < layersCount; z++) {
       // 网格尺寸逐层递减 1，偏移量逐层累加 0.5，形成向上收缩的金字塔堆叠
@@ -184,8 +185,8 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       }
     }
 
-    // 洗牌坐标：使用确定性 LCG 打乱三维坐标列表
-    let rand = lcg(seed);
+    // 洗牌坐标：使用关卡固定的布局种子打乱三维坐标列表
+    let rand = lcg(layoutSeed);
     for (let i = possibleCoords.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       const temp = possibleCoords[i];

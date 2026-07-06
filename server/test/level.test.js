@@ -126,3 +126,24 @@ test('所有关卡的卡牌数都在 [12, 300] 范围内', () => {
     }
   }
 });
+
+test('同一个关卡传入不同随机种子时，生成的卡牌数量与坐标完全相同，但卡牌花色与道具随机变化', () => {
+  const levelId = 10;
+  const tilesSeed1 = generateSolvableLevel(0, levelId, 11111);
+  const tilesSeed2 = generateSolvableLevel(0, levelId, 22222);
+
+  // 1. 卡牌数量必须完全相同
+  assert.equal(tilesSeed1.length, tilesSeed2.length, '同一个关卡使用不同 seed 时的卡牌数量应该相同');
+
+  // 2. 对应位置卡牌的坐标（x, y, z）应完全相同
+  for (let i = 0; i < tilesSeed1.length; i++) {
+    assert.equal(tilesSeed1[i].x, tilesSeed2[i].x, `卡牌 [${i}] 的 x 坐标应相同`);
+    assert.equal(tilesSeed1[i].y, tilesSeed2[i].y, `卡牌 [${i}] 的 y 坐标应相同`);
+    assert.equal(tilesSeed1[i].z, tilesSeed2[i].z, `卡牌 [${i}] 的 z 坐标应相同`);
+  }
+
+  // 3. 卡牌的 type (花色) 应当不同（有随机性变化）
+  const typesMatch = tilesSeed1.every((t, i) => t.type === tilesSeed2[i].type);
+  assert.ok(!typesMatch, '所有卡牌的花色应该在不同 seed 时随机刷新（不完全相同）');
+});
+

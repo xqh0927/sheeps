@@ -122,7 +122,7 @@ async function getAesKey(): Promise<CryptoKey> {
     const rawKey = hexToBytes(AES_KEY_HEX);
     cachedAesKey = await crypto.subtle.importKey(
       'raw',
-      rawKey,
+      rawKey as any,
       { name: 'AES-GCM' },
       false,
       ['encrypt', 'decrypt']

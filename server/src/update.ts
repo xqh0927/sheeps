@@ -56,3 +56,53 @@ export async function getDatabaseAppUpdate(env: Env, currentCode: number): Promi
   }
   return { has_update: false };
 }
+
+export function parseReleaseVersionCode(tagName?: string): number | null {
+  if (!tagName) return null;
+
+  const semanticMatch = tagName.match(/v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
+  if (!semanticMatch) return null;
+
+  const major = Number.parseInt(semanticMatch[1], 10);
+  const minor = semanticMatch[2] ? Number.parseInt(semanticMatch[2], 10) : 0;
+  const patch = semanticMatch[3] ? Number.parseInt(semanticMatch[3], 10) : 0;
+
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(patch)) {
+    return null;
+  }
+
+  return major * 10000 + minor * 100 + patch;
+}
+
+export function findApkAsset(assets?: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
+  return assets?.find(asset =>
+    Boolean(asset.browser_download_url) && Boolean(asset.name?.toLowerCase().endsWith('.apk'))
+  ) ?? null;
+}
+
+export function isForceUpdateRelease(body?: string): boolean {
+  if (!body) return false;
+  return /\[(force|force_update|强制更新|強制更新)\]|force_update\s*[:=]\s*true/i.test(body);
+}
+
+export function mapGitHubReleaseToUpdate(release: GitHubRelease, currentCode: number): AppUpdatePayload | null {
+  if (release.draft) return null;
+
+  const versionCode = parseReleaseVersionCode(release.tag_name);
+  const apkAsset = findApkAsset(release.assets);
+  if (!versionCode || !apkAsset?.browser_download_url || versionCode <= currentCode) {
+    return { has_update: false };
+  }
+
+  return {
+    has_update: true,
+    version_name: release.name || release.tag_name,
+    apk_url: apkAsset.browser_download_url,
+    update_log: release.body || '发现新版本，建议更新以获得更好的游戏体验。',
+    force_update: isForceUpdateRelease(release.body)
+  };
+}
+
+export function clearApkCache() {
+  apkExistenceCache.clear();
+}

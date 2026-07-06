@@ -9,6 +9,15 @@ import { handleTaskRoutes } from './handlers/task';
 import { handleGameRoutes } from './handlers/game';
 import { handleSystemRoutes } from './handlers/system';
 import { decryptRequest, encryptResponse } from './middleware';
+export {
+  parseReleaseVersionCode,
+  findApkAsset,
+  isForceUpdateRelease,
+  mapGitHubReleaseToUpdate,
+  checkApkExists,
+  clearApkCache,
+  getDatabaseAppUpdate,
+} from './update';
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
