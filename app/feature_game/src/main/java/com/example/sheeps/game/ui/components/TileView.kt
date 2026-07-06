@@ -71,9 +71,6 @@ fun TileView(
     isShaking: Boolean = false,
     isHighlighted: Boolean = false
 ) {
-    // 计算缩放比率以自适应缩放字体和图标大小
-    val sizeRatio = tileSize.value / 48f
-
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
 
@@ -197,7 +194,7 @@ fun TileView(
                         Text(
                             text = tile.type.toString(),
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = (16 * sizeRatio).sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -214,13 +211,13 @@ fun TileView(
                         Text(
                             text = tile.id.removePrefix("tile_"),
                             color = if (isBlocked) Color.Blue else Color.Red,
-                            fontSize = (8 * sizeRatio).sp,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "z${tile.z}",
                             color = if (isBlocked) Color.Blue else Color.Red,
-                            fontSize = (6 * sizeRatio).sp,
+                            fontSize = 6.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -246,16 +243,16 @@ fun TileView(
                         ) {
                             Text(
                                 text = "🔒",
-                                fontSize = (18 * sizeRatio).sp,
+                                fontSize = 18.sp,
                                 modifier = Modifier.graphicsLayer(scaleX = 1.1f, scaleY = 1.1f)
                             )
                             if (tile.sealedCount > 1) {
                                 Text(
                                     text = "x${tile.sealedCount}",
                                     color = Color(0xFFF1C40F), // 金色字体
-                                    fontSize = (11 * sizeRatio).sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = (1 * sizeRatio).dp)
+                                    modifier = Modifier.padding(top = 1.dp)
                                 )
                             }
                         }

@@ -60,7 +60,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
 
     // 棋盘基础网格大小，随关卡增加而变大，确保有足够坐标生成最多 300 张卡牌
     // 关卡 23+ 时 baseSize >= 17，保证最 restrictive 的形状（如 X 字形）也能生成 300+ 坐标
-    const baseSize = 6 + Math.floor(levelId / 2);
+    const baseSize = Math.min(6, 6 + Math.floor(levelId / 2));
 
     // 根据种子从 18 种不同的关卡异形轮廓中随机挑选一种进行图形网格过滤
     const shapeType = seed % 18;
@@ -224,8 +224,8 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     if (a.z <= b.z) return 0;
     const dx = Math.abs(a.x - b.x);
     const dy = Math.abs(a.y - b.y);
-    const ox = Math.max(0, 48.0 - dx * 46.0);
-    const oy = Math.max(0, 48.0 - dy * 46.0);
+    const ox = Math.max(0, 46.0 - dx * 46.0);
+    const oy = Math.max(0, 46.0 - dy * 46.0);
     return ox * oy;
   };
 
@@ -243,7 +243,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       const covered = Array.from(unassigned)
         .filter(other => other !== node && other.coord.z > node.coord.z)
         .reduce((sum, other) => sum + overlapArea(other.coord, node.coord), 0);
-      return covered < 48.0 * 48.0 * 0.01;
+      return covered < 46.0 * 46.0 * 0.01;
     });
 
     // 若暴露的可用卡牌少于 3 张，进入回退容错：强制将余下全部卡牌 3 个一组随意涂上相同花色
@@ -342,8 +342,8 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
 
     return {
       id: `tile_${node.index}`,
-      x: targetCenter + (node.coord.x - centroidX) * normScale2,
-      y: targetCenter + (node.coord.y - centroidY) * normScale2,
+      x: node.coord.x,
+      y: node.coord.y,
       z: node.coord.z,
       type: node.assignedType,
       isBlind,

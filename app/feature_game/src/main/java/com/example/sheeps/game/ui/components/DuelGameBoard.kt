@@ -50,8 +50,8 @@ fun DuelGameBoard(
     val minY = minOf(state.boardBounds.minY, actualMinY)
     val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
 
-    val tileSize = 48
-    val spacing = 48
+    val tileSize = 46
+    val spacing = 46
     // 计算卡片内容边界尺寸
     val contentWidth = (maxX - minX) * spacing + tileSize
     val contentHeight = (maxY - minY) * spacing + tileSize
@@ -62,23 +62,8 @@ fun DuelGameBoard(
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 420.dp
 
-    // 预留边距需覆盖卡牌 4dp shadow + 2dp 边框外沿，确保视觉边距仍有 16dp
-    val horizontalPadding = 42.dp
-    val verticalPadding = 42.dp
-
-    // 计算缩放比例：优先按宽度缩放，同时受高度限制
-    val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
-        val availableWidth = (boardWidth - horizontalPadding).value
-        val availableHeight = (boardHeight - verticalPadding).value
-
-        val scaleW = if (contentWidth > availableWidth) availableWidth / contentWidth else 1f
-        val scaleH = if (contentHeight > availableHeight) availableHeight / contentHeight else 1f
-        minOf(scaleW, scaleH)
-    }
-
-    // 缩放后真实占位尺寸 —— Box 用这个尺寸，让 Alignment.Center 按真实大小居中
-    val displayedWidth = (contentWidth * scale).dp
-    val displayedHeight = (contentHeight * scale).dp
+    val displayedWidth = contentWidth.dp
+    val displayedHeight = contentHeight.dp
     Box(
         modifier = modifier
             .size(width = boardWidth, height = boardHeight)
@@ -104,12 +89,12 @@ fun DuelGameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = "classic",
-                            tileSize = (48 * scale).dp,
+                            tileSize = 46.dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             modifier = Modifier
                                 .offset(
-                                    x = ((tile.x - minX) * spacing * scale).dp,
-                                    y = ((tile.y - minY) * spacing * scale).dp
+                                    x = ((tile.x - minX) * spacing).dp,
+                                    y = ((tile.y - minY) * spacing).dp
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .alpha(if (isFlying) 0f else 1f)

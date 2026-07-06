@@ -37,7 +37,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const seedStr = url.searchParams.get('seed');
         // 若客户端未传种子，则在后端随机生成一个，保证离线与在线的关卡同源随机性
         const seed = seedStr ? parseInt(seedStr, 10) : Math.floor(Math.random() * 1000000) + 1;
-        const cacheKey = `${levelId}_${seed}`;
+        const cacheKey = `v4_${levelId}_${seed}`;
 
         // 仅在传了确定性种子时读缓存，随机种子每次都不一样无需缓存
         if (seedStr) {

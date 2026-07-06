@@ -59,7 +59,7 @@ class GameLevelGenerator @Inject constructor() {
             val possible = mutableListOf<Point3D>()
             val layersCount = minOf(12, (12 - 8 / sqrt((levelId - 1).toDouble())).toInt())
 
-            val baseSize = 6 + levelId / 2
+            val baseSize = minOf(6, 6 + levelId / 2)
             for (z in 0 until layersCount) {
                 val size = maxOf(3, baseSize - z / 3)
                 val offset = if (z % 2 == 0) 0f else 0.5f
@@ -211,8 +211,8 @@ class GameLevelGenerator @Inject constructor() {
 
             Tile(
                 id = "tile_${node.index}",
-                x = 5.5f + (node.coord.x - normCx) * normScale,
-                y = 5.5f + (node.coord.y - normCy) * normScale,
+                x = node.coord.x,
+                y = node.coord.y,
                 z = node.coord.z,
                 type = node.assignedType,
                 isBlind = isBlind,

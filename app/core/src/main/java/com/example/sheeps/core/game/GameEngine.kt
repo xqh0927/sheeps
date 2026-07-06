@@ -7,7 +7,7 @@ import kotlin.math.floor
 
 object GameEngine {
 
-    private const val TILE = 48f
+    private const val TILE = 46f
     private const val SPACING = 46f
 
     private const val COVERAGE_THRESHOLD = 0.01f
