@@ -74,8 +74,9 @@ class GameLevelGenerator @Inject constructor() {
                 }
             }
 
-            // 洗牌随机化位置
-            val rand = lcg(seed)
+            // 引入关卡固定的布局种子，确保相同 levelId 产生完全一致的卡牌排布和总数量
+            val layoutSeed = levelId * 1000L
+            val rand = lcg(layoutSeed)
             for (i in possible.indices.reversed()) {
                 val j = (rand() * (i + 1)).toInt()
                 val temp = possible[i]
