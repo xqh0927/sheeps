@@ -47,6 +47,237 @@ export function getLangSuffix(request: Request): string {
 }
 
 /**
+ * 错误信息国际化映射翻译表
+ */
+const ERROR_TRANSLATIONS: Record<string, Record<string, string>> = {
+  '请填写手机号': {
+    'en': 'Please enter phone number',
+    'tw': '請填寫手機號碼',
+    'ja': '電話番号を入力してください',
+    'ko': '전화번호를 입력하십시오'
+  },
+  '请填写手机号和验证码': {
+    'en': 'Please enter phone number and verification code',
+    'tw': '請填寫手機號和驗證碼',
+    'ja': '電話番号と認証コードを入力してください',
+    'ko': '전화번호와 인증번호를 입력하십시오'
+  },
+  '验证码错误': {
+    'en': 'Invalid verification code',
+    'tw': '驗證碼錯誤',
+    'ja': '認証コードが正しくありません',
+    'ko': '인증번호가 잘못되었습니다'
+  },
+  '验证码已过期': {
+    'en': 'Verification code expired',
+    'tw': '驗證碼已過期',
+    'ja': '認証コードの有効期限が切れています',
+    'ko': '인증번호가 만료되었습니다'
+  },
+  '缺少刷新令牌': {
+    'en': 'Missing refresh token',
+    'tw': '缺少刷新令牌',
+    'ja': 'リフレッシュトークンがありません',
+    'ko': '리프레시 토큰이 누락되었습니다'
+  },
+  '登录凭证已过期，请重新登录': {
+    'en': 'Login expired, please log in again',
+    'tw': '登入憑證已過期，請重新登入',
+    'ja': 'ログイン期限が切れました。再度ログインしてください',
+    'ko': '로그인 증명이 만료되었습니다. 다시 로그인하십시오'
+  },
+  '请填写完整注册信息': {
+    'en': 'Please fill in registration info',
+    'tw': '請填寫完整註冊信息',
+    'ja': '登録情報を入力してください',
+    'ko': '등록 정보를 모두 입력하십시오'
+  },
+  '该手机号已注册': {
+    'en': 'Phone number already registered',
+    'tw': '該手機號已註冊',
+    'ja': 'この電話番号は既に登録されています',
+    'ko': '이미 등록된 전화번호입니다'
+  },
+  '请填写手机号和密码': {
+    'en': 'Please enter phone number and password',
+    'tw': '請填寫手機號和密碼',
+    'ja': '電話番号とパスワードを入力してください',
+    'ko': '전화번호와 비밀번호를 입력하십시오'
+  },
+  '用户不存在': {
+    'en': 'User does not exist',
+    'tw': '用戶不存在',
+    'ja': 'ユーザーが存在しません',
+    'ko': '사용자가 존재하지 않습니다'
+  },
+  '尚未设置密码，请使用验证码登录': {
+    'en': 'Password not set, please log in with code',
+    'tw': '尚未設置密碼，請使用驗證碼登入',
+    'ja': 'パスワードが設定されていません。コードでログインしてください',
+    'ko': '비밀번호가 설정되지 않았습니다. 인증번호로 로그인하십시오'
+  },
+  '密码错误': {
+    'en': 'Incorrect password',
+    'tw': '密碼錯誤',
+    'ja': 'パスワードが正しくありません',
+    'ko': '비밀번호가 틀렸습니다'
+  },
+  '请填写完整信息': {
+    'en': 'Please fill in all details',
+    'tw': '請填寫完整信息',
+    'ja': 'すべての情報を入力してください',
+    'ko': '모든 정보를 입력하십시오'
+  },
+  'Unauthorized': {
+    'en': 'Unauthorized, please log in again',
+    'tw': '未授權，請重新登入',
+    'ja': '未認可。再度ログインしてください',
+    'ko': '인증되지 않음. 다시 로그인하십시오'
+  },
+  'Missing new_username': {
+    'en': 'Missing new username',
+    'tw': '缺少新用戶名',
+    'ja': '新しいユーザー名がありません',
+    'ko': '새 사용자 이름이 누락되었습니다'
+  },
+  'Expected multipart/form-data': {
+    'en': 'Expected multipart form data',
+    'tw': '需要 multipart/form-data',
+    'ja': 'multipart/form-data形式が必要です',
+    'ko': 'multipart/form-data 형식이 필요합니다'
+  },
+  'Missing avatar file': {
+    'en': 'Missing avatar file',
+    'tw': '缺少頭像文件',
+    'ja': 'アバターファイルがありません',
+    'ko': '아바타 파일이 누락되었습니다'
+  },
+  'Avatar image too large (max 512KB)': {
+    'en': 'Avatar image too large (max 512KB)',
+    'tw': '頭像圖片太大 (最大 512KB)',
+    'ja': 'アバター画像が大きすぎます (最大 512KB)',
+    'ko': '아바타 이미지가 너무 큽니다 (최대 512KB)'
+  },
+  'Invalid image type (allowed: png, jpeg, webp)': {
+    'en': 'Invalid image type (allowed: png, jpeg, webp)',
+    'tw': '不支援的圖片格式 (僅允許 png, jpeg, webp)',
+    'ja': '無効な画像形式です (許可: png, jpeg, webp)',
+    'ko': '잘못된 이미지 형식입니다 (허용: png, jpeg, webp)'
+  },
+  'Missing userId': {
+    'en': 'Missing user ID',
+    'tw': '缺少用戶ID',
+    'ja': 'ユーザーIDがありません',
+    'ko': '사용자 ID가 누락되었습니다'
+  },
+  'Avatar not found': {
+    'en': 'Avatar not found',
+    'tw': '找不到頭像',
+    'ja': 'アバターが見つかりません',
+    'ko': '아바타를 찾을 수 없습니다'
+  },
+  'Avatar file not found': {
+    'en': 'Avatar file not found',
+    'tw': '找不到頭像文件',
+    'ja': 'アバターファイルが見つかりません',
+    'ko': '아바타 파일을 찾을 수 없습니다'
+  },
+  'Missing task ID': {
+    'en': 'Missing task ID',
+    'tw': '缺少任務ID',
+    'ja': 'タスクIDがありません',
+    'ko': '작업 ID가 누락되었습니다'
+  },
+  'Task not completed or already rewarded': {
+    'en': 'Task not completed or already rewarded',
+    'tw': '任務未完成或已領取獎勵',
+    'ja': 'タスクが未完了、または既に報酬を受け取っています',
+    'ko': '작업이 완료되지 않았거나 이미 보상을 받았습니다'
+  },
+  'Missing config key or value': {
+    'en': 'Missing config key or value',
+    'tw': '缺少配置鍵或值',
+    'ja': '設定キーまたは値がありません',
+    'ko': '설정 키 또는 값이 누락되었습니다'
+  },
+  'Invalid parameters': {
+    'en': 'Invalid parameters',
+    'tw': '無效參數',
+    'ja': '無効なパラメータ',
+    'ko': '유효하지 않은 매개변수'
+  },
+  'Item out of stock': {
+    'en': 'Item out of stock',
+    'tw': '商品庫存不足',
+    'ja': '在庫がありません',
+    'ko': '상품 재고가 부족합니다'
+  },
+  'Insufficient points': {
+    'en': 'Insufficient points',
+    'tw': '積分不足',
+    'ja': 'ポイントが不足しています',
+    'ko': '포인트가 부족합니다'
+  },
+  'Missing playerId': {
+    'en': 'Missing player ID',
+    'tw': '缺少玩家ID',
+    'ja': 'プレイヤーIDがありません',
+    'ko': '플레이어 ID가 누락되었습니다'
+  },
+  'Missing level ID': {
+    'en': 'Missing level ID',
+    'tw': '缺少關卡ID',
+    'ja': 'ステージIDがありません',
+    'ko': '스테이지 ID가 누락되었습니다'
+  },
+  'Missing level_id': {
+    'en': 'Missing level ID',
+    'tw': '缺少關卡ID',
+    'ja': 'ステージIDがありません',
+    'ko': '스테이지 ID가 누락되었습니다'
+  },
+  'Invalid level ID': {
+    'en': 'Invalid level ID',
+    'tw': '無效關卡ID',
+    'ja': '無効なステージID',
+    'ko': '유효하지 않은 스테이지 ID'
+  },
+  'Invalid signature': {
+    'en': 'Invalid signature',
+    'tw': '無效簽名',
+    'ja': '無効な署名',
+    'ko': '유효하지 않은 서명'
+  },
+  'Already signed in today': {
+    'en': 'Already signed in today',
+    'tw': '今天已簽到',
+    'ja': '本日は既にログインチェック済みです',
+    'ko': '오늘 이미 로그인 체크를 완료했습니다'
+  },
+  'Not Found': {
+    'en': 'Not Found',
+    'tw': '未找到',
+    'ja': '見つかりません',
+    'ko': '찾을 수 없음'
+  },
+  'Missing parameters': {
+    'en': 'Missing parameters',
+    'tw': '缺少參數',
+    'ja': 'パラメータが不足しています',
+    'ko': '매개변수가 누락되었습니다'
+  }
+};
+
+export function translateErrorMessage(error: string, lang: string): string {
+  if (!lang) return error; // 默认简体中文，直接返回原信息
+  const translations = ERROR_TRANSLATIONS[error];
+  if (translations && translations[lang]) {
+    return translations[lang];
+  }
+  return error;
+}
+
+/**
  * 读取系统配置值（优先 KV 缓存，未命中查 D1 并回填缓存）
  * 用于签到奖励、解锁积分门槛等低频变更的配置项
  */
