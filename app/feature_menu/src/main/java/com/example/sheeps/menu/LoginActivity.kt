@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.lifecycleScope
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
@@ -40,11 +39,16 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class LoginActivity : BaseActivity() {
 
-    @Inject lateinit var apiService: ApiService
-    @Inject lateinit var prefs: UserPreferences
-    @Inject lateinit var localDao: LocalDao
-    @Inject lateinit var syncRepository: SyncRepository
-    @Inject lateinit var json: Json
+    @Inject
+    lateinit var apiService: ApiService
+    @Inject
+    lateinit var prefs: UserPreferences
+    @Inject
+    lateinit var localDao: LocalDao
+    @Inject
+    lateinit var syncRepository: SyncRepository
+    @Inject
+    lateinit var json: Json
 
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
@@ -57,7 +61,11 @@ class LoginActivity : BaseActivity() {
                     isLoading = isLoading,
                     onBack = { finish() },
                     onSendCode = { phone -> handleSendCode(phone, scope) },
-                    onLogin = { phone, code -> handleLoginWithCode(phone, code, scope) { isLoading = it } },
+                    onLogin = { phone, code ->
+                        handleLoginWithCode(phone, code, scope) {
+                            isLoading = it
+                        }
+                    },
                     onPasswordLogin = { phone, password ->
                         handleLoginWithPassword(phone, password, scope) { isLoading = it }
                     },
@@ -218,6 +226,10 @@ class LoginActivity : BaseActivity() {
                 })
 
                 Toaster.show("登录成功！")
+                // 验证码登录后若未设密码，通知 MenuActivity 弹出强制设密
+                if (!response.hasPassword) {
+                    com.tencent.mmkv.MMKV.defaultMMKV().encode("need_set_password", true)
+                }
                 finish()
             } catch (e: Exception) {
                 Toaster.show("保存登录数据失败")

@@ -13,6 +13,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.ConflictInfo
 
@@ -22,6 +24,7 @@ fun ConflictDialog(
     onChooseLocal: () -> Unit,
     onChooseCloud: () -> Unit
 ) {
+    Dialog(onDismissRequest = {}, properties = DialogProperties()) {
     AlertDialog(
         onDismissRequest = {}, // 强制用户必须做出存档选择，不能直接点外部关闭
         title = {
@@ -110,4 +113,5 @@ fun ConflictDialog(
         confirmButton = {},
         shape = RoundedCornerShape(16.dp)
     )
+    }
 }

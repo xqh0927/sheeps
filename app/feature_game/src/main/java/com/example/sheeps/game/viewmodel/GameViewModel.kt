@@ -1,7 +1,6 @@
 package com.example.sheeps.game.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.base.BaseMviViewModel
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.core.preference.UserPreferences
@@ -27,6 +26,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
@@ -124,10 +124,15 @@ class GameViewModel @Inject constructor(
 
             is GameViewIntent.UseDoublePoints -> handleUseDoublePoints()
             is GameViewIntent.LoadLeaderboard -> handleLoadLeaderboard(intent.levelId)
-            is GameViewIntent.RestartLevel -> handleLoadLevel(
-                currentState.currentLevelId,
-                carryItemsJsonStr
+            is GameViewIntent.RestartLevel -> handleTriggerRestartFlow()
+            is GameViewIntent.TriggerRestartFlow -> handleTriggerRestartFlow()
+            is GameViewIntent.UpdateTempCarryItem -> handleUpdateTempCarryItem(
+                intent.itemType,
+                intent.change
             )
+
+            is GameViewIntent.ConfirmRestartWithCarry -> handleConfirmRestartWithCarry()
+            is GameViewIntent.DismissCarrySelection -> updateState { copy(showCarrySelection = false) }
 
             is GameViewIntent.GoBackToMenu -> updateState {
                 copy(
@@ -232,37 +237,16 @@ class GameViewModel @Inject constructor(
             syncRepository.syncDirtyData()
 
             try {
+                // 每次进入关卡随机生成种子，保证同关卡不同局图案不同
+                val gameSeed = (System.currentTimeMillis() % 1000000).toInt()
                 val finalTiles = calculateBlockedStates(
-                    apiService.getLevel(levelId).map { it.copy(state = TileState.NORMAL) })
-                // 打印遮挡统计和可疑卡牌
-                val blockedCount = finalTiles.count { it.state == TileState.BLOCKED }
-                val normalOnLayer1Plus =
-                    finalTiles.filter { it.z >= 1 && it.state == TileState.NORMAL }
-                LogUtils.d("BlockingDebug：BLOCKED: $blockedCount / ${finalTiles.size}")
-                LogUtils.d("BlockingDebug：z>=1 but NORMAL: ${normalOnLayer1Plus.map { "${it.id}(${it.x},${it.y},z=${it.z})" }}")
-
-                // 针对用户怀疑的 tile，打印上方所有可能的遮挡者
-                val suspectIds = setOf(157, 138, 151, 93, 160)
-                for (tid in suspectIds) {
-                    val suspect = finalTiles.find { it.id == "tile_$tid" } ?: continue
-                    val above = finalTiles.filter { o ->
-                        o.z > suspect.z && o.state == TileState.NORMAL
-                    }
-                    if (above.isEmpty()) {
-                        LogUtils.d("BlockingDebug：tile_$tid(z=${suspect.z},state=${suspect.state}): 上方无 NORMAL tile")
-                    } else {
-                        for (a in above) {
-                            val ox = 48f - kotlin.math.abs(a.x - suspect.x) * 46f
-                            val oy = 48f - kotlin.math.abs(a.y - suspect.y) * 46f
-                            LogUtils.d("BlockingDebug：tile_$tid(z=${suspect.z}) ← ${a.id}(z=${a.z}): dx=${"%.2f".format(kotlin.math.abs(a.x - suspect.x))} dy=${"%.2f".format(kotlin.math.abs(a.y - suspect.y))} ox=$ox oy=$oy blocking=${ox > 0.25f && oy > 0.25f}")
-                        }
-                    }
-                }
+                    apiService.getLevel(levelId, seed = gameSeed).map { it.copy(state = TileState.NORMAL) })
 
                 updateBoardState(finalTiles, carryMap, false)
             } catch (e: Exception) {
+                // 离线回退：使用与在线相同的种子保持一致性
                 val finalTiles =
-                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId))
+                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis()))
                 updateBoardState(finalTiles, carryMap, true)
             }
         }
@@ -417,5 +401,43 @@ class GameViewModel @Inject constructor(
         return when (prefs.getLanguage()) {
             "en" -> en; "tw" -> tw; "ja" -> ja; "ko" -> ko; else -> zh
         }
+    }
+
+    private fun handleTriggerRestartFlow() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val list = localDao.getAllItems()
+            val stocks = list.associate { it.itemType to it.count }
+            updateState {
+                copy(
+                    backpackItemStocks = stocks,
+                    tempCarryItems = emptyMap(),
+                    showCarrySelection = true
+                )
+            }
+        }
+    }
+
+    private fun handleUpdateTempCarryItem(itemType: String, change: Int) {
+        val currentSelected = currentState.tempCarryItems[itemType] ?: 0
+        val stock = currentState.backpackItemStocks[itemType] ?: 0
+        val newSelected = (currentSelected + change).coerceIn(0, stock)
+
+        val newMap = currentState.tempCarryItems.toMutableMap()
+        if (newSelected > 0) {
+            newMap[itemType] = newSelected
+        } else {
+            newMap.remove(itemType)
+        }
+        updateState {
+            copy(tempCarryItems = newMap)
+        }
+    }
+
+    private fun handleConfirmRestartWithCarry() {
+        val carryJson = json.encodeToString<Map<String, Int>>(currentState.tempCarryItems)
+        updateState {
+            copy(showCarrySelection = false)
+        }
+        handleLoadLevel(currentState.currentLevelId, carryJson)
     }
 }

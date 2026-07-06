@@ -5,8 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,38 +30,35 @@ fun DuelResultDialog(
 ) {
     if (state.gameStatus != GameStatus.WON && state.gameStatus != GameStatus.LOST) return
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f)),
-        contentAlignment = Alignment.Center
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.8f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = if (state.gameStatus == GameStatus.WON) stringResource(id = R.string.duel_won_title) else stringResource(id = R.string.duel_lost_title),
-                style = MaterialTheme.typography.headlineMedium,
-                color = if (state.gameStatus == GameStatus.WON) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
-            )
-            
-            Spacer(Modifier.height(16.dp))
-            
-            Text(text = stringResource(id = R.string.duel_your_score, state.score), style = MaterialTheme.typography.bodyLarge)
-            Text(text = stringResource(id = R.string.duel_opponent_score, state.opponentScore), style = MaterialTheme.typography.bodyLarge)
-            
-            Spacer(Modifier.height(24.dp))
-            
-            PrimaryButton(
-                text = stringResource(id = R.string.duel_btn_leave),
-                onClick = onLeave,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        AlertDialog(
+            onDismissRequest = {},
+            title = {
+                Text(
+                    text = if (state.gameStatus == GameStatus.WON) stringResource(id = R.string.duel_won_title) else stringResource(id = R.string.duel_lost_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = if (state.gameStatus == GameStatus.WON) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = stringResource(id = R.string.duel_your_score, state.score), style = MaterialTheme.typography.bodyLarge)
+                    Text(text = stringResource(id = R.string.duel_opponent_score, state.opponentScore), style = MaterialTheme.typography.bodyLarge)
+                }
+            },
+            confirmButton = {
+                PrimaryButton(
+                    text = stringResource(id = R.string.duel_btn_leave),
+                    onClick = onLeave,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }

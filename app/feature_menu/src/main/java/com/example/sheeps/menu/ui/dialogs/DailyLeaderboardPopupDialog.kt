@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.data.model.DailyPopupResponse
 
@@ -24,6 +26,7 @@ fun DailyLeaderboardPopupDialog(
     data: DailyPopupResponse,
     onDismiss: () -> Unit
 ) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties()) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -103,4 +106,5 @@ fun DailyLeaderboardPopupDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(16.dp)
     )
+    }
 }

@@ -54,6 +54,7 @@ import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
@@ -186,27 +187,10 @@ fun LeaderboardAppBar(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    CenterAlignedTopAppBar(
-        title = {
-            Text(
-                text = stringResource(id = R.string.leaderboard_title_format, levelId),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 20.sp
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = stringResource(id = R.string.btn_back),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color.Transparent
-        )
+    SheepsTopAppBar(
+        title = stringResource(id = R.string.leaderboard_title_format, levelId),
+        onBack = onBack,
+        containerColor = Color.Transparent
     )
 }
 

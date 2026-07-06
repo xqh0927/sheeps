@@ -65,7 +65,7 @@ import com.example.sheeps.game.ui.animations.GameAnimations
 fun TileView(
     tile: Tile,
     onClick: () -> Unit,
-    currentSkin: String = "classic",
+    currentSkin: String = "shuang",
     modifier: Modifier = Modifier,
     tileSize: Dp = 48.dp,
     isShaking: Boolean = false,
@@ -80,9 +80,7 @@ fun TileView(
     val isBlind =
         tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
     val isSealed = tile.sealedCount > 0
-    if (tile.z >= 1) {
-        LogUtils.d("BlockingDebug：渲染 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) mask else 1.0}")
-    }
+
     // 处理交互源：用于捕获按压状态以实现弹性缩放
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -180,12 +178,7 @@ fun TileView(
                         )
                     }
                 } else {
-                    // 资源缺失：显示类型编号作为占位符
-                    if (tile.z >= 1) {
-                        LogUtils.d("BlockingDebug：渲染1 ${tile.id}: state=${tile.state}, isBlocked=$isBlocked, alpha=${if (isBlocked) mask else 1.0}")
-                    }
-
-                    Box(
+                                      Box(
                         modifier = Modifier
                             .size(tileSize * 0.9f)
                             .alpha(if (isBlocked) mask else 1f),

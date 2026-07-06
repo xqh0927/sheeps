@@ -19,4 +19,8 @@
     <style name="Theme.Sheeps.Forest" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FF4CAF50</item>
     </style>
+    <!-- 萌趣竞技主题 -->
+    <style name="Theme.Sheeps.ShuangFun" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="iconColor">#FF29B6F6</item>
+    </style>
 </resources>

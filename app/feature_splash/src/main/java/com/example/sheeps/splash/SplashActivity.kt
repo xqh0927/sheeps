@@ -39,6 +39,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -100,9 +101,9 @@ class SplashActivity : BaseActivity() {
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFF0D1117),
-                                    Color(0xFF1A0A0A),
-                                    Color(0xFF2D0808)
+                                    MaterialTheme.colorScheme.background,
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    MaterialTheme.colorScheme.background
                                 )
                             )
                         )
@@ -194,21 +195,24 @@ fun ParticleBackground() {
 
         particles.forEach { (xR, yR, speed) ->
             val offsetY = sin(phase * speed) * h * 0.04f
-            val alpha = (sin(phase * speed * 0.7f + 1f) * 0.3f + 0.15f).coerceIn(0f, 0.5f)
-            val radius = sin(phase * speed * 0.5f + 2f) * 2f + 3f
+            val alpha = (sin(phase * speed * 0.7f + 1f) * 0.25f + 0.15f).coerceIn(0f, 0.4f)
+            val radius = sin(phase * speed * 0.5f + 2f) * 4f + 6f
 
             drawCircle(
-                color = themeSecondary,
-                radius = radius,
-                center = Offset(xR * w, yR * h + offsetY),
-                alpha = alpha
+                brush = Brush.radialGradient(
+                    colors = listOf(themeSecondary.copy(alpha = alpha), Color.Transparent),
+                    center = Offset(xR * w, yR * h + offsetY),
+                    radius = radius * 2.5f
+                ),
+                radius = radius * 2.5f,
+                center = Offset(xR * w, yR * h + offsetY)
             )
         }
 
-        // 底部红色光晕
+        // 底部主题主色调光晕
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(themePrimary.copy(alpha = 0.3f), Color.Transparent),
+                colors = listOf(themePrimary.copy(alpha = 0.15f), Color.Transparent),
                 center = Offset(w * 0.5f, h * 0.75f),
                 radius = w * 0.6f
             ),
@@ -271,47 +275,85 @@ fun SplashVisuals() {
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // 装饰图案（六角符文）
-                Canvas(modifier = Modifier.size(80.dp)) {
-                    val cx = this.size.width / 2f
-                    val cy = this.size.height / 2f
-                    val r = this.size.width * 0.45f
-                    for (i in 0 until 6) {
-                        val angle = Math.toRadians(60.0 * i)
-                        val x = cx + r * cos(angle).toFloat()
-                        val y = cy + r * sin(angle).toFloat()
-                        drawLine(
-                            color = themeSecondary.copy(alpha = 0.6f),
-                            start = Offset(cx, cy),
-                            end = Offset(x, y),
-                            strokeWidth = 1.5f,
-                            cap = StrokeCap.Round
+                // 现代叠放卡牌 Logo 动画 (代替国风六角符文)
+                val rotatePhase by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(6000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "logoRotation"
+                )
+
+                Box(
+                    modifier = Modifier.size(100.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // 外环：旋转的虚线圈
+                    Canvas(modifier = Modifier.size(90.dp)) {
+                        drawCircle(
+                            color = themeSecondary.copy(alpha = 0.25f),
+                            radius = size.width * 0.45f,
+                            style = Stroke(
+                                width = 1.5f,
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                                    floatArrayOf(15f, 10f),
+                                    0f
+                                )
+                            )
                         )
                     }
-                    drawCircle(
-                        color = themeSecondary.copy(alpha = 0.4f),
-                        radius = r * 0.6f,
-                        style = Stroke(width = 1.5f)
-                    )
-                    drawCircle(
-                        color = themeSecondary.copy(alpha = 0.2f),
-                        radius = r,
-                        style = Stroke(width = 1f)
-                    )
-                    drawCircle(color = themePrimary.copy(alpha = 0.8f), radius = 8f)
+
+                    // 叠放卡牌 1 (底层，逆时针微调旋转)
+                    Canvas(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .graphicsLayer {
+                                rotationZ = -rotatePhase * 0.5f
+                            }
+                    ) {
+                        drawRoundRect(
+                            color = themeSecondary.copy(alpha = 0.35f),
+                            size = size,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                            style = Stroke(width = 3f)
+                        )
+                    }
+
+                    // 叠放卡牌 2 (顶层，顺时针旋转)
+                    Canvas(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .graphicsLayer {
+                                rotationZ = rotatePhase
+                            }
+                    ) {
+                        drawRoundRect(
+                            color = themePrimary,
+                            size = size,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                            style = Stroke(width = 5f)
+                        )
+                        // 中心小核心圆点
+                        drawCircle(
+                            color = themeSecondary,
+                            radius = 6f
+                        )
+                    }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
 
                 // 游戏标题
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_name),
                     fontSize = 38.sp,
                     color = themeSecondary,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.SansSerif,
                     textAlign = TextAlign.Center,
-                    letterSpacing = 4.sp
+                    letterSpacing = 5.sp
                 )
 
                 Spacer(Modifier.height(10.dp))
@@ -319,10 +361,10 @@ fun SplashVisuals() {
                 // 副标题
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
-                    fontSize = 16.sp,
-                    color = Text_Secondary_Dark,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = FontFamily.Serif,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.SansSerif,
                     textAlign = TextAlign.Center,
                     letterSpacing = 2.sp
                 )
@@ -386,7 +428,7 @@ fun SplashVisuals() {
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(MoYe_SurfaceVariant.copy(alpha = 0.6f))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 // 绿色适龄标记
@@ -397,13 +439,13 @@ fun SplashVisuals() {
                         .background(Color(0xFF00C853)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("8", color = MaterialTheme.colorScheme.onPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("8", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = "适龄提示：适合 8 岁及以上用户",
-                    color = Text_Secondary_Dark,
-                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -412,7 +454,7 @@ fun SplashVisuals() {
 
             Text(
                 text = "健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。",
-                color = Text_Disabled_Dark,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
                 textAlign = TextAlign.Center,
@@ -445,14 +487,14 @@ fun PrivacyComposeDialog(
                         colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), Color.Transparent)
                     )
                 )
-                .background(MoYe_Surface)
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(1.5.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(ShapeLarge)
-                    .background(MoYe_SurfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(24.dp)
             ) {
                 Text(
@@ -460,7 +502,7 @@ fun PrivacyComposeDialog(
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.colorScheme.primary,
-                    fontFamily = FontFamily.Serif,
+                    fontFamily = FontFamily.SansSerif,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -480,7 +522,7 @@ fun PrivacyComposeDialog(
                         text = "不同意并退出",
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        color = Text_Secondary_Dark
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     PrimaryButton(
                         text = "同意并开始",

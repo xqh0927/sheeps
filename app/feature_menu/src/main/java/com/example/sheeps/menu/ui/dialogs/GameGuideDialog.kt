@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.menu.ui.components.CoinCanvas
 import com.example.sheeps.menu.ui.components.CompassCanvas
 import com.example.sheeps.menu.ui.components.GourdCanvas
@@ -27,27 +29,31 @@ import androidx.compose.ui.res.stringResource
 
 @Composable
 fun GameGuideDialog(onDismiss: () -> Unit) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
-            }
-        },
-        title = {
-            Text(
-                text = stringResource(id = R.string.guide_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = FontFamily.Serif
-            )
-        },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(stringResource(id = R.string.dialog_guide_ok), color = Color.White)
+                }
+            },
+            title = {
+                Text(
+                    text = stringResource(id = R.string.guide_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontFamily = FontFamily.Serif
+                )
+            },
+            text = {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -99,10 +105,11 @@ fun GameGuideDialog(onDismiss: () -> Unit) {
                     )
                 }
             }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(16.dp)
-    )
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
 @Composable

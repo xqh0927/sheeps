@@ -63,6 +63,15 @@ class GameActivity : BaseActivity() {
                             com.therouter.TheRouter.build("/leaderboard/show")
                                 .withInt("levelId", state.currentLevelId)
                                 .navigation()
+                        },
+                        onUpdateTempCarryItem = { type, change ->
+                            viewModel.sendIntent(GameViewIntent.UpdateTempCarryItem(type, change))
+                        },
+                        onConfirmRestartWithCarry = {
+                            viewModel.sendIntent(GameViewIntent.ConfirmRestartWithCarry)
+                        },
+                        onDismissCarrySelection = {
+                            viewModel.sendIntent(GameViewIntent.DismissCarrySelection)
                         }
                     )
                 }

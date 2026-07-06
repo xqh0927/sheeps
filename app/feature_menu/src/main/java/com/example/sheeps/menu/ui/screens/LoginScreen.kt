@@ -47,6 +47,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.core.R
 import com.example.sheeps.ui.components.SheepsLoading
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.hjq.toast.Toaster
 import kotlinx.coroutines.delay
 
@@ -94,25 +95,7 @@ fun LoginScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(id = R.string.btn_login),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFamily = FontFamily.Serif
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            )
+            SheepsTopAppBar(title = stringResource(id = R.string.btn_login), onBack = onBack)
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {

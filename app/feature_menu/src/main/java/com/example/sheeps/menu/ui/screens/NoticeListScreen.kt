@@ -22,7 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.data.model.Notice
+import com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -37,27 +39,9 @@ fun NoticeListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(id = R.string.notice_list_title),
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = stringResource(id = R.string.btn_back),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+            SheepsTopAppBar(
+                title = stringResource(id = R.string.notice_list_title),
+                onBack = onBack
             )
         }
     ) { padding ->
@@ -148,39 +132,9 @@ fun NoticeListScreen(
     }
 
     if (selectedNotice != null) {
-        val notice = selectedNotice!!
-        AlertDialog(
-            onDismissRequest = { selectedNotice = null },
-            title = {
-                Text(
-                    text = notice.title,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontFamily = FontFamily.Serif
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(notice.created_at)),
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
-                    HorizontalDivider()
-                    Text(
-                        text = notice.content,
-                        fontSize = 13.sp,
-                        lineHeight = 20.sp,
-                        color = Color.DarkGray
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { selectedNotice = null }) {
-                    Text(stringResource(id = R.string.dialog_prepare_close), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                }
-            },
-            shape = RoundedCornerShape(16.dp)
+        NoticeDetailDialog(
+            notice = selectedNotice!!,
+            onDismiss = { selectedNotice = null }
         )
     }
 }

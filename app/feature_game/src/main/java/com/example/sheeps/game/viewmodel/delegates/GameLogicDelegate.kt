@@ -1,6 +1,5 @@
 package com.example.sheeps.game.viewmodel.delegates
 
-import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.core.game.GameEngine.getBlockingTiles
 import com.example.sheeps.core.game.GameEngine.isTileBlocked
@@ -37,14 +36,6 @@ class GameLogicDelegate @Inject constructor() {
 
         // �ж������Ƿ��ڵ���spacing=46���ص�>0.25px��Ϊ�ڵ���
         val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
-        LogUtils.d(
-            "BlockingDebug：点击 ${tile.id}: state=${tile.state}, isBlockedByEngine=${
-                isTileBlocked(
-                    tile,
-                    state.boardTiles
-                )
-            }, 最终isBlocked=$isBlocked"
-        )
 
         if (isBlocked) {
             val blockers = getBlockingTiles(tile, state.boardTiles)
@@ -92,7 +83,10 @@ class GameLogicDelegate @Inject constructor() {
                 // ���������ܵ��
                 val updatedBoard = state.boardTiles
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = insertIntoSlot(state.slotTiles, tile.copy(state = TileState.IN_SLOT, isBlind = false))
+                val newSlot = insertIntoSlot(
+                    state.slotTiles,
+                    tile.copy(state = TileState.IN_SLOT, isBlind = false)
+                )
 
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                 processSlotMatch(updatedBoard, newSlot, updatedMovedOut)

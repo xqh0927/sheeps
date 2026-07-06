@@ -13,6 +13,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.core.utils.getLocalizedSource
@@ -29,33 +31,38 @@ fun PointHistoryDialog(
     history: List<PointRecord>,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(id = R.string.points_history_title),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        },
-        text = {
-            if (history.isEmpty()) {
-                Text(stringResource(id = R.string.no_points_history))
-            } else {
-                LazyColumn(modifier = Modifier.height(240.dp)) {
-                    items(history) { record ->
-                        PointRecordItem(record = record)
-                        HorizontalDivider()
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = stringResource(id = R.string.points_history_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                if (history.isEmpty()) {
+                    Text(stringResource(id = R.string.no_points_history))
+                } else {
+                    LazyColumn(modifier = Modifier.height(240.dp)) {
+                        items(history) { record ->
+                            PointRecordItem(record = record)
+                            HorizontalDivider()
+                        }
                     }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(id = R.string.btn_cancel))
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.btn_cancel))
-            }
-        }
-    )
+        )
+    }
 }
 
 /**
@@ -66,33 +73,38 @@ fun ExchangeHistoryDialog(
     history: List<ExchangeRecord>,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = stringResource(id = R.string.exchange_history_title),
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        },
-        text = {
-            if (history.isEmpty()) {
-                Text(stringResource(id = R.string.no_exchange_history))
-            } else {
-                LazyColumn(modifier = Modifier.height(240.dp)) {
-                    items(history) { record ->
-                        ExchangeRecordItem(record = record)
-                        HorizontalDivider()
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = stringResource(id = R.string.exchange_history_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                if (history.isEmpty()) {
+                    Text(stringResource(id = R.string.no_exchange_history))
+                } else {
+                    LazyColumn(modifier = Modifier.height(240.dp)) {
+                        items(history) { record ->
+                            ExchangeRecordItem(record = record)
+                            HorizontalDivider()
+                        }
                     }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(id = R.string.btn_cancel))
+                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.btn_cancel))
-            }
-        }
-    )
+        )
+    }
 }
 
 @Composable

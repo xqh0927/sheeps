@@ -50,6 +50,7 @@ import com.example.sheeps.menu.ui.screens.ShopScreen
 import com.example.sheeps.menu.viewmodel.MenuViewModel
 import com.example.sheeps.theme.Overlay_Dark_Medium
 import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.components.ConfirmDialog
 import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.toast.Toaster
 import com.tencent.mmkv.MMKV
@@ -117,10 +118,18 @@ class MenuActivity : BaseActivity() {
                     var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) }
                     var showSetPasswordDialog by remember { mutableStateOf(false) }
                     var showDailyPopup by remember { mutableStateOf<DailyPopupResponse?>(null) }
+                    var showLogoutConfirm by remember { mutableStateOf(false) }
 
-                    // 登录后检查每日弹窗
+                    // 登录后检查强制设密 + 每日弹窗
                     LaunchedEffect(state.isLoggedIn) {
                         if (state.isLoggedIn) {
+                            // 验证码登录后若未设密码，LoginActivity 会写入 need_set_password flag
+                            val kv = MMKV.defaultMMKV()
+                            if (kv.decodeBool("need_set_password", false)) {
+                                kv.removeValueForKey("need_set_password")
+                                showSetPasswordDialog = true
+                            }
+
                             val token = userPrefs.getToken()
                             val todayStr = java.text.SimpleDateFormat(
                                 "yyyy-MM-dd",
@@ -301,9 +310,7 @@ class MenuActivity : BaseActivity() {
                                                     TheRouter.build("/auth/login").navigation(this@MenuActivity)
                                                 },
                                                 onLogoutClick = {
-                                                    viewModel.sendIntent(
-                                                        MenuViewIntent.Logout
-                                                    )
+                                                    showLogoutConfirm = true
                                                 },
                                                 onSignInClick = {
                                                     viewModel.sendIntent(
@@ -417,6 +424,22 @@ class MenuActivity : BaseActivity() {
                                         DailyLeaderboardPopupDialog(
                                             data = showDailyPopup!!,
                                             onDismiss = { showDailyPopup = null }
+                                        )
+                                    }
+
+                                    // 退出登录确认弹窗
+                                    if (showLogoutConfirm) {
+                                        ConfirmDialog(
+                                            onDismissRequest = { showLogoutConfirm = false },
+                                            title = "提示",
+                                            message = "确定要退出登录吗？",
+                                            confirmText = "确定",
+                                            dismissText = "取消",
+                                            onConfirm = {
+                                                showLogoutConfirm = false
+                                                viewModel.sendIntent(MenuViewIntent.Logout)
+                                            },
+                                            onDismiss = { showLogoutConfirm = false }
                                         )
                                     }
 

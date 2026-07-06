@@ -90,9 +90,15 @@ data class GameViewState(
     /** 排行榜数据 */
     val rankings: List<RankingEntry> = emptyList(),
     /** 当前使用的卡牌皮肤主题名称 */
-    val currentSkin: String = "classic",
+    val currentSkin: String = "shuang",
     /** 正在抖动的卡牌 ID 集合（用于提示遮挡） */
-    val shakingTileIds: Set<String> = emptySet()
+    val shakingTileIds: Set<String> = emptySet(),
+    /** 是否展示携带道具选择弹窗 */
+    val showCarrySelection: Boolean = false,
+    /** 背包中每种道具的库存数量 */
+    val backpackItemStocks: Map<String, Int> = emptyMap(),
+    /** 临时选择准备携带的道具 */
+    val tempCarryItems: Map<String, Int> = emptyMap()
 )
 
 /**
@@ -132,6 +138,14 @@ sealed interface GameViewIntent {
     object RestartLevel : GameViewIntent
     /** 返回主菜单界面 */
     object GoBackToMenu : GameViewIntent
+    /** 触发重新开始关卡流程（展示道具选择） */
+    object TriggerRestartFlow : GameViewIntent
+    /** 更新临时选择携带的道具数量 */
+    data class UpdateTempCarryItem(val itemType: String, val change: Int) : GameViewIntent
+    /** 确认重新开始关卡并扣除道具 */
+    object ConfirmRestartWithCarry : GameViewIntent
+    /** 取消携带道具选择，关闭弹窗 */
+    object DismissCarrySelection : GameViewIntent
 }
 
 /**

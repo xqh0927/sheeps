@@ -122,6 +122,18 @@ val Forest_Outline          = Color(0xFFC8E6C9)
 val Forest_OutlineVariant   = Color(0xFFE8F5E9)
 val Forest_Gold_Subtle      = Color(0xFF81C784)
 
+// --- 萌趣竞技 (ShuangFun / 爽爽蓝) ---
+val ShuangFun_Primary          = Color(0xFF29B6F6)  // 爽爽蓝（主色）
+val ShuangFun_PrimaryLight     = Color(0xFF4FC3F7)  // 亮蓝
+val ShuangFun_PrimaryDark      = Color(0xFF0288D1)  // 深蓝
+val ShuangFun_Background       = Color(0xFFE1F5FE)  // 乐园浅蓝背景
+val ShuangFun_Surface          = Color(0xFFFFFFFF)  // 奶油白卡片
+val ShuangFun_SurfaceVariant   = Color(0xFFF0F9FF)  // 次级表面
+val ShuangFun_SurfaceContainer = Color(0xFFE3F2FD)  // 容器背景
+val ShuangFun_Outline          = Color(0xFF81D4FA)  // 边框色
+val ShuangFun_OutlineVariant   = Color(0xFFB3E5FC)  // 次级边框
+val ShuangFun_Gold_Subtle      = Color(0xFFFFCA28)  // 阳光金（装饰/奖励）
+
 // =============================================================================
 // 向后兼容别名（保留旧名称引用，避免大规模重命名编译错误）
 // =============================================================================

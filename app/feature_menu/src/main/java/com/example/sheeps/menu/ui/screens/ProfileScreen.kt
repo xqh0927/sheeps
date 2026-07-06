@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.sheeps.core.utils.ImageCompressor
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.menu.ui.dialogs.AvatarPickerDialog
+import com.example.sheeps.menu.ui.dialogs.ProfileChangePasswordDialog
 import com.hjq.toast.Toaster
 
 /**
@@ -98,30 +101,22 @@ fun ProfileScreen(
 
     // 头像底部选择菜单
     if (showAvatarPicker) {
-        AlertDialog(
-            onDismissRequest = { showAvatarPicker = false },
-            title = { Text("更换头像") },
-            text = {
-                Column {
-                    TextButton(onClick = {
-                        showAvatarPicker = false
-                        cameraLauncher.launch(null)
-                    }) { Text("拍照") }
-                    TextButton(onClick = {
-                        showAvatarPicker = false
-                        imagePickerLauncher.launch("image/*")
-                    }) { Text("从相册选择") }
-                }
+        AvatarPickerDialog(
+            onDismiss = { showAvatarPicker = false },
+            onTakePhoto = {
+                showAvatarPicker = false
+                cameraLauncher.launch(null)
             },
-            confirmButton = {
-                TextButton(onClick = { showAvatarPicker = false }) { Text("取消") }
+            onPickFromGallery = {
+                showAvatarPicker = false
+                imagePickerLauncher.launch("image/*")
             }
         )
     }
 
     // 修改密码对话框
     if (showChangePwdDialog) {
-        ChangePasswordDialog(
+        ProfileChangePasswordDialog(
             onDismiss = { showChangePwdDialog = false },
             onSendCode = { /* 复用现有验证码发送逻辑 */ },
             onChangePassword = { _, _, _ ->
@@ -133,12 +128,7 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("个人资料", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("返回") }
-                }
-            )
+            SheepsTopAppBar(title = "个人资料", onBack = onBack)
         }
     ) { paddingValues ->
         LazyColumn(
@@ -238,54 +228,4 @@ fun ProfileScreen(
     }
 }
 
-/**
- * 修改密码对话框（占位，实际复用重置密码流程）
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ChangePasswordDialog(
-    onDismiss: () -> Unit,
-    onSendCode: (String) -> Unit,
-    onChangePassword: (String, String, String) -> Unit
-) {
-    var phone by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("修改密码") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = phone, onValueChange = { phone = it },
-                    label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth()
-                )
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = code, onValueChange = { code = it },
-                        label = { Text("验证码") }, singleLine = true, modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { if (phone.length == 11) onSendCode(phone) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = RoundedCornerShape(8.dp)
-                    ) { Text("获取") }
-                }
-                OutlinedTextField(
-                    value = newPassword, onValueChange = { newPassword = it },
-                    label = { Text("新密码") }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onChangePassword(phone, code, newPassword) }) { Text("确认") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
-    )
-}
+/* No longer needed — extracted to ProfileChangePasswordDialog */

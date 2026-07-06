@@ -24,6 +24,7 @@ import com.example.sheeps.core.game.GameEngine
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.GameResultOverlay
+import com.example.sheeps.game.ui.dialogs.CarrySelectionDialog
 import com.example.sheeps.ui.components.*
 import kotlinx.coroutines.launch
 
@@ -58,7 +59,10 @@ fun GameScreen(
     onRestart: () -> Unit,
     onBack: () -> Unit,
     onNextLevel: () -> Unit,
-    onShowLeaderboard: () -> Unit
+    onShowLeaderboard: () -> Unit,
+    onUpdateTempCarryItem: (String, Int) -> Unit = { _, _ -> },
+    onConfirmRestartWithCarry: () -> Unit = {},
+    onDismissCarrySelection: () -> Unit = {}
 ) {
     val coroutineScope = rememberCoroutineScope()
     
@@ -205,6 +209,15 @@ fun GameScreen(
             onNextLevel = onNextLevel,
             onShowLeaderboard = onShowLeaderboard
         )
+
+        if (state.showCarrySelection) {
+            CarrySelectionDialog(
+                state = state,
+                onDismiss = onDismissCarrySelection,
+                onConfirm = onConfirmRestartWithCarry,
+                onUpdateItem = onUpdateTempCarryItem
+            )
+        }
 
         if (state.isLoading) {
             FullScreenLoading()

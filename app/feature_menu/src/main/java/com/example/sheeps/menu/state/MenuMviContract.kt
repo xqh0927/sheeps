@@ -57,7 +57,7 @@ data class MenuViewState(
     /** 应用版本更新信息 */
     val appUpdateInfo: AppUpdateResponse? = null,
     /** 当前生效的卡牌皮肤 ID */
-    val currentSkin: String = "classic",
+    val currentSkin: String = "shuang",
 
     // --- 在线匹配状态 ---
     /** 匹配状态：none (空闲), searching (匹配中), matched (已匹配), error (异常) */

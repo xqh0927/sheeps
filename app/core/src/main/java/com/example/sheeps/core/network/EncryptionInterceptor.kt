@@ -89,14 +89,14 @@ class EncryptionInterceptor : Interceptor {
         // ---- 解密响应体 ----
         val responseBody = response.body
         if (responseBody != null) {
+            var responseBodyString: String? = null
             try {
-                val responseBodyString = responseBody.string()
-
+                responseBodyString = responseBody.string()
                 if (responseBodyString.isNotBlank()) {
-                    val jsonObject = JSONObject(responseBodyString)
+                    val jsonObject = try { JSONObject(responseBodyString) } catch (e: Exception) { null }
 
                     // 检查是否包含 encrypted 字段
-                    if (jsonObject.has("encrypted") && !jsonObject.isNull("encrypted")) {
+                    if (jsonObject != null && jsonObject.has("encrypted") && !jsonObject.isNull("encrypted")) {
                         val encryptedData = jsonObject.getString("encrypted")
                         val decrypted = AesGcmCipher.decrypt(encryptedData)
 
@@ -105,12 +105,27 @@ class EncryptionInterceptor : Interceptor {
                         return response.newBuilder()
                             .body(newBody)
                             .build()
+                    } else {
+                        // 无 encrypted 字段 → 用刚才读出来的 responseBodyString 重建 body 返回（防止流被关闭后下层报错）
+                        val newBody = responseBodyString.toResponseBody(responseBody.contentType() ?: JSON_MEDIA_TYPE)
+                        return response.newBuilder()
+                            .body(newBody)
+                            .build()
                     }
-                    // 无 encrypted 字段 → 透传（兼容老服务端）
                 }
             } catch (e: Exception) {
-                // 解密失败时返回原始响应
                 e.printStackTrace()
+                // 如果已经成功读取到了 body 字符串，即使后续解析/解密出错，也必须用读到的内容重建 body，防止外部发生 closed 崩溃
+                if (responseBodyString != null) {
+                    try {
+                        val newBody = responseBodyString.toResponseBody(responseBody.contentType() ?: JSON_MEDIA_TYPE)
+                        return response.newBuilder()
+                            .body(newBody)
+                            .build()
+                    } catch (ex: Exception) {
+                        ex.printStackTrace()
+                    }
+                }
             }
         }
 

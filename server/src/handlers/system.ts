@@ -25,10 +25,10 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
      * 响应: [{ id, title, content, type, created_at }]
      */
     if (path === '/api/notice/list' && request.method === 'GET') {
-        const cacheKey = `notices_${lang}`;
+        const cacheKey = `notices_${lang}_v2`;
         // 读取公告 KV 缓存，默认缓存 1 小时以降低 D1 读负荷
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached) return new Response(cached, { headers: corsHeaders });
+        if (cached && cached.startsWith('[{')) return new Response(cached, { headers: corsHeaders });
 
         const titleCol = lang ? `COALESCE(title_${lang}, title)` : 'title';
         const contentCol = lang ? `COALESCE(content_${lang}, content)` : 'content';

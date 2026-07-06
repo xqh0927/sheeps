@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.LanguageSettingsCard
 import com.example.sheeps.menu.ui.components.ThemeSettingsCard
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 
@@ -38,25 +39,7 @@ fun SettingsScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "设置",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFamily = FontFamily.Serif
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            )
+            SheepsTopAppBar(title = "设置", onBack = onBack)
         }
     ) { paddingValues ->
         LazyColumn(

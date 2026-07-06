@@ -14,16 +14,17 @@ import kotlinx.coroutines.flow.asStateFlow
  * 应用支持的主题枚举
  */
 enum class AppTheme(val key: String, val displayName: String) {
-    FOREST("forest", "🌿 森林绿（默认）"),                   // 淡绿基调，治愈自然
+    SHUANG_FUN("shuang_fun", "萌趣竞技（默认）"),            // 爽爽蓝+阳光金，轻竞技卡通
+    FOREST("forest", "🌿 森林绿"),                           // 淡绿基调，治愈自然
     QING_RI_CHUN("qing_ri_chun", "清日春"),                 // 浅色，宣纸白+朱砂
     MO_YE_GOLD("mo_ye_gold", "墨夜金"),                     // 暗色，墨夜底色+帝王金
     SAKURA("sakura", "🌸 樱花粉"),                          // 粉白基调，甜美女性向
     COSMIC("cosmic", "🌌 星空蓝"),                           // 淡蓝紫基调，优雅神秘
-    SUNSET("sunset", "🌅 暖阳橙");                           // 暖黄基调，温暖活力
+    SUNSET("sunset", "🌅 暖阳橙");                          // 暖黄基调，温暖活力
 
     companion object {
         fun fromKey(key: String): AppTheme =
-            values().find { it.key == key } ?: FOREST
+            values().find { it.key == key } ?: SHUANG_FUN
     }
 }
 
@@ -34,13 +35,14 @@ enum class AppTheme(val key: String, val displayName: String) {
 object ThemeManager {
     private const val THEME_KEY = "app_current_theme"
 
-    private val _currentTheme = MutableStateFlow(AppTheme.FOREST)
+    private val _currentTheme = MutableStateFlow(AppTheme.SHUANG_FUN)
     val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
 
     /** 在 App 启动时调用，从 MMKV 读取上次保存的主题 */
     fun init() {
         val kv = MMKV.defaultMMKV()
-        val savedKey = kv.decodeString(THEME_KEY, AppTheme.FOREST.key) ?: AppTheme.FOREST.key
+        val savedKey =
+            kv.decodeString(THEME_KEY, AppTheme.SHUANG_FUN.key) ?: AppTheme.SHUANG_FUN.key
         _currentTheme.value = AppTheme.fromKey(savedKey)
     }
 
@@ -57,12 +59,13 @@ object ThemeManager {
     /** 获取 XML 主题的 Style 资源 ID */
     fun getThemeResId(theme: AppTheme = _currentTheme.value): Int {
         return when (theme) {
-            AppTheme.MO_YE_GOLD   -> com.example.sheeps.core.R.style.Theme_Sheeps_MoYeGold
+            AppTheme.MO_YE_GOLD -> com.example.sheeps.core.R.style.Theme_Sheeps_MoYeGold
             AppTheme.QING_RI_CHUN -> com.example.sheeps.core.R.style.Theme_Sheeps_QingRiChun
-            AppTheme.SAKURA       -> com.example.sheeps.core.R.style.Theme_Sheeps_Sakura
-            AppTheme.COSMIC       -> com.example.sheeps.core.R.style.Theme_Sheeps_Cosmic
-            AppTheme.SUNSET       -> com.example.sheeps.core.R.style.Theme_Sheeps_Sunset
-            AppTheme.FOREST       -> com.example.sheeps.core.R.style.Theme_Sheeps_Forest
+            AppTheme.SAKURA -> com.example.sheeps.core.R.style.Theme_Sheeps_Sakura
+            AppTheme.COSMIC -> com.example.sheeps.core.R.style.Theme_Sheeps_Cosmic
+            AppTheme.SUNSET -> com.example.sheeps.core.R.style.Theme_Sheeps_Sunset
+            AppTheme.FOREST -> com.example.sheeps.core.R.style.Theme_Sheeps_Forest
+            AppTheme.SHUANG_FUN -> com.example.sheeps.core.R.style.Theme_Sheeps_ShuangFun
         }
     }
 

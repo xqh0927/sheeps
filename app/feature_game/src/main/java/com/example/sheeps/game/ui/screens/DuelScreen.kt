@@ -32,6 +32,7 @@ import com.example.sheeps.data.model.TileState
 import com.example.sheeps.core.game.GameEngine
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
+import com.example.sheeps.game.ui.dialogs.DuelExitDialog
 import com.example.sheeps.game.ui.dialogs.DuelResultDialog
 import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.*
@@ -78,7 +79,7 @@ fun DuelScreen(
 
     // 退出确认弹窗
     if (showExitConfirmDialog) {
-        ExitConfirmDialog(
+        DuelExitDialog(
             onConfirm = { showExitConfirmDialog = false; onLeave() },
             onDismiss = { showExitConfirmDialog = false }
         )
@@ -171,28 +172,6 @@ fun DuelScreen(
 }
 
 /**
- * 退出确认对话框
- */
-@Composable
-private fun ExitConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(id = R.string.dialog_duel_exit_title), fontWeight = FontWeight.Bold) },
-        text = { Text(stringResource(id = R.string.dialog_duel_exit_text)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(id = R.string.dialog_duel_exit_confirm), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(id = R.string.dialog_duel_exit_cancel))
-            }
-        }
-    )
-}
-
-/**
  * 施法/受击消息提示条
  */
 @Composable
@@ -234,7 +213,7 @@ private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) 
     ) {
         state.movedOutTiles.forEach { tile ->
             key(tile.id) {
-                TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = "classic", tileSize = 48.dp)
+                TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = "shuang", tileSize = 48.dp)
             }
         }
     }
@@ -310,7 +289,7 @@ private fun DuelMatchingSlot(
                     TileView(
                         tile = tile,
                         onClick = {},
-                        currentSkin = "classic",
+                        currentSkin = "shuang",
                         tileSize = 48.dp
                     )
                 }
@@ -357,7 +336,7 @@ private fun DuelFlyingTilesLayer(
                         scaleY = 1f
                     }
             ) {
-                TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = "classic", tileSize = 48.dp)
+                TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = "shuang", tileSize = 48.dp)
             }
         }
     }

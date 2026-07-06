@@ -11,6 +11,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 
@@ -31,11 +33,15 @@ fun SetPasswordDialog(
     var confirmPassword by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = { /* 不可关闭 */ },
-        title = {
-            Text(
-                text = "\uD83D\uDD10 设置登录密码",
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        AlertDialog(
+            onDismissRequest = { /* 不可关闭 */ },
+            title = {
+                Text(
+                    text = "\uD83D\uDD10 设置登录密码",
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 fontFamily = FontFamily.Serif
@@ -90,8 +96,8 @@ fun SetPasswordDialog(
                 }
             }
         },
-        confirmButton = {
-            Button(
+            confirmButton = {
+                Button(
                 onClick = {
                     // 密码校验
                     when {
@@ -114,6 +120,7 @@ fun SetPasswordDialog(
                 Text("确认设置（完成后奖励 50 积分）", color = Color.White)
             }
         },
-        shape = RoundedCornerShape(16.dp)
-    )
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }

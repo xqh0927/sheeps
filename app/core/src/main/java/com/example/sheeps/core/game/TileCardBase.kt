@@ -33,6 +33,7 @@ fun TileCardBase(
         "keai" -> Triple(cs.surface, cs.primary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.4f)) // 萌趣卡通
         "daimeng" -> Triple(cs.surface, cs.secondary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.5f)) // 呆萌手绘
         "classic" -> Triple(cs.surface, cs.primary, cs.secondary) // 经典中国风
+        "shuang" -> Triple(cs.surface, Color(0xFF29B6F6), Color(0xFFFFCA28)) // 萌趣竞技：爽爽蓝边框+阳光金装饰
         else -> Triple(cs.surface, cs.primary, cs.secondary) // 默认经典色调
     }
 

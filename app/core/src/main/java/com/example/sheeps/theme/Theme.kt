@@ -182,6 +182,34 @@ private val ForestColorScheme = lightColorScheme(
     scrim               = Overlay_Dark_Heavy
 )
 
+// --- 主题八：🐑 萌趣竞技（高饱和卡通 · 轻竞技女性向）---
+private val ShuangFunColorScheme = lightColorScheme(
+    primary             = ShuangFun_Primary,
+    onPrimary           = Text_OnPrimary,
+    primaryContainer    = ShuangFun_SurfaceVariant,
+    onPrimaryContainer  = ShuangFun_PrimaryDark,
+    secondary           = ShuangFun_Gold_Subtle,
+    onSecondary         = Color(0xFF5D4037),
+    secondaryContainer  = Color(0xFFFFF8E1),
+    onSecondaryContainer = Color(0xFF5D4037),
+    tertiary            = Color(0xFFFF5252),  // 草莓红（竞技强调）
+    onTertiary          = Text_OnPrimary,
+    tertiaryContainer   = Color(0xFFFFE0E0),
+    onTertiaryContainer = Color(0xFF7F0000),
+    background          = ShuangFun_Background,
+    onBackground        = Text_Primary_Light,
+    surface             = ShuangFun_Surface,
+    onSurface           = Text_Primary_Light,
+    surfaceVariant      = ShuangFun_SurfaceVariant,
+    onSurfaceVariant    = ShuangFun_PrimaryDark,
+    surfaceContainer    = ShuangFun_SurfaceContainer,
+    outline             = ShuangFun_Outline,
+    outlineVariant      = ShuangFun_OutlineVariant,
+    error               = Vermilion_Error,
+    onError             = Text_OnPrimary,
+    scrim               = Overlay_Dark_Heavy
+)
+
 // =============================================================================
 // SheepsTheme - 根据 ThemeManager 的当前主题动态切换
 // =============================================================================
@@ -201,6 +229,7 @@ fun SheepsTheme(
         AppTheme.COSMIC        -> CosmicColorScheme
         AppTheme.SUNSET        -> SunsetColorScheme
         AppTheme.FOREST        -> ForestColorScheme
+        AppTheme.SHUANG_FUN    -> ShuangFunColorScheme
     }
 
     MaterialTheme(

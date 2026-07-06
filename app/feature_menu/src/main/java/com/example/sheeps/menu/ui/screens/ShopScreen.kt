@@ -153,6 +153,7 @@ fun ShopScreen(
                                 item = item,
                                 backpackCount = backpackCount,
                                 currentSkin = state.currentSkin,
+                                userPoints = state.points,
                                 onExchange = { count ->
                                     onExchangeClick(item.id, count)
                                 },
@@ -203,6 +204,7 @@ fun ShopScreen(
                                         item = item,
                                         backpackCount = backpackCount,
                                         currentSkin = state.currentSkin,
+                                        userPoints = state.points,
                                         onExchange = { count -> onExchangeClick(item.id, count) },
                                         onApplySkin = { skin -> onChangeSkin(skin) }
                                     )
@@ -230,6 +232,7 @@ fun ShopScreen(
                                             item = item,
                                             backpackCount = backpackCount,
                                             currentSkin = state.currentSkin,
+                                            userPoints = state.points,
                                             onExchange = { count -> onExchangeClick(item.id, count) },
                                             onApplySkin = { skin -> onChangeSkin(skin) }
                                         )
@@ -258,6 +261,7 @@ fun ShopScreen(
                                             item = item,
                                             backpackCount = backpackCount,
                                             currentSkin = state.currentSkin,
+                                            userPoints = state.points,
                                             onExchange = { count -> onExchangeClick(item.id, count) },
                                             onApplySkin = { skin -> onChangeSkin(skin) }
                                         )
@@ -275,6 +279,7 @@ fun ShopScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    // 阻断穿透点击事件
                     .pointerInput(Unit) {
                         awaitEachGesture {
                             while (true) {
@@ -285,7 +290,7 @@ fun ShopScreen(
                     }
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     .padding(32.dp),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center // 1. 确保 Card 在 Box 中水平+垂直居中
             ) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -294,8 +299,11 @@ fun ShopScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier
+                            .fillMaxWidth() // 2. 【关键修正】让 Column 撑满 Card 的宽度，确保对齐基准线正确
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally, // 3. 确保子组件水平居中
+                        verticalArrangement = Arrangement.Center            // 4. 【关键修正】确保子组件在垂直方向也居中
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lock,
@@ -309,14 +317,15 @@ fun ShopScreen(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
-                            fontFamily = FontFamily.Serif
+                            fontFamily = FontFamily.Serif,
+                            textAlign = TextAlign.Center // 5. 【关键修正】加上多行文字居中！防止字数多折行时默认左对齐
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = stringResource(id = R.string.shop_login_prompt),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
+                            textAlign = TextAlign.Center, // 保持原有的文本居中
                             lineHeight = 18.sp
                         )
                         Spacer(modifier = Modifier.height(16.dp))
@@ -325,7 +334,11 @@ fun ShopScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text(stringResource(id = R.string.shop_btn_login_sync), color = MaterialTheme.colorScheme.onPrimary)
+                            Text(
+                                text = stringResource(id = R.string.shop_btn_login_sync),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                textAlign = TextAlign.Center // 6. 【可选优化】确保按钮内的文字也绝对居中
+                            )
                         }
                     }
                 }

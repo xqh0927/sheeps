@@ -14,15 +14,17 @@ import kotlin.math.sqrt
  * 卡牌数量基于难度系数曲线（与服务端 server/src/difficulty.ts 完全对齐）：
  * - L1=12, L2=48, L3=60（固定）
  * - L4+ 使用幂函数公式 + 1~2 关随机 + 休息关 80% 折扣
- * - 本地模式 userId=0 作为种子
+ * - 本地模式 userId=0 作为难度种子
+ * - @param seed LCG 随机种子，控制卡牌图案与布局，不同 seed 产生不同排列
  */
 class GameLevelGenerator @Inject constructor() {
 
     /**
      * 生成一个保证有解的本地关卡
      * 采用反向生成算法：先生成布局，然后反向填充成对的卡牌类型
+     * @param seed LCG 随机种子，默认使用 levelId 保持向后兼容
      */
-    fun generateSolvableLevelLocal(levelId: Int): List<Tile> {
+    fun generateSolvableLevelLocal(levelId: Int, seed: Long = levelId * 1000L): List<Tile> {
         // 根据关卡ID计算难度（卡牌种类数），受限于美术资源总量
         val numTypes = if (levelId == 1) 3 else minOf(
             SkinConstants.MAX_TILE_TYPES,
@@ -73,7 +75,7 @@ class GameLevelGenerator @Inject constructor() {
             }
 
             // 洗牌随机化位置
-            val rand = lcg(levelId * 1000L)
+            val rand = lcg(seed)
             for (i in possible.indices.reversed()) {
                 val j = (rand() * (i + 1)).toInt()
                 val temp = possible[i]
@@ -93,7 +95,7 @@ class GameLevelGenerator @Inject constructor() {
         }
 
         val unassigned = nodes.toMutableSet()
-        val randAssign = lcg(levelId * 1000L + 100)
+        val randAssign = lcg(seed + 100)
 
         // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积
         val overlapArea = { a: Point3D, b: Point3D ->
@@ -187,7 +189,7 @@ class GameLevelGenerator @Inject constructor() {
             val count = maxOf(1, (eligible.size * blindProb).toInt())
             // 对 eligible 名单洗牌后取前 count 个作为盲盒牌
             val indices = eligible.indices.toMutableList()
-            val randShuffle = lcg(levelId * 1000L + 200)
+            val randShuffle = lcg(seed + 200)
             for (i in indices.indices.reversed()) {
                 val j = (randShuffle() * (i + 1)).toInt()
                 val tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp
@@ -197,7 +199,7 @@ class GameLevelGenerator @Inject constructor() {
             emptySet()
         }
 
-        val randProps = lcg(levelId * 1000L + 300)
+        val randProps = lcg(seed + 300)
         return nodes.map { node ->
             var isBlind = node.index in blindIndices
             var sealed = 0
