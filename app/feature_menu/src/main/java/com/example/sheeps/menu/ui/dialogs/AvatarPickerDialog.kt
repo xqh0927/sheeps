@@ -5,8 +5,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 
 @Composable
 fun AvatarPickerDialog(
@@ -20,19 +22,19 @@ fun AvatarPickerDialog(
     ) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("更换头像") },
+            title = { Text(stringResource(id = R.string.dialog_title_change_avatar)) },
             text = {
                 Column {
                     TextButton(onClick = onTakePhoto) {
-                        Text("拍照")
+                        Text(stringResource(id = R.string.btn_take_photo))
                     }
                     TextButton(onClick = onPickFromGallery) {
-                        Text("从相册选择")
+                        Text(stringResource(id = R.string.btn_choose_gallery))
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.btn_cancel)) }
             }
         )
     }

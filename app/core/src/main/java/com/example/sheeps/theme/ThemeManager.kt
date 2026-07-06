@@ -35,14 +35,14 @@ enum class AppTheme(val key: String, val displayName: String) {
 object ThemeManager {
     private const val THEME_KEY = "app_current_theme"
 
-    private val _currentTheme = MutableStateFlow(AppTheme.SHUANG_FUN)
+    private val _currentTheme = MutableStateFlow(AppTheme.QING_RI_CHUN)
     val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
 
     /** 在 App 启动时调用，从 MMKV 读取上次保存的主题 */
     fun init() {
         val kv = MMKV.defaultMMKV()
         val savedKey =
-            kv.decodeString(THEME_KEY, AppTheme.SHUANG_FUN.key) ?: AppTheme.SHUANG_FUN.key
+            kv.decodeString(THEME_KEY, AppTheme.QING_RI_CHUN.key) ?: AppTheme.QING_RI_CHUN.key
         _currentTheme.value = AppTheme.fromKey(savedKey)
     }
 

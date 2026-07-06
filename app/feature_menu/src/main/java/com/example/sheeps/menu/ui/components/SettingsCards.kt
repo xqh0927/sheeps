@@ -108,10 +108,10 @@ fun ThemeSettingsCard(
             ) {
                 val currentTheme = ThemeManager.currentTheme.collectAsState().value
                 val themes = listOf(
-                    AppTheme.SHUANG_FUN to "🐑 萌趣竞技",
-                    AppTheme.FOREST to "🌿 森林绿",
                     AppTheme.QING_RI_CHUN to stringResource(id = R.string.theme_light),
                     AppTheme.MO_YE_GOLD to stringResource(id = R.string.theme_gold),
+                    AppTheme.SHUANG_FUN to "🐑 萌趣竞技",
+                    AppTheme.FOREST to "🌿 森林绿",
                     AppTheme.SAKURA to "🌸 樱花粉",
                     AppTheme.COSMIC to "🌌 星空蓝",
                     AppTheme.SUNSET to "🌅 暖阳橙"

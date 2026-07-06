@@ -18,7 +18,7 @@ abstract class BaseActivity : ComponentActivity() {
             com.tencent.mmkv.MMKV.initialize(mmkvContext)
         } catch (e: Exception) {
         }
-        val lang = com.tencent.mmkv.MMKV.defaultMMKV()?.decodeString("language", "zh") ?: "zh"
+        val lang = com.tencent.mmkv.MMKV.defaultMMKV()?.decodeString("user_lang", "") ?: ""
         if (lang.isEmpty() || lang == "zh") {
             super.attachBaseContext(newBase)
         } else {

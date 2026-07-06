@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleUserRoutes = handleUserRoutes;
+exports.handleAvatarProxy = handleAvatarProxy;
 const helpers_1 = require("../helpers");
 /**
  * 处理用户中心相关的 HTTP 路由请求
@@ -13,7 +14,19 @@ const helpers_1 = require("../helpers");
  */
 async function handleUserRoutes(request, env, path) {
     const corsHeaders = (0, helpers_1.getCorsHeaders)();
-    // 1. 本地 Room 与云端 D1 数据库增量同步接口
+    /**
+     * POST /api/user/sync — 端云数据增量同步
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {number} [points] — 客户端当前积分
+     *   @param {number[]} [unlocked_levels] — 已解锁关卡ID列表
+     *   @param {Array<{item_type: string, count: number}>} [items] — 道具背包
+     *
+     * 响应: { success, user, unlocked_levels, items }
+     */
     if (path === '/api/user/sync' && request.method === 'POST') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -52,26 +65,42 @@ async function handleUserRoutes(request, env, path) {
         ]);
         return new Response(JSON.stringify({ success: true, user: updatedUserResult.results[0], unlocked_levels: updatedLevelsResult.results.map((r) => r.level_id), items: updatedItemsResult.results }), { headers: corsHeaders });
     }
-    // 2. 获取用户 Profile 资料与背包、签到综合进度接口
+    /**
+     * GET /api/user/profile — 获取用户完整Profile
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: { success, user, unlocked_levels, items, today_signed, sign_streak, highest_level_cleared, avatarUrl }
+     */
     if (path === '/api/user/profile' && request.method === 'GET') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, username, avatar, points, avatar_url FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
             env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(authUser.userId),
             env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ?').bind(authUser.userId)
         ]);
+        const userData = userResult.results[0];
         return new Response(JSON.stringify({
-            success: true, user: userResult.results[0], unlocked_levels: levelsResult.results.map((r) => r.level_id), items: itemsResult.results,
-            today_signed: signedTodayResult.results[0] !== null, sign_streak: lastSignResult.results[0]?.streak || 0, highest_level_cleared: highestClearedResult.results[0]?.highest || 0
+            success: true, user: userData, unlocked_levels: levelsResult.results.map((r) => r.level_id), items: itemsResult.results,
+            today_signed: signedTodayResult.results[0] !== null && signedTodayResult.results[0] !== undefined, sign_streak: lastSignResult.results[0]?.streak || 0, highest_level_cleared: highestClearedResult.results[0]?.highest || 0,
+            avatarUrl: userData?.avatar_url || null
         }), { headers: corsHeaders });
     }
-    // 3. 获取个人积分收支历史明细接口
+    /**
+     * GET /api/user/points-history — 查询积分收支明细
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: [{ type, amount, source, remaining_points, created_at }, ...] （最近50条）
+     */
     if (path === '/api/user/points-history' && request.method === 'GET') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -79,7 +108,14 @@ async function handleUserRoutes(request, env, path) {
         const records = await env.DB.prepare('SELECT type, amount, source, remaining_points, created_at FROM point_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
-    // 4. 获取法宝道具兑换历史明细接口
+    /**
+     * GET /api/user/exchange-history — 查询道具兑换历史
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: [{ id, shop_item_id, item_type, count, points_cost, created_at }, ...] （最近50条）
+     */
     if (path === '/api/user/exchange-history' && request.method === 'GET') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -87,13 +123,119 @@ async function handleUserRoutes(request, env, path) {
         const records = await env.DB.prepare('SELECT id, shop_item_id, item_type, count, points_cost, created_at FROM exchange_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
-    // 5. 用户修改昵称接口
+    /**
+     * POST /api/user/rename — 修改用户昵称
+     *
+     * 请求体 (JSON):
+     *   @param {string} id — 用户ID
+     *   @param {string} new_username — 新昵称
+     *
+     * 响应: { success: true }
+     */
     if (path === '/api/user/rename' && request.method === 'POST') {
+        const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
+        if (!authUser)
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         const body = await request.json();
-        if (!body.id || !body.new_username)
-            return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
-        await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(body.new_username, body.id).run();
+        if (!body.new_username)
+            return new Response(JSON.stringify({ error: 'Missing new_username' }), { status: 400, headers: corsHeaders });
+        await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(body.new_username, authUser.userId).run();
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
+    /**
+     * POST /api/user/avatar — 上传用户头像（multipart/form-data）
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *   Content-Type: multipart/form-data
+     *
+     * 请求体:
+     *   @param {File} avatar — 用户头像图片文件（png/jpeg/webp，≤ 512KB）
+     *
+     * 响应: { success: true, avatarUrl: string }
+     */
+    if (path === '/api/user/avatar' && request.method === 'POST') {
+        const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
+        if (!authUser)
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        // 从 multipart/form-data 中读取图片文件
+        const contentType = request.headers.get('Content-Type') || '';
+        if (!contentType.includes('multipart/form-data')) {
+            return new Response(JSON.stringify({ error: 'Expected multipart/form-data' }), { status: 400, headers: corsHeaders });
+        }
+        const formData = await request.formData();
+        const file = formData.get('avatar');
+        if (!file) {
+            return new Response(JSON.stringify({ error: 'Missing avatar file' }), { status: 400, headers: corsHeaders });
+        }
+        // 校验文件大小（≤ 512KB）
+        if (file.size > 512 * 1024) {
+            return new Response(JSON.stringify({ error: 'Avatar image too large (max 512KB)' }), { status: 400, headers: corsHeaders });
+        }
+        // 校验文件类型
+        const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            return new Response(JSON.stringify({ error: 'Invalid image type (allowed: png, jpeg, webp)' }), { status: 400, headers: corsHeaders });
+        }
+        // 删除该用户的旧头像文件（避免 R2 存储泄漏）
+        const oldObjects = await env.AVATAR_BUCKET.list({ prefix: `avatars/${authUser.userId}_` });
+        for (const oldObj of oldObjects.objects) {
+            await env.AVATAR_BUCKET.delete(oldObj.key);
+        }
+        // 上传到 R2
+        const timestamp = Date.now();
+        const key = `avatars/${authUser.userId}_${timestamp}.png`;
+        await env.AVATAR_BUCKET.put(key, file.stream(), {
+            httpMetadata: { contentType: file.type || 'image/jpeg' },
+            customMetadata: { userId: authUser.userId, uploadedAt: String(timestamp) }
+        });
+        // 存储 R2 公网直链到 D1（供 profile 等领域直接查询，跳过 Worker 代理）
+        const r2PublicUrl = env.R2_PUBLIC_URL || new URL(request.url).origin;
+        const avatarUrl = `${r2PublicUrl}/${key}`;
+        await env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?')
+            .bind(avatarUrl, authUser.userId).run();
+        // 响应中返回完整公网 URL（Android 端直接用于 Coil 加载）
+        return new Response(JSON.stringify({ success: true, avatarUrl }), { headers: corsHeaders });
+    }
     return null;
+}
+/**
+ * 处理头像代理请求 — GET /api/avatar/:userId
+ * 从 R2 中查找用户最新头像并直接返回图片二进制数据
+ *
+ * @param request 客户端 HTTP 请求对象
+ * @param env 环境变量及 R2 bucket 实例
+ * @param path 请求的 URL 路径
+ * @return 匹配时返回图片 Response，否则返回 null
+ */
+async function handleAvatarProxy(request, env, path) {
+    const corsHeaders = (0, helpers_1.getCorsHeaders)();
+    if (!path.startsWith('/api/avatar/') || request.method !== 'GET') {
+        return null;
+    }
+    // 路径格式: /api/avatar/{userId}
+    const userId = path.replace('/api/avatar/', '');
+    if (!userId) {
+        return new Response(JSON.stringify({ error: 'Missing userId' }), { status: 400, headers: corsHeaders });
+    }
+    // 查找 R2 中该用户的所有头像文件
+    const objects = await env.AVATAR_BUCKET.list({ prefix: `avatars/${userId}_` });
+    if (objects.objects.length === 0) {
+        return new Response(JSON.stringify({ error: 'Avatar not found' }), { status: 404, headers: corsHeaders });
+    }
+    // 取最新的一个（按上传时间排序）
+    const latestObject = objects.objects.sort((a, b) => (b.uploaded?.getTime() || 0) - (a.uploaded?.getTime() || 0))[0];
+    const object = await env.AVATAR_BUCKET.get(latestObject.key);
+    if (!object) {
+        return new Response(JSON.stringify({ error: 'Avatar file not found' }), { status: 404, headers: corsHeaders });
+    }
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('Cache-Control', 'public, max-age=86400'); // 缓存24小时
+    headers.set('etag', object.httpEtag);
+    // 合并 CORS 头
+    for (const [key, value] of Object.entries(corsHeaders)) {
+        headers.set(key, value);
+    }
+    return new Response(object.body, { headers });
 }

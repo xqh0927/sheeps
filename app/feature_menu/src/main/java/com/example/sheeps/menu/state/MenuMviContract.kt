@@ -57,7 +57,7 @@ data class MenuViewState(
     /** 应用版本更新信息 */
     val appUpdateInfo: AppUpdateResponse? = null,
     /** 当前生效的卡牌皮肤 ID */
-    val currentSkin: String = "shuang",
+    val currentSkin: String = "classic",
 
     // --- 在线匹配状态 ---
     /** 匹配状态：none (空闲), searching (匹配中), matched (已匹配), error (异常) */
@@ -146,7 +146,11 @@ sealed interface MenuViewIntent {
  */
 sealed interface MenuViewEffect {
     /** 显示提示消息 */
-    data class ShowToast(val message: String) : MenuViewEffect
+    data class ShowToast(
+        val message: String = "",
+        val resId: Int? = null,
+        val formatArgs: List<Any> = emptyList()
+    ) : MenuViewEffect
     /** 导航并跳转至游戏 Activity */
     data class NavigateToGame(val levelId: Int, val carryItemsJson: String) : MenuViewEffect
     /** 强制显示登录对话框 */

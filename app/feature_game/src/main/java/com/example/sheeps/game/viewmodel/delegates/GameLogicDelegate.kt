@@ -14,6 +14,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** 卡牌飞入卡槽的动画时长，与 GameAnimations.FlyTweenSpec (350ms) 保持一致 */
+private const val FLY_ANIMATION_DELAY_MS = 360L
+
 /**
  * ��Ϸ�����߼�ί����
  * �����Ƶ����ƥ���⡢��Ӯ�ж�
@@ -101,8 +104,10 @@ class GameLogicDelegate @Inject constructor() {
                         copy(boardTiles = calculateBlockedStates(state.boardTiles))
                     }
                 } else {
-                    // ���������λ �� tile.state �� updateState ����Э����ͬ�����
+                    // 普通棋盘牌落槽：等待飞行动画完成后再执行消除判断，
+                    // 避免 AAA 在卡牌视觉上还没落入卡槽时就被消除（卡牌凭空消失 bug）
                     setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+                    delay(FLY_ANIMATION_DELAY_MS)
                     processSlotMatch(
                         state.boardTiles,
                         newSlot ?: state.slotTiles,

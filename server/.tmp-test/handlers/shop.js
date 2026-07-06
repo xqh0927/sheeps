@@ -14,7 +14,14 @@ const helpers_1 = require("../helpers");
  */
 async function handleShopRoutes(request, env, path, lang) {
     const corsHeaders = (0, helpers_1.getCorsHeaders)();
-    // 1. 查询积分商城商品列表接口（支持多语言与 KV 缓存）
+    /**
+     * GET /api/shop/items — 查询积分商城商品列表（支持多语言与KV缓存）
+     *
+     * Query 参数（通过请求头 Accept-Language 解析）:
+     *   @param {string} [lang] — 语言标识（en / zh-CN / tw / ja / ko）
+     *
+     * 响应: [{ id, name, description, image_url, item_type, points_price, stock }]
+     */
     if (path === '/api/shop/items' && request.method === 'GET') {
         const cacheKey = `shop_items_${lang}`;
         // 读取 Cloudflare KV 缓存，减少频繁读库开销（缓存时间 10 分钟）
@@ -29,7 +36,18 @@ async function handleShopRoutes(request, env, path, lang) {
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
         return new Response(jsonStr, { headers: corsHeaders });
     }
-    // 2. 积分兑换商品/道具接口
+    /**
+     * POST /api/shop/exchange — 积分兑换道具（含库存扣减、背包写入、流水记录）
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {number} shop_item_id — 商品ID
+     *   @param {number} count — 兑换数量（≥1）
+     *
+     * 响应: { success, item_type, new_count, remaining_points }
+     */
     if (path === '/api/shop/exchange' && request.method === 'POST') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)

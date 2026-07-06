@@ -132,13 +132,22 @@ fun LevelItemRow(
                         fontFamily = FontFamily.Serif,
                         color      = if (isUnlocked) MaterialTheme.colorScheme.onBackground else Text_Disabled_Dark
                     )
+                    val descRes = remember(levelId) {
+                        val isRest = levelId >= 5 && levelId % 5 == 0
+                        val isBlind = !isRest && levelId >= 3 && levelId % 3 == 0
+                        val isSealed = !isRest && !isBlind && levelId >= 2 && levelId % 2 == 0
+
+                        when {
+                            levelId == 1 -> R.string.level_desc_1
+                            levelId == 2 -> R.string.level_desc_2
+                            levelId == 3 -> R.string.level_desc_3
+                            isBlind -> R.string.level_desc_blind
+                            isSealed -> R.string.level_desc_sealed
+                            else -> R.string.level_desc_hell
+                        }
+                    }
                     Text(
-                        text  = when (levelId) {
-                            1    -> stringResource(id = R.string.level_desc_1)
-                            2    -> stringResource(id = R.string.level_desc_2)
-                            3    -> stringResource(id = R.string.level_desc_3)
-                            else -> stringResource(id = R.string.level_desc_other)
-                        },
+                        text  = stringResource(id = descRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isUnlocked) MaterialTheme.colorScheme.onSurfaceVariant else Text_Disabled_Dark.copy(alpha = 0.6f)
                     )

@@ -1,6 +1,7 @@
 package com.example.sheeps.menu.viewmodel
 
 import androidx.lifecycle.viewModelScope
+import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseMviViewModel
 import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.core.preference.UserPreferences
@@ -222,7 +223,7 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("连接服务异常，已载入本地离线数据"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_offline_fallback))
             }
         }
     }
@@ -276,14 +277,19 @@ class MenuViewModel @Inject constructor(
                     saveLoginData(response)
                 } else {
                     updateState { copy(isLoading = false) }
-                    setEffect(MenuViewEffect.ShowToast("登录失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_login_failed))
                 }
             } catch (e: HttpException) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "登录失败，请稍后重试")))
+                val errorMsg = parseAuthError(e)
+                if (errorMsg != null) {
+                    setEffect(MenuViewEffect.ShowToast(message = errorMsg))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_login_failed_retry))
+                }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
             }
         }
     }
@@ -291,14 +297,14 @@ class MenuViewModel @Inject constructor(
     /**
      * 解析认证接口错误响应体，直接提取服务端返回的 error 字段
      */
-    private fun parseAuthError(e: HttpException, fallback: String): String {
+    private fun parseAuthError(e: HttpException): String? {
         return try {
             val errorBody = e.response()?.errorBody()?.string() ?: ""
             val errorJson = JSONObject(errorBody)
             val error = errorJson.optString("error", "")
-            error.ifBlank { fallback }
+            error.ifBlank { null }
         } catch (_: Exception) {
-            fallback
+            null
         }
     }
 
@@ -310,18 +316,23 @@ class MenuViewModel @Inject constructor(
                     com.example.sheeps.data.model.RegisterAuthRequest(phone, password, code)
                 )
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("注册成功，请登录"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_register_success))
                     updateState { copy(isLoading = false) }
                 } else {
                     updateState { copy(isLoading = false) }
-                    setEffect(MenuViewEffect.ShowToast("注册失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_register_failed))
                 }
             } catch (e: HttpException) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "注册失败，请稍后重试")))
+                val errorMsg = parseAuthError(e)
+                if (errorMsg != null) {
+                    setEffect(MenuViewEffect.ShowToast(message = errorMsg))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_register_failed_retry))
+                }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
             }
         }
     }
@@ -335,16 +346,21 @@ class MenuViewModel @Inject constructor(
                 )
                 updateState { copy(isLoading = false) }
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("密码重置成功"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_reset_password_success))
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("密码重置失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_reset_password_failed))
                 }
             } catch (e: HttpException) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "密码重置失败，请稍后重试")))
+                val errorMsg = parseAuthError(e)
+                if (errorMsg != null) {
+                    setEffect(MenuViewEffect.ShowToast(message = errorMsg))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_reset_password_failed_retry))
+                }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
             }
         }
     }
@@ -360,17 +376,22 @@ class MenuViewModel @Inject constructor(
                 )
                 updateState { copy(isLoading = false) }
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("密码设置成功！奖励 50 积分"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_set_password_success))
                     handleLoadData()
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("密码设置失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_set_password_failed))
                 }
             } catch (e: HttpException) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(parseAuthError(e, "密码设置失败，请稍后重试")))
+                val errorMsg = parseAuthError(e)
+                if (errorMsg != null) {
+                    setEffect(MenuViewEffect.ShowToast(message = errorMsg))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_set_password_failed_retry))
+                }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("网络连接异常，请稍后重试"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
             }
         }
     }
@@ -432,14 +453,14 @@ class MenuViewModel @Inject constructor(
                 })
 
                 handleLoadData()
-                setEffect(MenuViewEffect.ShowToast("登录成功！"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_login_success))
 
                 // 登录后检查是否已设置密码，若未设置则弹出强制设密对话框
                 if (!response.hasPassword) {
                     setEffect(MenuViewEffect.ShowSetPasswordDialog)
                 }
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("保存登录数据失败"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_save_login_data_failed))
             }
         }
     }
@@ -451,9 +472,9 @@ class MenuViewModel @Inject constructor(
         val target = current + change
 
         if (target < 0) return
-        if (target > stock) return setEffect(MenuViewEffect.ShowToast("携带数量超出库存上限"))
+        if (target > stock) return setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_carry_limit_exceeded))
         if (change > 0 && current == 0 && state.selectedCarryItems.count { it.value > 0 } >= 5) {
-            return setEffect(MenuViewEffect.ShowToast("最多只能选择5种道具"))
+            return setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_carry_limit_items))
         }
 
         val updated = state.selectedCarryItems.toMutableMap()
@@ -487,10 +508,10 @@ class MenuViewModel @Inject constructor(
                 val url = uploadResponse.avatarUrl ?: ""
                 prefs.setAvatarUrl(url)
                 updateState { copy(avatarUrl = url, isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("头像更新成功！"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_avatar_update_success))
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast("头像上传失败"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_avatar_upload_failed))
             }
         }
     }
@@ -500,9 +521,9 @@ class MenuViewModel @Inject constructor(
             try {
                 apiService.rename(RenameRequest(nickname))
                 updateState { copy(username = nickname) }
-                setEffect(MenuViewEffect.ShowToast("昵称修改成功！"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_nickname_update_success))
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("昵称修改失败"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_nickname_update_failed))
             }
         }
     }

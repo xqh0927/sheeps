@@ -61,9 +61,10 @@ function generateSolvableLevel(userId, levelId, seed) {
         const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
         // 棋盘基础网格大小，随关卡增加而变大，确保有足够坐标生成最多 300 张卡牌
         // 关卡 23+ 时 baseSize >= 17，保证最 restrictive 的形状（如 X 字形）也能生成 300+ 坐标
-        const baseSize = 6 + Math.floor(levelId / 2);
-        // 根据种子从 18 种不同的关卡异形轮廓中随机挑选一种进行图形网格过滤
-        const shapeType = seed % 18;
+        const baseSize = Math.min(6, 6 + Math.floor(levelId / 2));
+        // 引入关卡固定的布局种子，确保相同 levelId 产生完全一致的卡牌排布和总数量
+        const layoutSeed = levelId * 1000;
+        const shapeType = layoutSeed % 18;
         for (let z = 0; z < layersCount; z++) {
             // 网格尺寸逐层递减 1，偏移量逐层累加 0.5，形成向上收缩的金字塔堆叠
             const size = Math.max(3, baseSize - Math.floor(z / 3));
@@ -178,8 +179,8 @@ function generateSolvableLevel(userId, levelId, seed) {
                 }
             }
         }
-        // 洗牌坐标：使用确定性 LCG 打乱三维坐标列表
-        let rand = lcg(seed);
+        // 洗牌坐标：使用关卡固定的布局种子打乱三维坐标列表
+        let rand = lcg(layoutSeed);
         for (let i = possibleCoords.length - 1; i > 0; i--) {
             const j = Math.floor(rand() * (i + 1));
             const temp = possibleCoords[i];
@@ -201,16 +202,15 @@ function generateSolvableLevel(userId, levelId, seed) {
         coord: c,
         assignedType: -1
     }));
-    // 10% 物理重叠遮挡算法：用于判断 A 是否遮挡 B
-    const blocks = (a, b) => {
-        if (a.z <= b.z) {
-            return false;
-        }
+    // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积
+    const overlapArea = (a, b) => {
+        if (a.z <= b.z)
+            return 0;
         const dx = Math.abs(a.x - b.x);
         const dy = Math.abs(a.y - b.y);
-        const ox = Math.max(0, 48.0 - dx * 46.0);
-        const oy = Math.max(0, 48.0 - dy * 46.0);
-        return ox * oy > 230.4; // 重合面积必须大于 10% 单张牌面积 (48 * 48 = 2304)
+        const ox = Math.max(0, 46.0 - dx * 46.0);
+        const oy = Math.max(0, 46.0 - dy * 46.0);
+        return ox * oy;
     };
     const unassigned = new Set(nodes);
     let randAssign = lcg(seed + 100);
@@ -220,19 +220,13 @@ function generateSolvableLevel(userId, levelId, seed) {
     // 3. 将这 3 张牌从待涂色集合中移除，它们下方被压住的卡牌随之“暴露”。
     // 4. 重复上述步骤，直至所有卡牌涂色完成。因为花色分配逻辑与消除步骤完全镜像对称，所以逆向消去必定有解。
     while (unassigned.size > 0) {
-        const exposedNodes = [];
-        for (const node of unassigned) {
-            let isCovered = false;
-            for (const other of unassigned) {
-                if (other !== node && blocks(other.coord, node.coord)) {
-                    isCovered = true;
-                    break;
-                }
-            }
-            if (!isCovered) {
-                exposedNodes.push(node);
-            }
-        }
+        // 覆盖面积累计：累计所有更高层卡牌的覆盖面积，超过 25% 即视为遮挡
+        const exposedNodes = Array.from(unassigned).filter(node => {
+            const covered = Array.from(unassigned)
+                .filter(other => other !== node && other.coord.z > node.coord.z)
+                .reduce((sum, other) => sum + overlapArea(other.coord, node.coord), 0);
+            return covered < 46.0 * 46.0 * 0.01;
+        });
         // 若暴露的可用卡牌少于 3 张，进入回退容错：强制将余下全部卡牌 3 个一组随意涂上相同花色
         if (exposedNodes.length < 3) {
             const rem = Array.from(unassigned);
@@ -259,14 +253,14 @@ function generateSolvableLevel(userId, levelId, seed) {
             unassigned.delete(chosen);
         }
     }
-    // 基于 LCG 种子计算关卡附加类型：40% 正常关卡、40% 封印关卡、20% 盲盒关卡
-    let randType = lcg(seed + 500);
-    const typeRoll = randType();
-    // 盲盒关卡只在第 3 关及以上启用，概率为 20%
-    const isBlindLevel = levelId >= 3 && typeRoll < 0.20;
-    // 封印关卡在第 2 关及以上启用，概率为 40% (即 0.20 <= typeRoll < 0.60)
-    const isSealedLevel = levelId >= 2 && typeRoll >= 0.20 && typeRoll < 0.60;
-    let randProps = lcg(seed + 200);
+    // ===== 固定关卡类型规则（替代随机，与 Android 端对齐） =====
+    // 休息关（levelId % 5 == 0，levelId >= 5）：卡牌数量打八折
+    // 盲盒关（levelId % 3 == 0，levelId >= 3）：底层卡牌部分变盲盒
+    // 封印关（levelId % 2 == 0）：每张卡有概率带封印
+    // 优先级: 休息 > 盲盒 > 封印 > 普通
+    const isRest = (0, difficulty_1.isRestLevel)(levelId);
+    const isBlindLevel = !isRest && levelId >= 3 && levelId % 3 === 0;
+    const isSealedLevel = !isRest && !isBlindLevel && levelId >= 2 && levelId % 2 === 0;
     const maxZ = Math.max(...nodes.map(n => n.coord.z));
     // ===== 坐标归一化：质心对齐模式 =====
     // 目的：确保 Android 客户端渲染时卡牌不会因坐标跨度过大而变得极小
@@ -290,28 +284,38 @@ function generateSolvableLevel(userId, levelId, seed) {
     const targetCenter = 5.5; // 棋盘中心坐标（输出范围约 [0.5, 10.5]）
     const targetRadius = 4.8; // 最大半径，留出边距避免裁切
     const normScale2 = targetRadius / maxRadius;
-    return nodes.map((node) => {
-        let isBlind = false;
-        let sealedCount = 0;
-        const r = randProps();
-        if (isBlindLevel) {
-            const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
-            // 开局可读性保护：最表层 2~3 层卡牌禁止设为盲盒牌，保证前 3-5 步有可见消除入口
-            const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
-            if (r < blindProb && node.coord.z < limitZ) {
-                isBlind = true;
-            }
+    // 盲盒关卡：均匀分布固定数量的盲盒牌
+    let blindIndices;
+    if (isBlindLevel) {
+        const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
+        const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
+        const eligible = nodes.filter((n) => n.coord.z < limitZ);
+        const count = Math.max(1, Math.floor(eligible.length * blindProb));
+        // Fisher–Yates 洗牌取前 count 个
+        const indices = eligible.map((_, i) => i);
+        const randShuffle = lcg(seed + 200);
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(randShuffle() * (i + 1));
+            [indices[i], indices[j]] = [indices[j], indices[i]];
         }
-        else if (isSealedLevel) {
-            // 封印关卡中有 30% 概率给卡牌贴上解封符纸
-            if (r < 0.30) {
+        blindIndices = new Set(indices.slice(0, count).map(i => eligible[i].index));
+    }
+    else {
+        blindIndices = new Set();
+    }
+    let randProps = lcg(seed + 300);
+    return nodes.map((node) => {
+        const isBlind = blindIndices.has(node.index);
+        let sealedCount = 0;
+        if (!isBlindLevel && isSealedLevel) {
+            if (randProps() < 0.30) {
                 sealedCount = 1;
             }
         }
         return {
             id: `tile_${node.index}`,
-            x: targetCenter + (node.coord.x - centroidX) * normScale2,
-            y: targetCenter + (node.coord.y - centroidY) * normScale2,
+            x: node.coord.x,
+            y: node.coord.y,
             z: node.coord.z,
             type: node.assignedType,
             isBlind,

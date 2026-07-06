@@ -31,8 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 import com.example.sheeps.ui.components.SheepsLoading
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import kotlinx.coroutines.delay
@@ -62,6 +64,12 @@ fun RegisterScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var countdown by remember { mutableStateOf(0) }
 
+    val errInvalidPhone = stringResource(id = R.string.err_invalid_phone)
+    val pwdErrLength = stringResource(id = R.string.pwd_err_length)
+    val pwdErrNoAlphaDigit = stringResource(id = R.string.pwd_err_no_alpha_digit)
+    val pwdErrNotMatch = stringResource(id = R.string.pwd_err_not_match)
+    val pwdErrCodeLength = stringResource(id = R.string.pwd_err_code_length)
+
     LaunchedEffect(countdown) {
         if (countdown > 0) {
             delay(1000)
@@ -90,7 +98,7 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it; errorMsg = null },
-                        label = { Text("手机号") },
+                        label = { Text(stringResource(id = R.string.hint_phone)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -98,7 +106,7 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it; errorMsg = null },
-                        label = { Text("密码") },
+                        label = { Text(stringResource(id = R.string.hint_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -107,7 +115,7 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it; errorMsg = null },
-                        label = { Text("确认密码") },
+                        label = { Text(stringResource(id = R.string.hint_confirm_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -120,7 +128,7 @@ fun RegisterScreen(
                         OutlinedTextField(
                             value = code,
                             onValueChange = { code = it },
-                            label = { Text("验证码") },
+                            label = { Text(stringResource(id = R.string.hint_code)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -131,7 +139,7 @@ fun RegisterScreen(
                                     onSendCode(phone)
                                     countdown = 60
                                 } else {
-                                    errorMsg = "请输入正确的手机号"
+                                    errorMsg = errInvalidPhone
                                 }
                             },
                             enabled = countdown == 0,
@@ -140,7 +148,7 @@ fun RegisterScreen(
                             modifier = Modifier.height(48.dp)
                         ) {
                             Text(
-                                text = if (countdown > 0) "${countdown}s" else "获取",
+                                text = if (countdown > 0) "${countdown}s" else stringResource(id = R.string.btn_get_code),
                                 color = Color.White
                             )
                         }
@@ -148,7 +156,7 @@ fun RegisterScreen(
 
                     // 密码规则提示
                     Text(
-                        "6-20位，至少包含字母和数字",
+                        stringResource(id = R.string.pwd_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -168,14 +176,15 @@ fun RegisterScreen(
                     Button(
                         onClick = {
                             when {
-                                password.length < 6 || password.length > 20 -> errorMsg =
-                                    "密码长度需在6-20位之间"
+                                password.length < 6 || password.length > 20 -> errorMsg = pwdErrLength
 
                                 !password.any { it.isDigit() } || !password.any { it.isLetter() } -> errorMsg =
-                                    "密码需同时包含字母和数字"
+                                    pwdErrNoAlphaDigit
 
-                                password != confirmPassword -> errorMsg = "两次输入的密码不一致"
-                                code.length != 6 -> errorMsg = "请输入6位验证码"
+                                password != confirmPassword -> errorMsg = pwdErrNotMatch
+
+                                code.length != 6 -> errorMsg = pwdErrCodeLength
+
                                 else -> {
                                     onRegister(phone, password, code)
                                     onRegisterSuccess()
@@ -187,7 +196,7 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("注册", color = Color.White)
+                        Text(stringResource(id = R.string.btn_register), color = Color.White)
                     }
 
                     // 已有账号？去登录
@@ -197,7 +206,7 @@ fun RegisterScreen(
                     ) {
                         TextButton(onClick = onBack) {
                             Text(
-                                "已有账号？去登录",
+                                stringResource(id = R.string.hint_already_have_account),
                                 color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.bodySmall
                             )

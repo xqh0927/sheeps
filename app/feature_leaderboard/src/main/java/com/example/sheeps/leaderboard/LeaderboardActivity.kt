@@ -120,8 +120,7 @@ class LeaderboardActivity : BaseActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     Column(modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()) {
+                        .fillMaxSize()) {
                         LeaderboardAppBar(
                             levelId = levelId,
                             onBack = { finish() }

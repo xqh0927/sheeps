@@ -87,12 +87,12 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
 
         // KV 缓存避免频繁 D1 + HEAD 探测
-        const cacheKey = `update_check_${currentCode}`;
+        const cacheKey = `update_check_${currentCode}_${lang}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: corsHeaders });
 
         // 调用 update 模块进行 APK 的 HEAD 轻量级可用性探针检测与延迟缓存判定
-        const databaseUpdate = await getDatabaseAppUpdate(env, currentCode);
+        const databaseUpdate = await getDatabaseAppUpdate(env, currentCode, lang);
         const responseData = JSON.stringify(databaseUpdate);
         // 更新检测结果缓存 5 分钟（与 GitHub API 缓存对齐）
         await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });

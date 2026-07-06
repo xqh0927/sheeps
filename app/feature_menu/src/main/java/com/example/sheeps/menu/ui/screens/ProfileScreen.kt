@@ -31,6 +31,8 @@ import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarPickerDialog
 import com.example.sheeps.menu.ui.dialogs.ProfileChangePasswordDialog
 import com.hjq.toast.Toaster
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 
 /**
  * 个人资料编辑页
@@ -172,28 +174,29 @@ fun ProfileScreen(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "点击更换头像",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
-                )
+                     stringResource(id = R.string.click_to_change_avatar),
+                     style = MaterialTheme.typography.bodySmall,
+                     color = Color.Gray
+                 )
             }
 
             // ---- 昵称 ----
             item {
+                val context = LocalContext.current
                 OutlinedTextField(
                     value = nickname,
                     onValueChange = { nickname = it },
-                    label = { Text("昵称") },
+                    label = { Text(stringResource(id = R.string.hint_nickname)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     trailingIcon = {
                         IconButton(onClick = {
                             if (nickname.isNotBlank()) {
                                 onRename(state.phone, nickname)
-                                Toaster.show("昵称已更新")
+                                Toaster.show(context.getString(R.string.toast_nickname_updated))
                             }
                         }) {
-                            Icon(Icons.Default.Edit, contentDescription = "保存昵称")
+                            Icon(Icons.Default.Edit, contentDescription = stringResource(id = R.string.btn_save))
                         }
                     }
                 )
@@ -204,7 +207,7 @@ fun ProfileScreen(
                 OutlinedTextField(
                     value = state.phone,
                     onValueChange = {},
-                    label = { Text("手机号") },
+                    label = { Text(stringResource(id = R.string.hint_phone)) },
                     readOnly = true,
                     enabled = false,
                     modifier = Modifier.fillMaxWidth()
@@ -221,7 +224,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("修改密码", color = Color.White)
+                    Text(stringResource(id = R.string.dialog_title_change_password), color = Color.White)
                 }
             }
         }

@@ -38,8 +38,8 @@ android {
         applicationId = "com.example.sheeps"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.0.8"
+        versionCode = 1
+        versionName = "1.0.1"
     }
 
     buildTypes {

@@ -17,7 +17,16 @@ const CACHE_STAGE_CONFIG = new Map();
  */
 async function handleGameRoutes(request, env, path, url) {
     const corsHeaders = (0, helpers_1.getCorsHeaders)();
-    // 1. 获取关卡布局数据接口
+    /**
+     * GET /api/level — 获取关卡布局数据
+     *
+     * Query 参数:
+     *   @param {number} id — 关卡编号（必填）
+     *   @param {number} [seed] — 可选，随机种子（不传则服务端随机生成）
+     *   @param {number} [userId] — 可选，游客用户ID
+     *
+     * 响应: Tile[] 瓦片布局数组
+     */
     if (path === '/api/level' && request.method === 'GET') {
         const levelIdStr = url.searchParams.get('id');
         if (!levelIdStr)
@@ -28,7 +37,7 @@ async function handleGameRoutes(request, env, path, url) {
         const seedStr = url.searchParams.get('seed');
         // 若客户端未传种子，则在后端随机生成一个，保证离线与在线的关卡同源随机性
         const seed = seedStr ? parseInt(seedStr, 10) : Math.floor(Math.random() * 1000000) + 1;
-        const cacheKey = `${levelId}_${seed}`;
+        const cacheKey = `v4_${levelId}_${seed}`;
         // 仅在传了确定性种子时读缓存，随机种子每次都不一样无需缓存
         if (seedStr) {
             // 优先查内存缓存（最快）
@@ -69,7 +78,17 @@ async function handleGameRoutes(request, env, path, url) {
         }
         return new Response(layoutJson, { headers: corsHeaders });
     }
-    // 2. 扣除积分以解锁新关卡接口
+    /**
+     * POST /api/level/unlock — 消耗积分解锁关卡
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {number} level_id — 目标关卡编号
+     *
+     * 响应: { success: true, current_points: <number> }
+     */
     if (path === '/api/level/unlock' && request.method === 'POST') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -99,7 +118,18 @@ async function handleGameRoutes(request, env, path, url) {
         ]);
         return new Response(JSON.stringify({ success: true, current_points: newPoints }), { headers: corsHeaders });
     }
-    // 3. 安全提交并校验通关成绩接口
+    /**
+     * POST /api/score/submit — 提交通关成绩（含防作弊签名校验）
+     *
+     * 请求体 (JSON):
+     *   @param {string} user_id — 用户ID
+     *   @param {number} level_id — 关卡编号
+     *   @param {number} clear_time_ms — 通关耗时（毫秒）
+     *   @param {number} score — 得分
+     *   @param {string} sign — SHA256 防作弊签名
+     *
+     * 响应: { success, first_clear, points_reward }
+     */
     if (path === '/api/score/submit' && request.method === 'POST') {
         const body = await request.json();
         if (!body.sign)
@@ -139,9 +169,32 @@ async function handleGameRoutes(request, env, path, url) {
         mutations.push(env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, Date.now()));
         if (mutations.length > 0)
             await env.DB.batch(mutations);
+        // P0-1 修复：遍历用户任务，更新 PLAY_ 前缀的每日任务进度
+        const userTasks = tasksResult.results;
+        if (userTasks && userTasks.length > 0) {
+            const taskMutations = [];
+            for (const ut of userTasks) {
+                if (ut.task_id.startsWith('PLAY_') && ut.is_completed === 0) {
+                    const newProgress = (ut.progress || 0) + 1;
+                    const targetCount = ut.target_count || 999;
+                    const completed = newProgress >= targetCount;
+                    taskMutations.push(env.DB.prepare('UPDATE user_task SET progress = ?, is_completed = ? WHERE user_id = ? AND task_id = ? AND task_date = ?')
+                        .bind(newProgress, completed ? 1 : 0, resolvedUserId, ut.task_id, chinaToday));
+                }
+            }
+            if (taskMutations.length > 0)
+                await env.DB.batch(taskMutations);
+        }
         return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
     }
-    // 4. 每日签到接口
+    /**
+     * POST /api/sign/today — 每日签到领取积分
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 响应: { success, streak, reward_points, current_points }
+     */
     if (path === '/api/sign/today' && request.method === 'POST') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -165,16 +218,31 @@ async function handleGameRoutes(request, env, path, url) {
         const rewardPoints = rewards[Math.min(newStreak, 7) - 1] || 20;
         const newPoints = (userResult.results[0]?.points || 0) + rewardPoints;
         // 签到事务原子入库
+        // P0-1 修复：签到成功后自动领取 SIGN_IN_ONCE 的 10 积分
+        const signInOnceReward = 10;
+        const totalNewPoints = newPoints + signInOnceReward;
         await env.DB.batch([
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
+            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(totalNewPoints, authUser.userId),
             env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)').bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()),
-            // 更新每日签到任务状态为已完成
-            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 0)
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', totalNewPoints, Date.now()),
+            // 签到任务积分自动领取
+            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', signInOnceReward, 'SIGN_IN_ONCE', totalNewPoints, Date.now()),
+            // 更新每日签到任务状态为已完成且已领取
+            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 1)
         ]);
-        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints, current_points: newPoints }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints + signInOnceReward, current_points: totalNewPoints }), { headers: corsHeaders });
     }
-    // 5. 排行榜列表查询接口
+    /**
+     * GET /api/leaderboard — 排行榜查询（分页、按时间维度筛选）
+     *
+     * Query 参数:
+     *   @param {number} level_id — 关卡编号（必填）
+     *   @param {string} [type="history"] — 排行类型：daily / weekly / history
+     *   @param {number} [page=1] — 页码
+     *   @param {number} [limit=20] — 每页条数
+     *
+     * 响应: { success, rankings: [{ username, avatar, clear_time_ms, score, achieved_at }] }
+     */
     if (path === '/api/leaderboard' && request.method === 'GET') {
         const levelIdStr = url.searchParams.get('level_id');
         if (!levelIdStr)
@@ -204,7 +272,14 @@ async function handleGameRoutes(request, env, path, url) {
         await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });
         return new Response(responseData, { headers: corsHeaders });
     }
-    // 6. 每日弹窗（返回昨日积分榜前三名 + 当前用户昨日排名）
+    /**
+     * GET /api/leaderboard/daily-popup — 每日弹窗（昨日积分榜TOP3 + 当前用户排名）
+     *
+     * 请求头:
+     *   Authorization: Bearer <token> （可选，未登录返回 rank=0）
+     *
+     * 响应: { success, top3: [{ username, points }], yesterdayRank: <number> }
+     */
     if (path === '/api/leaderboard/daily-popup' && request.method === 'GET') {
         const authUser1 = await (0, helpers_1.getAuthenticatedUser)(request, env);
         const now1 = Date.now();
@@ -219,8 +294,7 @@ async function handleGameRoutes(request, env, path, url) {
             top3 = JSON.parse(top3Raw);
         }
         else {
-            // 按用户名去重，同一用户名取最高总分（避免不同用户取到相同随机名）
-            const top3Result = await env.DB.prepare('SELECT username, MAX(points) as points FROM (SELECT u.username, SUM(l.score) as points FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.achieved_at >= ?1 AND l.achieved_at <= ?2 GROUP BY l.user_id) GROUP BY username ORDER BY points DESC LIMIT 3').bind(yesterdayStart1, yesterdayEnd1).all();
+            const top3Result = await env.DB.prepare('SELECT u.username, SUM(l.score) as points FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.achieved_at >= ?1 AND l.achieved_at <= ?2 GROUP BY l.user_id ORDER BY points DESC LIMIT 3').bind(yesterdayStart1, yesterdayEnd1).all();
             top3 = top3Result.results;
             await env.SHEEPS_CACHE.put(top3CacheKey, JSON.stringify(top3), { expirationTtl: 600 });
         }

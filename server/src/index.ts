@@ -1,5 +1,5 @@
 import { Env } from './types';
-import { getCorsHeaders, getLangSuffix } from './helpers';
+import { getCorsHeaders, getLangSuffix, translateErrorMessage } from './helpers';
 import { handleWebSocketSession } from './websocket';
 import { handleAuthRoutes } from './handlers/auth';
 import { handleMatchRoutes } from './handlers/match';
@@ -186,6 +186,27 @@ export default {
 
       // 如果对应的业务路由匹配并成功响应则直接返回；否则抛出 404 Not Found
       let finalResponse = response || new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: corsHeaders });
+
+      // JSON 错误国际化翻译
+      if (finalResponse.headers.get('Content-Type')?.includes('application/json')) {
+        try {
+          const responseClone = finalResponse.clone();
+          const jsonBody = await responseClone.json() as any;
+          if (jsonBody && typeof jsonBody === 'object' && jsonBody.error) {
+            const originalError = jsonBody.error;
+            const translatedError = translateErrorMessage(originalError, lang);
+            if (translatedError !== originalError) {
+              jsonBody.error = translatedError;
+              finalResponse = new Response(JSON.stringify(jsonBody), {
+                status: finalResponse.status,
+                headers: finalResponse.headers
+              });
+            }
+          }
+        } catch (_) {
+          // 忽略解析错误
+        }
+      }
 
       // 5. 加密中间件：若原始请求是加密的，则加密响应体
       if (wasEncrypted) {

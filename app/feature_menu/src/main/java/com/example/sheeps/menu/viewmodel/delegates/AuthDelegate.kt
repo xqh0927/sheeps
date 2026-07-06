@@ -1,5 +1,6 @@
 package com.example.sheeps.menu.viewmodel.delegates
 
+import com.example.sheeps.core.R
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
@@ -35,20 +36,20 @@ class AuthDelegate @Inject constructor(
         setEffect: (MenuViewEffect) -> Unit
     ) {
         if (phone.length != 11) {
-            setEffect(MenuViewEffect.ShowToast("请输入正确的11位手机号"))
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_phone_invalid))
             return
         }
         scope.launch {
             try {
                 val response = apiService.sendCode(SendCodeRequest(phone))
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("验证码已发送！测试码为：${response.code}"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_success, formatArgs = listOf(response.code ?: "")))
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("验证码发送失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_failed))
                 }
             } catch (e: Exception) {
                 LogUtils.e("sendCode失败", e)
-                setEffect(MenuViewEffect.ShowToast("网络错误，发送失败"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_network_error))
             }
         }
     }
@@ -66,7 +67,7 @@ class AuthDelegate @Inject constructor(
         setEffect: (MenuViewEffect) -> Unit
     ) {
         if (phone.length != 11 || code.length != 6) {
-            setEffect(MenuViewEffect.ShowToast("请输入正确的手机号和6位验证码"))
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_phone_code_invalid))
             return
         }
         setLoading(true)
@@ -86,11 +87,11 @@ class AuthDelegate @Inject constructor(
                     }
                 } else {
                     setLoading(false)
-                    setEffect(MenuViewEffect.ShowToast("登录验证失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_login_verification_failed))
                 }
             } catch (e: Exception) {
                 setLoading(false)
-                setEffect(MenuViewEffect.ShowToast("验证码错误或已失效"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_code_invalid_or_expired))
             }
         }
     }
@@ -117,14 +118,14 @@ class AuthDelegate @Inject constructor(
                 val now = System.currentTimeMillis()
                 if (useLocal) {
                     resolveWithLocal(response, now)
-                    setEffect(MenuViewEffect.ShowToast("已保留本地进度并同步至云端！"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolved_local))
                 } else {
                     resolveWithCloud(response, now)
-                    setEffect(MenuViewEffect.ShowToast("已成功加载云端存档进度！"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolved_cloud))
                 }
                 onComplete()
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("存档冲突解决异常，请检查网络"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolve_error))
             } finally {
                 setLoading(false)
             }
@@ -197,7 +198,7 @@ class AuthDelegate @Inject constructor(
                 UserProgressEntity(levelId = 1, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
             )
 
-            setEffect(MenuViewEffect.ShowToast("已退出登录，清除本地缓存"))
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_logout_success))
             // 确保加载指示器有足够渲染时间
             kotlinx.coroutines.delay(400L)
             onComplete()

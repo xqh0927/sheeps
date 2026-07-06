@@ -21,6 +21,7 @@ fun getLocalizedItemName(itemType: String): String {
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan)
         "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai)
         "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng)
+        "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang)
         "CLASSIC" -> stringResource(id = R.string.item_skin_classic)
         else -> itemType
     }
@@ -43,6 +44,7 @@ fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan_desc)
         "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai_desc)
         "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng_desc)
+        "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang_desc)
         "CLASSIC" -> stringResource(id = R.string.item_skin_classic_desc)
         else -> defaultDesc ?: stringResource(id = R.string.default_item_desc)
     }
@@ -65,6 +67,8 @@ fun getLocalizedSource(source: String): String {
     return when (source.uppercase()) {
         "FIRST_CLEAR" -> stringResource(id = R.string.points_source_first_clear)
         "SIGN_IN" -> stringResource(id = R.string.points_source_sign_in)
+        "SIGN_IN_ONCE" -> stringResource(id = R.string.points_source_sign_in_once)
+        "SET_PASSWORD" -> stringResource(id = R.string.points_source_set_password)
         else -> source
     }
 }

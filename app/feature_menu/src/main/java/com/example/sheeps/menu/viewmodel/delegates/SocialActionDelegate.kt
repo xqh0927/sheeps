@@ -1,6 +1,7 @@
 package com.example.sheeps.menu.viewmodel.delegates
 
 import com.apkfuns.logutils.LogUtils
+import com.example.sheeps.core.R
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
@@ -56,7 +57,7 @@ class SocialActionDelegate @Inject constructor(
                 val response = apiService.signIn("Bearer $token")
 
                 if (!response.success) {
-                    setEffect(MenuViewEffect.ShowToast("签到失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_sign_in_failed))
                     return@launch // 直接返回，会触发 finally 里的回滚
                 }
 
@@ -64,7 +65,7 @@ class SocialActionDelegate @Inject constructor(
                 withContext(NonCancellable) {
                     isConfirmedByServer = true
 
-                    setEffect(MenuViewEffect.ShowToast("签到成功！连续签到第 ${response.streak} 天，获得 ${response.reward_points} 积分！"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_sign_in_success, formatArgs = listOf(response.streak, response.reward_points)))
                     updateLocalPoints(response.current_points, false)
                     prefs.setPoints(response.current_points)
                     prefs.setTodaySigned(true)
@@ -80,7 +81,7 @@ class SocialActionDelegate @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 LogUtils.e("SignIn failed: ${e::class.simpleName} — ${e.message}", e)
-                setEffect(MenuViewEffect.ShowToast("签到失败，请检查网络后重试"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_sign_in_failed_retry))
             } finally {
                 // 【核心安全网】如果走到这里时，服务端没有确认成功（网络报错、接口返回false、或者用户关闭页面导致协程取消）
                 // 必须使用 NonCancellable 将预扣的 20 积分完美回滚！
@@ -107,11 +108,11 @@ class SocialActionDelegate @Inject constructor(
     ) {
         val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
         val item = shopItems.find { it.id == shopItemId }
-            ?: return setEffect(MenuViewEffect.ShowToast("道具未找到"))
+            ?: return setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_item_not_found))
 
         val totalCost = item.points_price * count
         if (prefs.getPoints() < totalCost) {
-            setEffect(MenuViewEffect.ShowToast("兑换失败，积分余额不足"))
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_points_insufficient))
             return
         }
 
@@ -138,15 +139,15 @@ class SocialActionDelegate @Inject constructor(
                 val response =
                     apiService.exchangeItem("Bearer $token", ExchangeRequest(shopItemId, count))
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("兑换成功，已加入背包！"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_exchange_success))
                     localDao.clearProfileDirty(prefs.getUserId())
                     localDao.clearItemDirty(item.item_type)
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("云端兑换失败，回滚本地扣减"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_exchange_failed_cloud))
                     onComplete()
                 }
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("连接受限，积分本地扣减，已记录入背包，稍后将自动同步"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_exchange_offline))
             }
         }
     }
@@ -175,15 +176,15 @@ class SocialActionDelegate @Inject constructor(
 
                 val response = apiService.claimTaskReward("Bearer $token", TaskClaimRequest(taskId))
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("任务奖励领取成功！积分已增加"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_task_claim_success))
                     localDao.clearProfileDirty(prefs.getUserId())
                     onComplete()
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("领奖失败"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_task_claim_failed))
                     onComplete()
                 }
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("网络连通受限，积分已加入本地，稍后同步"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_task_claim_offline))
             }
         }
     }
@@ -206,7 +207,7 @@ class SocialActionDelegate @Inject constructor(
         }
 
         if (prefs.getPoints() < cost) {
-            setEffect(MenuViewEffect.ShowToast("解锁失败，积分余额不足"))
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_failed_insufficient))
             return
         }
 
@@ -231,15 +232,15 @@ class SocialActionDelegate @Inject constructor(
 
                 val response = apiService.unlockLevel("Bearer $token", UnlockLevelRequest(levelId))
                 if (response.success) {
-                    setEffect(MenuViewEffect.ShowToast("积分子系统扣除成功！第 ${levelId} 关已解锁"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_success_level, formatArgs = listOf(levelId)))
                     localDao.clearProfileDirty(prefs.getUserId())
                     localDao.clearProgressDirty(levelId)
                 } else {
-                    setEffect(MenuViewEffect.ShowToast("解锁失败，云端同步拒绝"))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_failed_cloud))
                     onComplete()
                 }
             } catch (e: Exception) {
-                setEffect(MenuViewEffect.ShowToast("连接不畅，已扣减积分本地解锁，后续有网自动同步"))
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_offline))
             }
         }
     }

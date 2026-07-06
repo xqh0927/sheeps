@@ -3,6 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.apkExistenceCache = void 0;
 exports.checkApkExists = checkApkExists;
 exports.getDatabaseAppUpdate = getDatabaseAppUpdate;
+exports.parseReleaseVersionCode = parseReleaseVersionCode;
+exports.findApkAsset = findApkAsset;
+exports.isForceUpdateRelease = isForceUpdateRelease;
+exports.mapGitHubReleaseToUpdate = mapGitHubReleaseToUpdate;
+exports.clearApkCache = clearApkCache;
 // Github 接口及缓存策略
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/xqh0927/sheeps-releases/releases/latest';
 const GITHUB_RELEASE_CACHE_TTL_MS = 5 * 60 * 1000; // API 响应缓存 5 分钟
@@ -53,4 +58,45 @@ async function getDatabaseAppUpdate(env, currentCode) {
         }
     }
     return { has_update: false };
+}
+function parseReleaseVersionCode(tagName) {
+    if (!tagName)
+        return null;
+    const semanticMatch = tagName.match(/v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i);
+    if (!semanticMatch)
+        return null;
+    const major = Number.parseInt(semanticMatch[1], 10);
+    const minor = semanticMatch[2] ? Number.parseInt(semanticMatch[2], 10) : 0;
+    const patch = semanticMatch[3] ? Number.parseInt(semanticMatch[3], 10) : 0;
+    if (!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(patch)) {
+        return null;
+    }
+    return major * 10000 + minor * 100 + patch;
+}
+function findApkAsset(assets) {
+    return assets?.find(asset => Boolean(asset.browser_download_url) && Boolean(asset.name?.toLowerCase().endsWith('.apk'))) ?? null;
+}
+function isForceUpdateRelease(body) {
+    if (!body)
+        return false;
+    return /\[(force|force_update|强制更新|強制更新)\]|force_update\s*[:=]\s*true/i.test(body);
+}
+function mapGitHubReleaseToUpdate(release, currentCode) {
+    if (release.draft)
+        return null;
+    const versionCode = parseReleaseVersionCode(release.tag_name);
+    const apkAsset = findApkAsset(release.assets);
+    if (!versionCode || !apkAsset?.browser_download_url || versionCode <= currentCode) {
+        return { has_update: false };
+    }
+    return {
+        has_update: true,
+        version_name: release.name || release.tag_name,
+        apk_url: apkAsset.browser_download_url,
+        update_log: release.body || '发现新版本，建议更新以获得更好的游戏体验。',
+        force_update: isForceUpdateRelease(release.body)
+    };
+}
+function clearApkCache() {
+    exports.apkExistenceCache.clear();
 }

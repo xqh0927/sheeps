@@ -15,6 +15,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * 强制设密对话框
@@ -29,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 fun SetPasswordDialog(
     onSetPassword: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -41,16 +43,16 @@ fun SetPasswordDialog(
             onDismissRequest = { /* 不可关闭 */ },
             title = {
                 Text(
-                    text = "\uD83D\uDD10 设置登录密码",
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                fontFamily = FontFamily.Serif
-            )
+                    text = stringResource(id = R.string.set_password_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontFamily = FontFamily.Serif
+                )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "为保障账号安全，请设置密码（后续可用密码快捷登录）",
+                    text = stringResource(id = R.string.set_password_desc),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
@@ -61,7 +63,7 @@ fun SetPasswordDialog(
                         password = it
                         errorMsg = null
                     },
-                    label = { Text("新密码") },
+                    label = { Text(stringResource(id = R.string.label_new_password)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     isError = errorMsg != null,
@@ -74,7 +76,7 @@ fun SetPasswordDialog(
                         confirmPassword = it
                         errorMsg = null
                     },
-                    label = { Text("确认密码") },
+                    label = { Text(stringResource(id = R.string.label_confirm_password)) },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     isError = errorMsg != null,
@@ -82,7 +84,7 @@ fun SetPasswordDialog(
                 )
 
                 Text(
-                    text = "6-20位，至少包含字母和数字",
+                    text = stringResource(id = R.string.password_length_rule),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
@@ -102,13 +104,13 @@ fun SetPasswordDialog(
                     // 密码校验
                     when {
                         password.length < 6 || password.length > 20 -> {
-                            errorMsg = "密码长度需在6-20位之间"
+                            errorMsg = context.getString(R.string.pwd_err_length)
                         }
                         !password.any { it.isDigit() } || !password.any { it.isLetter() } -> {
-                            errorMsg = "密码需同时包含字母和数字"
+                            errorMsg = context.getString(R.string.pwd_err_alphanumeric)
                         }
                         password != confirmPassword -> {
-                            errorMsg = "两次输入的密码不一致"
+                            errorMsg = context.getString(R.string.pwd_err_mismatch)
                         }
                         else -> {
                             onSetPassword(password)
@@ -117,7 +119,7 @@ fun SetPasswordDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text("确认设置（完成后奖励 50 积分）", color = Color.White)
+                Text(stringResource(id = R.string.btn_confirm_set_pwd_reward), color = Color.White)
             }
         },
             shape = RoundedCornerShape(16.dp)

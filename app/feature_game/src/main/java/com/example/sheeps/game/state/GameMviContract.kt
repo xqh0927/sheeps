@@ -90,7 +90,7 @@ data class GameViewState(
     /** 排行榜数据 */
     val rankings: List<RankingEntry> = emptyList(),
     /** 当前使用的卡牌皮肤主题名称 */
-    val currentSkin: String = "shuang",
+    val currentSkin: String = "classic",
     /** 正在抖动的卡牌 ID 集合（用于提示遮挡） */
     val shakingTileIds: Set<String> = emptySet(),
     /** 是否展示携带道具选择弹窗 */

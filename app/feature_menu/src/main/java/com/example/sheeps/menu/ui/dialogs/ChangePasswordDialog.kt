@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +50,11 @@ fun ChangePasswordDialog(
     var countdown by remember { mutableStateOf(0) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
+    val pwdErrLength = stringResource(id = R.string.pwd_err_length)
+    val pwdErrNoAlphaDigit = stringResource(id = R.string.pwd_err_no_alpha_digit)
+    val pwdErrNotMatch = stringResource(id = R.string.pwd_err_not_match)
+    val pwdErrCodeLength = stringResource(id = R.string.pwd_err_code_length)
+
     LaunchedEffect(countdown) {
         if (countdown > 0) {
             delay(1000)
@@ -63,7 +70,7 @@ fun ChangePasswordDialog(
             onDismissRequest = onDismiss,
             title = {
                 Text(
-                    "修改密码",
+                    stringResource(id = R.string.dialog_title_change_password),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
@@ -72,7 +79,7 @@ fun ChangePasswordDialog(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "当前账户：$currentPhone",
+                        stringResource(id = R.string.current_account_prefix, currentPhone),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -83,7 +90,7 @@ fun ChangePasswordDialog(
                         OutlinedTextField(
                             value = code,
                             onValueChange = { code = it; errorMsg = null },
-                            label = { Text("验证码") },
+                            label = { Text(stringResource(id = R.string.hint_code)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -99,7 +106,7 @@ fun ChangePasswordDialog(
                             modifier = Modifier.height(48.dp)
                         ) {
                             Text(
-                                text = if (countdown > 0) "${countdown}s" else "获取",
+                                text = if (countdown > 0) "${countdown}s" else stringResource(id = R.string.btn_get_code),
                                 color = Color.White,
                                 fontSize = 12.sp
                             )
@@ -108,7 +115,7 @@ fun ChangePasswordDialog(
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it; errorMsg = null },
-                        label = { Text("新密码") },
+                        label = { Text(stringResource(id = R.string.hint_new_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -116,13 +123,13 @@ fun ChangePasswordDialog(
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it; errorMsg = null },
-                        label = { Text("确认密码") },
+                        label = { Text(stringResource(id = R.string.hint_confirm_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        "6-20位，至少包含字母和数字",
+                        stringResource(id = R.string.pwd_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -139,21 +146,21 @@ fun ChangePasswordDialog(
                 Button(
                     onClick = {
                         when {
-                            newPassword.length < 6 || newPassword.length > 20 -> errorMsg = "密码长度需在6-20位之间"
-                            !newPassword.any { it.isDigit() } || !newPassword.any { it.isLetter() } -> errorMsg = "密码需同时包含字母和数字"
-                            newPassword != confirmPassword -> errorMsg = "两次输入的密码不一致"
-                            code.length != 6 -> errorMsg = "请输入6位验证码"
+                            newPassword.length < 6 || newPassword.length > 20 -> errorMsg = pwdErrLength
+                            !newPassword.any { it.isDigit() } || !newPassword.any { it.isLetter() } -> errorMsg = pwdErrNoAlphaDigit
+                            newPassword != confirmPassword -> errorMsg = pwdErrNotMatch
+                            code.length != 6 -> errorMsg = pwdErrCodeLength
                             else -> onChangePassword(code, newPassword)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("确认", color = Color.White)
+                    Text(stringResource(id = R.string.btn_confirm), color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("取消", color = Color.Gray)
+                    Text(stringResource(id = R.string.btn_cancel), color = Color.Gray)
                 }
             },
             shape = RoundedCornerShape(16.dp)

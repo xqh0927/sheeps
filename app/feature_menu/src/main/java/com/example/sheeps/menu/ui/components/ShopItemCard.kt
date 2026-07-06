@@ -60,7 +60,7 @@ fun ShopItemCard(
 ) {
     val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
     val isUnlocked =
-        if (item.item_type == "CLASSIC" || item.item_type == "SKIN_SHUANG") true else backpackCount >= 1
+        if (item.item_type == "CLASSIC") true else backpackCount >= 1
 
     val skinKey = remember(item.item_type) {
         if (item.item_type == "CLASSIC") {

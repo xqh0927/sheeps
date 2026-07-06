@@ -169,10 +169,11 @@ fun ShopScreen(
                         it.item_type == "CLASSIC" || it.item_type == "SKIN_INK" || it.item_type == "SKIN_CYBER"
                     }
                     val animatedSkins = displayItems.filter {
-                        it.item_type == "SKIN_KEAI" || it.item_type == "SKIN_DAIMENG"
+                        it.item_type == "SKIN_SHUANG" || it.item_type == "SKIN_KEAI" || it.item_type == "SKIN_DAIMENG"
                     }
                     val provinceSkins = displayItems.filter {
                         it.item_type.startsWith("SKIN_") && 
+                        it.item_type != "SKIN_SHUANG" &&
                         it.item_type != "SKIN_INK" && it.item_type != "SKIN_CYBER" &&
                         it.item_type != "SKIN_KEAI" && it.item_type != "SKIN_DAIMENG"
                     }

@@ -16,11 +16,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 
 @Composable
 fun NicknameEditDialog(
@@ -38,7 +40,7 @@ fun NicknameEditDialog(
             onDismissRequest = onDismiss,
             title = {
                 Text(
-                    "修改昵称",
+                    stringResource(id = R.string.dialog_title_change_nickname),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     fontFamily = FontFamily.Serif
@@ -48,7 +50,7 @@ fun NicknameEditDialog(
                 OutlinedTextField(
                     value = nickname,
                     onValueChange = { nickname = it },
-                    label = { Text("昵称") },
+                    label = { Text(stringResource(id = R.string.hint_nickname)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -62,12 +64,12 @@ fun NicknameEditDialog(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("保存", color = Color.White)
+                    Text(stringResource(id = R.string.btn_save), color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = onDismiss) {
-                    Text("取消", color = Color.Gray)
+                    Text(stringResource(id = R.string.btn_cancel), color = Color.Gray)
                 }
             },
             shape = RoundedCornerShape(16.dp)

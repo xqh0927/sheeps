@@ -24,8 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,38 +46,38 @@ fun ProfileChangePasswordDialog(
     ) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("修改密码") },
+            title = { Text(stringResource(id = R.string.dialog_title_change_password)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
                         value = phone, onValueChange = { phone = it },
-                        label = { Text("手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth()
+                        label = { Text(stringResource(id = R.string.hint_phone)) }, singleLine = true, modifier = Modifier.fillMaxWidth()
                     )
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedTextField(
                             value = code, onValueChange = { code = it },
-                            label = { Text("验证码") }, singleLine = true, modifier = Modifier.weight(1f)
+                            label = { Text(stringResource(id = R.string.hint_code)) }, singleLine = true, modifier = Modifier.weight(1f)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = { if (phone.length == 11) onSendCode(phone) },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                             shape = RoundedCornerShape(8.dp)
-                        ) { Text("获取") }
+                        ) { Text(stringResource(id = R.string.btn_get_code)) }
                     }
                     OutlinedTextField(
                         value = newPassword, onValueChange = { newPassword = it },
-                        label = { Text("新密码") }, singleLine = true,
+                        label = { Text(stringResource(id = R.string.hint_new_password)) }, singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                Button(onClick = { onChangePassword(phone, code, newPassword) }) { Text("确认") }
+                Button(onClick = { onChangePassword(phone, code, newPassword) }) { Text(stringResource(id = R.string.btn_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.btn_cancel)) }
             }
         )
     }

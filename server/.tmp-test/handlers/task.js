@@ -14,7 +14,17 @@ const helpers_1 = require("../helpers");
  */
 async function handleTaskRoutes(request, env, path, lang) {
     const corsHeaders = (0, helpers_1.getCorsHeaders)();
-    // 1. 查询每日任务列表及进度接口
+    /**
+     * GET /api/task/daily — 查询每日任务列表及当前进度
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * Query 参数（通过请求头 Accept-Language 解析）:
+     *   @param {string} [lang] — 语言标识
+     *
+     * 响应: [{ task_id, name, description, progress, target_count, is_completed, is_rewarded, points_reward }]
+     */
     if (path === '/api/task/daily' && request.method === 'GET') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)
@@ -42,9 +52,30 @@ async function handleTaskRoutes(request, env, path, lang) {
         // 批量将缺失的进度条目插入 D1 数据库
         if (inserts.length > 0)
             await env.DB.batch(inserts);
+        // 修复：如果用户今天已签到但 SIGN_IN_ONCE 任务状态未同步（如老用户已签到但任务数据未更新），自动修复
+        const signInTask = list.find(t => t.task_id === 'SIGN_IN_ONCE');
+        if (signInTask && !signInTask.is_completed) {
+            const signRecord = await env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday).first();
+            if (signRecord) {
+                await env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 1).run();
+                signInTask.progress = 1;
+                signInTask.is_completed = true;
+                signInTask.is_rewarded = true;
+            }
+        }
         return new Response(JSON.stringify(list), { headers: corsHeaders });
     }
-    // 2. 领取任务积分奖励接口
+    /**
+     * POST /api/task/claim — 领取任务积分奖励
+     *
+     * 请求头:
+     *   Authorization: Bearer <token>
+     *
+     * 请求体 (JSON):
+     *   @param {string} task_id — 任务ID
+     *
+     * 响应: { success, current_points }
+     */
     if (path === '/api/task/claim' && request.method === 'POST') {
         const authUser = await (0, helpers_1.getAuthenticatedUser)(request, env);
         if (!authUser)

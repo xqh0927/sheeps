@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -43,14 +44,16 @@ fun SheepsTopAppBar(
     ) {
         Box(
             modifier = Modifier
+                .statusBarsPadding()
                 .fillMaxWidth()
-                .height(44.dp)
                 .padding(horizontal = 4.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
             ) {
                 IconButton(onClick = onBack) {
                     Icon(

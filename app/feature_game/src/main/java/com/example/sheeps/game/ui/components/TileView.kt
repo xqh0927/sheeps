@@ -65,7 +65,7 @@ import com.example.sheeps.game.ui.animations.GameAnimations
 fun TileView(
     tile: Tile,
     onClick: () -> Unit,
-    currentSkin: String = "shuang",
+    currentSkin: String = "classic",
     modifier: Modifier = Modifier,
     tileSize: Dp = 48.dp,
     isShaking: Boolean = false,

@@ -139,7 +139,7 @@ class UserPreferences @Inject constructor(
     }
 
     fun getCurrentSkin(): String {
-        return kv.decodeString("current_skin", "shuang") ?: "shuang"
+        return kv.decodeString("current_skin", "classic") ?: "classic"
     }
 
     fun setCurrentSkin(skin: String) {

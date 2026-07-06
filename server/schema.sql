@@ -203,19 +203,23 @@ CREATE TABLE IF NOT EXISTS app_version (
     version_name TEXT NOT NULL,
     apk_url TEXT NOT NULL,
     update_log TEXT,
+    update_log_en TEXT,
+    update_log_tw TEXT,
+    update_log_ja TEXT,
+    update_log_ko TEXT,
     is_force_update INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL
 );
 
-INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES
-(1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 0, 1720000000000);
+INSERT INTO app_version (version_code, version_name, apk_url, update_log, update_log_en, update_log_tw, update_log_ja, update_log_ko, is_force_update, created_at) VALUES
+(1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 'Initial release', '初始版本發布', '初期リリース', '초기 버전 출시', 0, 1720000000000);
 
 INSERT INTO shop_items (id, name, description, name_en, description_en, name_tw, description_tw, name_ja, description_ja, name_ko, description_ko, item_type, points_price, stock) VALUES 
 (9, '水墨江山 (卡牌皮肤)', '古典水墨底色与墨金边框', 'Ink Landscape Skin', 'Classic ink wash background with dark gold frame', '水墨江山', '古典水墨底色與墨金邊框', '水墨山水', '古典的な水墨画の背景とダークゴールドのフレーム', '수묵강산', '고전적인 수묵화 배경과 다크 골드 프레임', 'SKIN_INK', 200, 9999),
 (10, '赛博霓虹 (卡牌皮肤)', '电子科幻线条与极光发光外框', 'Cyber Neon Skin', 'Electronic sci-fi lines with neon glowing frame', '賽博霓虹', '電子科幻線條與極光發光外框', 'サイバーネオン', 'ネオンに光るフレームを備えた電子SFライン', '사이버 네온', '네온으로 빛나는 프레임이 있는 전자 공상 과학 라인', 'SKIN_CYBER', 500, 9999),
 (1000, '河南·省味 (卡牌皮肤)', '解锁河南省特色美食图标皮肤', 'Henan Gourmet Skin', 'Unlock Henan local gourmet icon skin', '河南·省味', '解鎖河南省特色美食圖標皮膚', '河南・省味', '河南省の特色ある美食アイコンスキンをアンロック', '허난성 맛', '허난성 특색 미식 아이콘 스킨 해제', 'SKIN_HENAN', 200, 9999),
 (1001, '四川·省味 (卡牌皮肤)', '解锁四川省特色美食图标皮肤', 'Sichuan Gourmet Skin', 'Unlock Sichuan local gourmet icon skin', '四川·省味', '解鎖四川省特色美食圖標皮膚', '四川・省味', '四川省の特色ある美食アイコンスキンをアンロック', '쓰촨성 맛', '쓰촨성 특색 미식 아이콘 스킨 해제', 'SKIN_SICHUAN', 200, 9999),
-(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'Shuang Fun Skin', '12 cute sheep tiles with sky blue borders and sunlit gold accents', '萌趣競技', '12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾', '萌趣競技', 'スカイブルーのボーダーとサンライトゴールドのアクセントを持つ12種のかわいい羊タイル', '멍취징지', '하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일', 'SKIN_SHUANG', 300, 9999);
+(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'Shuang Fun Skin', '12 cute sheep tiles with sky blue borders and sunlit gold accents', '萌趣競技', '12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾', '萌趣競技', 'スカイブルーのボーダーとサンライトゴールド的アクセントを持つ12种のかわいい羊タイル', '멍취징지', '하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일', 'SKIN_SHUANG', 300, 9999);
 
 
 -- 联机对战匹配队列

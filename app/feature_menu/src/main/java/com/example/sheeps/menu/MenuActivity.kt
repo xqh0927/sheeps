@@ -155,7 +155,12 @@ class MenuActivity : BaseActivity() {
                         viewModel.viewEffect.collect { effect ->
                             when (effect) {
                                 is MenuViewEffect.ShowToast -> {
-                                    Toaster.show(effect.message)
+                                    val msg = if (effect.resId != null) {
+                                        localizedContext.getString(effect.resId, *effect.formatArgs.toTypedArray())
+                                    } else {
+                                        effect.message
+                                    }
+                                    Toaster.show(msg)
                                 }
 
                                 is MenuViewEffect.ShowLoginDialog -> {

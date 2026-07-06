@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateJWT = generateJWT;
 exports.verifyJWT = verifyJWT;
 exports.sha256 = sha256;
+exports.decryptAES = decryptAES;
+exports.encryptAES = encryptAES;
 /** * 服务器间共享的 JWT 密钥
  * 注意：生产环境中建议将其移入环境机密变量 (Worker Secrets) 中
  */
@@ -71,4 +73,73 @@ async function sha256(message) {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     // 转换为 16 进制字符串
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// ====================== AES-256-GCM 加解密模块 ======================
+/**
+ * 共享的 AES-256 密钥（HEX 编码）
+ * 生产环境中建议迁移至 Cloudflare Worker Secrets (wrangler secret)
+ */
+const AES_KEY_HEX = "a1b2c3d4e5f6a7b8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
+/** Worker 实例级缓存的 AES CryptoKey，避免每次加解密都 importKey */
+let cachedAesKey = null;
+/**
+ * 将 HEX 字符串转换为 Uint8Array
+ * @param hex HEX 编码的字符串
+ * @returns 对应的字节数组
+ */
+function hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+    }
+    return bytes;
+}
+/**
+ * 获取或缓存 AES-GCM CryptoKey
+ * @returns 导入的 CryptoKey 实例
+ */
+async function getAesKey() {
+    if (!cachedAesKey) {
+        const rawKey = hexToBytes(AES_KEY_HEX);
+        cachedAesKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    }
+    return cachedAesKey;
+}
+/**
+ * 使用 AES-256-GCM 解密 Base64 编码的密文
+ *
+ * 密文格式：Base64(IV(12字节) || ciphertext || authTag(16字节))
+ *
+ * @param encryptedBase64 Base64 编码的密文
+ * @returns 解密后的明文字符串（通常为 JSON）
+ */
+async function decryptAES(encryptedBase64) {
+    const key = await getAesKey();
+    const encryptedBytes = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+    // 提取 IV（前 12 字节）
+    const iv = encryptedBytes.slice(0, 12);
+    // 提取密文 + authTag（authTag 在末尾 16 字节）
+    const ciphertextWithTag = encryptedBytes.slice(12);
+    const decryptedBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertextWithTag);
+    return new TextDecoder().decode(decryptedBuffer);
+}
+/**
+ * 使用 AES-256-GCM 加密明文
+ *
+ * 输出格式：Base64(IV(12字节) || ciphertext || authTag(16字节))
+ *
+ * @param plaintext 需要加密的明文字符串
+ * @returns Base64 编码的密文
+ */
+async function encryptAES(plaintext) {
+    const key = await getAesKey();
+    // 生成 12 字节随机 IV
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encodedPlaintext = new TextEncoder().encode(plaintext);
+    const encryptedBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encodedPlaintext);
+    // 拼接 IV + 密文(含 authTag)
+    const result = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+    result.set(iv, 0);
+    result.set(new Uint8Array(encryptedBuffer), iv.length);
+    return btoa(String.fromCharCode(...result));
 }

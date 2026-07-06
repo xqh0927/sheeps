@@ -118,11 +118,11 @@ class SplashActivity : BaseActivity() {
                         PrivacyComposeDialog(
                             onConfirm = {
                                 userPrefs.setPrivacyAccepted(true)
-                                Toaster.show("感谢您的理解与同意！")
+                                Toaster.show(getString(com.example.sheeps.core.R.string.toast_privacy_agree))
                                 showPrivacyDialog = false
                             },
                             onDismiss = {
-                                Toaster.show("很抱歉，您需要同意隐私政策才能体验游戏")
+                                Toaster.show(getString(com.example.sheeps.core.R.string.toast_privacy_disagree))
                                 finish()
                             }
                         )
@@ -443,7 +443,7 @@ fun SplashVisuals() {
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = "适龄提示：适合 8 岁及以上用户",
+                    text = stringResource(id = com.example.sheeps.core.R.string.splash_age_tip),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -453,7 +453,7 @@ fun SplashVisuals() {
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。",
+                text = stringResource(id = com.example.sheeps.core.R.string.splash_health_advice),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
@@ -498,7 +498,7 @@ fun PrivacyComposeDialog(
                     .padding(24.dp)
             ) {
                 Text(
-                    text = "用户服务与隐私协议",
+                    text = stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.colorScheme.primary,
@@ -507,7 +507,7 @@ fun PrivacyComposeDialog(
                 )
 
                 Text(
-                    text = "感谢您体验《秘境消消乐》！\n\n在您开始游戏前，请认真阅读并理解《用户协议》与《隐私政策》。\n\n点击‘同意并开始’表示您已了解并同意以上条款。",
+                    text = stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_content),
                     fontSize = 14.sp,
                     lineHeight = 22.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
@@ -519,13 +519,13 @@ fun PrivacyComposeDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GhostButton(
-                        text = "不同意并退出",
+                        text = stringResource(id = com.example.sheeps.core.R.string.btn_disagree_exit),
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     PrimaryButton(
-                        text = "同意并开始",
+                        text = stringResource(id = com.example.sheeps.core.R.string.btn_agree_start),
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f)
                     )

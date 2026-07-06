@@ -94,7 +94,11 @@ fun BackpackCard(
                 state.backpackItems.filter { !it.item_type.startsWith("SKIN_") && it.item_type != "CLASSIC" }
             }
             val skinItems = remember(state.backpackItems) {
-                state.backpackItems.filter { it.item_type.startsWith("SKIN_") || it.item_type == "CLASSIC" }
+                val list = state.backpackItems.filter { it.item_type.startsWith("SKIN_") || it.item_type == "CLASSIC" }.toMutableList()
+                if (list.none { it.item_type == "CLASSIC" }) {
+                    list.add(0, com.example.sheeps.data.model.UserItem("CLASSIC", 1))
+                }
+                list
             }
 
             if (magicItems.isNotEmpty()) {

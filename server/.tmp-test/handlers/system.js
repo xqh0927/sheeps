@@ -16,12 +16,19 @@ const update_1 = require("../update");
  */
 async function handleSystemRoutes(request, env, path, lang, url) {
     const corsHeaders = (0, helpers_1.getCorsHeaders)();
-    // 1. 公告列表查询接口（支持多语言与 KV 缓存）
+    /**
+     * GET /api/notice/list — 公告列表查询（支持多语言与KV缓存）
+     *
+     * Query 参数（通过请求头 Accept-Language 解析）:
+     *   @param {string} [lang] — 语言标识
+     *
+     * 响应: [{ id, title, content, type, created_at }]
+     */
     if (path === '/api/notice/list' && request.method === 'GET') {
-        const cacheKey = `notices_${lang}`;
+        const cacheKey = `notices_${lang}_v2`;
         // 读取公告 KV 缓存，默认缓存 1 小时以降低 D1 读负荷
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached)
+        if (cached && cached.startsWith('[{'))
             return new Response(cached, { headers: corsHeaders });
         const titleCol = lang ? `COALESCE(title_${lang}, title)` : 'title';
         const contentCol = lang ? `COALESCE(content_${lang}, content)` : 'content';
@@ -30,7 +37,11 @@ async function handleSystemRoutes(request, env, path, lang, url) {
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 3600 });
         return new Response(jsonStr, { headers: corsHeaders });
     }
-    // 2. 获取管理员配置接口（常用于读取签到配置、解锁积分门槛等）
+    /**
+     * GET /api/admin/config — 获取管理员配置列表
+     *
+     * 响应: [{ key, value }] 所有配置项
+     */
     if (path === '/api/admin/config' && request.method === 'GET') {
         const cached = await env.SHEEPS_CACHE.get('admin_config_list');
         if (cached)
@@ -40,7 +51,15 @@ async function handleSystemRoutes(request, env, path, lang, url) {
         await env.SHEEPS_CACHE.put('admin_config_list', jsonStr, { expirationTtl: 600 });
         return new Response(jsonStr, { headers: corsHeaders });
     }
-    // 3. 写入/修改管理员配置接口
+    /**
+     * POST /api/admin/config — 写入/修改管理员配置项
+     *
+     * 请求体 (JSON):
+     *   @param {string} key — 配置键名
+     *   @param {string} value — 配置值
+     *
+     * 响应: { success: true }
+     */
     if (path === '/api/admin/config' && request.method === 'POST') {
         const body = await request.json();
         if (!body.key || !body.value)
@@ -48,14 +67,31 @@ async function handleSystemRoutes(request, env, path, lang, url) {
         // 保存配置到 config 表并主动删除旧缓存，保证后续读取能及时同步
         await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)').bind(body.key, body.value).run();
         await env.SHEEPS_CACHE.delete('admin_config_list');
+        await env.SHEEPS_CACHE.delete(`config_${body.key}`);
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
-    // 4. 客户端 App 版本更新检测接口
+    /**
+     * GET /api/app/check-update — 客户端App版本更新检测
+     *
+     * Query 参数:
+     *   @param {number} version_code — 当前客户端版本号
+     *
+     * 响应: { has_update, latest_version, download_url, update_info }
+     */
     if (path === '/api/app/check-update' && request.method === 'GET') {
         const currentCodeStr = url.searchParams.get('version_code');
+        const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
+        // KV 缓存避免频繁 D1 + HEAD 探测
+        const cacheKey = `update_check_${currentCode}`;
+        const cached = await env.SHEEPS_CACHE.get(cacheKey);
+        if (cached)
+            return new Response(cached, { headers: corsHeaders });
         // 调用 update 模块进行 APK 的 HEAD 轻量级可用性探针检测与延迟缓存判定
-        const databaseUpdate = await (0, update_1.getDatabaseAppUpdate)(env, currentCodeStr ? parseInt(currentCodeStr, 10) : 1);
-        return new Response(JSON.stringify(databaseUpdate), { headers: corsHeaders });
+        const databaseUpdate = await (0, update_1.getDatabaseAppUpdate)(env, currentCode);
+        const responseData = JSON.stringify(databaseUpdate);
+        // 更新检测结果缓存 5 分钟（与 GitHub API 缓存对齐）
+        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });
+        return new Response(responseData, { headers: corsHeaders });
     }
     return null;
 }
