@@ -198,7 +198,7 @@ class GameToolDelegate @Inject constructor() {
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
         onToolUsed: () -> Unit,
-        processSlotMatch: suspend (List<Tile>, List<Tile>, List<Tile>) -> Unit
+        processSlotMatch: suspend () -> Unit
     ) {
         if (state.bombCount <= 0) return
 
@@ -232,7 +232,7 @@ class GameToolDelegate @Inject constructor() {
         setEffect: (GameViewEffect) -> Unit,
         onToolUsed: () -> Unit,
         onAddHistory: () -> Unit,
-        processSlotMatch: suspend (List<Tile>, List<Tile>, List<Tile>) -> Unit
+        processSlotMatch: suspend () -> Unit
     ) {
         if (state.jokerCount <= 0) return
 
@@ -316,7 +316,7 @@ class GameToolDelegate @Inject constructor() {
 
         // 5. 启动协程触发成绩提交、胜负状态同步
         scope.launch {
-            processSlotMatch(finalBoard, newSlotTiles, newMovedOutTiles)
+            processSlotMatch()
         }
     }
 }

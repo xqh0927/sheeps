@@ -14,9 +14,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Notice
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -62,7 +64,7 @@ fun NoticeDetailDialog(
             confirmButton = {
                 TextButton(onClick = onDismiss) {
                     Text(
-                        "关闭",
+                        stringResource(R.string.dialog_prepare_close),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )

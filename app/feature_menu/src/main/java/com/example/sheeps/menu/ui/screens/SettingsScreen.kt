@@ -39,7 +39,7 @@ fun SettingsScreen(
 ) {
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "设置", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.settings_title), onBack = onBack)
         }
     ) { paddingValues ->
         LazyColumn(

@@ -1,624 +1,332 @@
-# 秘境消消乐 — 全栈认证与积分系统重构 系统设计文档
+# 秘境消消乐 · 管理后台架构设计 + 任务分解（v1.1）
 
-> **文档版本**: v1.0  
-> **作者**: Bob (Architect)  
-> **日期**: 2025-07-11  
-
----
-
-## 目录
-
-- [Part A: 系统设计](#part-a-系统设计)
-  - [1. 实现方案与框架选型](#1-实现方案与框架选型)
-  - [2. 文件列表](#2-文件列表)
-  - [3. 数据结构与接口](#3-数据结构与接口)
-  - [4. 程序调用流程](#4-程序调用流程)
-  - [5. 待明确事项](#5-待明确事项)
-- [Part B: 任务分解](#part-b-任务分解)
-  - [6. 依赖包列表](#6-依赖包列表)
-  - [7. 任务列表](#7-任务列表)
-  - [8. 共享知识](#8-共享知识)
-  - [9. 任务依赖图](#9-任务依赖图)
+> 文档性质：架构设计稿（仅设计，不写实现代码）。确认后再进入开发。
+> 作者：架构师高见远 ｜ 版本：v1.1（依据 `docs/admin-prd.md` v0.1 增量 PRD 修订）｜ 语言：中文
+> 基线：v1.0 已落盘并源码核实；本版**仅修订角色模型、鉴权分层、审计日志、seed 脚本**四处，其余（前端栈、Pages 独立站、明文 JSON、CORS、密钥迁 Secrets、接口清单、部署）沿用 v1.0。
 
 ---
 
-## Part A: 系统设计
+## 0. 现状核实与本轮修订点
 
-### 1. 实现方案与框架选型
+### 0.1 源码核实结论（沿用 v1.0，已读 server/src）
+- 路由：`index.ts` 用 `if/else` 按 `path.startsWith` 分发；`/api/admin` 原与 `/api/app`、`/api/notice` 同属 `handleSystemRoutes`。
+- 🔴 `/api/admin/config`（GET/POST）在 `handlers/system.ts` 中**完全无鉴权**。
+- 🔴 `crypto.ts` 硬编码 `JWT_SECRET='antigravity_secret_key'` 与 `AES_KEY_HEX`；payload 原仅 `{userId, phone, type, exp}` 无 role。
+- 现有鉴权：`helpers.ts: getAuthenticatedUser()` 校验 `type==='access'`；CORS `Allow-Origin:'*'`、仅 GET/POST。
+- 加密中间件：`middleware.ts` 仅在 body 含 `{encrypted}` 时解密，且响应仅在请求被加密时才加密 → **后台 Web 发明文 JSON 即可直通，无需客户端 AES**。
+- 用户表：`users(id, phone, username, avatar, points, password_hash, avatar_url, created_at)`；`migrateSchema()` 幂等加列。
+- 密码：`auth-utils.ts` PBKDF2-SHA256 10 万次，存 `salt_hex:hash_hex`，可直接复用。
 
-#### P1-4: Token 刷新拦截器复用 ApiService
-
-**当前问题**：
-`NetworkModule.kt` 的 `tokenRefreshInterceptor`（第 90-163 行）手动创建 `OkHttpClient`、手动拼 JSON 字符串 `{"refreshToken":"$refreshToken"}`、手动 `json.decodeFromString<RefreshResponse>` 解析。完全绕过了 `ApiService.refreshToken()` 方法，导致：
-- 代码重复（序列化/反序列化逻辑两处维护）
-- 无法享受 Retrofit 的类型安全与错误处理
-- 新增临时 OkHttpClient 开销
-
-**技术挑战**：
-OkHttp Interceptor 在 `OkHttpClient.Builder` 中注册时，Retrofit/ApiService 尚未创建（Hilt 对象图构建顺序：`OkHttpClient` → `Retrofit` → `ApiService`），存在循环依赖。
-
-**方案：Hold-And-Set 模式（懒静态持有者）**
-
-创建 `RefreshTokenProvider` 单例对象，在 `NetworkModule.provideApiService()` 中注入引用，Interceptor 通过静态持有者懒获取：
-
-```
-NetworkModule:
-  provideOkHttpClient() → 创建 OkHttpClient（含所有拦截器）
-    拦截器内通过 RefreshTokenProvider.apiService 获取（可能为 null，降级到旧逻辑）
-  provideRetrofit() → 创建 Retrofit
-  provideApiService() → 创建 ApiService → 注入到 RefreshTokenProvider.apiService
-```
-
-- 无额外框架依赖
-- 降级逻辑：若 `apiService` 为 null（极端情况），fallback 到当前手动实现
-- 线程安全：`@Volatile` 变量确保多线程可见性
-
-#### P2-1/2: API 全量 AES-256-GCM 加解密
-
-**方案选型**：
-
-| 层 | 技术 | 说明 |
-|---|------|------|
-| Android 加密 | `javax.crypto.Cipher` (JDK 内置) | AES/GCM/NoPadding，无需额外依赖 |
-| 服务端加密 | Web Crypto API (`crypto.subtle`) | Cloudflare Workers 原生支持 |
-| 密钥管理 | 硬编码共享密钥（`AppConfig` / 服务端常量） | 首次实现，后续可迁移到 Worker Secrets |
-
-**架构**：
-- **客户端加密拦截器**：在 `NetworkModule` 中添加 `encryptionInterceptor`，位置在 `authInterceptor` 之后、`loggingInterceptor` 之前
-- **服务端解密中间件**：Hono 中间件 `decryptMiddleware` 在路由分发前解密请求体
-- **服务端加密中间件**：`encryptMiddleware` 在响应返回前加密响应体
-
-**拦截器顺序（客户端）**：
-```
-languageInterceptor → authInterceptor → tokenRefreshInterceptor → encryptionInterceptor → weakNetworkRetryInterceptor → loggingInterceptor
-```
-
-注意：`encryptionInterceptor` 在 `loggingInterceptor` 之前加密，因此日志输出的是密文。在 Debug 模式下，通过 `encryptionInterceptor` 内部判断 `BuildConfig.DEBUG`，决定是否将明文回写到日志可见的请求体副本中。
-
-**豁免路径**：
-- WebSocket `/api/ws`：不经过 HTTP 拦截器，自然豁免
-- `/api/auth/refresh`：**不豁免**，全量 `/api/` 统一加密（刷新 Token 请求体也是敏感数据）
-
-**加密格式**：
-- 请求体：`{"encrypted": "<Base64(AES-256-GCM(iv + ciphertext + tag))>"}`
-- 响应体：`{"encrypted": "<Base64(AES-256-GCM(iv + ciphertext + tag))>"}`
-- iv：12 字节随机生成，前置附在密文之前，一起 Base64 编码
-
-#### P0-1: 积分系统修复
-
-**根因分析**：
-
-经代码审查，发现 **两个独立 Bug**：
-
-**Bug #1（主因）：成绩提交后任务进度永不更新**
-
-文件：`server/src/handlers/game.ts` 第 141-183 行（`POST /api/score/submit`）
-
-代码在第 154-158 行读取了每日任务进度：
-```typescript
-const tasksResult = await env.DB.batch([...]);
-```
-但 `tasksResult` 变量**从未被后续代码使用**。成绩提交后，`PLAY_3_GAMES` 和 `PLAY_5_GAMES` 任务的 `progress` 字段永远停留在初始化值 0，`is_completed` 永远为 0。
-
-结果：每日任务列表中 "小试牛刀" / "大显身手" 永远显示进度 0，永远不可领取。
-
-**修复方案**：在成绩提交成功后，遍历 `tasksResult`，对 `task_id` 匹配 `PLAY_` 前缀的任务执行 `progress + 1`，并在 `progress >= target_count` 时设置 `is_completed = 1`。
-
-**Bug #2（次因）：签到后 SIGN_IN_ONCE 任务状态不一致**
-
-文件：`server/src/handlers/game.ts` 第 222-227 行（`POST /api/sign/today`）
-
-签到处理器正确地将 `SIGN_IN_ONCE` 的 `user_task` 记录设置为 `is_completed=1, is_rewarded=0`。但随后用户需要**手动点击"领取"**才能获得这 10 积分。如果用户不知道要手动领取，就会认为"签到积分没到账"。
-
-实际上签到奖励的积分（连签奖励 20~100）已经直接在 `sign/today` 接口中加到 `users.points` 了。`SIGN_IN_ONCE` 额外奖励 10 积分需要单独领取。
-
-**修复方案**：签到接口中，在设置 `SIGN_IN_ONCE` 为 `is_completed=1` 的同时，直接设置 `is_rewarded=1` 并自动发放 10 积分（从 task 表读取 `points_reward`），写入 `point_record`。这样签到后无需额外操作。
-
-#### P1-1/2: 头像上传 + 昵称修改 + Profile 扩展
-
-**方案**：
-
-- **头像存储**：Base64 编码存 D1 `users.avatar`（TEXT 字段，已有）
-- **上传接口**：`POST /api/user/avatar` — 接收 `{"avatar_base64": "data:image/png;base64,..."}`，校验大小 ≤ 512KB，写入 D1
-- **昵称修改**：已有 `POST /api/user/rename`，但缺少鉴权校验（直接用 `body.id` 查用户，无 Token 校验）
-  - 修复：改用 `getAuthenticatedUser` 鉴权，从 JWT 中取 `userId`，删除 body 中的 `id` 字段
-- **Profile 返回字段扩展**：在 `GET /api/user/profile` 响应中增加 `phone`、`avatar` 字段（当前 `UserInfo` 已包含但 `users` 表查询可能缺失）
-- **客户端 PersonalScreen**：增加头像点击 → 调用系统图片选择器（`ActivityResultContracts.PickVisualMedia`）→ Base64 编码 → 上传
-- **强制设密后 50 积分奖励**：在密码设置接口中，首次设密成功后回写 50 积分
-
-#### P0-2/3/4/5/6: 密码注册/登录/找回 + 登录界面切换 + 强制设密
-
-**方案**：
-
-**服务端密码存储**：
-- 使用 Web Crypto API 的 PBKDF2 进行密码哈希（HMAC-SHA256，100,000 次迭代，16 字节盐值）
-- 存储格式：`salt_hex:hash_hex`（64 字符 + 冒号 + 64 字符）
-- 不引入外部 bcrypt 依赖（Cloudflare Workers 不友好），使用原生 `crypto.subtle`
-
-**新增接口**：
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/auth/register-password` | POST | 密码注册/设置 |
-| `/api/auth/login-password` | POST | 密码登录 |
-| `/api/auth/reset-password` | POST | 找回密码（验证码校验后重置） |
-| `/api/auth/check-password` | GET | 检查用户是否已设置密码 |
-
-**D1 Schema 变更**：
-```sql
-ALTER TABLE users ADD COLUMN password_hash TEXT;  -- NULLABLE
-```
-
-**登录界面切换**：
-- `LoginDialog.kt` 改造为双模式：验证码登录 Tab + 密码登录 Tab
-- 密码登录：手机号 + 密码 → `/api/auth/login-password`
-- 验证码登录：保持现有逻辑
-- 找回密码：验证码登录 Tab 中，输入验证码后检测 `has_password` 字段
-
-**强制设密流程**：
-- 验证码登录成功后，服务端在 `LoginResponse` 中增加 `has_password: boolean` 字段
-- 客户端收到 `has_password == false` 时，弹出"设置密码"对话框（不可跳过）
-- 设密成功后奖励 50 积分（服务端 `/api/auth/register-password` 接口处理）
-- 对话框包含跳过按钮但提示"跳过将不获得 50 积分奖励"（允许跳过但不给积分）
-
-**D1 迁移**：
-- `password_hash TEXT` 字段 NULLABLE，兼容老用户
-- 老用户 `password_hash IS NULL` → `has_password = false`
-- 无需数据迁移脚本
+### 0.2 本轮修订点（对比 v1.0）
+| v1.0 | v1.1（PRD 要求） |
+|---|---|
+| `users` 加 `is_admin INTEGER`（二值） | 改为 `role TEXT`（super/operator/readonly，默认 readonly），取消 `is_admin`；保留 `is_banned` |
+| JWT payload `role:'admin'`（固定） | payload 携带**真实角色** `role`（super/operator/readonly） |
+| `requireAdmin` 仅校验 `type==='access'` | 三级校验 `role IN (super,operator,readonly)` → 401；**写操作追加 `role!='readonly'` → 403**；super 专属接口追加 `role==='super'` → 403 |
+| 无审计 | 新增 `admin_audit_log` 表，关键写操作 + 登录必落审计，记录不可改/删 |
+| seed 脚本细节未定 | 从环境变量 `ADMIN_PHONE`/`ADMIN_PASSWORD` 读取，幂等，创建首个 `super` |
 
 ---
 
-### 2. 文件列表
+## 1. 实现方案 + 框架选型
 
-#### Android 端（需要创建或修改的文件）
+### 1.1 总体架构（同 v1.0，略）
+Cloudflare Pages（React+Vite）独立站 → fetch 调现有 Worker `/api/admin/*`；明文 JSON + `Authorization: Bearer`；CORS 用 `ADMIN_WEB_ORIGIN` 具体源。
 
-```
-app/
-├── core/
-│   └── src/main/java/com/example/sheeps/
-│       ├── core/
-│       │   ├── AppConfig.kt                          # [修改] 新增 AES_KEY 常量
-│       │   ├── di/
-│       │   │   └── NetworkModule.kt                  # [修改] 新增加密拦截器 + 重构 Token 刷新
-│       │   ├── preference/
-│       │   │   └── UserPreferences.kt                # [修改] 新增 hasPassword/password 相关方法
-│       │   └── utils/
-│       │       ├── CryptoUtil.kt                     # [新增] AES-256-GCM 加解密工具函数
-│       │       ├── RefreshTokenProvider.kt           # [新增] ApiService 静态持有者
-│       │       └── AuthEventBus.kt                   # [修改] 新增 ForceSetPassword 事件
-│       └── data/
-│           ├── model/
-│           │   └── GameModels.kt                     # [修改] 新增密码/头像相关数据模型
-│           └── network/
-│               └── ApiService.kt                     # [修改] 新增密码/头像相关 API 接口
-├── feature_menu/
-│   └── src/main/java/com/example/sheeps/menu/
-│       ├── state/
-│       │   └── MenuViewState.kt                      # [修改] 新增 hasPassword 状态字段
-│       ├── viewmodel/
-│       │   ├── MenuViewModel.kt                      # [修改] 新增密码/头像相关 Intent 处理
-│       │   └── delegates/
-│       │       ├── AuthDelegate.kt                   # [修改] 新增密码登录/注册/找回逻辑
-│       │       └── SocialActionDelegate.kt           # [修改] 修复签到后积分状态更新
-│       └── ui/
-│           ├── dialogs/
-│           │   ├── LoginDialog.kt                    # [修改] 改造为双模式（验证码 + 密码）
-│           │   ├── SetPasswordDialog.kt              # [新增] 强制设密对话框
-│           │   └── ForgotPasswordDialog.kt           # [新增] 找回密码对话框
-│           └── screens/
-│               └── PersonalScreen.kt                 # [修改] 新增头像上传入口
-```
+### 1.2 前端框架选型（同 v1.0）
+React18 + Vite5 + MUI5 + React Router6 + Zustand(token 持久化) + Axios(拦截器挂 Bearer/401 跳登录)。不引入客户端 AES。
 
-#### 服务端（需要创建或修改的文件）
+### 1.3 后端如何挂载 `/api/admin/*`（同 v1.0）
+`index.ts` 把 `/api/admin` 从 system 分支拆出 → `handleAdminRoutes`；`/api/admin/login`、`/api/admin/refresh` 不鉴权，其余先过 `requireAdmin`。
 
-```
-server/
-└── src/
-    ├── index.ts                                      # [修改] 注册新路由 + 添加加密中间件
-    ├── types.ts                                      # [修改] Env 新增 AES_KEY 字段声明
-    ├── helpers.ts                                    # [修改] 新增密码哈希/加密/解密工具函数
-    ├── crypto.ts                                     # [修改] 新增 PBKDF2 密码哈希函数
-    ├── middleware/
-    │   └── encryption.ts                             # [新增] 请求解密 + 响应加密中间件
-    └── handlers/
-        ├── auth.ts                                   # [修改] 新增密码注册/登录/找回/检查接口
-        ├── game.ts                                   # [修改] 修复任务进度更新 + 签到自动领奖
-        └── user.ts                                   # [修改] rename 接口加鉴权 + 新增头像上传接口
-```
+### 1.4 管理员账户 + 三级角色模型（本轮修订核心）
+
+- **数据模型**：复用 `users` 表，新增 `role TEXT`（取值 `super`/`operator`/`readonly`，默认 `readonly`）取代 `is_admin`；保留 `is_banned INTEGER DEFAULT 0`。"是否管理员" = `role != 'readonly'`（派生，不单列）。
+- **管理员登录** `POST /api/admin/login {phone, password}`：按 phone 查用户 → 校验 `role != 'readonly'`（否则 `401 该账号无管理员权限`）→ `verifyPassword` → 签发带**真实角色**的 access(2h)/refresh(7d) JWT。
+- **JWT payload**：`{userId, phone, role, type:'access'|'refresh', exp}`，`role` 携带真实角色；刷新（`/api/admin/refresh`）须保留 `role`。
+- **鉴权分层**（后端为最终防线，前端禁用仅为体验）：
+  1. `requireAdmin(request, env)`：校验 `type==='access' && role IN ('super','operator','readonly')`，否则返回 `401`（无 token/无效/非管理员/被封禁）。
+  2. 写操作守卫 `assertCanWrite(payload)`：若 `role==='readonly'` → `403`（POST/PUT/DELETE 业务接口统一调用）。
+  3. 超级守卫 `assertSuper(payload)`：若 `role!=='super'` → `403`（管理员账户管理、审计日志查看专属）。
+- **被封禁管理员**：登录时 `is_banned=1` 直接拒绝；已登录者 `requireAdmin` 额外校验 `is_banned!=1` → 401。
+
+### 1.5 密钥迁移到 Worker Secrets（同 v1.0）
+`crypto.ts` 新增 `configureSecrets(env)` 注入 `JWT_SECRET`/`AES_KEY_HEX`（保留 dev fallback）；`Env` 增加 `JWT_SECRET`、`AES_KEY_HEX`、`ADMIN_WEB_ORIGIN`；部署 `wrangler secret put`。
 
 ---
 
-### 3. 数据结构与接口
+## 2. 文件列表及相对路径（标注新增/修改）
 
-#### 3.1 数据模型（Kotlin / TypeScript）
+> 仅列出与 v1.0 的差异点；未提及的文件（前端 `admin-console/*` 全套、后端 `index.ts` 路由分发、`system.ts` 移除 config 等）同 v1.0 §2。
+
+### 2.1 后端（现有 `server/`）
+
+| 路径 | 状态 | 本轮改动要点 |
+|---|---|---|
+| `server/src/crypto.ts` | 【修改】 | `configureSecrets(env)`；`generateJWT/verifyJWT` 透传任意 payload（含 `role`） |
+| `server/src/helpers.ts` | 【修改】 | `requireAdmin()` 三级校验 + `is_banned` 校验；新增 `assertCanWrite(payload)`、`assertSuper(payload)`；`getCorsHeaders()` 支持 `ADMIN_WEB_ORIGIN` 与 PUT/DELETE |
+| `server/src/types.ts` | 【修改】 | `Env` 增加 `JWT_SECRET`、`AES_KEY_HEX`、`ADMIN_WEB_ORIGIN` |
+| `server/src/index.ts` | 【修改】 | `configureSecrets` 调用；`migrateSchema` 加 `role TEXT DEFAULT 'readonly'` 与 `is_banned INTEGER DEFAULT 0`（**不再加 `is_admin`**） |
+| `server/src/handlers/system.ts` | 【修改】 | 移除 `/api/admin/config`（迁 admin，加鉴权） |
+| `server/src/handlers/admin.ts` | 【新增】 | 全部后台接口 + 三级角色守卫 + **落审计**（`writeAudit`）+ 管理员账户管理/审计查看（super） |
+| `server/schema.sql` | 【修改】 | `users` 加 `role`/`is_banned`；**新增 `admin_audit_log` 表 + 索引**（见 §3.3） |
+| `server/scripts/seed-admin.mjs` | 【新增】 | 读 `ADMIN_PHONE`/`ADMIN_PASSWORD` 环境变量，幂等创建首个 `super`（PBKDF2 哈希） |
+
+### 2.2 前端（新建 `admin-console/`，同 v1.0）
+全套文件同 v1.0 §2.2。本轮需在前端补充：
+- `src/store/auth.ts`：`user.role` 持久化，暴露 `useCanWrite()`（role!=='readonly'）、`isSuper`（role==='super'）。
+- `src/components/Layout.tsx`：按 `isSuper` 显隐「管理员账户管理」「审计日志」导航；按 `useCanWrite` 禁用写按钮。
+- `src/pages/{Users,ShopItems,Notices,Tasks,Levels,Config}.tsx`：写按钮 `disabled={!canWrite}`；`src/pages/Accounts.tsx`、`src/pages/AuditLogs.tsx`（super 专属，P1）。
+- `src/api/admin.ts`：补充 `refreshAdmin`、`listAccounts`/`setRole`/`disableAccount`、`listAuditLogs`。
+
+---
+
+## 3. 数据结构和接口
+
+### 3.1 类图（详见 `docs/class-diagram.mermaid`）
 
 ```mermaid
 classDiagram
-    %% ── Android 端数据模型 ──
-    class EncryptedRequest {
-        +String encrypted
+    class User {
+        +string id
+        +string phone
+        +string username
+        +number points
+        +string password_hash
+        +string avatar_url
+        +string role
+        +number is_banned
+        +number created_at
     }
-    
-    class EncryptedResponse {
-        +String encrypted
-        +String error
+    class AdminAuditLog {
+        +number id
+        +string admin_id
+        +string admin_phone
+        +string admin_role
+        +string action
+        +string target_type
+        +string target_id
+        +string before_snapshot
+        +string after_snapshot
+        +string source_ip
+        +string user_agent
+        +number created_at
     }
+    class JwtUtil {
+        +configureSecrets(env)
+        +generateJWT(payload, secret) string
+        +verifyJWT(token, secret) payload
+    }
+    class AdminAuthService {
+        +login(phone, password, env) AdminToken
+        +requireAdmin(request, env) AdminPayload
+        +assertCanWrite(payload) void
+        +assertSuper(payload) void
+    }
+    class AdminApiHandler {
+        +handleAdminRoutes(...)
+        +listUsers / adjustPoints / banUser / updateUser
+        +crudShopItem / crudNotice / crudTask / crudLevel
+        +getConfig / setConfig
+        +listAccounts / setRole / disableAccount   // super
+        +listAuditLogs                              // super
+        +getStats
+        +writeAudit(log)   // 落审计，无改/删接口
+    }
+    class AdminApiClient { +login / refreshAdmin / getUsers / ... / listAccounts / listAuditLogs }
+    class AuthStore { +token +user +login / logout / isAuthenticated / isSuper / canWrite }
 
-    class PasswordRegisterRequest {
-        +String phone
-        +String password
-        +String code
-    }
-
-    class PasswordLoginRequest {
-        +String phone
-        +String password
-    }
-
-    class PasswordResetRequest {
-        +String phone
-        +String code
-        +String newPassword
-    }
-
-    class HasPasswordResponse {
-        +Boolean success
-        +Boolean hasPassword
-    }
-
-    class PasswordRegisterResponse {
-        +Boolean success
-        +String token
-        +String refreshToken
-        +Int bonusPoints
-    }
-
-    class AvatarUploadRequest {
-        +String avatarBase64
-    }
-
-    class AvatarUploadResponse {
-        +Boolean success
-        +String avatarUrl
-    }
-
-    class SetPasswordRequest {
-        +String token
-        +String password
-    }
-
-    class SetPasswordResponse {
-        +Boolean success
-        +Int bonusPoints
-    }
-
-    %% LoginResponse 扩展字段
-    class LoginResponse {
-        +Boolean success
-        +String token
-        +String refreshToken
-        +UserInfo user
-        +List~Int~ unlocked_levels
-        +List~UserItem~ items
-        +Boolean today_signed
-        +Int sign_streak
-        +Boolean has_password
-    }
-
-    class UserInfo {
-        +String id
-        +String phone
-        +String username
-        +String avatar
-        +Int points
-    }
-
-    %% ── Android 基础设施 ──
-    class RefreshTokenProvider {
-        +ApiService apiService$ @Volatile
-        <<object>>
-    }
-
-    class CryptoUtil {
-        +String encrypt(String plaintext, String key)$
-        +String decrypt(String ciphertext, String key)$
-        <<object>>
-    }
-
-    class AppConfig {
-        +String AES_KEY$
-        <<object>>
-    }
-
-    %% ── 服务端类型 ──
-    class Env {
-        +D1Database DB
-        +KVNamespace SHEEPS_CACHE
-        +String AES_KEY
-    }
-
-    class CryptoHelpers {
-        +Promise~String~ hashPassword(String password)$
-        +Promise~Boolean~ verifyPassword(String password, String hash)$
-        +Promise~String~ aesEncrypt(String plaintext, String key)$
-        +Promise~String~ aesDecrypt(String ciphertext, String key)$
-    }
-
-    %% ── 服务端中间件 ──
-    class EncryptionMiddleware {
-        +MiddlewareHandler decryptBody()
-        +MiddlewareHandler encryptResponse()
-    }
-
-    %% 关系
-    RefreshTokenProvider --> ApiService : 持有静态引用
-    CryptoUtil ..> AppConfig : 读取 AES_KEY
-    LoginResponse --> UserInfo : 包含
-    EncryptionMiddleware ..> CryptoHelpers : 调用
+    User "1" --> "0..*" AdminAuditLog : 操作人
+    AdminApiHandler ..> AdminAuthService : 三级鉴权+角色守卫
+    AdminApiHandler ..> AdminAuditLog : 落审计(只读表)
+    AdminApiHandler ..> User : 读写
+    AdminAuthService ..> JwtUtil : 签发/校验
+    AdminApiClient ..> AdminApiHandler : HTTP /api/admin/*
+    AuthStore ..> AdminApiClient : 登录/刷新
 ```
 
-#### 3.2 新增/修改 API 接口
+### 3.2 接口表（后台 `/api/admin/*`，明文 JSON + Bearer）
 
-| 方法 | 路径 | 请求体 | 响应体 | 鉴权 | 加密 |
-|------|------|--------|--------|------|------|
-| POST | `/api/auth/register-password` | `{phone, password, code}` | `{success, token, refreshToken, bonusPoints}` | 否（验证码校验） | 是 |
-| POST | `/api/auth/login-password` | `{phone, password}` | `{success, token, refreshToken, user, unlocked_levels, items, today_signed, sign_streak, has_password}` | 否 | 是 |
-| POST | `/api/auth/reset-password` | `{phone, code, newPassword}` | `{success}` | 否（验证码校验） | 是 |
-| GET | `/api/auth/check-password` | — | `{success, hasPassword}` | 是 | 是 |
-| POST | `/api/user/avatar` | `{avatarBase64}` | `{success, avatarUrl}` | 是 | 是 |
+> 统一：成功 `{success:true,...}`；失败 `{error:"msg"}`：无 token/无效/非管理员/被封禁 → **401**；readonly 调写接口 / 非 super 调 super 专属 → **403**。
 
-**修改的现有接口**：
+#### 3.2.1 管理员登录 / 刷新（无鉴权）
+- `POST /api/admin/login` `{phone,password}` → `{success, token, refreshToken, user:{id,phone,username,role,is_banned}}`；失败 `401`。
+- `POST /api/admin/refresh` `{refreshToken}` → `{success, token, refreshToken}`（保留 `role`）；失败 `401`。
 
-| 方法 | 路径 | 变更说明 |
-|------|------|----------|
-| POST | `/api/auth/login` | 响应新增 `has_password: boolean` 字段 |
-| POST | `/api/user/rename` | 改用 `getAuthenticatedUser` 鉴权，从 JWT 取 userId，删除 body.id 字段 |
-| POST | `/api/sign/today` | 签到后自动领取 SIGN_IN_ONCE 任务奖励 |
-| POST | `/api/score/submit` | 新增每日任务进度更新逻辑 |
+#### 3.2.2 用户管理
+| 方法 & 路径 | 角色 | 请求/响应 |
+|---|---|---|
+| `GET /api/admin/users?page&pageSize&keyword` | 全部 | `{list,total,page,pageSize}` |
+| `POST /api/admin/users/:id/points` `{amount,reason}` | super/operator | `{success,current_points}`；落 `ADJUST_POINTS` 审计 |
+| `POST /api/admin/users/:id/ban` `{banned}` | super/operator | `{success}`；落 `BAN/UNBAN_USER` 审计 |
+| `PUT /api/admin/users/:id` `{username}` | super/operator | `{success}` |
+
+#### 3.2.3 商品 / 公告 / 任务 / 关卡 CRUD（同 v1.0 §3.2.3–3.2.6）
+- 读（GET）全部角色；写（POST/PUT/DELETE）super/operator，readonly → 403；每类写操作落对应 `CREATE/UPDATE/DELETE_*` 审计（关卡 `layout_data` 仅记长度/hash）。
+
+#### 3.2.7 系统配置（迁自 system，加鉴权）
+- `GET/POST /api/admin/config`：POST 仅 super/operator；落 `UPDATE_CONFIG` 审计。
+
+#### 3.2.8 概览统计 `GET /api/admin/stats`（全部角色）
+返回：`users_total, today_signup, exchange_total, points_total, notice_count, banned_count, shop_item_count, task_count, level_count`。
+
+#### 3.2.9 管理员账户管理（super 专属，P1）
+| 方法 & 路径 | 角色 | 说明 |
+|---|---|---|
+| `GET /api/admin/accounts` | super | 列出管理员账号（role!='readonly' 或含全部，按设计） |
+| `POST /api/admin/accounts` `{phone, role}` | super | 将已有用户提升为 operator/readonly（落 `CREATE_ADMIN`） |
+| `PUT /api/admin/accounts/:id/role` `{role}` | super | 改他人角色（落 `UPDATE_ADMIN_ROLE`） |
+| `POST /api/admin/accounts/:id/disable` `{disabled}` | super | 禁用/启用其他管理员（落 `DISABLE_ADMIN`） |
+
+#### 3.2.10 审计日志查看（super 专属，P1）
+- `GET /api/admin/audit-logs?page&pageSize&admin_id&action&from&to` → `{list,total}`（只读，可导出 CSV；**无写/删接口**）。
 
 ---
 
-### 4. 程序调用流程
+### 3.3 审计表结构（新增 `admin_audit_log`，PRD §5.1）
 
-#### 4.1 Token 刷新（Hold-And-Set 模式）
-
-```mermaid
-sequenceDiagram
-    participant App as 业务代码
-    participant Retrofit as Retrofit/ApiService
-    participant OkHttp as OkHttpClient
-    participant TR as tokenRefreshInterceptor
-    participant RTP as RefreshTokenProvider
-    participant API as ApiService
-    participant Server as 服务端
-
-    App->>Retrofit: signIn() / 任意 API 调用
-    Retrofit->>OkHttp: execute(request)
-    OkHttp->>TR: intercept(chain)
-    TR->>OkHttp: chain.proceed(request)
-    OkHttp->>Server: HTTP 请求
-    Server-->>OkHttp: 401 Unauthorized
-    
-    TR->>TR: 检测 401 + 非 refresh 端点
-    TR->>RTP: 读取 apiService 引用
-    RTP-->>TR: ApiService 实例（非 null）
-    
-    TR->>API: refreshToken(mapOf("refreshToken" to rt))
-    API->>Server: POST /api/auth/refresh
-    Server-->>API: {success, token, refreshToken}
-    API-->>TR: RefreshResponse
-    
-    TR->>TR: prefs.setToken() / prefs.setRefreshToken()
-    TR->>OkHttp: 重试原始请求（新 Token）
-    OkHttp->>Server: 原始请求（Bearer newToken）
-    Server-->>OkHttp: 200 OK
-    OkHttp-->>App: 响应
+```sql
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_id        TEXT    NOT NULL,
+  admin_phone     TEXT    NOT NULL,
+  admin_role      TEXT    NOT NULL,
+  action          TEXT    NOT NULL,   -- 见 3.4 枚举
+  target_type     TEXT,               -- user/shop_item/notice/task/level/config/admin_account
+  target_id       TEXT,
+  before_snapshot TEXT,
+  after_snapshot  TEXT,
+  source_ip       TEXT,
+  user_agent      TEXT,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX idx_audit_admin   ON admin_audit_log(admin_id);
+CREATE INDEX idx_audit_created ON admin_audit_log(created_at);
 ```
 
-#### 4.2 AES 加密请求/响应流程
+### 3.4 必须落审计的 action 枚举（PRD §5.2）
+`LOGIN_SUCCESS` / `LOGIN_FAILED`（记 attempted phone）/ `ADJUST_POINTS` / `BAN_USER` `UNBAN_USER` / `CREATE|UPDATE|DELETE_SHOP_ITEM` / `CREATE|UPDATE|DELETE_NOTICE` / `CREATE|UPDATE|DELETE_TASK` / `CREATE|UPDATE|DELETE_LEVEL`（layout 仅记长度/hash）/ `UPDATE_CONFIG` / `CREATE_ADMIN` `UPDATE_ADMIN_ROLE` `DISABLE_ADMIN`。
+**不记录**：所有读操作、readonly 查看、静态资源。
+
+---
+
+## 4. 程序调用流程（时序图）
+
+> 完整 Mermaid 见 `docs/sequence-diagram.mermaid`。要点：登录（带 role）→ 写操作经 `requireAdmin`(401) + `assertCanWrite`(403) → DB 变更成功后 `writeAudit` 落审计。
 
 ```mermaid
 sequenceDiagram
-    participant VM as ViewModel
-    participant Retrofit as Retrofit
-    participant EncInt as encryptionInterceptor
-    participant LogInt as loggingInterceptor
-    participant Server as Cloudflare Worker
-    participant DecMW as decryptMiddleware
-    participant Handler as Route Handler
-    participant EncMW as encryptMiddleware
+    actor Admin as 管理员
+    participant FE as 前端(AdminConsole)
+    participant MW as requireAdmin+角色守卫
+    participant H as AdminApiHandler
+    participant DB as D1
+    participant AL as admin_audit_log
 
-    VM->>Retrofit: 调用 API（明文请求体）
-    Retrofit->>EncInt: 明文 JSON Body
-    
-    Note over EncInt: 1. 生成随机 12-byte IV
-    Note over EncInt: 2. AES-256-GCM 加密
-    Note over EncInt: 3. 组装 {encrypted: Base64(IV+cipher+tag)}
-    
-    EncInt->>LogInt: 密文请求体
-    Note over LogInt: Debug 模式可通过 EncInt 获取明文日志
-    LogInt->>Server: POST /api/xxx + 加密 Body
-    
-    Server->>DecMW: 解密中间件
-    Note over DecMW: 1. Base64 解码
-    Note over DecMW: 2. 提取 IV(前12字节)
-    Note over DecMW: 3. AES-256-GCM 解密
-    Note over DecMW: 4. 替换 request.body 为明文
-    
-    DecMW->>Handler: 明文 JSON Body
-    Handler->>Handler: 业务逻辑处理
-    Handler-->>EncMW: 明文 JSON 响应
-    
-    Note over EncMW: 1. 生成随机 12-byte IV
-    Note over EncMW: 2. AES-256-GCM 加密
-    Note over EncMW: 3. 返回 {encrypted: Base64(IV+cipher+tag)}
-    
-    EncMW-->>Server: 加密响应体
-    Server-->>LogInt: 加密响应
-    LogInt-->>EncInt: 加密响应
-    
-    Note over EncInt: 1. 解密响应
-    Note over EncInt: 2. 还原明文响应体
-    
-    EncInt-->>Retrofit: 明文 JSON Response
-    Retrofit-->>VM: 反序列化后的数据对象
-```
+    Note over Admin, FE: ① 登录（带真实 role）
+    Admin->>FE: 输入手机号 + 密码
+    FE->>H: POST /api/admin/login {phone,password}
+    H->>DB: SELECT * FROM users WHERE phone=?
+    H->>H: role!='readonly' 且 verifyPassword 且 is_banned=0
+    H->>H: generateJWT(role=真实角色)
+    H->>AL: INSERT LOGIN_SUCCESS
+    H-->>FE: {token, refreshToken, user{role}}
 
-#### 4.3 密码注册流程
+    Note over Admin, AL: ② readonly 调写接口 → 403
+    Admin->>FE: (readonly) 点"新建商品"
+    FE->>MW: POST /api/admin/shop-items (Bearer)
+    MW->>MW: requireAdmin OK, assertCanWrite → role=='readonly'
+    MW-->>FE: 403 {error:'无写权限'}
 
-```mermaid
-sequenceDiagram
-    participant User as 用户
-    participant Dialog as SetPasswordDialog
-    participant VM as MenuViewModel
-    participant API as ApiService
-    participant Server as Cloudflare Worker
-    participant D1 as D1 Database
-
-    User->>Dialog: 输入密码并确认
-    Dialog->>VM: SetPassword(password)
-    VM->>API: registerPassword(phone, password, code)
-    API->>Server: POST /api/auth/register-password (加密)
-    
-    Server->>Server: 1. 解密请求体
-    Server->>Server: 2. 验证验证码（复用 login_token）
-    Server->>Server: 3. PBKDF2 哈希密码
-    Server->>D1: UPDATE users SET password_hash = ?
-    Server->>D1: UPDATE users SET points = points + 50
-    Server->>D1: INSERT point_record (IN, 50, SET_PASSWORD)
-    Server-->>API: {success, token, refreshToken, bonusPoints: 50}
-    
-    API-->>VM: PasswordRegisterResponse
-    VM->>VM: prefs.setHasPassword(true)
-    VM->>VM: prefs.setPoints(points + 50)
-    VM->>User: Toast "密码设置成功！获得 50 积分奖励"
-```
-
-#### 4.4 积分修复：成绩提交 → 任务进度更新
-
-```mermaid
-sequenceDiagram
-    participant Game as GameActivity
-    participant Server as Cloudflare Worker
-    participant D1 as D1 Database
-
-    Game->>Server: POST /api/score/submit (通关成绩)
-    Server->>D1: 查询用户信息 + 通关次数 + 每日任务进度
-    D1-->>Server: tasksResult (PLAY_3_GAMES/PLAY_5_GAMES 当前进度)
-    
-    Server->>Server: 处理首次通关奖励 + 解锁下一关
-    Server->>D1: 写入排行榜 + 解锁关卡
-    
-    Note over Server: 【新增逻辑】遍历 tasksResult
-    Server->>Server: 对于 PLAY_ 前缀任务: progress += 1
-    Server->>Server: 若 progress >= target_count: is_completed = 1
-    Server->>D1: UPDATE user_task SET progress=?, is_completed=?
-    
-    Server-->>Game: {success, first_clear, points_reward}
+    Note over Admin, AL: ③ operator 改积分（成功路径）
+    Admin->>FE: (operator) 改用户积分
+    FE->>MW: POST /api/admin/users/:id/points (Bearer)
+    MW->>MW: requireAdmin OK, assertCanWrite OK
+    MW->>H: 放行
+    H->>DB: UPDATE users SET points...; INSERT point_record
+    H->>AL: INSERT ADJUST_POINTS(before/after/reason)
+    H-->>FE: {success, current_points}
 ```
 
 ---
 
-### 5. 待明确事项
+## 5. 任务列表（有序、含依赖）
 
-1. **AES 密钥生命周期**：当前设计为硬编码。后续是否需要在服务端通过 Admin API 提供密钥轮换接口？
-   - **影响**：当前无影响，已在架构中预留 `AppConfig.AES_KEY` 集中管理入口
-2. **密码规则严格度**：已确认为 6-20 位、包含字母和数字、特殊字符可选。是否需要防弱密码字典？
-   - **建议**：首版不加入弱密码检测，降低复杂度
-3. **头像 Base64 大小上限**：建议 512KB（约 400×400 JPEG 质量 80%），是否需要调整？
-4. **强制设密对话框"跳过"按钮**：已设计为"可跳过但不给 50 积分"。产品是否接受？
+> 共 **5 个任务**（硬上限），每任务 ≥3 文件；本轮重点更新 T01（角色模型+分层鉴权+JWT role）与 T02（admin handler+审计+seed）。
 
----
+| Task | 名称 | 分类 | 源文件 | 依赖 | 优先级 |
+|---|---|---|---|---|---|
+| **T01** | 后端安全与鉴权基座（三级角色） | 后端+安全 | `server/src/crypto.ts`【修改】、`server/src/helpers.ts`【修改】、`server/src/types.ts`【修改】、`server/src/index.ts`【修改】、`server/src/handlers/system.ts`【修改】 | 无 | P0 |
+| **T02** | 后端管理接口 + 数据层 + 审计 + seed | 后端 | `server/src/handlers/admin.ts`【新增】、`server/schema.sql`【修改】、`server/scripts/seed-admin.mjs`【新增】 | T01 | P0 |
+| **T03** | 前端工程基础设施 | 前端 | `admin-console/package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`、`src/main.tsx`、`src/api/client.ts` | 无 | P0 |
+| **T04** | 前端登录/布局/用户管理/角色守卫 | 前端 | `src/pages/Login.tsx`、`src/components/Layout.tsx`、`src/components/ProtectedRoute.tsx`、`src/store/auth.ts` | T03 | P0 |
+| **T05** | 前端其余页面/路由/审计与账户页/部署 | 前端+部署 | `src/App.tsx`、`src/pages/{Dashboard,Users,ShopItems,Notices,Tasks,Levels,Config,Accounts,AuditLogs}.tsx`、`src/api/admin.ts`、`.github/workflows/deploy-pages.yml` | T03,T04 | P1 |
 
-## Part B: 任务分解
-
-### 6. 依赖包列表
-
-**Android 端**：无需新增外部依赖。所有加密操作使用 JDK 内置 `javax.crypto`。
-
-**服务端**：无需新增 npm 依赖。密码哈希使用 Cloudflare Workers 内置 `crypto.subtle`（PBKDF2），AES 加解密使用 `crypto.subtle`（AES-GCM）。
-
-### 7. 任务列表
-
-| Task ID | 任务名称 | 涉及文件 | 依赖 | 优先级 |
-|---------|----------|----------|------|--------|
-| **T01** | 服务端基础设施：加密中间件 + 密码哈希 + Schema 迁移 | `server/src/middleware/encryption.ts`（新增）, `server/src/helpers.ts`（修改）, `server/src/crypto.ts`（修改）, `server/src/types.ts`（修改）, `server/src/index.ts`（修改）, `server/schema.sql`（修改） | — | P0 |
-| **T02** | 服务端业务接口：密码认证 + 头像上传 + 积分修复 | `server/src/handlers/auth.ts`（修改）, `server/src/handlers/user.ts`（修改）, `server/src/handlers/game.ts`（修改） | T01 | P0 |
-| **T03** | Android 基础设施：加密拦截器 + Token 刷新重构 + 数据模型 | `app/core/.../core/AppConfig.kt`（修改）, `app/core/.../core/di/NetworkModule.kt`（修改）, `app/core/.../core/utils/CryptoUtil.kt`（新增）, `app/core/.../core/utils/RefreshTokenProvider.kt`（新增）, `app/core/.../data/model/GameModels.kt`（修改）, `app/core/.../data/network/ApiService.kt`（修改）, `app/core/.../core/preference/UserPreferences.kt`（修改）, `app/core/.../core/utils/AuthEventBus.kt`（修改） | — | P0 |
-| **T04** | Android 登录 UI + 密码流程 Delegate | `app/feature_menu/.../ui/dialogs/LoginDialog.kt`（修改）, `app/feature_menu/.../ui/dialogs/SetPasswordDialog.kt`（新增）, `app/feature_menu/.../ui/dialogs/ForgotPasswordDialog.kt`（新增）, `app/feature_menu/.../viewmodel/delegates/AuthDelegate.kt`（修改）, `app/feature_menu/.../viewmodel/delegates/SocialActionDelegate.kt`（修改）, `app/feature_menu/.../state/MenuViewState.kt`（修改）, `app/feature_menu/.../viewmodel/MenuViewModel.kt`（修改） | T03 | P0 |
-| **T05** | Android Profile 头像 + 集成联调 | `app/feature_menu/.../ui/screens/PersonalScreen.kt`（修改）, `app/feature_menu/.../ui/dialogs/LoginDialog.kt`（修改-集成）, 全量端到端自测 | T02, T04 | P1 |
-
-### 8. 共享知识
-
-跨文件约定（供 Engineer 实现时参考）：
-
-```
-## AES 加密相关
-
-- 客户端密钥常量：AppConfig.AES_KEY = "SheepsAES256Key!2025Secret!!"
-- 服务端密钥常量：helpers.ts 中 const AES_KEY = "SheepsAES256Key!2025Secret!!"
-- 算法：AES-256-GCM（AEAD），IV 长度 12 字节，Tag 长度 128 bit
-- 加密格式：Base64(IV[12] || ciphertext || tag[16])
-- 传输格式：{"encrypted": "<上述 Base64 字符串>"}
-- 加密拦截器类名：EncryptionInterceptor（com.example.sheeps.core.di.NetworkModule 内部类）
-- 解密工具函数：CryptoUtil.decrypt(encryptedBase64: String, key: String): String
-- 加密工具函数：CryptoUtil.encrypt(plaintext: String, key: String): String
-
-## Token 刷新相关
-
-- ApiService 静态持有者：RefreshTokenProvider（object, @Volatile var apiService: ApiService?）
-- 降级逻辑：若 apiService 为 null，tokenRefreshInterceptor 保留当前手动实现作为 fallback
-- Token 存储：EncryptedSharedPreferences，key 为 "jwt_token" / "refresh_token"
-
-## 密码相关
-
-- 密码规则：6-20 字符，必须包含字母和数字，特殊字符可选
-- 哈希算法：PBKDF2-HMAC-SHA256，100,000 次迭代，16 字节随机盐值
-- 存储格式：salt_hex:hash_hex（用冒号分隔）
-- users.password_hash 字段：TEXT NULLABLE，老用户为 NULL
-- 强制设密流程：验证码登录后检查 has_password，为 false 时弹出不可跳过的设密对话框
-
-## 积分系统
-
-- 签到积分规则：连签天数对应的奖励 = [20,20,30,30,40,50,100]（7 天循环）
-- 首次通关奖励：50 积分
-- 强制设密奖励：50 积分
-- SIGN_IN_ONCE 任务奖励：10 积分（签到后自动领取，无需手动）
-- 所有积分变更必须写 point_record 流水表
-- D1 批量写入使用 batch() 保证原子性
-
-## API 通用约定
-
-- 所有 `/api/` 请求/响应均通过 AES-256-GCM 加密（WebSocket 除外）
-- 加密后的请求 Content-Type 仍为 application/json
-- 服务端中间件在路由分发前解密，响应返回前加密
-- Debug 模式（BuildConfig.DEBUG = true）时，loggingInterceptor 可输出解密后的明文
-```
-
-### 9. 任务依赖图
-
-```mermaid
-graph TD
-    T01["T01: 服务端基础设施<br/>加密中间件 + 密码哈希 + Schema"]
-    T02["T02: 服务端业务接口<br/>密码认证 + 头像上传 + 积分修复"]
-    T03["T03: Android 基础设施<br/>加密拦截器 + Token 刷新 + 数据模型"]
-    T04["T04: Android 登录 UI<br/>密码流程 Delegate + 对话框"]
-    T05["T05: Android Profile 头像<br/>集成联调 + 端到端自测"]
-
-    T01 --> T02
-    T03 --> T04
-    T02 --> T05
-    T04 --> T05
-
-    style T01 fill:#ff6b6b,color:#fff
-    style T02 fill:#ff6b6b,color:#fff
-    style T03 fill:#ff6b6b,color:#fff
-    style T04 fill:#ff6b6b,color:#fff
-    style T05 fill:#ffa502,color:#fff
-```
-
-**并行执行策略**：T01 和 T03 无依赖关系，可完全并行执行。T02 依赖 T01，T04 依赖 T03。T05 需要等 T02 和 T04 都完成。
+**执行顺序**：T01 与 T03 并行；T02 依赖 T01；T04 依赖 T03；T05 依赖 T03+T04。后端线（T01→T02）与前端线（T03→T04→T05）并行，最后联调。
+**P1 端点归属**：账户管理（§3.2.9）、审计查看（§3.2.10）、token 静默刷新（§3.2.1）在设计中已预留，随 T02（后端）/T05（前端）一并实现。
 
 ---
 
-*本设计文档由 Bob (Architect) 生成，涵盖全栈认证与积分系统重构的所有技术细节。*
+## 6. 依赖包列表（同 v1.0，略）
+
+前端：react, react-dom, react-router-dom, @mui/material, @emotion/react, @emotion/styled, @mui/icons-material, zustand, axios, vite, @vitejs/plugin-react, typescript。后端无新运行时依赖。
+
+---
+
+## 7. 共享知识（跨文件约定，含本轮修订）
+
+- **Admin Token 与角色**：localStorage 持久化；Axios 拦截器统一加 `Authorization: Bearer`；`requireAdmin` 校验 `type==='access' && role IN (super,operator,readonly) && is_banned=0`，失败 401。`refresh`（`/api/admin/refresh`）须保留 `role`，避免刷新后角色丢失。
+- **写/超级守卫**：所有 POST/PUT/DELETE 业务接口在 `requireAdmin` 之后调用 `assertCanWrite(payload)`（readonly→403）；super 专属接口（账户管理、审计查看）额外 `assertSuper(payload)`（非 super→403）。**前端禁用仅为体验，后端 403 是唯一防线**。
+- **统一错误响应**：`{error:"msg"}`（4xx/5xx）；前端非 2xx → toast，401 清 token 跳登录，403 提示"无权限"。
+- **分页规范**：`?page=1&pageSize=20`（默认 20，最大 100），响应 `{list,total,page,pageSize}`，后端 `LIMIT/OFFSET`。审计列表复用同一规范。
+- **审计落库约定**：业务 handler 在 **DB 变更成功后** 调用 `writeAudit({admin_id, admin_phone, admin_role, action, target_type, target_id, before_snapshot, after_snapshot, source_ip, user_agent})`；`source_ip` 取自 `CF-Connecting-IP` 否则 `x-forwarded-for`；`user_agent` 取自 `User-Agent`。**审计表无任何写/删接口**，保证不可篡改。快照为 JSON 摘要；关卡 `layout_data` 仅记长度/hash。
+- **CORS**：`Allow-Origin` 读 `env.ADMIN_WEB_ORIGIN`（Pages 域名，弃用 `*`）；`Allow-Methods` 扩为 `GET,POST,PUT,DELETE,OPTIONS`；后台明文 JSON 不触发加密中间件。
+- **密钥与 seed 环境变量**：`configureSecrets(env)` 注入生产密钥；seed 脚本运行期读取 `ADMIN_PHONE`/`ADMIN_PASSWORD`（本地/CI 环境变量，非 Worker Secret），幂等（已存在则确保 `role='super'`），仅运行一次。
+- **前端角色助手**：`useCanWrite()` 返回 `role!=='readonly'`；`isSuper` 返回 `role==='super'`，用于控制导航显隐与按钮 `disabled`。
+
+---
+
+## 8. 待明确事项（v1.0 七项经 PRD §7 已确认，本轮无新增悬而未决）
+
+| 原 v1.0 问题 | PRD 确认结论 |
+|---|---|
+| 初始账号创建 | seed 脚本读 `ADMIN_PHONE`/`ADMIN_PASSWORD`，幂等建首个 super |
+| 审计日志 | 已纳入（§3.3/§3.4），本期 P0 落审计，查看页 P1（super） |
+| 自定义域 | 不建，用 `ADMIN_WEB_ORIGIN` 具体源 CORS |
+| 登录态持久化 | localStorage 默认；access 2h / refresh 7d 静默刷新（P1-5） |
+| 封禁实时拦截游戏端 | 二期（P2-1），本期仅数据标记 |
+| 管理员是否分级 | **三级**（super/operator/readonly），本期落地 |
+| 多语言字段维护 | 本期仅默认语言，P2-2 |
+
+> 结论：设计已与 PRD 完全对齐，无新增需用户决策项，可进入开发。
+
+---
+
+## 9. 部署方案（同 v1.0，seed 部分更新）
+
+### 9.1 前端（Cloudflare Pages）
+连 Git 仓库，`npm run build` → `dist`，设 `VITE_API_BASE`=Worker 地址；`.github/workflows/deploy-pages.yml` 自动发布；免费额度内。
+
+### 9.2 后端（现有 Worker）
+1. **密钥注入**：
+   ```
+   cd server
+   wrangler secret put JWT_SECRET
+   wrangler secret put AES_KEY_HEX
+   wrangler secret put ADMIN_WEB_ORIGIN
+   ```
+2. **D1 加列**（幂等，`migrateSchema` 首请求自动执行；如需立即生效）：
+   ```
+   wrangler d1 execute my-app-db --remote --command="ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'readonly'; ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0;"
+   ```
+3. **初始化首个 super**（读环境变量，幂等，仅一次）：
+   ```
+   ADMIN_PHONE=13800000000 ADMIN_PASSWORD='初始强密码' node server/scripts/seed-admin.mjs
+   ```
+4. **发布**：`wrangler deploy`（绑定不变）。
+
+### 9.3 跨域（同 v1.0）
+`Allow-Origin=Pages源` + Bearer（非 Cookie）即可；`OPTIONS` 预检由 `index.ts` 统一返回 CORS 头（已扩 PUT/DELETE）。
+
+### 9.4 整体结论
+复用现有 Worker + D1/KV/R2，仅新增 Secrets、两列与一张审计表；前端独立 Pages 站。两端均落 Cloudflare 免费额度内。安全改造（密钥迁移 + 三级鉴权 + 审计）为上线前置硬条件。

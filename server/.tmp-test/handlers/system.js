@@ -5,7 +5,10 @@ const helpers_1 = require("../helpers");
 const update_1 = require("../update");
 /**
  * 处理系统级业务相关的 HTTP 路由请求
- * 包含公告列表查询（多语言匹配）、管理员基础环境参数配置（读取与保存）、以及客户端 App 版本更新检测。
+ * 包含公告列表查询（多语言匹配）、客户端 App 版本更新检测。
+ *
+ * 注意：原 /api/admin/config（GET/POST）已迁移至 handlers/admin.ts 并加管理员鉴权，
+ * 此处不再处理，避免无鉴权暴露配置写入口。
  *
  * @param request 客户端 HTTP 请求对象
  * @param env 环境变量及 D1 数据库实例
@@ -38,39 +41,6 @@ async function handleSystemRoutes(request, env, path, lang, url) {
         return new Response(jsonStr, { headers: corsHeaders });
     }
     /**
-     * GET /api/admin/config — 获取管理员配置列表
-     *
-     * 响应: [{ key, value }] 所有配置项
-     */
-    if (path === '/api/admin/config' && request.method === 'GET') {
-        const cached = await env.SHEEPS_CACHE.get('admin_config_list');
-        if (cached)
-            return new Response(cached, { headers: corsHeaders });
-        const list = await env.DB.prepare('SELECT key, value FROM config').all();
-        const jsonStr = JSON.stringify(list.results);
-        await env.SHEEPS_CACHE.put('admin_config_list', jsonStr, { expirationTtl: 600 });
-        return new Response(jsonStr, { headers: corsHeaders });
-    }
-    /**
-     * POST /api/admin/config — 写入/修改管理员配置项
-     *
-     * 请求体 (JSON):
-     *   @param {string} key — 配置键名
-     *   @param {string} value — 配置值
-     *
-     * 响应: { success: true }
-     */
-    if (path === '/api/admin/config' && request.method === 'POST') {
-        const body = await request.json();
-        if (!body.key || !body.value)
-            return new Response(JSON.stringify({ error: 'Missing config key or value' }), { status: 400, headers: corsHeaders });
-        // 保存配置到 config 表并主动删除旧缓存，保证后续读取能及时同步
-        await env.DB.prepare('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)').bind(body.key, body.value).run();
-        await env.SHEEPS_CACHE.delete('admin_config_list');
-        await env.SHEEPS_CACHE.delete(`config_${body.key}`);
-        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
-    }
-    /**
      * GET /api/app/check-update — 客户端App版本更新检测
      *
      * Query 参数:
@@ -82,12 +52,12 @@ async function handleSystemRoutes(request, env, path, lang, url) {
         const currentCodeStr = url.searchParams.get('version_code');
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
         // KV 缓存避免频繁 D1 + HEAD 探测
-        const cacheKey = `update_check_${currentCode}`;
+        const cacheKey = `update_check_${currentCode}_${lang}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached)
             return new Response(cached, { headers: corsHeaders });
         // 调用 update 模块进行 APK 的 HEAD 轻量级可用性探针检测与延迟缓存判定
-        const databaseUpdate = await (0, update_1.getDatabaseAppUpdate)(env, currentCode);
+        const databaseUpdate = await (0, update_1.getDatabaseAppUpdate)(env, currentCode, lang);
         const responseData = JSON.stringify(databaseUpdate);
         // 更新检测结果缓存 5 分钟（与 GitHub API 缓存对齐）
         await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });

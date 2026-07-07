@@ -215,7 +215,7 @@ fun ShopItemCard(
             onDismissRequest = { showExchangeDialog = false },
             title = {
                 Text(
-                    text = "确认兑换",
+                    text = stringResource(id = R.string.shop_exchange_title),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -226,7 +226,9 @@ fun ShopItemCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isSkin) "确定使用积分兑换此皮肤吗？" else "确定使用积分兑换此道具吗？",
+                        text = stringResource(
+                            id = if (isSkin) R.string.shop_exchange_skin_desc else R.string.shop_exchange_item_desc
+                        ),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -242,7 +244,7 @@ fun ShopItemCard(
                     // 数量选择器
                     if (isSkin) {
                         Text(
-                            text = "数量: 1",
+                            text = stringResource(id = R.string.shop_quantity_label, 1),
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -306,7 +308,7 @@ fun ShopItemCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "单价:",
+                            stringResource(id = R.string.shop_unit_price_label),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -321,7 +323,7 @@ fun ShopItemCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "总计:",
+                            stringResource(id = R.string.shop_total_label),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -338,7 +340,7 @@ fun ShopItemCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "当前余额:",
+                            stringResource(id = R.string.shop_balance_label),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -359,12 +361,12 @@ fun ShopItemCard(
                     enabled = quantity > 0 && quantity <= maxQuantity,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text("确认兑换", color = MaterialTheme.colorScheme.onPrimary)
+                    Text(stringResource(id = R.string.shop_exchange_title), color = MaterialTheme.colorScheme.onPrimary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showExchangeDialog = false }) {
-                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(id = R.string.btn_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )

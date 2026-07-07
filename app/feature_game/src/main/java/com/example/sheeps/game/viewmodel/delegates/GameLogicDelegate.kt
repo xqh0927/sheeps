@@ -18,13 +18,13 @@ import javax.inject.Inject
 private const val FLY_ANIMATION_DELAY_MS = 360L
 
 /**
- * ��Ϸ�����߼�ί����
- * �����Ƶ����ƥ���⡢��Ӯ�ж�
+ * 游戏核心逻辑委派类
+ * 处理卡牌点击、匹配消除及输赢判断
  */
 class GameLogicDelegate @Inject constructor() {
 
     /**
-     * �����Ƶ��
+     * 处理卡牌点击逻辑
      */
     fun handleClickTile(
         scope: CoroutineScope,
@@ -33,11 +33,11 @@ class GameLogicDelegate @Inject constructor() {
         onAddHistory: () -> Unit,
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
-        processSlotMatch: suspend (List<Tile>, List<Tile>, List<Tile>) -> Unit
+        processSlotMatch: suspend () -> Unit
     ) {
         if (state.gameStatus != GameStatus.PLAYING) return
 
-        // �ж������Ƿ��ڵ���spacing=46���ص�>0.25px��Ϊ�ڵ���
+        // 判断卡牌是否被遮挡
         val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
 
         if (isBlocked) {
@@ -60,68 +60,65 @@ class GameLogicDelegate @Inject constructor() {
 
         onAddHistory()
 
-        // ���ص�ǰ�ĸ�����ʾ
+        // 清除当前的高亮提示
         updateState { copy(highlightedTileIds = emptySet()) }
 
-        // ͬ��ִ�У��������Ʊ��Ϊ IN_SLOT ������ StateFlow��
-        // ����Э���ڵ�״̬�������ڷ��ж������������¿�����ԭλ����
-        // newSlot ��Ҫ�������������Э���ڵ� processSlotMatch ʹ�ã�
-        // ����Э�̱հ������ state.slotTiles �Ǿɿ��գ��Ḳ�ǵ��˴�����ȷ״̬
-        var newSlot: List<Tile>? = null
-        if (tile.state != TileState.MOVED_OUT && tile.sealedCount == 0) {
-            // 盲盒牌进入卡槽后立刻揭示图案
-            tile.isBlind = false
-            tile.state = TileState.IN_SLOT
-            newSlot = insertIntoSlot(state.slotTiles, tile)
+        if (tile.state == TileState.MOVED_OUT) {
+            // 从置物架移回卡槽
+            val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
+            val newSlot = insertIntoSlot(
+                state.slotTiles,
+                tile.copy(state = TileState.IN_SLOT, isBlind = false)
+            )
             updateState {
                 copy(
-                    boardTiles = state.boardTiles,
-                    slotTiles = newSlot!!
+                    movedOutTiles = updatedMovedOut,
+                    slotTiles = newSlot
                 )
             }
-        }
-
-        scope.launch {
-            if (tile.state == TileState.MOVED_OUT) {
-                // ���������ܵ��
-                val updatedBoard = state.boardTiles
-                val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = insertIntoSlot(
-                    state.slotTiles,
-                    tile.copy(state = TileState.IN_SLOT, isBlind = false)
-                )
-
+            scope.launch {
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
+                processSlotMatch()
+            }
+        } else {
+            // 从棋盘点击
+            if (tile.sealedCount > 0) {
+                // 解锁封印
+                tile.sealedCount--
+                // 碎冰连锁：若封印完全解除，相邻封印牌溅射 -1 层
+                if (tile.sealedCount == 0) {
+                    val shattered = mutableSetOf(tile.id)
+                    shatterSealedNeighbors(tile, state.boardTiles, shattered)
+                }
+                setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
+                setEffect(GameViewEffect.Vibrate)
+                updateState {
+                    copy(boardTiles = calculateBlockedStates(state.boardTiles))
+                }
             } else {
-                // ��������̵��
-                if (tile.sealedCount > 0) {
-                    // ������ӡ
-                    tile.sealedCount--
-                    setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
-                    setEffect(GameViewEffect.Vibrate)
-                    updateState {
-                        copy(boardTiles = calculateBlockedStates(state.boardTiles))
-                    }
-                } else {
-                    // 普通棋盘牌落槽：等待飞行动画完成后再执行消除判断，
-                    // 避免 AAA 在卡牌视觉上还没落入卡槽时就被消除（卡牌凭空消失 bug）
+                // 普通棋盘牌落槽
+                tile.isBlind = false
+                tile.state = TileState.IN_SLOT
+                val newSlot = insertIntoSlot(state.slotTiles, tile)
+                updateState {
+                    copy(
+                        boardTiles = state.boardTiles,
+                        slotTiles = newSlot
+                    )
+                }
+                scope.launch {
                     setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
                     delay(FLY_ANIMATION_DELAY_MS)
-                    processSlotMatch(
-                        state.boardTiles,
-                        newSlot ?: state.slotTiles,
-                        state.movedOutTiles
-                    )
+                    processSlotMatch()
                 }
             }
         }
     }
 
     /**
-     * ִ�в�λƥ��������Ӯ�ж�
-     * 
-     * @return ���յĵ÷�����ֵ
+     * 执行槽位匹配及输赢判定
+     *
+     * @return 本次所获得的得分增量值
      */
     suspend fun processSlotMatchAndCheckEndGame(
         board: List<Tile>,
@@ -137,10 +134,7 @@ class GameLogicDelegate @Inject constructor() {
         val finalSlot = slot.toMutableList()
         var scoreAdd = 0
 
-        // ����Ҫ����ȫ�������Ա㿨���еĿ��Ʊ���˳������׷�ӣ����ڲ�����ͬ���ƺ�����ܹ�����ƽ���ƶ�����
-        // �Կ��۽��л�ɫ����ķ����߼���finalSlot.sortBy { it.type }
-
-        // �޸�Bug #1��ʹ��whileѭ�����������ֱ��û�и���ƥ��
+        // 进行匹配消除检查，循环直到没有可以消除的为止
         var matched = true
         while (matched) {
             matched = false
@@ -157,7 +151,7 @@ class GameLogicDelegate @Inject constructor() {
                     }
                     scoreAdd += if (isDoublePoints) 200 else 100
                     matched = true
-                    break  // ����һ������¼��
+                    break
                 }
             }
         }
@@ -187,7 +181,6 @@ class GameLogicDelegate @Inject constructor() {
 
         val totalScore = currentScore + scoreAdd
         updateState {
-            // �ϲ����ԣ��������µ� state (this)��ֻ�������������ϵ� tile ���ڵ�״̬
             val mergedBoard = boardTiles.map { currentTile ->
                 val recomputed = finalBoard.find { it.id == currentTile.id }
                 if (recomputed != null &&
@@ -212,9 +205,9 @@ class GameLogicDelegate @Inject constructor() {
     }
 
     /**
-     * �����������򿨲���׷�ӿ��ơ�
-     * ����������Ѵ�����ͬͼ�����ƣ�����뵽���һ����ͬ�Ƶĺ��棻
-     * ����ֱ��׷�ӵ�����β����
+     * 插入棋子至托盘匹配槽。
+     * 如果匹配槽已存在相同图案的棋子，排在该同图案棋子的最末尾；
+     * 否则追加至末尾。
      */
     private fun insertIntoSlot(slot: List<Tile>, newTile: Tile): List<Tile> {
         val result = slot.toMutableList()
@@ -225,6 +218,33 @@ class GameLogicDelegate @Inject constructor() {
         } else {
             result.add(lastIndex + 1, newTile)
             result
+        }
+    }
+
+    /**
+     * 碎冰连锁：当一张卡牌的封印被完全解除时，相邻的同层封印牌也会受到溅射，封印层数 -1。
+     * 若溅射后封印也归零，则继续连锁（递归）。
+     *
+     * @param centerTile 本次被解除封印的卡牌
+     * @param board      当前棋盘所有卡牌
+     * @param visited    已处理过的卡牌 id，防止循环
+     */
+    private fun shatterSealedNeighbors(centerTile: Tile, board: List<Tile>, visited: MutableSet<String>) {
+        val neighbors = board.filter { other ->
+            other.id != centerTile.id &&
+            other.sealedCount > 0 &&
+            other.id !in visited &&
+            other.z == centerTile.z &&
+            kotlin.math.abs(other.x - centerTile.x) <= 1.5f &&
+            kotlin.math.abs(other.y - centerTile.y) <= 1.5f
+        }
+
+        for (neighbor in neighbors) {
+            neighbor.sealedCount--
+            visited.add(neighbor.id)
+            if (neighbor.sealedCount == 0) {
+                shatterSealedNeighbors(neighbor, board, visited)
+            }
         }
     }
 }

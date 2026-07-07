@@ -5,6 +5,12 @@
   "placement": {
     "mode": "smart"
   },
+  "routes": [
+    {
+      "pattern": "api.xqh.cc.cd",
+      "custom_domain": true
+    }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -25,6 +31,6 @@
     }
   ],
   "vars": {
-    "R2_PUBLIC_URL": "https://apk.xqh.cc.cd"
+    "R2_PUBLIC_URL": "https://file.xqh.cc.cd"
   }
 }

@@ -5,34 +5,52 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.ImageCompressor
-import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarPickerDialog
 import com.example.sheeps.menu.ui.dialogs.ProfileChangePasswordDialog
+import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.hjq.toast.Toaster
-import androidx.compose.ui.res.stringResource
-import com.example.sheeps.core.R
 
 /**
  * 个人资料编辑页
@@ -72,9 +90,9 @@ fun ProfileScreen(
                 val base64 = ImageCompressor.compressImage(context, it)
                 avatarBase64 = base64
                 onUploadAvatar(base64)
-                Toaster.show("头像上传成功")
+                Toaster.show(context.getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show("头像处理失败：${e.message}")
+                Toaster.show(context.getString(R.string.toast_avatar_process_failed, e.message))
             }
         }
     }
@@ -94,9 +112,9 @@ fun ProfileScreen(
                 avatarBase64 = base64
                 onUploadAvatar(base64)
                 tempFile.delete()
-                Toaster.show("头像上传成功")
+                Toaster.show(context.getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show("头像处理失败：${e.message}")
+                Toaster.show(context.getString(R.string.toast_avatar_process_failed, e.message))
             }
         }
     }
@@ -123,14 +141,14 @@ fun ProfileScreen(
             onSendCode = { /* 复用现有验证码发送逻辑 */ },
             onChangePassword = { _, _, _ ->
                 showChangePwdDialog = false
-                Toaster.show("密码修改功能暂未开放，请使用找回密码")
+                Toaster.show(context.getString(R.string.toast_password_feature_locked))
             }
         )
     }
 
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "个人资料", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.profile_edit_title), onBack = onBack)
         }
     ) { paddingValues ->
         LazyColumn(
@@ -174,10 +192,10 @@ fun ProfileScreen(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                     stringResource(id = R.string.click_to_change_avatar),
-                     style = MaterialTheme.typography.bodySmall,
-                     color = Color.Gray
-                 )
+                    stringResource(id = R.string.click_to_change_avatar),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
             }
 
             // ---- 昵称 ----
@@ -196,7 +214,7 @@ fun ProfileScreen(
                                 Toaster.show(context.getString(R.string.toast_nickname_updated))
                             }
                         }) {
-                            Icon(Icons.Default.Edit, contentDescription = stringResource(id = R.string.btn_save))
+                            Icon(Icons.Default.Edit, contentDescription = "保存")
                         }
                     }
                 )
@@ -224,7 +242,10 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(stringResource(id = R.string.dialog_title_change_password), color = Color.White)
+                    Text(
+                        stringResource(id = R.string.dialog_title_change_password),
+                        color = Color.White
+                    )
                 }
             }
         }

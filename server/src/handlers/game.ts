@@ -136,7 +136,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
      *   @param {number} score — 得分
      *   @param {string} sign — SHA256 防作弊签名
      *
-     * 响应: { success, first_clear, points_reward }
+     * 响应: { success }
      */
     if (path === '/api/score/submit' && request.method === 'POST') {
         const body: any = await request.json();
@@ -167,12 +167,6 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
             userExists = { points: 0 };
         }
 
-        let firstClear = false, finalPoints = userExists.points;
-        // 如果是该玩家的首次通关（无论离线还是在线），奖励 50 积分
-        if (!(clearsResult.results[0] as any)?.count) {
-            firstClear = true; finalPoints += 50;
-            mutations.push(env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(finalPoints, resolvedUserId));
-        }
         // 自动解锁下一关
         mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now()));
         // 将成绩录入排行榜表
@@ -198,7 +192,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
             if (taskMutations.length > 0) await env.DB.batch(taskMutations);
         }
 
-        return new Response(JSON.stringify({ success: true, first_clear: firstClear, points_reward: firstClear ? 50 : 0 }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
     }
 
     /**

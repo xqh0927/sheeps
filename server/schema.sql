@@ -13,6 +13,10 @@ DROP TABLE IF EXISTS config;
 DROP TABLE IF EXISTS leaderboard;
 DROP TABLE IF EXISTS backup_save_log;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS app_version;
+DROP TABLE IF EXISTS matchmaking_queue;
+DROP TABLE IF EXISTS game_commands;
+DROP TABLE IF EXISTS admin_audit_log;
 
 CREATE TABLE users (
     id TEXT PRIMARY KEY,
@@ -22,7 +26,9 @@ CREATE TABLE users (
     points INTEGER DEFAULT 0,
     password_hash TEXT,
     avatar_url TEXT,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    role TEXT DEFAULT 'readonly',
+    is_banned INTEGER DEFAULT 0
 );
 
 CREATE TABLE login_token (
@@ -146,6 +152,24 @@ CREATE TABLE config (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+-- 管理后台操作审计日志（仅由后台写接口 INSERT，无任何写/删接口）
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    admin_id        TEXT    NOT NULL,
+    admin_phone     TEXT    NOT NULL,
+    admin_role      TEXT    NOT NULL,
+    action          TEXT    NOT NULL,
+    target_type     TEXT,
+    target_id       TEXT,
+    before_snapshot TEXT,
+    after_snapshot  TEXT,
+    source_ip       TEXT,
+    user_agent      TEXT,
+    created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_audit_log(admin_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_log(created_at);
 
 CREATE TABLE leaderboard (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

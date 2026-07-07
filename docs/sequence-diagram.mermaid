@@ -1,116 +1,38 @@
 sequenceDiagram
-    participant App as 业务代码
-    participant Retrofit as Retrofit/ApiService
-    participant OkHttp as OkHttpClient
-    participant TR as tokenRefreshInterceptor
-    participant RTP as RefreshTokenProvider
-    participant API as ApiService
-    participant Server as 服务端
+    actor Admin as 管理员
+    participant FE as 前端(AdminConsole)
+    participant MW as requireAdmin+角色守卫
+    participant H as AdminApiHandler
+    participant DB as D1
+    participant AL as admin_audit_log
 
-    App->>Retrofit: signIn() / 任意 API 调用
-    Retrofit->>OkHttp: execute(request)
-    OkHttp->>TR: intercept(chain)
-    TR->>OkHttp: chain.proceed(request)
-    OkHttp->>Server: HTTP 请求
-    Server-->>OkHttp: 401 Unauthorized
-    
-    TR->>TR: 检测 401 + 非 refresh 端点
-    TR->>RTP: 读取 apiService 引用
-    RTP-->>TR: ApiService 实例（非 null）
-    
-    TR->>API: refreshToken(mapOf("refreshToken" to rt))
-    API->>Server: POST /api/auth/refresh
-    Server-->>API: {success, token, refreshToken}
-    API-->>TR: RefreshResponse
-    
-    TR->>TR: prefs.setToken() / prefs.setRefreshToken()
-    TR->>OkHttp: 重试原始请求（新 Token）
-    OkHttp->>Server: 原始请求（Bearer newToken）
-    Server-->>OkHttp: 200 OK
-    OkHttp-->>App: 响应
+    Note over Admin, FE: ① 登录（携带真实 role）
+    Admin->>FE: 输入手机号 + 密码
+    FE->>H: POST /api/admin/login {phone,password}
+    H->>DB: SELECT * FROM users WHERE phone=?
+    H->>H: role!='readonly' 且 verifyPassword 且 is_banned=0
+    H->>H: generateJWT(role=真实角色)
+    H->>AL: INSERT LOGIN_SUCCESS
+    H-->>FE: {token, refreshToken, user{role}}
 
-    ---
+    Note over Admin, AL: ② readonly 调写接口 → 403（后端最终防线）
+    Admin->>FE: (readonly) 点"新建商品"
+    FE->>MW: POST /api/admin/shop-items (Authorization: Bearer)
+    MW->>MW: requireAdmin OK, assertCanWrite → role=='readonly'
+    MW-->>FE: 403 {error:'无写权限'}
 
-    participant VM as ViewModel
-    participant EncInt as encryptionInterceptor
-    participant LogInt as loggingInterceptor
-    participant DecMW as decryptMiddleware
-    participant Handler as Route Handler
-    participant EncMW as encryptMiddleware
+    Note over Admin, AL: ③ operator 改积分（成功路径）
+    Admin->>FE: (operator) 改用户积分
+    FE->>MW: POST /api/admin/users/:id/points (Bearer)
+    MW->>MW: requireAdmin OK, assertCanWrite OK
+    MW->>H: 放行
+    H->>DB: UPDATE users SET points...; INSERT point_record
+    H->>AL: INSERT ADJUST_POINTS(before/after/reason)
+    H-->>FE: {success, current_points}
+    FE-->>Admin: 提示成功
 
-    VM->>Retrofit: 调用 API（明文请求体）
-    Retrofit->>EncInt: 明文 JSON Body
-    
-    Note over EncInt: 1. 生成随机 12-byte IV
-    Note over EncInt: 2. AES-256-GCM 加密
-    Note over EncInt: 3. 组装 {encrypted: Base64(IV+cipher+tag)}
-    
-    EncInt->>LogInt: 密文请求体
-    Note over LogInt: Debug 模式可通过 EncInt 获取明文日志
-    LogInt->>Server: POST /api/xxx + 加密 Body
-    
-    Server->>DecMW: 解密中间件
-    Note over DecMW: 1. Base64 解码
-    Note over DecMW: 2. 提取 IV(前12字节)
-    Note over DecMW: 3. AES-256-GCM 解密
-    Note over DecMW: 4. 替换 request.body 为明文
-    
-    DecMW->>Handler: 明文 JSON Body
-    Handler->>Handler: 业务逻辑处理
-    Handler-->>EncMW: 明文 JSON 响应
-    
-    Note over EncMW: 1. 生成随机 12-byte IV
-    Note over EncMW: 2. AES-256-GCM 加密
-    Note over EncMW: 3. 返回 {encrypted: Base64(IV+cipher+tag)}
-    
-    EncMW-->>Server: 加密响应体
-    Server-->>LogInt: 加密响应
-    LogInt-->>EncInt: 加密响应
-    
-    Note over EncInt: 1. 解密响应
-    Note over EncInt: 2. 还原明文响应体
-    
-    EncInt-->>Retrofit: 明文 JSON Response
-    Retrofit-->>VM: 反序列化后的数据对象
-
-    ---
-
-    participant User as 用户
-    participant Dialog as SetPasswordDialog
-    participant D1 as D1 Database
-
-    User->>Dialog: 输入密码并确认
-    Dialog->>VM: SetPassword(password)
-    VM->>API: registerPassword(phone, password, code)
-    API->>Server: POST /api/auth/register-password (加密)
-    
-    Server->>Server: 1. 解密请求体
-    Server->>Server: 2. 验证验证码（复用 login_token）
-    Server->>Server: 3. PBKDF2 哈希密码
-    Server->>D1: UPDATE users SET password_hash = ?
-    Server->>D1: UPDATE users SET points = points + 50
-    Server->>D1: INSERT point_record (IN, 50, SET_PASSWORD)
-    Server-->>API: {success, token, refreshToken, bonusPoints: 50}
-    
-    API-->>VM: PasswordRegisterResponse
-    VM->>VM: prefs.setHasPassword(true)
-    VM->>VM: prefs.setPoints(points + 50)
-    VM->>User: Toast "密码设置成功！获得 50 积分奖励"
-
-    ---
-
-    participant Game as GameActivity
-
-    Game->>Server: POST /api/score/submit (通关成绩)
-    Server->>D1: 查询用户信息 + 通关次数 + 每日任务进度
-    D1-->>Server: tasksResult (PLAY_3_GAMES/PLAY_5_GAMES 当前进度)
-    
-    Server->>Server: 处理首次通关奖励 + 解锁下一关
-    Server->>D1: 写入排行榜 + 解锁关卡
-    
-    Note over Server: 【新增逻辑】遍历 tasksResult
-    Server->>Server: 对于 PLAY_ 前缀任务: progress += 1
-    Server->>Server: 若 progress >= target_count: is_completed = 1
-    Server->>D1: UPDATE user_task SET progress=?, is_completed=?
-    
-    Server-->>Game: {success, first_clear, points_reward}
+    Note over Admin, AL: ④ super 专属接口（非 super → 403）
+    Admin->>FE: (operator) 打开"管理员账户管理"
+    FE->>MW: GET /api/admin/accounts (Bearer)
+    MW->>MW: requireAdmin OK, assertSuper → role!='super'
+    MW-->>FE: 403 {error:'需要超级管理员权限'}

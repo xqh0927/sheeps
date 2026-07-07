@@ -25,6 +25,9 @@ import com.example.sheeps.game.viewmodel.helpers.GameLevelGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -51,6 +54,7 @@ class GameViewModel @Inject constructor(
     private var levelStartTime: Long = 0
     private var carryItemsJsonStr: String? = null
     private var itemsUsedCount: Int = 0
+    private var tickJob: kotlinx.coroutines.Job? = null
 
     // 历史状态栈（用于撤销功能）
     private val historyStack = mutableListOf<Triple<List<Tile>, List<Tile>, List<Tile>>>()
@@ -209,6 +213,14 @@ class GameViewModel @Inject constructor(
         levelStartTime = System.currentTimeMillis()
         itemsUsedCount = 0
         carryItemsJsonStr = carryItemsJson
+        // 启动计时器协程
+        tickJob?.cancel()
+        tickJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1000)
+                updateState { copy(elapsedMs = System.currentTimeMillis() - levelStartTime) }
+            }
+        }
 
         val carryMap = try {
             if (!carryItemsJson.isNullOrEmpty()) json.decodeFromString<Map<String, Int>>(
@@ -244,9 +256,10 @@ class GameViewModel @Inject constructor(
 
                 updateBoardState(finalTiles, carryMap, false)
             } catch (e: Exception) {
-                // 离线回退：使用与在线相同的种子保持一致性
+                // 离线回退：使用当前真实用户ID和随机种子保持一致性
+                val numericUserId = prefs.getUserId().toIntOrNull() ?: 0
                 val finalTiles =
-                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis()))
+                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis(), numericUserId))
                 updateBoardState(finalTiles, carryMap, true)
             }
         }
@@ -301,29 +314,39 @@ class GameViewModel @Inject constructor(
         )
     }
 
-    private suspend fun processSlotMatchAndCheckEndGame(
-        board: List<Tile>,
-        slot: List<Tile>,
-        movedOut: List<Tile>
-    ) {
+    private suspend fun processSlotMatchAndCheckEndGame() {
+        val state = currentState
         logicDelegate.processSlotMatchAndCheckEndGame(
-            board,
-            slot,
-            movedOut,
-            currentState.score,
-            currentState.isDoublePointsActive,
+            state.boardTiles,
+            state.slotTiles,
+            state.movedOutTiles,
+            state.score,
+            state.isDoublePointsActive,
             ::updateState,
             ::setEffect
         ) {
+            // 计算通关结算积分（与 ScoreDelegate 同样公式）
+            val elapsedMs = System.currentTimeMillis() - levelStartTime
+            val timeInSeconds = elapsedMs / 1000L
+            val difficultyCoeff = when (currentState.currentLevelId) {
+                1 -> 1; 2 -> 2; 3 -> 3; else -> 4
+            }
+            val baseScore = (maxOf(100L, (1000L - timeInSeconds * 2) - itemsUsedCount * 50L) * difficultyCoeff).toInt()
+            val computedFinalScore = if (currentState.isDoublePointsActive) baseScore * 2 else baseScore
+            updateState { copy(finalScore = computedFinalScore, elapsedMs = elapsedMs) }
+
             scoreDelegate.submitScoreOnline(
                 CoroutineScope(Dispatchers.IO),
                 currentState.currentLevelId,
-                levelStartTime,
-                itemsUsedCount,
-                currentState.isDoublePointsActive,
+                computedFinalScore,
+                elapsedMs,
                 ::getLocalizedString,
                 ::setEffect
             )
+        }
+        // 游戏结束时停止计时器
+        if (currentState.gameStatus == GameStatus.WON || currentState.gameStatus == GameStatus.LOST) {
+            tickJob?.cancel()
         }
     }
 

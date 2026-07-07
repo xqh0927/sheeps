@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import androidx.core.content.FileProvider
+import com.example.sheeps.core.R
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -120,7 +121,7 @@ class UpdateDownloadManager {
             } catch (e: Exception) {
                 _state.value = UpdateDownloadState(
                     status = UpdateStatus.Error,
-                    error = e.message ?: "下载失败"
+                    error = e.message ?: context.getString(R.string.update_download_failed)
                 )
             } finally {
                 try { output?.close() } catch (_: Exception) {}
@@ -136,7 +137,10 @@ class UpdateDownloadManager {
     fun tryInstallApk(context: Context): Boolean {
         val file = apkFile
         if (file == null || !file.exists()) {
-            _state.value = UpdateDownloadState(status = UpdateStatus.Error, error = "安装文件不存在")
+            _state.value = UpdateDownloadState(
+                status = UpdateStatus.Error,
+                error = context.getString(R.string.update_install_file_missing)
+            )
             return false
         }
 
@@ -164,7 +168,10 @@ class UpdateDownloadManager {
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            _state.value = UpdateDownloadState(status = UpdateStatus.Error, error = "安装失败: ${e.message}")
+            _state.value = UpdateDownloadState(
+                status = UpdateStatus.Error,
+                error = context.getString(R.string.update_install_failed, e.message)
+            )
             false
         }
     }

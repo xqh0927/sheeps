@@ -1,36 +1,59 @@
 package com.example.sheeps.menu.ui.dialogs
 
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
+import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.ui.components.ItemAnimationIcon
 import com.hjq.toast.Toaster
-import com.example.sheeps.core.R
-import com.example.sheeps.core.utils.getLocalizedItemName
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun PrepareGameDialog(
@@ -71,7 +94,13 @@ fun PrepareGameDialog(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(
                     2.dp,
-                    Brush.linearGradient(listOf(MaterialTheme.colorScheme.secondary, Color(0xFFEDD9A3), MaterialTheme.colorScheme.secondary))
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.secondary,
+                            Color(0xFFEDD9A3),
+                            MaterialTheme.colorScheme.secondary
+                        )
+                    )
                 ),
                 shape = RoundedCornerShape(20.dp)
             ) {
@@ -82,7 +111,10 @@ fun PrepareGameDialog(
                 ) {
                     // 对话框头部主标题文本
                     Text(
-                        text = if (isLocked) stringResource(id = R.string.prepare_title_locked) else stringResource(id = R.string.prepare_title_unlocked, levelId),
+                        text = if (isLocked) stringResource(id = R.string.prepare_title_locked) else stringResource(
+                            id = R.string.prepare_title_unlocked,
+                            levelId
+                        ),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 18.sp,
@@ -93,7 +125,11 @@ fun PrepareGameDialog(
                     if (isLocked) {
                         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Text(
-                                text = stringResource(id = R.string.prepare_locked_desc, cost, state.points),
+                                text = stringResource(
+                                    id = R.string.prepare_locked_desc,
+                                    cost,
+                                    state.points
+                                ),
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -104,7 +140,10 @@ fun PrepareGameDialog(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text(stringResource(id = R.string.dialog_prepare_back), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        stringResource(id = R.string.dialog_prepare_back),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Button(
@@ -118,7 +157,10 @@ fun PrepareGameDialog(
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(stringResource(id = R.string.dialog_prepare_unlock), color = MaterialTheme.colorScheme.onPrimary)
+                                    Text(
+                                        stringResource(id = R.string.dialog_prepare_unlock),
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
                                 }
                             }
                         }
@@ -134,8 +176,13 @@ fun PrepareGameDialog(
                             if (isBlind) {
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(10.dp),
@@ -155,8 +202,13 @@ fun PrepareGameDialog(
                             if (isSealed) {
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(10.dp),
@@ -176,7 +228,14 @@ fun PrepareGameDialog(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             val itemTypes = listOf(
-                                "UNDO", "SHUFFLE", "MOVEOUT", "REVIVE", "HINT", "BOMB", "JOKER", "DOUBLE_POINTS"
+                                "UNDO",
+                                "SHUFFLE",
+                                "MOVEOUT",
+                                "REVIVE",
+                                "HINT",
+                                "BOMB",
+                                "JOKER",
+                                "DOUBLE_POINTS"
                             )
 
                             val selectedTypesCount = remember(state.selectedCarryItems) {
@@ -204,10 +263,15 @@ fun PrepareGameDialog(
                                             Column(
                                                 modifier = Modifier
                                                     .weight(1f)
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                                                    .background(
+                                                        MaterialTheme.colorScheme.surfaceVariant,
+                                                        RoundedCornerShape(12.dp)
+                                                    )
                                                     .border(
                                                         1.dp,
-                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant,
+                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(
+                                                            alpha = 0.5f
+                                                        ) else MaterialTheme.colorScheme.outlineVariant,
                                                         RoundedCornerShape(12.dp)
                                                     )
                                                     .padding(vertical = 8.dp, horizontal = 4.dp),
@@ -227,7 +291,10 @@ fun PrepareGameDialog(
                                                     maxLines = 1
                                                 )
                                                 Text(
-                                                    stringResource(id = R.string.stock_prefix, stock),
+                                                    stringResource(
+                                                        id = R.string.stock_prefix,
+                                                        stock
+                                                    ),
                                                     fontSize = 9.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1
@@ -245,12 +312,17 @@ fun PrepareGameDialog(
                                                             .size(22.dp)
                                                             .clip(CircleShape)
                                                             .background(if (selected > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
-                                                            .clickable(enabled = selected > 0) { onUpdateItem(type, -1) },
+                                                            .clickable(enabled = selected > 0) {
+                                                                onUpdateItem(
+                                                                    type,
+                                                                    -1
+                                                                )
+                                                            },
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = stringResource(id = R.string.prepare_desc_decrease),
+                                                            contentDescription = "减少",
                                                             tint = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                             modifier = Modifier.size(14.dp)
                                                         )
@@ -274,18 +346,24 @@ fun PrepareGameDialog(
                                                         color = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                     )
 
-                                                    val canIncrease = selected < stock && (selected > 0 || selectedTypesCount < 5)
+                                                    val canIncrease =
+                                                        selected < stock && (selected > 0 || selectedTypesCount < 5)
                                                     Box(
                                                         modifier = Modifier
                                                             .size(22.dp)
                                                             .clip(CircleShape)
                                                             .background(if (canIncrease) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
-                                                            .clickable(enabled = canIncrease) { onUpdateItem(type, 1) },
+                                                            .clickable(enabled = canIncrease) {
+                                                                onUpdateItem(
+                                                                    type,
+                                                                    1
+                                                                )
+                                                            },
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowUp,
-                                                            contentDescription = stringResource(id = R.string.prepare_desc_increase),
+                                                            contentDescription = "增加",
                                                             tint = if (canIncrease) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                                             modifier = Modifier.size(14.dp)
                                                         )
@@ -310,7 +388,10 @@ fun PrepareGameDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextButton(onClick = onDismiss) {
-                                    Text(stringResource(id = R.string.dialog_prepare_close), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        stringResource(id = R.string.dialog_prepare_close),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Button(

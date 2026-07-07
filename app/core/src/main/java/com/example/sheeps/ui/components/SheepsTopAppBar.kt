@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 
 /**
  * 统一的二级界面顶部导航栏，高度 44dp（比默认 64dp 低 20dp）。

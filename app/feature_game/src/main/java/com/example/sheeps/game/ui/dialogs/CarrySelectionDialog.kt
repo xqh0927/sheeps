@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.ui.components.ItemAnimationIcon
@@ -73,7 +75,7 @@ fun CarrySelectionDialog(
                         .fillMaxWidth()
                 ) {
                     Text(
-                        text = "选择携带法宝 (重新闯关)",
+                        text = stringResource(id = R.string.carry_dialog_title),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         fontSize = 18.sp,
@@ -82,7 +84,7 @@ fun CarrySelectionDialog(
                     )
 
                     Text(
-                        text = "选择本局想要携带的道具，通关更轻松！点击确定后将扣减对应的背包库存。",
+                        text = stringResource(id = R.string.carry_dialog_desc),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 16.sp,
@@ -132,7 +134,7 @@ fun CarrySelectionDialog(
                                             textAlign = TextAlign.Center
                                         )
                                         Text(
-                                            text = "库存: $stock",
+                                            text = stringResource(id = R.string.carry_stock_label, stock),
                                             fontSize = 9.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -205,7 +207,7 @@ fun CarrySelectionDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = onDismiss) {
-                            Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(id = R.string.btn_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Button(
@@ -214,7 +216,7 @@ fun CarrySelectionDialog(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
-                                "确定开始",
+                                stringResource(id = R.string.carry_confirm_start),
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.Bold
                             )

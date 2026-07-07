@@ -246,7 +246,7 @@
     <string name="prepare_title_locked">关卡锁定</string>
     <string name="prepare_title_unlocked">挑战准备 (第 %1$d 关)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒关卡！部分卡牌图案隐藏，放入槽位后才显现。</string>
-    <string name="prepare_sealed_warning">🔒 锁定关卡！部分卡牌被锁扣锁定，需消除其他牌解锁。</string>
+    <string name="prepare_sealed_warning">🔒 封印关卡！部分卡牌被封印（1~3层），点击逐层解封；完全解封时会触发“碎冰”，相邻封印牌自动减1层。</string>
     <string name="update_discovered">发现新版本 %1$s</string>
     <string name="update_log_title">更新内容：</string>
     <string name="update_default_log">优化游戏体验，修复已知问题。</string>
@@ -372,6 +372,13 @@
     <string name="toast_task_claim_failed">领奖失败</string>
     <string name="toast_task_claim_offline">网络连通受限，积分已加入本地，稍后同步</string>
     <string name="toast_unlock_failed_insufficient">解锁失败，积分余额不足</string>
+
+    <string name="game_clear_time">用时 %1$s</string>
+    <string name="carry_dialog_title">选择携带法宝 (重新闯关)</string>
+    <string name="carry_dialog_desc">选择本局想要携带的道具，通关更轻松！点击确定后将扣减对应的背包库存。</string>
+    <string name="carry_stock_label">库存: %1$d</string>
+    <string name="leaderboard_rules_title">积分计算规则</string>
+    <string name="leaderboard_rules_text">• 基础分 = 1000 - 通关用时(秒) × 2 - 使用道具数 × 50\n• 最低保底 100 分\n• 最终积分 = 基础分 × 关卡难度系数 × 双倍(如有)\n• 各关卡按最高分排名，相同分数时用时短者优先</string>
     <string name="toast_unlock_success_level">积分子系统扣除成功！第 %1$d 关已解锁</string>
     <string name="toast_unlock_failed_cloud">解锁失败，云端同步拒绝</string>
     <string name="toast_unlock_offline">连接不畅，已扣减积分本地解锁，后续有网自动同步</string>
@@ -382,6 +389,7 @@
     <string name="toast_phone_code_invalid">请输入正确的手机号和6位验证码</string>
     <string name="toast_login_verification_failed">登录验证失败</string>
     <string name="toast_code_invalid_or_expired">验证码错误或已失效</string>
+    <string name="toast_session_expired">登录已过期，请重新登录</string>
     <string name="toast_conflict_resolved_local">已保留本地进度并同步至云端！</string>
     <string name="toast_conflict_resolved_cloud">已成功加载云端存档进度！</string>
     <string name="toast_conflict_resolve_error">存档冲突解决异常，请检查网络</string>
@@ -408,4 +416,67 @@
     <string name="err_invalid_phone">请输入正确的11位手机号</string>
     <string name="btn_register">注册</string>
     <string name="hint_already_have_account">已有账号？去登录</string>
+
+    <!-- ===== i18n 改造新增 key（用户可见中文文案国际化） ===== -->
+    <!-- 通用标题 / 标签 -->
+    <string name="settings_title">设置</string>
+    <string name="register_title">注册账号</string>
+    <string name="profile_title">个人资料</string>
+    <string name="profile_edit_title">个人资料</string>
+    <string name="reset_password_title">找回密码</string>
+    <string name="label_not_set">未设置</string>
+
+    <!-- 登录相关 -->
+    <string name="tab_login_code">验证码登录</string>
+    <string name="tab_login_password">密码登录</string>
+    <string name="login_forgot_password">忘记密码？</string>
+    <string name="login_no_account">没有账号？立即注册</string>
+    <string name="toast_login_required_level">第四关及后续关卡需要登录解锁，请先登录！</string>
+
+    <!-- 积分 / 单位 -->
+    <string name="unit_points"> 积分</string>
+
+    <!-- 游戏内 -->
+    <string name="game_movedout_tray">— 置物架 —</string>
+
+    <!-- 个人中心 Toasts -->
+    <string name="toast_image_process_failed">图片处理失败</string>
+    <string name="toast_password_change_success">密码修改成功，请重新登录</string>
+    <string name="toast_password_change_failed">密码修改失败</string>
+    <string name="toast_avatar_process_failed">头像处理失败：%1$s</string>
+    <string name="toast_password_feature_locked">密码修改功能暂未开放，请使用找回密码</string>
+
+    <!-- 退出确认弹窗 -->
+    <string name="dialog_tip_title">提示</string>
+    <string name="dialog_logout_confirm_message">确定要退出登录吗？</string>
+    <string name="toast_press_back_exit">再按一次退出</string>
+
+    <!-- 游客态 -->
+    <string name="guest_name">逑客云游</string>
+    <string name="login_sync_prompt">登录同步存档 · 解锁演化关卡</string>
+
+    <!-- 携带法宝弹窗（carry_dialog_title / carry_dialog_desc 已存在，复用） -->
+    <string name="carry_confirm_start">确定开始</string>
+
+    <!-- 商城兑换弹窗 -->
+    <string name="shop_exchange_title">确认兑换</string>
+    <string name="shop_exchange_skin_desc">确定使用积分兑换此皮肤吗？</string>
+    <string name="shop_exchange_item_desc">确定使用积分兑换此道具吗？</string>
+    <string name="shop_quantity_label">数量: %1$d</string>
+    <string name="shop_unit_price_label">单价:</string>
+    <string name="shop_total_label">总计:</string>
+    <string name="shop_balance_label">当前余额:</string>
+
+    <!-- App 更新 -->
+    <string name="update_downloading">下载中 %1$d%%</string>
+    <string name="update_completed">下载完成，准备安装...</string>
+    <string name="update_need_permission">请授权"允许安装未知应用"后点击安装</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_retry_download">重新下载</string>
+    <string name="update_install">安装更新</string>
+    <string name="update_install_after_auth">授权后安装</string>
+    <string name="update_downloading_hint">下载更新中，请勿退出</string>
+    <string name="update_install_file_missing">安装文件不存在</string>
+    <string name="update_install_failed">安装失败: %1$s</string>
+    <string name="duel_match_id_label">对局号: %1$s</string>
 </resources>

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,27 +39,27 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import com.apkfuns.logutils.LogUtils
+import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.theme.MoYe_Surface
-import com.example.sheeps.theme.MoYe_SurfaceVariant
 import com.example.sheeps.theme.ShapeLarge
 import com.example.sheeps.theme.SheepsTheme
-import com.example.sheeps.theme.Text_Disabled_Dark
-import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.GhostButton
 import com.example.sheeps.ui.components.PrimaryButton
 import com.example.sheeps.ui.components.SheepsLoading
@@ -73,7 +74,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.sin
 
 @Route(path = "/splash/entry")
@@ -316,7 +316,10 @@ fun SplashVisuals() {
                         drawRoundRect(
                             color = themeSecondary.copy(alpha = 0.35f),
                             size = size,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                                12.dp.toPx(),
+                                12.dp.toPx()
+                            ),
                             style = Stroke(width = 3f)
                         )
                     }
@@ -332,7 +335,10 @@ fun SplashVisuals() {
                         drawRoundRect(
                             color = themePrimary,
                             size = size,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
+                                12.dp.toPx(),
+                                12.dp.toPx()
+                            ),
                             style = Stroke(width = 5f)
                         )
                         // 中心小核心圆点
@@ -484,7 +490,10 @@ fun PrivacyComposeDialog(
                 .clip(ShapeLarge)
                 .background(
                     Brush.linearGradient(
-                        colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), Color.Transparent)
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f),
+                            Color.Transparent
+                        )
                     )
                 )
                 .background(MaterialTheme.colorScheme.surface)
@@ -506,12 +515,86 @@ fun PrivacyComposeDialog(
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                Text(
-                    text = stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_content),
-                    fontSize = 14.sp,
-                    lineHeight = 22.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                    modifier = Modifier.padding(bottom = 24.dp)
+                val fullText =
+                    stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_content)
+                val agreementKeywords =
+                    listOf("《用户协议》", "《用戶協議》", "User Agreement", "利用規約", "이용 약관")
+                val privacyKeywords = listOf(
+                    "《隐私政策》",
+                    "《隱私政策》",
+                    "Privacy Policy",
+                    "プライバシーポリシー",
+                    "개인정보 처리방침"
+                )
+
+                val agreementKeyword = agreementKeywords.firstOrNull { fullText.contains(it) }
+                val privacyKeyword = privacyKeywords.firstOrNull { fullText.contains(it) }
+
+                val annotatedString = buildAnnotatedString {
+                    append(fullText)
+                    agreementKeyword?.let { keyword ->
+                        val start = fullText.indexOf(keyword)
+                        if (start != -1) {
+                            val end = start + keyword.length
+                            addStyle(
+                                style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                start = start,
+                                end = end
+                            )
+                            addStringAnnotation(
+                                tag = "URL",
+                                annotation = AppConfig.BASE_URL + "agreement.html",
+                                start = start,
+                                end = end
+                            )
+                        }
+                    }
+                    privacyKeyword?.let { keyword ->
+                        val start = fullText.indexOf(keyword)
+                        if (start != -1) {
+                            val end = start + keyword.length
+                            addStyle(
+                                style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                start = start,
+                                end = end
+                            )
+                            addStringAnnotation(
+                                tag = "URL",
+                                annotation = AppConfig.BASE_URL + "privacy.html",
+                                start = start,
+                                end = end
+                            )
+                        }
+                    }
+                }
+
+                val uriHandler = LocalUriHandler.current
+                ClickableText(
+                    text = annotatedString,
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontSize = 14.sp,
+                        lineHeight = 22.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                    ),
+                    modifier = Modifier.padding(bottom = 24.dp),
+                    onClick = { offset ->
+                        annotatedString.getStringAnnotations(
+                            tag = "URL",
+                            start = offset,
+                            end = offset
+                        )
+                            .firstOrNull()?.let { annotation ->
+                                uriHandler.openUri(annotation.item)
+                            }
+                    }
                 )
 
                 Row(

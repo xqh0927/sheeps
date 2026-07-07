@@ -235,7 +235,7 @@
     <string name="prepare_title_locked">Locked</string>
     <string name="prepare_title_unlocked">Start Level (Stage %1$d)</string>
     <string name="prepare_blind_warning">⚠️ Blind Stage! Some tiles are hidden.</string>
-    <string name="prepare_sealed_warning">🔒 Locked Stage! Some tiles are locked.</string>
+    <string name="prepare_sealed_warning">🔒 Sealed Stage! Some tiles are sealed (1~3 layers). Tap to unseal layer by layer; full unseal triggers "Shatter", reducing adjacent sealed tiles by 1 layer.</string>
     <string name="update_discovered">New version %1$s found</string>
     <string name="update_log_title">Updates:</string>
     <string name="update_default_log">Bug fixes and performance improvements.</string>
@@ -359,6 +359,13 @@
     <string name="toast_task_claim_failed">Failed to claim reward</string>
     <string name="toast_task_claim_offline">Offline: points added locally, will sync later</string>
     <string name="toast_unlock_failed_insufficient">Unlock failed, insufficient points</string>
+
+    <string name="game_clear_time">Time %1$s</string>
+    <string name="carry_dialog_title">Choose Items (Retry Level)</string>
+    <string name="carry_dialog_desc">Select items to bring into this level. Tapping confirm will deduct from your backpack.</string>
+    <string name="carry_stock_label">Stock: %1$d</string>
+    <string name="leaderboard_rules_title">Scoring Rules</string>
+    <string name="leaderboard_rules_text">• Base Score = 1000 - Clear Time(s) × 2 - Items Used × 50\n• Minimum 100 points guaranteed\n• Final Score = Base Score × Difficulty Multiplier × Double (if active)\n• Rankings by highest score per level; ties broken by clear time</string>
     <string name="toast_unlock_success_level">Points deducted! Level %1$d unlocked</string>
     <string name="toast_unlock_failed_cloud">Unlock failed, cloud sync rejected</string>
     <string name="toast_unlock_offline">Offline: unlocked locally, will sync when reconnected</string>
@@ -369,6 +376,7 @@
     <string name="toast_phone_code_invalid">Please enter a valid phone number and 6-digit code</string>
     <string name="toast_login_verification_failed">Login verification failed</string>
     <string name="toast_code_invalid_or_expired">Verification code incorrect or expired</string>
+    <string name="toast_session_expired">Session expired, please login again</string>
     <string name="toast_conflict_resolved_local">Local progress retained and synced to cloud!</string>
     <string name="toast_conflict_resolved_cloud">Cloud save progress loaded successfully!</string>
     <string name="toast_conflict_resolve_error">Archive conflict resolution error, please check network</string>
@@ -395,4 +403,47 @@
     <string name="err_invalid_phone">Please enter a valid 11-digit phone number</string>
     <string name="btn_register">Register</string>
     <string name="hint_already_have_account">Already have an account? Login</string>
+
+    <string name="settings_title">设置</string>
+    <string name="register_title">注册账号</string>
+    <string name="profile_title">个人资料</string>
+    <string name="profile_edit_title">个人资料</string>
+    <string name="reset_password_title">找回密码</string>
+    <string name="label_not_set">未设置</string>
+    <string name="tab_login_code">验证码登录</string>
+    <string name="tab_login_password">密码登录</string>
+    <string name="login_forgot_password">忘记密码？</string>
+    <string name="login_no_account">没有账号？立即注册</string>
+    <string name="toast_login_required_level">第四关及后续关卡需要登录解锁，请先登录！</string>
+    <string name="unit_points"> 积分</string>
+    <string name="game_movedout_tray">— 置物架 —</string>
+    <string name="toast_image_process_failed">图片处理失败</string>
+    <string name="toast_password_change_success">密码修改成功，请重新登录</string>
+    <string name="toast_password_change_failed">密码修改失败</string>
+    <string name="toast_avatar_process_failed">头像处理失败：%1$s</string>
+    <string name="toast_password_feature_locked">密码修改功能暂未开放，请使用找回密码</string>
+    <string name="dialog_tip_title">提示</string>
+    <string name="dialog_logout_confirm_message">确定要退出登录吗？</string>
+    <string name="toast_press_back_exit">再按一次退出</string>
+    <string name="guest_name">逑客云游</string>
+    <string name="login_sync_prompt">登录同步存档 · 解锁演化关卡</string>
+    <string name="carry_confirm_start">确定开始</string>
+    <string name="shop_exchange_title">确认兑换</string>
+    <string name="shop_exchange_skin_desc">确定使用积分兑换此皮肤吗？</string>
+    <string name="shop_exchange_item_desc">确定使用积分兑换此道具吗？</string>
+    <string name="shop_quantity_label">数量: %1$d</string>
+    <string name="shop_unit_price_label">单价:</string>
+    <string name="shop_total_label">总计:</string>
+    <string name="shop_balance_label">当前余额:</string>
+    <string name="update_downloading">下载中 %1$d%%</string>
+    <string name="update_completed">下载完成，准备安装...</string>
+    <string name="update_need_permission">请授权"允许安装未知应用"后点击安装</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_retry_download">重新下载</string>
+    <string name="update_install">安装更新</string>
+    <string name="update_install_after_auth">授权后安装</string>
+    <string name="update_downloading_hint">下载更新中，请勿退出</string>
+    <string name="update_install_file_missing">安装文件不存在</string>
+    <string name="update_install_failed">安装失败: %1$s</string>
+    <string name="duel_match_id_label">对局号: %1$s</string>
 </resources>

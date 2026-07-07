@@ -258,7 +258,15 @@ class MenuViewModel @Inject constructor(
             val allExistingTypes = remoteTypes + animatedTypes
 
             val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
-                ShopItem(1000 + index, "${province.name}美食", "解锁${province.name}省特色美食图标皮肤", "", "SKIN_${province.id.uppercase()}", 200, 9999)
+                ShopItem(
+                    1000 + index,
+                    context.getString(R.string.province_skin_title, province.name),
+                    context.getString(R.string.province_skin_desc, province.name),
+                    "",
+                    "SKIN_${province.id.uppercase()}",
+                    200,
+                    9999
+                )
             }.filter { it.item_type !in allExistingTypes }
             remoteItems + localAnimatedSkins + gourmetSkins
         } catch (e: Exception) {

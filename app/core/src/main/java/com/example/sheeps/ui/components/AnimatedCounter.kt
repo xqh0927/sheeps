@@ -12,10 +12,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.sheeps.core.R
 
 // =============================================================================
 // 秘境消消乐 · 设计系统 - 数字滚动动画组件
@@ -85,6 +87,6 @@ fun PointsDisplay(
     ) {
         AnimatedCounter(count = points, style = numberStyle)
         Spacer(Modifier.width(4.dp))
-        Text(text = "积分", style = unitStyle)
+        Text(text = stringResource(R.string.unit_points), style = unitStyle)
     }
 }

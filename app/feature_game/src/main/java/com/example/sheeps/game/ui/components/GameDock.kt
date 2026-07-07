@@ -19,7 +19,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import com.example.sheeps.data.model.Tile
+import com.example.sheeps.core.R
 import com.example.sheeps.game.state.GameViewState
+import androidx.compose.ui.res.stringResource
 
 /**
  * 游戏底部托盘/消除槽组件
@@ -73,7 +75,7 @@ private fun MovedOutTray(
         modifier = Modifier.padding(vertical = 4.dp)
     ) {
         Text(
-            text  = "— 置物架 —",
+            text  = stringResource(R.string.game_movedout_tray),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
         )

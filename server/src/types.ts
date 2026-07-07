@@ -6,7 +6,10 @@ export interface Env {
   DB: D1Database;          // D1 关系型数据库实例
   SHEEPS_CACHE: KVNamespace; // KV 键值对缓存实例
   AVATAR_BUCKET: R2Bucket;   // R2 对象存储 bucket（用户头像）
-  R2_PUBLIC_URL: string;     // R2 公网自定义域名（如 https://apk.xqh.cc.cd）
+  R2_PUBLIC_URL: string;     // R2 公网自定义域名（如 https://file.xqh.cc.cd）
+  JWT_SECRET: string;        // JWT 签名密钥（Worker Secrets 注入）
+  AES_KEY_HEX: string;       // AES-256 密钥（HEX，Worker Secrets 注入）
+  ADMIN_WEB_ORIGIN: string;  // 管理后台 Pages 站点源（用于 CORS 精确授权）
 }
 
 /** GitHub Release 资源附件 */

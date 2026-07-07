@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -60,14 +61,19 @@ fun GameBoard(
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 420.dp
 
-    val displayedWidth = contentWidth.dp
-    val displayedHeight = contentHeight.dp
+    // 采用方案二：服务端限制生成网格在 6x7 内，客户端固定卡牌尺寸不缩放
+    val scale = 1f
+
+    val displayedWidth = (contentWidth * scale).dp
+    val displayedHeight = (contentHeight * scale).dp
 
     Box(
         modifier = modifier
-            .size(width = boardWidth, height = boardHeight)
+            .width(boardWidth)
+            .heightIn(min = 200.dp, max = boardHeight)
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(16.dp))
+            .clipToBounds()
             .background(
                 Brush.linearGradient(
                     colors = listOf(
@@ -104,13 +110,13 @@ fun GameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = state.currentSkin,
-                            tileSize = 46.dp,
+                            tileSize = (46 * scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             isHighlighted = isHighlighted,
                             modifier = Modifier
                                 .offset(
-                                    x = ((tile.x - minX) * spacing).dp,
-                                    y = ((tile.y - minY) * spacing).dp
+                                    x = ((tile.x - minX) * spacing * scale).dp,
+                                    y = ((tile.y - minY) * spacing * scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .onGloballyPositioned { coords ->

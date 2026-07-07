@@ -216,18 +216,20 @@ fun TileView(
                     }
                 }
 
-                // 叠加层：封印效果 (方案 A：半透明灰蓝色冰封网格 + 金色锁头图标 + 剩余解封次数)
+                // 叠加层：封印效果（多层封印有不同视觉）
                 if (isSealed) {
+                    // 1层：冰晶蓝；2层：岩石灰；3层：暗晶紫
+                    val (sealBg, sealBorder, sealEmoji) = when (tile.sealedCount) {
+                        1 -> Triple(Color(0xBB2C3E50), Color(0xFFF1C40F).copy(alpha = 0.8f), "🔒")
+                        2 -> Triple(Color(0xDD5D6D7E), Color(0xFFE67E22).copy(alpha = 0.85f), "⛓️")
+                        else -> Triple(Color(0xDD6C3483), Color(0xFF9B59B6).copy(alpha = 0.85f), "🔐")
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xBB2C3E50)) // 半透明灰蓝色冰封底色
-                            .border(
-                                1.5.dp,
-                                Color(0xFFF1C40F).copy(alpha = 0.8f),
-                                RoundedCornerShape(8.dp)
-                            ), // 金色微光边框
+                            .background(sealBg)
+                            .border(1.5.dp, sealBorder, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(
@@ -235,14 +237,14 @@ fun TileView(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "🔒",
+                                text = sealEmoji,
                                 fontSize = 18.sp,
                                 modifier = Modifier.graphicsLayer(scaleX = 1.1f, scaleY = 1.1f)
                             )
                             if (tile.sealedCount > 1) {
                                 Text(
                                     text = "x${tile.sealedCount}",
-                                    color = Color(0xFFF1C40F), // 金色字体
+                                    color = sealBorder,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(top = 1.dp)

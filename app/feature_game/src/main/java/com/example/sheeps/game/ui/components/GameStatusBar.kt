@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.GameViewState
@@ -21,21 +22,34 @@ import com.example.sheeps.core.R
 
 /**
  * 游戏状态栏组件
- * 展示：当前得分、双倍积分标识、剩余卡牌数量
- * 
+ * 展示：当前得分、双倍积分标识、实时计时器、剩余卡牌数量
+ *
  * @param state 游戏界面状态
  */
 @Composable
 fun GameStatusBar(state: GameViewState) {
-    Row(
+    // 剩余卡牌数量
+    val remaining = state.boardTiles.count {
+        it.state == TileState.NORMAL || it.state == TileState.BLOCKED
+    }
+    // 计时器
+    val minutes = (state.elapsedMs / 60000).toInt()
+    val seconds = ((state.elapsedMs % 60000) / 1000).toInt()
+    val timeText = String.format("%02d:%02d", minutes, seconds)
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically
+        contentAlignment = Alignment.Center
     ) {
-        // 得分展示区域
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // 左侧：得分 + 双倍标识
+        Row(
+            modifier = Modifier
+                .wrapContentWidth()
+                .align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 text = stringResource(id = R.string.game_score_label),
                 style = MaterialTheme.typography.labelMedium,
@@ -45,12 +59,10 @@ fun GameStatusBar(state: GameViewState) {
             AnimatedCounter(
                 count = state.score,
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    color      = MaterialTheme.colorScheme.secondary,
+                    color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.Bold
                 )
             )
-            
-            // 双倍积分标识
             if (state.isDoublePointsActive) {
                 Spacer(Modifier.width(6.dp))
                 Box(
@@ -60,7 +72,7 @@ fun GameStatusBar(state: GameViewState) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text  = "×2",
+                        text = "×2",
                         color = MaterialTheme.colorScheme.secondary,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
@@ -69,13 +81,23 @@ fun GameStatusBar(state: GameViewState) {
             }
         }
 
-        // 剩余卡牌数量展示
-        val remaining = state.boardTiles.count {
-            it.state == TileState.NORMAL || it.state == TileState.BLOCKED
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // 居中：计时器
+        Text(
+            text = timeText,
+            style = MaterialTheme.typography.headlineSmall.copy(
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold
+            ),
+            textAlign = TextAlign.Center
+        )
+
+        // 右侧：剩余卡牌
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text  = stringResource(id = R.string.game_remaining_tiles, remaining),
+                text = stringResource(id = R.string.game_remaining_tiles, remaining),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Text_Secondary_Dark
             )

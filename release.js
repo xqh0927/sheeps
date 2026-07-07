@@ -11,6 +11,12 @@ try { HttpsProxyAgent = require('https-proxy-agent').HttpsProxyAgent; } catch { 
 // 填写你本地的 HTTP/SOCKS 代理地址（已为你默认填好 10808）
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:10808';
 
+// ─── 管理后台 HTTP API 配置（公告发布走后台 API，版本仍用 wrangler） ───
+// 可通过环境变量覆盖，或直接替换占位常量后运行
+const ADMIN_API_BASE = process.env.ADMIN_API_BASE || 'https://api.xqh.cc.cd';
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '13800000000';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
 /**
  * 带有指数退避的通用异步重试函数
  */
@@ -61,6 +67,60 @@ function translateText(text, targetLang) {
     });
 }
 
+/**
+ * 调用管理后台登录接口，返回可用于后续请求的 Bearer Token。
+ * 非 2xx 或未返回 token 时抛错（携带响应文本便于排查）。
+ */
+async function adminLogin() {
+    const loginUrl = `${ADMIN_API_BASE}/api/admin/login`;
+    const resp = await fetch(loginUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: ADMIN_PHONE, password: ADMIN_PASSWORD }),
+    });
+    const text = await resp.text();
+    if (!resp.ok) {
+        throw new Error(`登录接口返回 HTTP ${resp.status}: ${text}`);
+    }
+    let json;
+    try {
+        json = JSON.parse(text);
+    } catch (e) {
+        throw new Error(`登录接口响应非 JSON: ${text}`);
+    }
+    // 兼容响应直接返回 token，或嵌套于 data.token 两种情况
+    const token = json.token || (json.data && json.data.token);
+    if (!token) {
+        throw new Error(`登录响应中未包含 token: ${text}`);
+    }
+    return token;
+}
+
+/**
+ * 调用管理后台公告创建接口，将公告写入 D1（真理来源）。
+ * 非 2xx 时抛错（携带响应文本便于排查），成功返回解析后的 JSON。
+ */
+async function createNoticeViaApi(token, payload) {
+    const url = `${ADMIN_API_BASE}/api/admin/notices`;
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+    });
+    const text = await resp.text();
+    if (!resp.ok) {
+        throw new Error(`公告创建接口返回 HTTP ${resp.status}: ${text}`);
+    }
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new Error(`公告创建接口响应非 JSON: ${text}`);
+    }
+}
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -93,7 +153,7 @@ function run() {
     console.log(`  versionName = "${currentName}"`);
     console.log(`======================================\n`);
 
-    const R2_PUBLIC_BASE = 'https://apk.xqh.cc.cd';
+    const R2_PUBLIC_BASE = 'https://file.xqh.cc.cd';
     const nextCode = currentCode + 1;
     // 正则定位末尾数字自增，兼容 1.0.6 和 1.0.6-beta1
     const nextName = currentName.replace(/(\d+)(?=[^\d]*$)/, (m) => parseInt(m, 10) + 1);
@@ -109,14 +169,24 @@ function run() {
 
                 console.log(`\n准备执行以下【安全发布流水线】:`);
                 console.log(`1. 自动翻译升级日志（包含繁体中文、英文、日文、韩文）`);
-                console.log(`2. 预写版本与公告数据至 Cloudflare D1 & KV（带重试与防脚本注入）`);
-                console.log(`3. 确认数据库全部成功后，更新 gradle 文件并将全部本地代码 Push 触发编译`);
+                console.log(`2. 更新云端 D1 数据库（仅写入版本号）`);
+                console.log(`3. 调用管理后台 API 发布多语言公告 + 刷新 KV 边缘缓存`);
+                console.log(`4. 确认云端全部成功后，更新 gradle 文件并 Push 代码触发编译`);
 
                 rl.question(`\n确认开始发布？(y/n): `, async (confirm) => {
                     if (confirm.toLowerCase() !== 'y' && confirm.toLowerCase() !== 'yes') {
                         console.log("发布已取消。");
                         rl.close();
                         process.exit(0);
+                    }
+
+                    // ─── 管理后台凭据守卫：缺少凭据则拒绝继续 ───
+                    if (ADMIN_PHONE === 'REPLACE_WITH_ADMIN_PHONE' || ADMIN_PASSWORD === 'REPLACE_WITH_ADMIN_PASSWORD') {
+                        console.error(`\n❌ 缺少管理后台登录凭据！`);
+                        console.error(`   请通过环境变量设置 ADMIN_PHONE / ADMIN_PASSWORD，或直接替换 release.js 中的占位常量。`);
+                        console.error(`   例如: ADMIN_PHONE=138xxxx ADMIN_PASSWORD=xxxx node release.js`);
+                        rl.close();
+                        process.exit(1);
                     }
 
                     let isGradleUpdated = false;
@@ -168,15 +238,14 @@ function run() {
                         console.log("   ✔ 多语言（含繁体中文）文本处理完毕");
 
                         // ─── 第二步：更新 D1 数据库 ───
-                        console.log("➔ [2/4] 正在更新云端 D1 数据库...");
+                        console.log("➔ [2/4] 正在更新云端 D1 数据库（版本号）...");
                         const apkUrl = `${R2_PUBLIC_BASE}/sheeps_${newName}.apk`;
                         const now = Date.now();
                         const escSql = (s) => s.replace(/'/g, "''");
 
-                        // ⚠️ 修复：在 SQL 语句的 INSERT 字段和 VALUES 中全部加入了 _tw 对应的值
+                        // 仅写入 app_version 表；公告改由管理后台 API 写入，不再用 wrangler 写 notice 表
                         const sqlContent = [
-                            `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escSql(updateLog)}', 0, ${now});`,
-                            `INSERT INTO notice (title, title_tw, title_en, title_ja, title_ko, content, content_tw, content_en, content_ja, content_ko, type, created_at) VALUES ('${escSql(versionTitle)}', '${escSql(titleTw)}', '${escSql(titleEn)}', '${escSql(titleJa)}', '${escSql(titleKo)}', '${escSql(updateLog)}', '${escSql(contentTw)}', '${escSql(contentEn)}', '${escSql(contentJa)}', '${escSql(contentKo)}', 'update', ${now});`
+                            `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escSql(updateLog)}', 0, ${now});`
                         ].join('\n');
 
                         fs.writeFileSync(tempSqlPath, sqlContent, 'utf8');
@@ -192,11 +261,29 @@ function run() {
 
                         console.log("   ✔ D1 数据库更新成功！");
 
-                        // ─── 第三步：更新 KV 边缘缓存 ───
-                        console.log("➔ [3/4] 正在同步多语言 KV 缓存板...");
+                        // ─── 第三步：调用管理后台 API 发布公告 + 刷新 KV 边缘缓存 ───
+                        console.log("➔ [3/4] 正在调用管理后台 API 发布多语言公告 + 刷新 KV 边缘缓存...");
+
+                        // 3.1 先通过后台 API 将公告写入 D1（真理来源）
+                        const token = await withRetry(() => adminLogin(), 3, 2000, "管理后台登录");
+                        console.log("   ✔ 管理后台登录成功，已获取访问令牌");
+
+                        // 公告请求体：透传列，后端 genericCreate 会直接以 body 的 key 作为列名 INSERT
+                        const noticeBody = {
+                            title: versionTitle,
+                            content: updateLog,
+                            type: 'update',
+                            created_at: now,
+                            title_tw, title_en, title_ja, title_ko,
+                            content_tw, content_en, content_ja, content_ko,
+                        };
+                        await withRetry(() => createNoticeViaApi(token, noticeBody), 3, 2000, "公告 API 写入 D1");
+                        console.log("   ✔ 公告已通过管理后台 API 写入 D1（真理来源）");
+
+                        // 3.2 刷新 KV 边缘缓存（键名必须使用 _v2 后缀，与客户端读端对齐）
                         const kvNsId = '784104ac67eb4f3c83a92e9dcc91b673';
 
-                        // ⚠️ 修复：增加了 'tw' 繁体中文 KV 缓存组
+                        // 各语言公告项：默认 lang='' 用中文；tw/en/ja/ko 用对应翻译结果
                         const noticesByLang = {
                             '': { title: versionTitle, content: updateLog },
                             'tw': { title: titleTw, content: contentTw },
@@ -205,31 +292,43 @@ function run() {
                             'ko': { title: titleKo, content: contentKo },
                         };
 
+                        let kvAllOk = true;
                         for (const [lang, item] of Object.entries(noticesByLang)) {
-                            const cacheKey = `notices_${lang}`;
-                            await withRetry(() => {
-                                return new Promise((res, rej) => {
-                                    try {
-                                        let list = [];
+                            // ⚠️ 修复 KV key 不匹配：使用 notices_${lang}_v2（旧版缺 _v2 后缀）
+                            const cacheKey = `notices_${lang}_v2`;
+                            try {
+                                await withRetry(() => {
+                                    return new Promise((res, rej) => {
                                         try {
-                                            const existing = execSync(`npx wrangler kv key get "${cacheKey}" --namespace-id ${kvNsId} --remote --text`, { cwd: serverDir, stdio: 'pipe', timeout: 10000 }).toString().trim();
-                                            if (existing && existing !== 'null' && existing !== 'undefined') {
-                                                list = JSON.parse(existing);
-                                            }
-                                        } catch { }
+                                            let list = [];
+                                            try {
+                                                const existing = execSync(`npx wrangler kv key get "${cacheKey}" --namespace-id ${kvNsId} --remote --text`, { cwd: serverDir, stdio: 'pipe', timeout: 10000 }).toString().trim();
+                                                if (existing && existing !== 'null' && existing !== 'undefined') {
+                                                    list = JSON.parse(existing);
+                                                }
+                                            } catch { }
 
-                                        list.unshift({ title: item.title, content: item.content, type: 'update', created_at: now });
-                                        fs.writeFileSync(tempKvPath, JSON.stringify(list), 'utf8');
-                                        execSync(`npx wrangler kv key put "${cacheKey}" --namespace-id ${kvNsId} --remote --path="${tempKvPath}"`, { cwd: serverDir, stdio: 'pipe' });
-                                        res();
-                                    } catch (err) { rej(err); }
-                                });
-                            }, 3, 2000, `KV同步[${lang || 'zh'}]`);
+                                            list.unshift({ title: item.title, content: item.content, type: 'update', created_at: now });
+                                            fs.writeFileSync(tempKvPath, JSON.stringify(list), 'utf8');
+                                            execSync(`npx wrangler kv key put "${cacheKey}" --namespace-id ${kvNsId} --remote --path="${tempKvPath}"`, { cwd: serverDir, stdio: 'pipe' });
+                                            res();
+                                        } catch (err) { rej(err); }
+                                    });
+                                }, 3, 2000, `KV同步[${lang || 'zh'}]`);
+                            } catch (kvErr) {
+                                // 容错：D1 已有数据，客户端在 1h TTL 兜底期内仍能读到；不因此中断发版
+                                kvAllOk = false;
+                                console.warn(`   ⚠️ [容错] KV 缓存同步失败 (${lang || 'zh'})，但 D1 已落库，客户端将在 ≤1h 内读到: ${kvErr.message}`);
+                            }
                         }
-                        console.log("   ✔ 多语言 KV 边缘缓存全部同步完毕");
+                        if (kvAllOk) {
+                            console.log("   ✔ 多语言 KV 边缘缓存全部同步完毕");
+                        } else {
+                            console.warn("   ⚠️ 部分 KV 边缘缓存同步失败，但发版继续（D1 数据已落库）。");
+                        }
 
                         // ─── 第四步：全部网络交互成功后，修改本地 gradle 并执行 Git 操作 ───
-                        console.log("➔ [4/4] 数据库与缓存已锁定，正在修改版本文件并 Push 代码...");
+                        console.log("➔ [4/4] 云端数据与缓存已锁定，正在修改版本文件并 Push 代码...");
                         let updatedGradle = originalGradleContent
                             .replace(/versionCode\s*=\s*\d+/, `versionCode = ${newCode}`)
                             .replace(/versionName\s*=\s*"[^"]+"/, `versionName = "${newName}"`);

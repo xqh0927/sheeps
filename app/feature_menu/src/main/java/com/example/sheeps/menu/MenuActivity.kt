@@ -29,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.DailyPopupResponse
@@ -150,6 +152,17 @@ class MenuActivity : BaseActivity() {
                         }
                     }
 
+                    // --- 监听 Token 失效登录态事件 ---
+                    LaunchedEffect(Unit) {
+                        com.example.sheeps.core.utils.AuthEventBus.events.collect { event ->
+                            if (event is com.example.sheeps.core.utils.AuthEvent.Logout) {
+                                Toaster.show(localizedContext.getString(R.string.toast_session_expired))
+                                TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                finish()
+                            }
+                        }
+                    }
+
                     // --- 监听 ViewModel 副作用 ---
                     LaunchedEffect(Unit) {
                         viewModel.viewEffect.collect { effect ->
@@ -244,7 +257,7 @@ class MenuActivity : BaseActivity() {
                                                 onLevelClick = { lvl ->
                                                     if (lvl > 3 && !state.isLoggedIn) {
                                                         TheRouter.build("/auth/login").navigation(this@MenuActivity)
-                                                        Toaster.show("第四关及后续关卡需要登录解锁，请先登录！")
+                                                        Toaster.show(this@MenuActivity.getString(R.string.toast_login_required_level))
                                                     } else {
                                                         showPrepareDialog = lvl
                                                     }
@@ -436,10 +449,10 @@ class MenuActivity : BaseActivity() {
                                     if (showLogoutConfirm) {
                                         ConfirmDialog(
                                             onDismissRequest = { showLogoutConfirm = false },
-                                            title = "提示",
-                                            message = "确定要退出登录吗？",
-                                            confirmText = "确定",
-                                            dismissText = "取消",
+                                            title = stringResource(R.string.dialog_tip_title),
+                                            message = stringResource(R.string.dialog_logout_confirm_message),
+                                            confirmText = stringResource(R.string.btn_confirm),
+                                            dismissText = stringResource(R.string.btn_cancel),
                                             onConfirm = {
                                                 showLogoutConfirm = false
                                                 viewModel.sendIntent(MenuViewIntent.Logout)
@@ -526,7 +539,7 @@ class MenuActivity : BaseActivity() {
             super.onBackPressed()
         } else {
             lastBackPressTime = now
-            Toaster.show("再按一次退出")
+            Toaster.show(getString(R.string.toast_press_back_exit))
         }
     }
 }

@@ -75,7 +75,10 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) } // 0: 验证码登录, 1: 密码登录
-    val tabTitles = listOf("验证码登录", "密码登录")
+    val tabTitles = listOf(
+        stringResource(R.string.tab_login_code),
+        stringResource(R.string.tab_login_password)
+    )
 
     // ----- 验证码登录状态 -----
     var phone by remember { mutableStateOf("") }
@@ -220,7 +223,7 @@ fun LoginScreen(
                                     OutlinedTextField(
                                         value = password,
                                         onValueChange = { password = it },
-                                        label = { Text("密码") },
+                                        label = { Text(stringResource(R.string.label_password)) },
                                         singleLine = true,
                                         visualTransformation = PasswordVisualTransformation(),
                                         modifier = Modifier.fillMaxWidth()
@@ -232,7 +235,7 @@ fun LoginScreen(
                                         modifier = Modifier.align(Alignment.End)
                                     ) {
                                         Text(
-                                            "忘记密码？",
+                                            stringResource(R.string.login_forgot_password),
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.bodySmall
                                         )
@@ -260,7 +263,7 @@ fun LoginScreen(
                                     ) {
                                         TextButton(onClick = onNavigateToRegister) {
                                             Text(
-                                                "没有账号？立即注册",
+                                                stringResource(R.string.login_no_account),
                                                 color = MaterialTheme.colorScheme.primary,
                                                 style = MaterialTheme.typography.bodySmall
                                             )

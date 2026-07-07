@@ -12,8 +12,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.*
 import com.example.sheeps.menu.ui.dialogs.ExchangeHistoryDialog
@@ -132,7 +134,7 @@ fun PersonalScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            "设置",
+                            stringResource(R.string.settings_title),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
