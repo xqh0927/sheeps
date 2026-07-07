@@ -318,7 +318,7 @@ fun GameHomeScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.MyLocation,
-                    contentDescription = stringResource(id = R.string.cd_locate_latest_level),
+                    contentDescription = "定位最新关卡",
                     modifier = Modifier.size(20.dp)
                 )
             }

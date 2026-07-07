@@ -107,14 +107,14 @@ fun UserInfoScreen(
                         if (state.avatarUrl.isNotBlank()) {
                             AsyncImage(
                                 model = state.avatarUrl,
-                                contentDescription = stringResource(R.string.cd_avatar),
+                                contentDescription = "头像",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
-                                contentDescription = stringResource(R.string.cd_upload_avatar),
+                                contentDescription = "上传头像",
                                 tint = Color.Gray,
                                 modifier = Modifier.size(36.dp)
                             )
@@ -153,7 +153,7 @@ fun UserInfoScreen(
                         }
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = stringResource(R.string.cd_edit_nickname),
+                            contentDescription = "修改昵称",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )

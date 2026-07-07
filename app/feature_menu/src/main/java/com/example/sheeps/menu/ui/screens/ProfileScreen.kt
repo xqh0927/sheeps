@@ -158,7 +158,7 @@ fun ProfileScreen(
                                 .data("data:image/jpeg;base64,$avatarBase64")
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = stringResource(R.string.cd_avatar),
+                            contentDescription = "头像",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
@@ -166,7 +166,7 @@ fun ProfileScreen(
                         // 显示默认灰色占位
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
-                            contentDescription = stringResource(R.string.cd_upload_avatar),
+                            contentDescription = "上传头像",
                             tint = Color.Gray,
                             modifier = Modifier.size(36.dp)
                         )

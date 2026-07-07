@@ -268,7 +268,7 @@ fun LeaderboardTabs(
         ) {
             Icon(
                 Icons.Default.Info,
-                contentDescription = stringResource(id = R.string.leaderboard_rules_icon_desc),
+                contentDescription = "积分规则",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )

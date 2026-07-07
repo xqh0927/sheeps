@@ -55,7 +55,7 @@ fun GameHeader(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.Default.ArrowBack,
-                    contentDescription = stringResource(id = R.string.btn_back),
+                    contentDescription = "返回",
                     tint = MaterialTheme.colorScheme.secondary
                 )
             }
@@ -74,7 +74,7 @@ fun GameHeader(
             IconButton(onClick = onRestart) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(id = R.string.game_restart_desc),
+                    contentDescription = "重玩",
                     tint = Text_Secondary_Dark
                 )
             }

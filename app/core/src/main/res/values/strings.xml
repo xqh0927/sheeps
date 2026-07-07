@@ -379,8 +379,6 @@
     <string name="carry_stock_label">库存: %1$d</string>
     <string name="leaderboard_rules_title">积分计算规则</string>
     <string name="leaderboard_rules_text">• 基础分 = 1000 - 通关用时(秒) × 2 - 使用道具数 × 50\n• 最低保底 100 分\n• 最终积分 = 基础分 × 关卡难度系数 × 双倍(如有)\n• 各关卡按最高分排名，相同分数时用时短者优先</string>
-    <string name="leaderboard_rules_icon_desc">积分规则</string>
-    <string name="game_restart_desc">重玩</string>
     <string name="toast_unlock_success_level">积分子系统扣除成功！第 %1$d 关已解锁</string>
     <string name="toast_unlock_failed_cloud">解锁失败，云端同步拒绝</string>
     <string name="toast_unlock_offline">连接不畅，已扣减积分本地解锁，后续有网自动同步</string>
@@ -439,14 +437,6 @@
 
     <!-- 游戏内 -->
     <string name="game_movedout_tray">— 置物架 —</string>
-
-    <!-- contentDescription -->
-    <string name="cd_avatar">头像</string>
-    <string name="cd_upload_avatar">上传头像</string>
-    <string name="cd_edit_nickname">编辑昵称</string>
-    <string name="cd_view_profile">查看个人信息</string>
-    <string name="cd_locked">锁定</string>
-    <string name="cd_locate_latest_level">定位最新关卡</string>
 
     <!-- 个人中心 Toasts -->
     <string name="toast_image_process_failed">图片处理失败</string>
