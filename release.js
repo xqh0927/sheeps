@@ -322,8 +322,8 @@ function run() {
                             content: updateLog,
                             type: 'update',
                             created_at: now,
-                            title_tw, title_en, title_ja, title_ko,
-                            content_tw, content_en, content_ja, content_ko,
+                            title_tw: titleTw, title_en: titleEn, title_ja: titleJa, title_ko: titleKo,
+                            content_tw: contentTw, content_en: contentEn, content_ja: contentJa, content_ko: contentKo,
                         };
                         await withRetry(() => createNoticeViaApi(token, noticeBody), 3, 2000, "公告 API 写入 D1");
                         console.log("   ✔ 公告已通过管理后台 API 写入 D1（真理来源）");
