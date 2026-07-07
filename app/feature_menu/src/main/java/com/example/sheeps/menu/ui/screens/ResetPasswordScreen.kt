@@ -62,6 +62,12 @@ fun ResetPasswordScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
     var countdown by remember { mutableStateOf(0) }
 
+    // 预先在 composable 作用域内捕获本地化文案，避免在 onClick（非 composable lambda）中调用 stringResource
+    val errInvalidPhone = stringResource(R.string.err_invalid_phone)
+    val pwdErrLength = stringResource(R.string.pwd_err_length)
+    val pwdErrAlphanumeric = stringResource(R.string.pwd_err_alphanumeric)
+    val pwdErrCodeLength = stringResource(R.string.pwd_err_code_length)
+
     LaunchedEffect(countdown) {
         if (countdown > 0) {
             delay(1000)
@@ -113,7 +119,7 @@ fun ResetPasswordScreen(
                                     onSendCode(phone)
                                     countdown = 60
                                 } else {
-                                    errorMsg = stringResource(R.string.err_invalid_phone)
+                                    errorMsg = errInvalidPhone
                                 }
                             },
                             enabled = countdown == 0,
@@ -153,12 +159,12 @@ fun ResetPasswordScreen(
                         onClick = {
                             when {
                                 newPassword.length < 6 || newPassword.length > 20 -> errorMsg =
-                                    stringResource(R.string.pwd_err_length)
+                                    pwdErrLength
 
                                 !newPassword.any { it.isDigit() } || !newPassword.any { it.isLetter() } -> errorMsg =
-                                    stringResource(R.string.pwd_err_alphanumeric)
+                                    pwdErrAlphanumeric
 
-                                code.length != 6 -> errorMsg = stringResource(R.string.pwd_err_code_length)
+                                code.length != 6 -> errorMsg = pwdErrCodeLength
                                 else -> {
                                     onReset(phone, code, newPassword)
                                     onResetSuccess()
