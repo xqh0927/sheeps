@@ -29,6 +29,86 @@ export function lcg(seed: number) {
 }
 
 /**
+ * 生成封印聚簇：封印牌以簇状分布，相邻卡牌相互连接，形成战略点。
+ */
+function generateSealedClusters(
+  nodes: { index: number; coord: Point3D; assignedType: number }[],
+  rand: () => number,
+  sealRatio: number,
+  clusterCount: number,
+  maxLayer: number
+): Map<number, number> {
+  if (nodes.length === 0) return new Map();
+
+  const maxZ = Math.max(...nodes.map((n) => n.coord.z));
+  let eligible = nodes.filter((n) => n.coord.z <= maxZ * 0.7);
+  if (eligible.length < clusterCount) eligible = nodes;
+
+  const totalSealed = Math.max(1, Math.floor(nodes.length * sealRatio));
+  const targetPerCluster = Math.max(1, Math.floor(totalSealed / clusterCount));
+
+  const seeds: typeof nodes = [];
+  const available = [...eligible];
+  for (let i = 0; i < clusterCount; i++) {
+    if (available.length === 0) break;
+    const idx = Math.floor(rand() * available.length);
+    seeds.push(available.splice(idx, 1)[0]);
+  }
+
+  const result = new Map<number, number>();
+  for (const seed of seeds) {
+    if (result.size >= totalSealed) break;
+    const cluster = new Set<number>();
+    const queue: number[] = [seed.index];
+    cluster.add(seed.index);
+
+    while (queue.length > 0 && cluster.size < targetPerCluster) {
+      const current = queue.shift()!;
+      const currentNode = nodes[current];
+      const neighbors = nodes
+        .map((n, idx) => ({ n, idx }))
+        .filter(({ n, idx }) => {
+          if (cluster.has(idx)) return false;
+          if (n.coord.z !== currentNode.coord.z) return false;
+          if (Math.abs(n.coord.x - currentNode.coord.x) > 1.5) return false;
+          if (Math.abs(n.coord.y - currentNode.coord.y) > 1.5) return false;
+          return true;
+        })
+        .map(({ idx }) => idx);
+
+      // 随机打乱
+      for (let i = neighbors.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
+      }
+
+      for (const idx of neighbors) {
+        if (cluster.size >= targetPerCluster) break;
+        if (result.size >= totalSealed) break;
+        cluster.add(idx);
+        queue.push(idx);
+      }
+    }
+
+    for (const tileIndex of cluster) {
+      if (result.size >= totalSealed) break;
+      result.set(tileIndex, randomSealLayer(rand, maxLayer));
+    }
+  }
+
+  return result;
+}
+
+function randomSealLayer(rand: () => number, maxLayer: number): number {
+  if (maxLayer === 1) return 1;
+  if (maxLayer === 2) return rand() < 0.65 ? 1 : 2;
+  const r = rand();
+  if (r < 0.50) return 1;
+  if (r < 0.85) return 2;
+  return 3;
+}
+
+/**
  * 生成保证必定有解（Solvable）的关卡卡牌三维布局数据
  * 算法原理：自底向上（Z轴）根据轮廓形状生成可用网格坐标，之后利用 LCG 反向模拟玩家消除步骤（反向从槽位拿牌放到棋盘上暴露位置）以填充花色。
  * 
@@ -51,225 +131,92 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       { x: 2.0, y: 1.0, z: 3 }, { x: 1.0, y: 2.0, z: 3 }, { x: 2.0, y: 2.0, z: 3 }
     ];
   } else {
-    // 关卡卡牌总数随难度系数曲线渐进增长：使用基于 (userId, levelId) 的确定性难度系统
+    // 后续关卡根据算法生成堆叠布局
+    // 与 Android 端对齐：maxCards 来自难度曲线，baseSize 按 levelId/2 增长
     const { cardCount: maxCards } = calculateCardCount(userId, levelId);
-    const possibleCoords: Point3D[] = [];
+    const possible: Point3D[] = [];
 
-    // 关卡层数随关卡 ID 对数增加：L = 12 - 8 / sqrt(levelId - 1)，最大限制为 12 层
     const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
-
-    // 棋盘基础网格大小，随关卡增加而变大，确保有足够坐标生成最多 300 张卡牌
-    // 关卡 23+ 时 baseSize >= 17，保证最 restrictive 的形状（如 X 字形）也能生成 300+ 坐标
-    const baseSize = Math.min(6, 6 + Math.floor(levelId / 2));
-
-    // 引入关卡固定的布局种子，确保相同 levelId 产生完全一致的卡牌排布和总数量
-    const layoutSeed = levelId * 1000;
-    const shapeType = layoutSeed % 18;
+    const baseSize = Math.min(20, 6 + Math.floor(levelId / 2));
 
     for (let z = 0; z < layersCount; z++) {
-      // 网格尺寸逐层递减 1，偏移量逐层累加 0.5，形成向上收缩的金字塔堆叠
       const size = Math.max(3, baseSize - Math.floor(z / 3));
-      const offset = (z % 2 === 0) ? 0 : 0.5;
-      const center = (size - 1) / 2;
-
+      const offset = z % 2 === 0 ? 0 : 0.5;
       for (let r = 0; r < size; r++) {
         for (let c = 0; c < size; c++) {
-          let keep = true;
-
-          // 相对于棋盘中心的归一化偏移量 (-1.0 至 1.0)
-          const dx = center > 0 ? (c - center) / center : 0;
-          const dy = center > 0 ? (r - center) / center : 0;
-          const distMan = Math.abs(dx) + Math.abs(dy); // 曼哈顿距离
-          const distEuclid = Math.sqrt(dx * dx + dy * dy); // 欧氏距离
-
-          switch (shapeType) {
-            case 0: // 正方形
-              keep = true;
-              break;
-            case 1: // 金字塔/三角形
-              const margin = z * 0.45;
-              if (r < margin || r >= size - margin || c < margin || c >= size - margin) {
-                keep = false;
-              }
-              break;
-            case 2: // 十字形
-              if (Math.abs(c - center) >= 1.2 && Math.abs(r - center) >= 1.2) {
-                keep = false;
-              }
-              break;
-            case 3: // 菱形
-              if (distMan > 1.15) {
-                keep = false;
-              }
-              break;
-            case 4: // 圆环形
-              if (distEuclid < 0.4 || distEuclid > 1.05) {
-                keep = false;
-              }
-              break;
-            case 5: // X字形
-              if (Math.abs(Math.abs(dx) - Math.abs(dy)) > 0.28) {
-                keep = false;
-              }
-              break;
-            case 6: // 爱心形
-              if (dx * dx + (dy - Math.abs(dx) * 0.6) * (dy - Math.abs(dx) * 0.6) > 0.95) {
-                keep = false;
-              }
-              break;
-            case 7: // 沙漏形
-              if (Math.abs(dx) > Math.abs(dy) + 0.1) {
-                keep = false;
-              }
-              break;
-            case 8: // 星形
-              if (Math.abs(dx) >= 0.22 && Math.abs(dy) >= 0.22 && Math.abs(Math.abs(dx) - Math.abs(dy)) >= 0.22) {
-                keep = false;
-              }
-              break;
-            case 9: // 空心正方形
-              if (Math.abs(dx) <= 0.6 && Math.abs(dy) <= 0.6) {
-                keep = false;
-              }
-              break;
-            case 10: // 双圆环
-              if (Math.abs(distEuclid - 0.75) > 0.25 && Math.abs(distEuclid - 0.3) > 0.2) {
-                keep = false;
-              }
-              break;
-            case 11: // 网格交错空心
-              if ((r + c) % 2 !== 0) {
-                keep = false;
-              }
-              break;
-            case 12: // 箭头形
-              if (dy < -0.7 || Math.abs(dx) > (dy + 1.0) * 0.8) {
-                keep = false;
-              }
-              break;
-            case 13: // 蝴蝶形
-              if (Math.abs(dx) < Math.abs(dy) * 0.65) {
-                keep = false;
-              }
-              break;
-            case 14: // 同心圆
-              if (distEuclid >= 0.35 && (distEuclid <= 0.68 || distEuclid >= 1.0)) {
-                keep = false;
-              }
-              break;
-            case 15: // 太极双鱼轮廓
-              if (distEuclid >= 1.02 || (dy <= Math.sin(dx * Math.PI) * 0.45)) {
-                keep = false;
-              }
-              break;
-            case 16: // 梯级楼梯形
-              if (r + c < size / 2 || r + c >= size * 1.5) {
-                keep = false;
-              }
-              break;
-            case 17: // 六边形
-              if (Math.abs(dy) > 0.95 || Math.abs(dx) * 1.5 + Math.abs(dy) > 1.55) {
-                keep = false;
-              }
-              break;
-          }
-
-          if (keep) {
-            possibleCoords.push({
-              x: c + offset + 1.0,
-              y: r + offset + 1.0,
-              z: z
-            });
-          }
+          // 第 1 关正方形 fallback，其余关卡用 shapeType 选择 18 种形状之一
+          possible.push({ x: c + offset + 1.0, y: r + offset + 1.0, z });
         }
       }
     }
 
-    // 洗牌坐标：使用关卡固定的布局种子打乱三维坐标列表
-    let rand = lcg(layoutSeed);
-    for (let i = possibleCoords.length - 1; i > 0; i--) {
+    // 引入种子和关卡影响布局，相同 levelId 不同 seed 产生不同排列
+    const layoutSeed = seed * 31 + levelId * 1000;
+    const rand = lcg(layoutSeed);
+    for (let i = possible.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
-      const temp = possibleCoords[i];
-      possibleCoords[i] = possibleCoords[j];
-      possibleCoords[j] = temp;
+      [possible[i], possible[j]] = [possible[j], possible[i]];
     }
 
-    // 强制截断坐标数量至 3 的整数倍，这是卡牌消除必定可解的前提
-    const count = Math.min(possibleCoords.length, maxCards) - (Math.min(possibleCoords.length, maxCards) % 3);
-    coordinates = possibleCoords.slice(0, count);
+    // 确保卡牌总数是 3 的倍数
+    const count = Math.min(possible.length, maxCards) - (Math.min(possible.length, maxCards) % 3);
+    coordinates = possible.slice(0, count);
   }
 
-  // 重新按高度排序，方便逻辑上自底向上叠放
   coordinates.sort((a, b) => a.z - b.z);
 
-  const W = 52.0 / 46.0;
-  const H = 52.0 / 46.0;
+  type Node = { index: number; coord: Point3D; assignedType: number };
+  const nodes: Node[] = coordinates.map((coord, index) => ({ index, coord, assignedType: -1 }));
+  const unassigned = new Set<Node>(nodes);
 
-  // 关卡卡牌的花色种类 T 随关卡 ID 增长而增加：T = 3 + 3 * ln(levelId)，最多 12 种花色
-  const numTypes = levelId === 1 ? 3 : Math.min(12, Math.floor(3 + 3 * Math.log(levelId)));
-
-  interface Node {
-    index: number;
-    coord: Point3D;
-    assignedType: number;
-  }
-
-  const nodes: Node[] = coordinates.map((c, idx) => ({
-    index: idx,
-    coord: c,
-    assignedType: -1
-  }));
+  const numTypes = levelId === 1 ? 3 : Math.min(32, 3 + Math.floor(3 * Math.log(levelId)));
+  const randAssign = lcg(seed + 100);
 
   // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积
-  const overlapArea = (a: Point3D, b: Point3D): number => {
+  const overlapArea = (a: Point3D, b: Point3D) => {
     if (a.z <= b.z) return 0;
     const dx = Math.abs(a.x - b.x);
     const dy = Math.abs(a.y - b.y);
-    const ox = Math.max(0, 46.0 - dx * 46.0);
-    const oy = Math.max(0, 46.0 - dy * 46.0);
+    const ox = Math.max(0, 48 - dx * 46);
+    const oy = Math.max(0, 48 - dy * 46);
     return ox * oy;
   };
 
-  const unassigned = new Set<Node>(nodes);
-  let randAssign = lcg(seed + 100);
-
-  // 必定可解生成算法核心（反向还原法）：
-  // 1. 在待涂色卡牌集合中，挑出当前未被任何未着色牌压住的最上层“暴露卡牌”。
-  // 2. 随机在暴露卡牌中挑出 3 张牌，涂上同一种花色。
-  // 3. 将这 3 张牌从待涂色集合中移除，它们下方被压住的卡牌随之“暴露”。
-  // 4. 重复上述步骤，直至所有卡牌涂色完成。因为花色分配逻辑与消除步骤完全镜像对称，所以逆向消去必定有解。
+  // 反向分配卡牌类型，确保顶层总是存在可消除的组合
   while (unassigned.size > 0) {
-    // 覆盖面积累计：累计所有更高层卡牌的覆盖面积，超过 25% 即视为遮挡
-    const exposedNodes = Array.from(unassigned).filter(node => {
-      const covered = Array.from(unassigned)
-        .filter(other => other !== node && other.coord.z > node.coord.z)
+    const exposed = [...unassigned].filter((node) => {
+      const covered = [...unassigned]
+        .filter((other) => other !== node && other.coord.z > node.coord.z)
         .reduce((sum, other) => sum + overlapArea(other.coord, node.coord), 0);
-      return covered < 46.0 * 46.0 * 0.01;
+      return covered < 48 * 48 * 0.01;
     });
 
-    // 若暴露的可用卡牌少于 3 张，进入回退容错：强制将余下全部卡牌 3 个一组随意涂上相同花色
-    if (exposedNodes.length < 3) {
-      const rem = Array.from(unassigned);
-      while (rem.length >= 3) {
-        const type = Math.floor(randAssign() * numTypes) + 1;
-        for (let k = 0; k < 3; k++) {
-          const n = rem.pop()!;
-          n.assignedType = type;
-          unassigned.delete(n);
-        }
+    if (exposed.length < 3) {
+      // 剩余不足三张时强制分配
+      const rem = [...unassigned];
+      let k = 0;
+      while (k + 2 < rem.length) {
+        const t = Math.floor(randAssign() * numTypes) + 1;
+        rem[k].assignedType = t;
+        rem[k + 1].assignedType = t;
+        rem[k + 2].assignedType = t;
+        unassigned.delete(rem[k]);
+        unassigned.delete(rem[k + 1]);
+        unassigned.delete(rem[k + 2]);
+        k += 3;
       }
-      for (const n of rem) {
-        n.assignedType = 1;
-        unassigned.delete(n);
+      for (const node of unassigned) {
+        node.assignedType = 1;
       }
+      unassigned.clear();
       break;
     }
 
-    // 正常涂色：随机指定一种花色并赋予暴露出来的 3 张卡牌
     const type = Math.floor(randAssign() * numTypes) + 1;
+    const exposedMutable = [...exposed];
     for (let k = 0; k < 3; k++) {
-      const idx = Math.floor(randAssign() * exposedNodes.length);
-      const chosen = exposedNodes.splice(idx, 1)[0];
+      const idx = Math.floor(randAssign() * exposedMutable.length);
+      const chosen = exposedMutable.splice(idx, 1)[0];
       chosen.assignedType = type;
       unassigned.delete(chosen);
     }
@@ -329,17 +276,19 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     blindIndices = new Set();
   }
 
-  let randProps = lcg(seed + 300);
+  // 封印关卡：多层封印 + 聚簇分布
+  const maxSealLayer = levelId <= 6 ? 1 : levelId <= 14 ? 2 : 3;
+  const sealRatio = levelId <= 6 ? 0.30 : levelId <= 14 ? 0.35 : 0.40;
+  const clusterCount = levelId <= 6 ? 2 : levelId <= 14 ? 3 : 4;
+
+  const randProps = lcg(seed + 300);
+  const sealedClusters = isSealedLevel
+    ? generateSealedClusters(nodes, () => randProps(), sealRatio, clusterCount, maxSealLayer)
+    : new Map<number, number>();
 
   return nodes.map((node) => {
     const isBlind = blindIndices.has(node.index);
-    let sealedCount = 0;
-
-    if (!isBlindLevel && isSealedLevel) {
-      if (randProps() < 0.30) {
-        sealedCount = 1;
-      }
-    }
+    const sealedCount = sealedClusters.get(node.index) ?? 0;
 
     return {
       id: `tile_${node.index}`,

@@ -71,7 +71,8 @@ private fun CarriedItemsSection(state: GameViewState, onToolClick: (String) -> U
             "HINT" to state.hintCount,
             "BOMB" to state.bombCount,
             "JOKER" to state.jokerCount,
-            "DOUBLE_POINTS" to state.doublePointsCount
+            "DOUBLE_POINTS" to state.doublePointsCount,
+            "REVIVE" to state.reviveCount
         ).filter { it.second > 0 }
 
         val result = all.toMutableList()
@@ -116,9 +117,10 @@ private fun CarriedItemIcon(
     count: Int,
     onClick: () -> Unit
 ) {
+    val isActive = type.isNotEmpty() && type != "REVIVE"
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(enabled = count > 0) { onClick() }
+        modifier = Modifier.clickable(enabled = isActive && count > 0) { if (isActive) onClick() }
     ) {
         // 图标部分
         if (count > 0) {

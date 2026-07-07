@@ -87,6 +87,10 @@ data class GameViewState(
     val score: Int = 0,
     /** 当前游戏运行状态 */
     val gameStatus: GameStatus = GameStatus.INIT,
+    /** 本局已用时间（毫秒） */
+    val elapsedMs: Long = 0,
+    /** 通关结算积分（排行榜提交值） */
+    val finalScore: Int = 0,
     /** 排行榜数据 */
     val rankings: List<RankingEntry> = emptyList(),
     /** 当前使用的卡牌皮肤主题名称 */

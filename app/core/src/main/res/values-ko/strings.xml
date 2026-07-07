@@ -235,7 +235,7 @@
     <string name="prepare_title_locked">잠김</string>
     <string name="prepare_title_unlocked">스테이지 준비 (제 %1$d 관)</string>
     <string name="prepare_blind_warning">⚠️ 물음표 스테이지! 일부 카드는 슬롯에 들어가야 보입니다.</string>
-    <string name="prepare_sealed_warning">🔒 잠금 스테이지! 일부 카드는 다른 카드를 지워야 풀립니다.</string>
+    <string name="prepare_sealed_warning">🔒 봉인 스테이지! 일부 카드는 봉인되어 있습니다(1~3층). 탭하여 층별로 해제; 완전 해제 시 "쇄빙"이 발동하여 인접한 봉인 카드의 층수가 1 감소합니다.</string>
     <string name="update_discovered">새 버전 %1$s 발견</string>
     <string name="update_log_title">업데이트 내역:</string>
     <string name="update_default_log">버그 수정 및 안정성 향상.</string>

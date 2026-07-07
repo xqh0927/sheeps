@@ -159,8 +159,16 @@ private fun WonContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             AnimatedCounter(
-                count = if (state.isDoublePointsActive) state.score * 2 else state.score,
+                count = state.finalScore,
                 style = MaterialTheme.typography.displayMedium.copy(color = MaterialTheme.colorScheme.secondary)
+            )
+            Spacer(Modifier.height(8.dp))
+            val minutes = (state.elapsedMs / 60000).toInt()
+            val seconds = ((state.elapsedMs % 60000) / 1000).toInt()
+            Text(
+                text = "用时 ${String.format("%02d:%02d", minutes, seconds)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

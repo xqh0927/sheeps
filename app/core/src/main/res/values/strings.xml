@@ -246,7 +246,7 @@
     <string name="prepare_title_locked">关卡锁定</string>
     <string name="prepare_title_unlocked">挑战准备 (第 %1$d 关)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒关卡！部分卡牌图案隐藏，放入槽位后才显现。</string>
-    <string name="prepare_sealed_warning">🔒 锁定关卡！部分卡牌被锁扣锁定，需消除其他牌解锁。</string>
+    <string name="prepare_sealed_warning">🔒 封印关卡！部分卡牌被封印（1~3层），点击逐层解封；完全解封时会触发“碎冰”，相邻封印牌自动减1层。</string>
     <string name="update_discovered">发现新版本 %1$s</string>
     <string name="update_log_title">更新内容：</string>
     <string name="update_default_log">优化游戏体验，修复已知问题。</string>

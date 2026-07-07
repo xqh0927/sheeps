@@ -123,12 +123,12 @@ fun GameScreen(
                     .padding(paddingValues)
                     .padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // 1. 顶部状态栏（得分、卡牌数）
                 GameStatusBar(state = state)
 
-                // 2. 游戏核心棋盘
+                // 2. 游戏核心棋盘：可自适应高度，置物架出现时自动压缩
                 GameBoard(
                     state = state,
                     flyingTileIds = flyingTileIds,
@@ -163,10 +163,12 @@ fun GameScreen(
                              }
                          }
                     },
-                    modifier = Modifier.offset(
-                        x = boardShakeOffset.value.x.dp,
-                        y = boardShakeOffset.value.y.dp
-                    )
+                    modifier = Modifier
+                        .weight(1f)
+                        .offset(
+                            x = boardShakeOffset.value.x.dp,
+                            y = boardShakeOffset.value.y.dp
+                        )
                 )
 
                 // 3. 底部槽位区（置物架 + 消除槽）

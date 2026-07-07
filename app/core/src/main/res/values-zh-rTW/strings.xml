@@ -235,7 +235,7 @@
     <string name="prepare_title_locked">關卡鎖定</string>
     <string name="prepare_title_unlocked">挑戰準備 (第 %1$d 關)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒關卡！部分卡牌圖案隱藏，放入槽位後才顯現。</string>
-    <string name="prepare_sealed_warning">🔒 鎖定關卡！部分卡牌被鎖扣鎖定，需消除其他牌解鎖。</string>
+    <string name="prepare_sealed_warning">🔒 封印關卡！部分卡牌被封印（1~3層），點擊逐層解封；完全解封時會觸發「碎冰」，相鄰封印牌自動減1層。</string>
     <string name="update_discovered">發現新版本 %1$s</string>
     <string name="update_log_title">更新內容：</string>
     <string name="update_default_log">優化遊戲體驗，修復已知問題。</string>

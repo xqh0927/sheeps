@@ -61,7 +61,7 @@ class GameLevelGenerator @Inject constructor() {
             val possible = mutableListOf<Point3D>()
             val layersCount = minOf(12, (12 - 8 / sqrt((levelId - 1).toDouble())).toInt())
 
-            val baseSize = minOf(6, 6 + levelId / 2)
+            val baseSize = minOf(20, 6 + levelId / 2)
             for (z in 0 until layersCount) {
                 val size = maxOf(3, baseSize - z / 3)
                 val offset = if (z % 2 == 0) 0f else 0.5f
@@ -74,8 +74,8 @@ class GameLevelGenerator @Inject constructor() {
                 }
             }
 
-            // 引入关卡固定的布局种子，确保相同 levelId 产生完全一致的卡牌排布和总数量
-            val layoutSeed = levelId * 1000L
+            // 引入种子影响布局，相同 levelId 不同 seed 产生不同排列
+            val layoutSeed = seed + levelId * 1000L
             val rand = lcg(layoutSeed)
             for (i in possible.indices.reversed()) {
                 val j = (rand() * (i + 1)).toInt()
@@ -200,17 +200,33 @@ class GameLevelGenerator @Inject constructor() {
             emptySet()
         }
 
-        val randProps = lcg(seed + 300)
-        return nodes.map { node ->
-            var isBlind = node.index in blindIndices
-            var sealed = 0
+        // 封印关卡：多层封印 + 聚簇分布
+        val maxSealLayer = when {
+            levelId <= 6 -> 1
+            levelId <= 14 -> 2
+            else -> 3
+        }
+        val sealRatio = when {
+            levelId <= 6 -> 0.30
+            levelId <= 14 -> 0.35
+            else -> 0.40
+        }
+        val clusterCount = when {
+            levelId <= 6 -> 2
+            levelId <= 14 -> 3
+            else -> 4
+        }
 
-            if (!isBlindLevel && isSealedLevel) {
-                val r = randProps()
-                if (r < 0.30) {
-                    sealed = 1
-                }
-            }
+        val randProps = lcg(seed + 300)
+        val sealedClusters = if (isSealedLevel) {
+            generateSealedClusters(nodes, { randProps() }, sealRatio, clusterCount, maxSealLayer)
+        } else {
+            emptyMap()
+        }
+
+        return nodes.map { node ->
+            val isBlind = node.index in blindIndices
+            val sealed = sealedClusters[node.index] ?: 0
 
             Tile(
                 id = "tile_${node.index}",
@@ -221,6 +237,97 @@ class GameLevelGenerator @Inject constructor() {
                 isBlind = isBlind,
                 sealedCount = sealed
             )
+        }
+    }
+
+    /**
+     * 生成封印聚簇：封印牌以簇状分布，相邻卡牌相互连接，形成战略点。
+     *
+     * @param nodes 所有卡牌节点
+     * @param rand 随机数生成函数，返回 [0, 1)
+     * @param sealRatio 封印卡牌占总卡牌的比例
+     * @param clusterCount 期望簇数
+     * @param maxLayer 最大封印层数
+     * @return Map<nodeIndex, sealedCount>
+     */
+    private fun generateSealedClusters(
+        nodes: List<LocalNode>,
+        rand: () -> Double,
+        sealRatio: Double,
+        clusterCount: Int,
+        maxLayer: Int
+    ): Map<Int, Int> {
+        if (nodes.isEmpty()) return emptyMap()
+
+        val maxZ = nodes.maxOfOrNull { it.coord.z } ?: 0
+        // 封印只生成在较低层（z <= 70% 最高层），保证玩家能优先看到
+        val eligible = nodes.filter { it.coord.z <= maxZ * 0.7f }
+            .takeIf { it.size >= clusterCount } ?: nodes.toList()
+
+        val totalSealed = maxOf(1, (nodes.size * sealRatio).toInt())
+        val targetPerCluster = maxOf(1, totalSealed / clusterCount)
+
+        // 随机选取簇种子
+        val seeds = mutableListOf<LocalNode>()
+        val available = eligible.toMutableList()
+        repeat(clusterCount) {
+            if (available.isEmpty()) return@repeat
+            val idx = (rand() * available.size).toInt()
+            seeds.add(available.removeAt(idx))
+        }
+
+        val result = mutableMapOf<Int, Int>()
+        for (seed in seeds) {
+            if (result.size >= totalSealed) break
+            val cluster = mutableSetOf<Int>()
+            val queue = ArrayDeque<Int>()
+            queue.add(seed.index)
+            cluster.add(seed.index)
+
+            while (queue.isNotEmpty() && cluster.size < targetPerCluster) {
+                val current = queue.removeFirst()
+                val currentNode = nodes[current]
+                val neighbors = nodes.mapIndexedNotNull { idx, neighbor ->
+                    if (idx !in cluster &&
+                        neighbor.coord.z == currentNode.coord.z &&
+                        abs(neighbor.coord.x - currentNode.coord.x) <= 1.5f &&
+                        abs(neighbor.coord.y - currentNode.coord.y) <= 1.5f
+                    ) idx else null
+                }
+
+                // 随机打乱邻居，避免簇总是朝同一方向生长
+                val shuffled = neighbors.toMutableList()
+                for (i in shuffled.indices.reversed()) {
+                    val j = (rand() * (i + 1)).toInt()
+                    val tmp = shuffled[i]
+                    shuffled[i] = shuffled[j]
+                    shuffled[j] = tmp
+                }
+
+                for (idx in shuffled) {
+                    if (cluster.size >= targetPerCluster) break
+                    if (result.size >= totalSealed) break
+                    cluster.add(idx)
+                    queue.add(idx)
+                }
+            }
+
+            for (tileIndex in cluster) {
+                if (result.size >= totalSealed) break
+                result[tileIndex] = randomSealLayer(rand, maxLayer)
+            }
+        }
+
+        return result
+    }
+
+    private fun randomSealLayer(rand: () -> Double, maxLayer: Int): Int = when (maxLayer) {
+        1 -> 1
+        2 -> if (rand() < 0.65) 1 else 2
+        else -> when {
+            rand() < 0.50 -> 1
+            rand() < 0.85 -> 2
+            else -> 3
         }
     }
 

@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -86,9 +88,10 @@ class LeaderboardActivity : BaseActivity() {
     private fun showLeaderboardContent() {
         setContent {
             SheepsTheme {
-                var selectedTab by remember { mutableStateOf("history") } // 可选标签：daily (每日榜), weekly (每周榜), history (总榜)
+                var selectedTab by remember { mutableStateOf("history") }
                 var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }
                 var isLoading by remember { mutableStateOf(false) }
+                var showRulesDialog by remember { mutableStateOf(false) }
 
                 val loadRankings = {
                     isLoading = true
@@ -126,9 +129,31 @@ class LeaderboardActivity : BaseActivity() {
                             onBack = { finish() }
                         )
 
+                        // 积分规则说明弹窗
+                        if (showRulesDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showRulesDialog = false },
+                                title = { Text("积分计算规则") },
+                                text = {
+                                    Text(
+                                        "• 基础分 = 1000 - 通关用时(秒) × 2 - 使用道具数 × 50\n" +
+                                        "• 最低保底 100 分\n" +
+                                        "• 最终积分 = 基础分 × 关卡难度系数 × 双倍(如有)\n" +
+                                        "• 各关卡按最高分排名，相同分数时用时短者优先"
+                                    )
+                                },
+                                confirmButton = {
+                                    androidx.compose.material3.TextButton(onClick = { showRulesDialog = false }) {
+                                        Text("知道了")
+                                    }
+                                }
+                            )
+                        }
+
                         LeaderboardTabs(
                             selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it }
+                            onTabSelected = { selectedTab = it },
+                            onShowRules = { showRulesDialog = true }
                         )
 
                         if (isLoading) {
@@ -196,7 +221,8 @@ fun LeaderboardAppBar(
 @Composable
 fun LeaderboardTabs(
     selectedTab: String,
-    onTabSelected: (String) -> Unit
+    onTabSelected: (String) -> Unit,
+    onShowRules: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -206,7 +232,8 @@ fun LeaderboardTabs(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(20.dp)
             )
-            .padding(4.dp)
+            .padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         val tabs = listOf(
             "daily" to stringResource(id = R.string.leaderboard_tab_daily),
@@ -236,6 +263,18 @@ fun LeaderboardTabs(
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                 )
             }
+        }
+        // 积分规则按钮
+        IconButton(
+            onClick = onShowRules,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                Icons.Default.Info,
+                contentDescription = "积分规则",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

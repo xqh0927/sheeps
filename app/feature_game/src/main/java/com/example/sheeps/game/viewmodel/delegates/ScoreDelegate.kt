@@ -27,49 +27,32 @@ class ScoreDelegate @Inject constructor(
     fun submitScoreOnline(
         scope: CoroutineScope,
         levelId: Int,
-        levelStartTime: Long,
-        itemsUsedCount: Int,
-        isDoublePointsActive: Boolean,
+        finalScore: Int,
+        clearTimeMs: Long,
         getLocalizedString: (String, String, String, String, String) -> String,
         setEffect: (GameViewEffect) -> Unit
     ) {
-        val clearTime = System.currentTimeMillis() - levelStartTime
-
         // 更新本地解锁状态
         if (levelId == prefs.getUnlockedLevel()) {
             prefs.setUnlockedLevel(levelId + 1)
         }
 
-        // 计算成绩积分
-        val timeInSeconds = clearTime / 1000L
-        val difficultyCoeff = when (levelId) {
-            1 -> 1
-            2 -> 2
-            3 -> 3
-            else -> 4
-        }
-        val baseScore = (maxOf(100L, (1000L - timeInSeconds * 2) - itemsUsedCount * 50L) * difficultyCoeff).toInt()
-        val finalScore = if (isDoublePointsActive) baseScore * 2 else baseScore
-
         // 使用独立的 IO 作用域提交，防止页面关闭导致提交中断
         scope.launch(Dispatchers.IO) {
             try {
                 // 1. 本地存储进度
-                val currentProgress = localDao.getAllProgress().find { it.levelId == levelId && it.score > 0 }
-                val pointsReward = if (currentProgress == null) 50 else 0
-                
                 syncRepository.saveProgressAndPointsLocally(
                     levelId = levelId,
                     score = finalScore,
-                    clearTime = clearTime,
-                    pointsGained = pointsReward
+                    clearTime = clearTimeMs,
+                    pointsGained = 0
                 )
 
                 // 2. 云端排行榜同步
                 val userId = prefs.getUserId()
                 val token = prefs.getToken()
                 val authHeader = token?.let { "Bearer $it" }
-                val sign = sha256("${userId}_${levelId}_${clearTime}_folklore")
+                val sign = sha256("${userId}_${levelId}_${clearTimeMs}_folklore")
 
                 apiService.submitScore(
                     auth = authHeader,
@@ -77,17 +60,13 @@ class ScoreDelegate @Inject constructor(
                         user_id = userId,
                         level_id = levelId,
                         score = finalScore,
-                        clear_time_ms = clearTime,
+                        clear_time_ms = clearTimeMs,
                         sign = sign
                     )
                 )
 
                 setEffect(GameViewEffect.ShowToast(
-                    if (pointsReward > 0) {
-                        getLocalizedString("恭喜通关！首次通关获得50积分，进度已安全存储！", "Congratulations! First clear rewarded 50 points, progress saved!", "恭喜通關！首次通關獲得50積分，進度已安全存儲！", "クリアおめでとうございます！初回クリアで50ポイント獲得、セーブしました！", "클리어를 축하합니다! 최초 클리어로 50포인트를 획득했으며, 저장되었습니다!")
-                    } else {
-                        getLocalizedString("通关成功！进度已安全存储！", "Cleared! Progress saved!", "通關成功！進度已安全存儲！", "クリア成功！セーブしました！", "클리어 성공! 저장되었습니다!")
-                    }
+                    getLocalizedString("通关成功！进度已安全存储！", "Cleared! Progress saved!", "通關成功！進度已安全存儲！", "クリア成功！セーブしました！", "클리어 성공! 저장되었습니다!")
                 ))
             } catch (e: Exception) {
                 setEffect(GameViewEffect.ShowToast(

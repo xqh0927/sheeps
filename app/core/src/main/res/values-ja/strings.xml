@@ -235,7 +235,7 @@
     <string name="prepare_title_locked">未開放</string>
     <string name="prepare_title_unlocked">ステージ準備 (ステージ %1$d)</string>
     <string name="prepare_blind_warning">⚠️ ブラインドステージ！一部のカードはスロットに入れるまで隠されています。</string>
-    <string name="prepare_sealed_warning">🔒 ロックステージ！一部のカードはロックされており、他のカードを消すと開放されます。</string>
+    <string name="prepare_sealed_warning">🔒 封印ステージ！一部のカードは封印されています（1~3層）。タップして層ごとに解封；完全解封で「シャッター」が発動し、隣接する封印カードの層数が1減ります。</string>
     <string name="update_discovered">新しいバージョン %1$s が見つかりました</string>
     <string name="update_log_title">アップデート内容：</string>
     <string name="update_default_log">プレイ感の向上および不具合の修正。</string>
