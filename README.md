@@ -245,6 +245,108 @@
 
 ---
 
+## 🧩 核心业务逻辑与技术细节实现 (For AI Developers)
+
+为了便于其他 AI 开发助手快速理解和维护本项目，以下是核心模块的深层逻辑与数据模型规格说明：
+
+### 1. 数据库实体关系 (D1 Relational Schema)
+云端存储搭载 Cloudflare D1，核心实体表结构与关联如下：
+
+* **用户主体表 `users`**：
+  - 字段：`id` (TEXT, PK, UUID), `phone` (TEXT, UNIQUE), `username` (TEXT), `points` (INTEGER, 积分/金币余额), `password_hash` (TEXT, 采用 pbkdf2 盐值加密哈希), `role` (TEXT, 角色: `user` / `admin` / `super` / `readonly`), `is_banned` (INTEGER, 1表示禁用), `created_at` (INTEGER)
+* **用户道具资产表 `user_items`**：
+  - 字段：`user_id` (TEXT, 外键关联 users.id), `item_type` (TEXT, 资产标识如 `UNDO`/`SKIN_CYBER`), `count` (INTEGER, 拥有数量)
+  - 复合主键：`PRIMARY KEY (user_id, item_type)`
+* **关卡解锁表 `level_unlock`**：
+  - 字段：`user_id` (TEXT), `level_id` (INTEGER, 关卡 ID), `unlocked_at` (INTEGER)
+  - 复合主键：`PRIMARY KEY (user_id, level_id)`
+* **积分交易日志表 `point_record`**：
+  - 字段：`id` (TEXT, PK, UUID), `user_id` (TEXT), `type` (TEXT, `'IN'` 产出 / `'OUT'` 消耗), `amount` (INTEGER), `reason` (TEXT), `created_at` (INTEGER)
+* **管理员审计日志表 `admin_audit_log`**：
+  - 字段：`id` (INTEGER, PK, AUTOINCREMENT), `admin_id` (TEXT), `admin_phone` (TEXT), `admin_role` (TEXT), `action` (TEXT, 操作行为如 `UPDATE_USER_ITEMS`/`DELETE_LEVEL`), `target_type` (TEXT), `target_id` (TEXT), `before_snapshot` (TEXT, JSON 序列化旧数据), `after_snapshot` (TEXT, JSON 新数据), `source_ip` (TEXT), `user_agent` (TEXT), `created_at` (INTEGER)
+
+---
+
+### 2. 双 Token 鉴权与静默刷新流程 (Double Token Flow)
+系统在客户端与服务端之间采用 AccessToken（短效，1小时）和 RefreshToken（长效，30天）的双令牌体系：
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as Android Client
+    participant Interceptor as OkHttp Interceptor
+    participant Gate as Cloudflare Workers API
+    
+    App->>Interceptor: 发起常规 API 请求 (携带 AccessToken)
+    Interceptor->>Gate: 发送带有 Authorization: Bearer Header 的请求
+    alt AccessToken 未过期
+        Gate-->>Interceptor: 200 OK 并返回数据
+        Interceptor-->>App: 返回正常数据
+    else AccessToken 已失效 (返回 401 Unauthorized)
+        Gate-->>Interceptor: 401 令牌过期
+        Note over Interceptor: 触发排他锁阻止并发刷新<br/>调用 /api/auth/refresh 接口
+        Interceptor->>Gate: POST /api/auth/refresh (携带 RefreshToken)
+        alt RefreshToken 有效
+            Gate-->>Interceptor: 200 OK (颁发新 AccessToken)
+            Note over Interceptor: 更新本地持久化 Token 缓存<br/>重新构造原始 HTTP 请求并重试
+            Interceptor->>Gate: 重试发起常规 API 请求 (携带新 AccessToken)
+            Gate-->>Interceptor: 200 OK
+            Interceptor-->>App: 返回正常数据 (用户侧无感)
+        else RefreshToken 也失效 (401)
+            Gate-->>Interceptor: 401 彻底过期
+            Note over Interceptor: 发送 AuthEvent.Logout 事件到 EventBus
+            Interceptor-->>App: 退出登录并强制切回登录页
+        end
+    end
+```
+
+---
+
+### 3. 可解性关卡生成算法 ( Solvability Level Generation)
+关卡采用逆向模拟（Reverse Simulation）与有解拓扑校正算法生成，逻辑位于 `server/src/level.ts` 与客户端 `GameLevelGenerator.kt` 中：
+1. **逆向卡牌生成**：生成器预设所需卡牌类型（种类随关卡增加而变多，最多 12 种花色）。每一关卡的卡牌总数必须是 3 的倍数（$Total = Count \times 3$）。
+2. **三维层叠堆叠**：通过网格重叠算法判定卡牌之间的物理遮挡，层与层之间高度递增。重叠度采用 **10% 面积碰撞重叠公式**：
+   $$ox = \max(0, Width - |x_1 - x_2| \times AlignmentScale)$$
+   $$oy = \max(0, Height - |y_1 - y_2| \times AlignmentScale)$$
+   $$Area = ox \times oy$$
+   若 $Area > 0.1 \times Width \times Height$，则在上方卡牌与下方卡牌之间建立“父子遮挡关系拓扑图（Over/Under Card Chain）”。
+3. **逆向消除可解性校验（BFS 反向求解器）**：
+   - 算法并非简单随机堆放卡牌，而是从全空卡槽出发，在逆向状态下依次将 3 张同色卡牌“拆解”并摆放到当前的棋盘暴露点。
+   - 每次“拆解”保证仅在完全暴露的、且重叠判定无锁定的区域生成。
+   - 最终从顶向下倒推生成完整个三维金字塔。这在数学上保证了玩家在正向游玩时，只要清除被遮挡的底层，**棋盘必定存在至少一条能完全消除的通路**。
+
+---
+
+### 4. WebSocket 多人对决与 Combo 连击攻击计算 (PvP Combo Math)
+多人对决服务通过 WebSocket 支持，其伤害机制融入了连击缓动衰减设计，以实现兼具操作快感与数值平衡的竞技对抗：
+
+* **连击伤害转换模型 (Combo Damage Math)**：
+  为了避免玩家由于超高手速消除或随机连消产生瞬间秒杀对方的不平衡体验，攻击伤害随着连击数（Combo）呈**对数曲线缓动增长**：
+  $$Attack = BaseDamage \times (1 + \ln(Combo))$$
+  - `BaseDamage`：每次 3 连消除的基础伤害点数。
+  - `Combo`：连续达成 3 连消除的倍率数（从 1 开始计）。
+  - `ln(Combo)`：自然对数函数。例如：连击 1 次伤害为 $Base$；连击 3 次时伤害约增加至 $2.1 \times Base$；连击 10 次时伤害平滑增加至约 $3.3 \times Base$。
+* **法术诅咒与同步协议**：
+  客户端与服务端在对决期间维持心跳，同步协议的载荷（Payload）部分关键格式如下：
+  ```json
+  // 发起攻击/发送诅咒载荷
+  {
+    "action": "cast_spell",
+    "spell_type": "fog", // fog 迷雾诅咒 / slot_lock 锁槽诅咒 / seal 封印诅咒
+    "target_user_id": "opp_456"
+  }
+  
+  // 局内同步棋盘消除状态
+  {
+    "action": "sync_state",
+    "unlocked_level": 4,
+    "current_grid_count": 48,
+    "shelf_slots_used": 3
+  }
+  ```
+
+---
+
 ## 📐 核心算法与设计决策
 
 ### 1. 关卡三维金字塔布局与 10% 面积碰撞重叠判定
