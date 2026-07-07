@@ -369,6 +369,7 @@
     <string name="toast_phone_code_invalid">올바른 전화번호와 6자리 인증번호를 입력하십시오</string>
     <string name="toast_login_verification_failed">로그인 인증 실패</string>
     <string name="toast_code_invalid_or_expired">인증번호가 올바르지 않거나 만료되었습니다</string>
+    <string name="toast_session_expired">로그인 세션이 만료되었습니다. 다시 로그인해 주세요</string>
     <string name="toast_conflict_resolved_local">로컬 진행 상황이 보존되어 서버에 동기화되었습니다!</string>
     <string name="toast_conflict_resolved_cloud">서버 저장 진행 상황을 불러왔습니다!</string>
     <string name="toast_conflict_resolve_error">저장 파일 충돌 해결 오류, 네트워크를 확인하십시오</string>

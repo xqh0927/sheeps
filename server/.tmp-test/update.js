@@ -39,8 +39,9 @@ async function checkApkExists(url) {
 /** * 数据库兜底更新检查逻辑
  * 当 GitHub API 不可用时，从 D1 数据库中查找并校验更新
  */
-async function getDatabaseAppUpdate(env, currentCode) {
-    const versions = await env.DB.prepare('SELECT version_code, version_name, apk_url, update_log, is_force_update FROM app_version WHERE version_code > ? ORDER BY version_code DESC LIMIT 5').bind(currentCode).all();
+async function getDatabaseAppUpdate(env, currentCode, lang) {
+    const logCol = lang ? `COALESCE(update_log_${lang}, update_log)` : 'update_log';
+    const versions = await env.DB.prepare(`SELECT version_code, version_name, apk_url, ${logCol} as update_log, is_force_update FROM app_version WHERE version_code > ? ORDER BY version_code DESC LIMIT 5`).bind(currentCode).all();
     if (versions.results && versions.results.length > 0) {
         for (const release of versions.results) {
             if (release.apk_url) {

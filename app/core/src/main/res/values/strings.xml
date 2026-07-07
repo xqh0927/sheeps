@@ -389,6 +389,7 @@
     <string name="toast_phone_code_invalid">请输入正确的手机号和6位验证码</string>
     <string name="toast_login_verification_failed">登录验证失败</string>
     <string name="toast_code_invalid_or_expired">验证码错误或已失效</string>
+    <string name="toast_session_expired">登录已过期，请重新登录</string>
     <string name="toast_conflict_resolved_local">已保留本地进度并同步至云端！</string>
     <string name="toast_conflict_resolved_cloud">已成功加载云端存档进度！</string>
     <string name="toast_conflict_resolve_error">存档冲突解决异常，请检查网络</string>

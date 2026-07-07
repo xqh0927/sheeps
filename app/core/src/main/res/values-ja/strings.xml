@@ -369,6 +369,7 @@
     <string name="toast_phone_code_invalid">正しい電話番号と6桁の認証コードを入力してください</string>
     <string name="toast_login_verification_failed">ログイン認証に失敗しました</string>
     <string name="toast_code_invalid_or_expired">認証コードが正しくないか有効期限切れです</string>
+    <string name="toast_session_expired">ログインセッションが期限切れです。再ログインしてください</string>
     <string name="toast_conflict_resolved_local">ローカルの進捗を維持し、クラウドに同期しました！</string>
     <string name="toast_conflict_resolved_cloud">クラウドセーブデータを読み込みました！</string>
     <string name="toast_conflict_resolve_error">アーカイブ競合の解決中にエラーが発生しました。接続を確認してください</string>

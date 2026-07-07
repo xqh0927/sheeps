@@ -55,7 +55,38 @@ test('GET /api/admin/users/:id/items returns user items successfully', async () 
   const url = new URL(req.url);
   const response = await handleAdminRoutes(req, mockEnv, url.pathname, url);
   
-  // Since we haven't implemented GET /api/admin/users/:id/items in admin.ts yet,
-  // this should return 404. Let's assert it fails (returns 404) first.
-  assert.equal(response.status, 404);
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.success, true);
+  assert.deepEqual(data.list, [{ item_type: 'UNDO', count: 5 }]);
+});
+
+test('POST /api/admin/users/:id/items updates user items successfully', async () => {
+  const token = await generateJWT({ userId: 'user_123', phone: '13800000000', role: 'super', type: 'access', exp: Date.now() + 100000 });
+  const payload = {
+    items: [
+      { item_type: 'UNDO', count: 10 },
+      { item_type: 'SKIN_INK', count: 1 }
+    ]
+  };
+  const req = {
+    method: 'POST',
+    headers: {
+      get: (headerName) => {
+        if (headerName.toLowerCase() === 'authorization') {
+          return `Bearer ${token}`;
+        }
+        return null;
+      }
+    },
+    json: async () => payload,
+    url: 'https://example.com/api/admin/users/user_123/items'
+  };
+
+  const url = new URL(req.url);
+  const response = await handleAdminRoutes(req, mockEnv, url.pathname, url);
+  
+  assert.equal(response.status, 200);
+  const data = await response.json();
+  assert.equal(data.success, true);
 });

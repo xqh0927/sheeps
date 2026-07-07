@@ -1,12 +1,24 @@
 package com.example.sheeps.game.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,7 +56,7 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
                 color = MaterialTheme.colorScheme.secondary,
                 fontFamily = FontFamily.Serif
             )
-            
+
             // 连接状态指示
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val statusColor = when (state.connectionState) {
@@ -52,7 +64,12 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
                     WebSocketManager.ConnectionState.Connecting -> Color.Yellow
                     else -> Color.Red
                 }
-                Box(modifier = Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(statusColor))
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(statusColor)
+                )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = when (state.connectionState) {
@@ -65,12 +82,12 @@ fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
             }
 
             IconButton(onClick = onLeave) {
-                Icon(Icons.Default.Close, contentDescription = stringResource(id = R.string.duel_btn_leave))
+                Icon(Icons.Default.Close, contentDescription = "退出")
             }
         }
-        
+
         Spacer(Modifier.height(8.dp))
-        
+
         // 第二部分：双方进度条对比
         DuelProgressBars(state = state)
 
@@ -86,22 +103,37 @@ private fun DuelProgressBars(state: DuelViewState) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         // 己方进度
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(id = R.string.label_duel_me), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
-            val remaining = state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } + state.movedOutTiles.size
+            Text(
+                stringResource(id = R.string.label_duel_me),
+                modifier = Modifier.width(30.dp),
+                style = MaterialTheme.typography.labelSmall
+            )
+            val remaining =
+                state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } + state.movedOutTiles.size
             val totalTiles = if (state.totalTileCount > 0) state.totalTileCount else 100
             LinearProgressIndicator(
                 progress = { 1f - (remaining.toFloat() / totalTiles.toFloat()).coerceIn(0f, 1f) },
-                modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
                 color = MaterialTheme.colorScheme.secondary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
         // 对手进度
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(id = R.string.label_duel_enemy), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+            Text(
+                stringResource(id = R.string.label_duel_enemy),
+                modifier = Modifier.width(30.dp),
+                style = MaterialTheme.typography.labelSmall
+            )
             LinearProgressIndicator(
                 progress = { state.opponentProgress.coerceIn(0f, 1f) },
-                modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
@@ -112,7 +144,11 @@ private fun DuelProgressBars(state: DuelViewState) {
 @Composable
 private fun DuelEnergyBar(currentEnergy: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(id = R.string.label_duel_energy), modifier = Modifier.width(30.dp), style = MaterialTheme.typography.labelSmall)
+        Text(
+            stringResource(id = R.string.label_duel_energy),
+            modifier = Modifier.width(30.dp),
+            style = MaterialTheme.typography.labelSmall
+        )
         Box(
             modifier = Modifier
                 .weight(1f)

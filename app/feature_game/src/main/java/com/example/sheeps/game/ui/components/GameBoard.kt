@@ -61,14 +61,8 @@ fun GameBoard(
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 420.dp
 
-    // 计算缩放比例，确保所有卡牌都能完整显示在棋盘内
-    // 留 8dp 边距，避免卡牌贴到棋盘边框
-    val scale = remember(contentWidth, contentHeight, boardWidth, boardHeight) {
-        val maxW = boardWidth.value - 8
-        val maxH = boardHeight.value - 8
-        val rawScale = minOf(maxW / contentWidth, maxH / contentHeight, 1f)
-        rawScale.coerceAtLeast(0.5f)
-    }
+    // 采用方案二：服务端限制生成网格在 6x7 内，客户端固定卡牌尺寸不缩放
+    val scale = 1f
 
     val displayedWidth = (contentWidth * scale).dp
     val displayedHeight = (contentHeight * scale).dp

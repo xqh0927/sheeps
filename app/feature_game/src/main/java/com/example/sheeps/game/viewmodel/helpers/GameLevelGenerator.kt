@@ -24,15 +24,15 @@ class GameLevelGenerator @Inject constructor() {
      * 采用反向生成算法：先生成布局，然后反向填充成对的卡牌类型
      * @param seed LCG 随机种子，默认使用 levelId 保持向后兼容
      */
-    fun generateSolvableLevelLocal(levelId: Int, seed: Long = levelId * 1000L): List<Tile> {
+    fun generateSolvableLevelLocal(levelId: Int, seed: Long = levelId * 1000L, userId: Int = 0): List<Tile> {
         // 根据关卡ID计算难度（卡牌种类数），受限于美术资源总量
         val numTypes = if (levelId == 1) 3 else minOf(
             SkinConstants.MAX_TILE_TYPES,
             (3 + 3 * Math.log(levelId.toDouble())).toInt()
         )
 
-        // 使用难度系数系统计算卡牌总数（本地模式 userId=0）
-        val maxCards = calculateCardCount(0, levelId)
+        // 使用难度系数系统计算卡牌总数
+        val maxCards = calculateCardCount(userId, levelId)
 
         val coordinates = mutableListOf<Point3D>()
         if (levelId == 1) {
@@ -64,9 +64,11 @@ class GameLevelGenerator @Inject constructor() {
             val baseSize = minOf(20, 6 + levelId / 2)
             for (z in 0 until layersCount) {
                 val size = maxOf(3, baseSize - z / 3)
+                val colSize = minOf(6, size)
+                val rowSize = minOf(7, size)
                 val offset = if (z % 2 == 0) 0f else 0.5f
-                for (r in 0 until size) {
-                    for (c in 0 until size) {
+                for (r in 0 until rowSize) {
+                    for (c in 0 until colSize) {
                         // 本地 fallback：使用正方形 shape（与后端 shape=0 一致）
                         // 后端默认从 18 种异形中随机选一种，本地仅 fallback 时使用正方形保证可解
                         possible.add(Point3D(c + offset + 1.0f, r + offset + 1.0f, z))

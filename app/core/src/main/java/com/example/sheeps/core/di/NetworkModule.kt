@@ -4,7 +4,6 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.network.EncryptionInterceptor
-import com.example.sheeps.core.network.RefreshTokenProvider
 import com.apkfuns.logutils.LogUtils
 import dagger.Module
 import dagger.Provides
@@ -116,35 +115,27 @@ object NetworkModule {
                     }
 
                     try {
-                        // 使用 RefreshTokenProvider 中的 ApiService 实例发起刷新请求
-                        val api = RefreshTokenProvider.apiService
-                        val refreshRes = if (api != null) {
-                            kotlinx.coroutines.runBlocking {
-                                api.refreshToken(mapOf("refreshToken" to refreshToken))
-                            }
+                        // 始终使用独立的 OkHttpClient 实例发起刷新请求以避免 Dispatcher 主机限制下的死锁 (maxRequestsPerHost)
+                        val client = OkHttpClient.Builder()
+                            .connectTimeout(10, TimeUnit.SECONDS)
+                            .readTimeout(10, TimeUnit.SECONDS)
+                            .writeTimeout(10, TimeUnit.SECONDS)
+                            .build()
+                        val mediaType = "application/json".toMediaType()
+                        val requestBody =
+                            "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
+                        val refreshUrl =
+                            request.url.newBuilder().encodedPath("/api/auth/refresh").build()
+                        val refreshRequest = okhttp3.Request.Builder()
+                            .url(refreshUrl)
+                            .method("POST", requestBody)
+                            .build()
+                        val rawResponse = client.newCall(refreshRequest).execute()
+                        val refreshRes = if (rawResponse.isSuccessful) {
+                            val bodyStr = rawResponse.body?.string() ?: ""
+                            json.decodeFromString<com.example.sheeps.data.model.RefreshResponse>(bodyStr)
                         } else {
-                            // fallback：手动构建 HTTP 请求
-                            val client = OkHttpClient.Builder()
-                                .connectTimeout(10, TimeUnit.SECONDS)
-                                .readTimeout(10, TimeUnit.SECONDS)
-                                .writeTimeout(10, TimeUnit.SECONDS)
-                                .build()
-                            val mediaType = "application/json".toMediaType()
-                            val requestBody =
-                                "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
-                            val refreshUrl =
-                                request.url.newBuilder().encodedPath("/api/auth/refresh").build()
-                            val refreshRequest = okhttp3.Request.Builder()
-                                .url(refreshUrl)
-                                .method("POST", requestBody)
-                                .build()
-                            val rawResponse = client.newCall(refreshRequest).execute()
-                            if (rawResponse.isSuccessful) {
-                                val bodyStr = rawResponse.body?.string() ?: ""
-                                json.decodeFromString<com.example.sheeps.data.model.RefreshResponse>(bodyStr)
-                            } else {
-                                null
-                            }
+                            null
                         }
 
                         if (refreshRes != null && refreshRes.success && refreshRes.token != null) {
@@ -213,6 +204,10 @@ object NetworkModule {
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
+            .dispatcher(okhttp3.Dispatcher().apply {
+                maxRequests = 64
+                maxRequestsPerHost = 20
+            })
             .addInterceptor(languageInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(tokenRefreshInterceptor)
@@ -239,9 +234,6 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService {
-        val service = retrofit.create(ApiService::class.java)
-        RefreshTokenProvider.apiService = service
-        return service
-    }
+    fun provideApiService(retrofit: Retrofit): ApiService =
+        retrofit.create(ApiService::class.java)
 }

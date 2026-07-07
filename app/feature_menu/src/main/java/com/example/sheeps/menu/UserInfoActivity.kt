@@ -139,19 +139,19 @@ class UserInfoActivity : BaseActivity() {
 
     private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
         if (phone.length != 11) {
-            Toaster.show(context.getString(R.string.err_invalid_phone))
+            Toaster.show(getString(R.string.err_invalid_phone))
             return
         }
         scope.launch {
             try {
                 val response = apiService.sendCode(SendCodeRequest(phone))
                 if (response.success) {
-                    Toaster.show(context.getString(R.string.toast_send_code_success, response.code))
+                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
                 } else {
-                    Toaster.show(context.getString(R.string.toast_send_code_failed))
+                    Toaster.show(getString(R.string.toast_send_code_failed))
                 }
             } catch (e: Exception) {
-                Toaster.show(context.getString(R.string.toast_send_code_network_error))
+                Toaster.show(getString(R.string.toast_send_code_network_error))
             }
         }
     }
@@ -174,9 +174,9 @@ class UserInfoActivity : BaseActivity() {
                 val url = uploadResponse.avatarUrl ?: ""
                 prefs.setAvatarUrl(url)
                 onSuccess(url)
-                Toaster.show(context.getString(R.string.toast_avatar_update_success))
+                Toaster.show(getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show(context.getString(R.string.toast_avatar_upload_failed))
+                Toaster.show(getString(R.string.toast_avatar_upload_failed))
             }
         }
     }
@@ -205,9 +205,9 @@ class UserInfoActivity : BaseActivity() {
                     )
                 )
                 onSuccess(nickname)
-                Toaster.show(context.getString(R.string.toast_nickname_update_success))
+                Toaster.show(getString(R.string.toast_nickname_update_success))
             } catch (e: Exception) {
-                Toaster.show(context.getString(R.string.toast_nickname_update_failed))
+                Toaster.show(getString(R.string.toast_nickname_update_failed))
             } finally {
                 setLoading(false)
             }
@@ -230,16 +230,16 @@ class UserInfoActivity : BaseActivity() {
                 if (response.success) {
                     // 清空本地登录态
                     prefs.logout()
-                    Toaster.show(context.getString(R.string.toast_password_change_success))
+                    Toaster.show(getString(R.string.toast_password_change_success))
                     // 跳转到登录页
                     com.therouter.TheRouter.build("/auth/login").navigation(this@UserInfoActivity)
                     finish()
                 } else {
-                    Toaster.show(context.getString(R.string.toast_password_change_failed))
+                    Toaster.show(getString(R.string.toast_password_change_failed))
                     setLoading(false)
                 }
             } catch (e: Exception) {
-                Toaster.show(context.getString(R.string.toast_password_change_failed))
+                Toaster.show(getString(R.string.toast_password_change_failed))
                 setLoading(false)
             }
         }

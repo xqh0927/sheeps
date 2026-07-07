@@ -1,153 +1,70 @@
 classDiagram
-    %% ── Android 端数据模型 ──
-    class EncryptedRequest {
-        +String encrypted
+    class User {
+        +string id
+        +string phone
+        +string username
+        +number points
+        +string password_hash
+        +string avatar_url
+        +string role
+        +number is_banned
+        +number created_at
     }
-    
-    class EncryptedResponse {
-        +String encrypted
-        +String error
+    class AdminAuditLog {
+        +number id
+        +string admin_id
+        +string admin_phone
+        +string admin_role
+        +string action
+        +string target_type
+        +string target_id
+        +string before_snapshot
+        +string after_snapshot
+        +string source_ip
+        +string user_agent
+        +number created_at
     }
-
-    class PasswordRegisterRequest {
-        +String phone
-        +String password
-        +String code
+    class JwtUtil {
+        +configureSecrets(env)
+        +generateJWT(payload, secret) string
+        +verifyJWT(token, secret) payload
     }
-
-    class PasswordLoginRequest {
-        +String phone
-        +String password
+    class AdminAuthService {
+        +login(phone, password, env) AdminToken
+        +requireAdmin(request, env) AdminPayload
+        +assertCanWrite(payload) void
+        +assertSuper(payload) void
     }
-
-    class PasswordResetRequest {
-        +String phone
-        +String code
-        +String newPassword
+    class AdminApiHandler {
+        +handleAdminRoutes(...)
+        +listUsers / adjustPoints / banUser / updateUser
+        +crudShopItem / crudNotice / crudTask / crudLevel
+        +getConfig / setConfig
+        +listAccounts / setRole / disableAccount   // super
+        +listAuditLogs                              // super
+        +getStats
+        +writeAudit(log)   // 落审计，无改/删接口
     }
-
-    class HasPasswordResponse {
-        +Boolean success
-        +Boolean hasPassword
+    class AdminApiClient {
+        +login / refreshAdmin
+        +getUsers / adjustPoints / banUser
+        +crudShopItems / crudNotices / crudTasks / crudLevels
+        +getConfig / setConfig
+        +listAccounts / setRole / disableAccount
+        +listAuditLogs
     }
-
-    class PasswordRegisterResponse {
-        +Boolean success
-        +String token
-        +String refreshToken
-        +Int bonusPoints
+    class AuthStore {
+        +token: string
+        +user: AdminUser
+        +login() / logout()
+        +isAuthenticated: boolean
+        +isSuper(): boolean
+        +canWrite(): boolean
     }
-
-    class AvatarUploadRequest {
-        +String avatarBase64
-    }
-
-    class AvatarUploadResponse {
-        +Boolean success
-        +String avatarUrl
-    }
-
-    class SetPasswordRequest {
-        +String token
-        +String password
-    }
-
-    class SetPasswordResponse {
-        +Boolean success
-        +Int bonusPoints
-    }
-
-    %% LoginResponse 扩展字段
-    class LoginResponse {
-        +Boolean success
-        +String token
-        +String refreshToken
-        +UserInfo user
-        +List~Int~ unlocked_levels
-        +List~UserItem~ items
-        +Boolean today_signed
-        +Int sign_streak
-        +Boolean has_password
-    }
-
-    class UserInfo {
-        +String id
-        +String phone
-        +String username
-        +String avatar
-        +Int points
-    }
-
-    %% ── Android 基础设施 ──
-    class RefreshTokenProvider {
-        +ApiService apiService$ @Volatile
-        <<object>>
-    }
-
-    class CryptoUtil {
-        +String encrypt(String plaintext, String key)$
-        +String decrypt(String ciphertext, String key)$
-        <<object>>
-    }
-
-    class AppConfig {
-        +String AES_KEY$
-        +String BASE_URL$
-        +String WS_URL$
-        <<object>>
-    }
-
-    class EncryptionInterceptor {
-        -String aesKey
-        -Boolean isDebug
-        +Response intercept(Chain chain)
-    }
-
-    %% ── 服务端类型 ──
-    class Env {
-        +D1Database DB
-        +KVNamespace SHEEPS_CACHE
-        +String AES_KEY
-    }
-
-    class CryptoHelpers {
-        +Promise~String~ hashPassword(String password)$
-        +Promise~Boolean~ verifyPassword(String password, String hash)$
-        +Promise~String~ aesEncrypt(String plaintext, String key)$
-        +Promise~String~ aesDecrypt(String ciphertext, String key)$
-    }
-
-    %% ── 服务端中间件 ──
-    class EncryptionMiddleware {
-        +MiddlewareHandler decryptBody()
-        +MiddlewareHandler encryptResponse()
-    }
-
-    %% ── 服务端 Handler ──
-    class AuthHandler {
-        +handleRegisterPassword(Request, Env) Promise~Response~
-        +handleLoginPassword(Request, Env) Promise~Response~
-        +handleResetPassword(Request, Env) Promise~Response~
-        +handleCheckPassword(Request, Env) Promise~Response~
-    }
-
-    class UserHandler {
-        +handleRename(Request, Env) Promise~Response~
-        +handleAvatarUpload(Request, Env) Promise~Response~
-    }
-
-    class GameHandler {
-        +handleScoreSubmit(Request, Env) Promise~Response~
-        +handleSignToday(Request, Env) Promise~Response~
-    }
-
-    %% 关系
-    RefreshTokenProvider --> ApiService : 持有静态引用
-    CryptoUtil ..> AppConfig : 读取 AES_KEY
-    LoginResponse --> UserInfo : 包含
-    EncryptionMiddleware ..> CryptoHelpers : 调用
-    EncryptionInterceptor ..> CryptoUtil : 调用
-    NetworkModule --> EncryptionInterceptor : 创建并注册
-    NetworkModule --> RefreshTokenProvider : 注入引用
-    AuthHandler ..> CryptoHelpers : 密码哈希
-    AppConfig ..> EncryptionInterceptor : 提供 AES_KEY
+    User "1" --> "0..*" AdminAuditLog : 操作人
+    AdminApiHandler ..> AdminAuthService : 三级鉴权+角色守卫
+    AdminApiHandler ..> AdminAuditLog : 落审计(只读表)
+    AdminApiHandler ..> User : 读写
+    AdminAuthService ..> JwtUtil : 签发/校验(携带 role)
+    AdminApiClient ..> AdminApiHandler : HTTP /api/admin/*
+    AuthStore ..> AdminApiClient : 登录/刷新

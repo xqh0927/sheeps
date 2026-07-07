@@ -256,9 +256,10 @@ class GameViewModel @Inject constructor(
 
                 updateBoardState(finalTiles, carryMap, false)
             } catch (e: Exception) {
-                // 离线回退：使用与在线相同的种子保持一致性
+                // 离线回退：使用当前真实用户ID和随机种子保持一致性
+                val numericUserId = prefs.getUserId().toIntOrNull() ?: 0
                 val finalTiles =
-                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis()))
+                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis(), numericUserId))
                 updateBoardState(finalTiles, carryMap, true)
             }
         }

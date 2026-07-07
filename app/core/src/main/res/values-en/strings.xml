@@ -376,6 +376,7 @@
     <string name="toast_phone_code_invalid">Please enter a valid phone number and 6-digit code</string>
     <string name="toast_login_verification_failed">Login verification failed</string>
     <string name="toast_code_invalid_or_expired">Verification code incorrect or expired</string>
+    <string name="toast_session_expired">Session expired, please login again</string>
     <string name="toast_conflict_resolved_local">Local progress retained and synced to cloud!</string>
     <string name="toast_conflict_resolved_cloud">Cloud save progress loaded successfully!</string>
     <string name="toast_conflict_resolve_error">Archive conflict resolution error, please check network</string>

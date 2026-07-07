@@ -176,7 +176,7 @@ class DuelCommandHandler @Inject constructor() {
                 val types = boardNormalTiles.map { it.type }.shuffled()
                 var typeIdx = 0
                 val newBoard = state.boardTiles.map { tile ->
-                    if (tile.state == TileState.NORMAL || it.state == TileState.BLOCKED) {
+                    if (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) {
                         tile.copy(type = types[typeIdx++])
                     } else tile
                 }

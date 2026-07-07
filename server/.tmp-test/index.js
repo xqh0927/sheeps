@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseAppUpdate = exports.clearApkCache = exports.checkApkExists = exports.mapGitHubReleaseToUpdate = exports.isForceUpdateRelease = exports.findApkAsset = exports.parseReleaseVersionCode = void 0;
 const helpers_1 = require("./helpers");
+const crypto_1 = require("./crypto");
 const websocket_1 = require("./websocket");
 const auth_1 = require("./handlers/auth");
 const match_1 = require("./handlers/match");
@@ -10,7 +11,9 @@ const shop_1 = require("./handlers/shop");
 const task_1 = require("./handlers/task");
 const game_1 = require("./handlers/game");
 const system_1 = require("./handlers/system");
+const admin_1 = require("./handlers/admin");
 const middleware_1 = require("./middleware");
+const legal_docs_1 = require("./legal-docs");
 var update_1 = require("./update");
 Object.defineProperty(exports, "parseReleaseVersionCode", { enumerable: true, get: function () { return update_1.parseReleaseVersionCode; } });
 Object.defineProperty(exports, "findApkAsset", { enumerable: true, get: function () { return update_1.findApkAsset; } });
@@ -49,6 +52,41 @@ async function migrateSchema(env) {
         await env.DB.prepare('ALTER TABLE users ADD COLUMN avatar_url TEXT').run();
     }
     catch (_) { /* 列已存在，忽略 */ }
+    // 管理后台：三级角色模型（取代 is_admin 二值）+ 封禁标记
+    try {
+        await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'readonly'").run();
+    }
+    catch (_) { /* 列已存在，忽略 */ }
+    try {
+        await env.DB.prepare('ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0').run();
+    }
+    catch (_) { /* 列已存在，忽略 */ }
+    // 管理后台：审计日志表（不可改/删，仅由后台写接口 INSERT）
+    try {
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS admin_audit_log (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      admin_id        TEXT    NOT NULL,
+      admin_phone     TEXT    NOT NULL,
+      admin_role      TEXT    NOT NULL,
+      action          TEXT    NOT NULL,
+      target_type     TEXT,
+      target_id       TEXT,
+      before_snapshot TEXT,
+      after_snapshot  TEXT,
+      source_ip       TEXT,
+      user_agent      TEXT,
+      created_at      INTEGER NOT NULL
+    )`).run();
+    }
+    catch (_) { /* 表已存在，忽略 */ }
+    try {
+        await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_audit_log(admin_id)').run();
+    }
+    catch (_) { /* 索引已存在，忽略 */ }
+    try {
+        await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_log(created_at)').run();
+    }
+    catch (_) { /* 索引已存在，忽略 */ }
     schemaMigrated = true;
 }
 /**
@@ -56,8 +94,10 @@ async function migrateSchema(env) {
  */
 exports.default = {
     async fetch(request, env) {
-        const corsHeaders = (0, helpers_1.getCorsHeaders)();
-        // 0. 执行 D1 Schema 自动迁移（首次请求时触发）
+        // 0. 注入生产密钥（Worker Secrets）；开发环境保留 fallback 常量
+        (0, crypto_1.configureSecrets)(env);
+        const corsHeaders = (0, helpers_1.getCorsHeaders)(env);
+        // 1. 执行 D1 Schema 自动迁移（首次请求时触发）
         await migrateSchema(env);
         // 1. 处理 OPTIONS 预检请求以允许跨域
         if (request.method === 'OPTIONS') {
@@ -66,6 +106,25 @@ exports.default = {
         const url = new URL(request.url);
         const path = url.pathname;
         const lang = (0, helpers_1.getLangSuffix)(request);
+        // 1.2 处理静态法律文件路由
+        if (request.method === 'GET') {
+            if (path === '/privacy.html' || path === '/api/legal/privacy') {
+                return new Response(legal_docs_1.privacyHtml, {
+                    headers: {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        'Access-Control-Allow-Origin': '*'
+                    }
+                });
+            }
+            if (path === '/agreement.html' || path === '/api/legal/agreement') {
+                return new Response(legal_docs_1.agreementHtml, {
+                    headers: {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        'Access-Control-Allow-Origin': '*'
+                    }
+                });
+            }
+        }
         /**
          * 2. WebSocket 联机对决协议升级路由
          *
@@ -151,14 +210,21 @@ exports.default = {
             else if (path.startsWith('/api/task')) {
                 response = await (0, task_1.handleTaskRoutes)(decryptedRequest, env, path, lang);
                 /**
+                 * 管理后台模块 — 覆盖接口（见 handlers/admin.ts）：
+                 *   POST /api/admin/login — 管理员登录（无鉴权）
+                 *   POST /api/admin/refresh — 刷新访问令牌（无鉴权）
+                 *   GET/POST/PUT/DELETE /api/admin/* — 其余后台接口（先过 requireAdmin 三级校验）
+                 */
+            }
+            else if (path.startsWith('/api/admin')) {
+                response = await (0, admin_1.handleAdminRoutes)(decryptedRequest, env, path, url);
+                /**
                  * 系统模块 — 覆盖接口:
                  *   GET  /api/notice/list — 公告列表
-                 *   GET  /api/admin/config — 获取管理员配置
-                 *   POST /api/admin/config — 修改管理员配置
                  *   GET  /api/app/check-update — App版本更新检测
                  */
             }
-            else if (path.startsWith('/api/admin') || path.startsWith('/api/app') || path.startsWith('/api/notice')) {
+            else if (path.startsWith('/api/app') || path.startsWith('/api/notice')) {
                 response = await (0, system_1.handleSystemRoutes)(decryptedRequest, env, path, lang, url);
                 /**
                  * 游戏模块 — 覆盖接口:
@@ -175,6 +241,27 @@ exports.default = {
             }
             // 如果对应的业务路由匹配并成功响应则直接返回；否则抛出 404 Not Found
             let finalResponse = response || new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: corsHeaders });
+            // JSON 错误国际化翻译
+            if (finalResponse.headers.get('Content-Type')?.includes('application/json')) {
+                try {
+                    const responseClone = finalResponse.clone();
+                    const jsonBody = await responseClone.json();
+                    if (jsonBody && typeof jsonBody === 'object' && jsonBody.error) {
+                        const originalError = jsonBody.error;
+                        const translatedError = (0, helpers_1.translateErrorMessage)(originalError, lang);
+                        if (translatedError !== originalError) {
+                            jsonBody.error = translatedError;
+                            finalResponse = new Response(JSON.stringify(jsonBody), {
+                                status: finalResponse.status,
+                                headers: finalResponse.headers
+                            });
+                        }
+                    }
+                }
+                catch (_) {
+                    // 忽略解析错误
+                }
+            }
             // 5. 加密中间件：若原始请求是加密的，则加密响应体
             if (wasEncrypted) {
                 finalResponse = await (0, middleware_1.encryptResponse)(finalResponse);

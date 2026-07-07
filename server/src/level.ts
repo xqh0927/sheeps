@@ -141,9 +141,11 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
 
     for (let z = 0; z < layersCount; z++) {
       const size = Math.max(3, baseSize - Math.floor(z / 3));
+      const colSize = Math.min(6, size);
+      const rowSize = Math.min(7, size);
       const offset = z % 2 === 0 ? 0 : 0.5;
-      for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
+      for (let r = 0; r < rowSize; r++) {
+        for (let c = 0; c < colSize; c++) {
           // 第 1 关正方形 fallback，其余关卡用 shapeType 选择 18 种形状之一
           possible.push({ x: c + offset + 1.0, y: r + offset + 1.0, z });
         }

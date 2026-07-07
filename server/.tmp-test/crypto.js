@@ -1,16 +1,41 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.configureSecrets = configureSecrets;
 exports.generateJWT = generateJWT;
 exports.verifyJWT = verifyJWT;
 exports.sha256 = sha256;
 exports.decryptAES = decryptAES;
 exports.encryptAES = encryptAES;
-/** * 服务器间共享的 JWT 密钥
- * 注意：生产环境中建议将其移入环境机密变量 (Worker Secrets) 中
+/**
+ * 服务器间共享的 JWT 密钥
+ * 开发环境使用内置 fallback；生产环境由 Worker Secrets 经 configureSecrets 注入。
  */
-const JWT_SECRET = 'antigravity_secret_key';
-/** Worker 实例级缓存的 CryptoKey，避免每次 JWT 操作都重新 importKey（省 30-40% CPU） */
+let JWT_SECRET = 'antigravity_secret_key';
+/**
+ * 共享的 AES-256 密钥（HEX 编码）
+ * 开发环境使用内置 fallback；生产环境由 Worker Secrets 经 configureSecrets 注入。
+ */
+let AES_KEY_HEX = 'a1b2c3d4e5f6a7b8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2';
+/** Worker 实例级缓存的 HMAC CryptoKey，避免每次 JWT 操作都重新 importKey（省 30-40% CPU） */
 let cachedKey = null;
+/** Worker 实例级缓存的 AES CryptoKey，避免每次加解密都 importKey */
+let cachedAesKey = null;
+/**
+ * 注入生产环境密钥（Worker Secrets）。
+ * 在 index.ts 的 fetch 入口调用一次；保留 dev fallback 常量以便本地 `wrangler dev`。
+ *
+ * @param env Worker 环境变量（含可选的 JWT_SECRET / AES_KEY_HEX）
+ */
+function configureSecrets(env) {
+    if (env && env.JWT_SECRET) {
+        JWT_SECRET = env.JWT_SECRET;
+        cachedKey = null; // 密钥变更，强制下次重新 importKey
+    }
+    if (env && env.AES_KEY_HEX) {
+        AES_KEY_HEX = env.AES_KEY_HEX;
+        cachedAesKey = null;
+    }
+}
 async function getKey() {
     if (!cachedKey) {
         cachedKey = await crypto.subtle.importKey('raw', new TextEncoder().encode(JWT_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -19,7 +44,9 @@ async function getKey() {
 }
 /**
  * 签发 JWT (JSON Web Token)
- * @param payload 需要签名的数据负载 (如 userId, phone)
+ * 透传任意 payload 字段（含 userId/phone/role/type/exp），仅做 HMAC-SHA256 签名。
+ *
+ * @param payload 需要签名的数据负载
  * @returns 签名后的 Base64 字符串 (Header.Payload.Signature)
  */
 async function generateJWT(payload) {
@@ -37,7 +64,7 @@ async function generateJWT(payload) {
 /**
  * 验证并解析 JWT
  * @param token 客户端传来的 JWT 字符串
- * @returns 验证成功返回 Payload 对象，失败或过期返回 null
+ * @returns 验证成功返回 Payload 对象（含任意透传字段），失败或过期返回 null
  */
 async function verifyJWT(token) {
     const parts = token.split('.');
@@ -65,7 +92,7 @@ async function verifyJWT(token) {
     }
 }
 /**
- * 简单的 SHA-256 哈希计算，用于防作弊签名校验
+ * 简单的 SHA-256 哈希计算，用于关卡 layout_data 摘要等
  */
 async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);
@@ -75,13 +102,6 @@ async function sha256(message) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 // ====================== AES-256-GCM 加解密模块 ======================
-/**
- * 共享的 AES-256 密钥（HEX 编码）
- * 生产环境中建议迁移至 Cloudflare Worker Secrets (wrangler secret)
- */
-const AES_KEY_HEX = "a1b2c3d4e5f6a7b8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2";
-/** Worker 实例级缓存的 AES CryptoKey，避免每次加解密都 importKey */
-let cachedAesKey = null;
 /**
  * 将 HEX 字符串转换为 Uint8Array
  * @param hex HEX 编码的字符串

@@ -152,6 +152,17 @@ class MenuActivity : BaseActivity() {
                         }
                     }
 
+                    // --- 监听 Token 失效登录态事件 ---
+                    LaunchedEffect(Unit) {
+                        com.example.sheeps.core.utils.AuthEventBus.events.collect { event ->
+                            if (event is com.example.sheeps.core.utils.AuthEvent.Logout) {
+                                Toaster.show(localizedContext.getString(R.string.toast_session_expired))
+                                TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                finish()
+                            }
+                        }
+                    }
+
                     // --- 监听 ViewModel 副作用 ---
                     LaunchedEffect(Unit) {
                         viewModel.viewEffect.collect { effect ->
