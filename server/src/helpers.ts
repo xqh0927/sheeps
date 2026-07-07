@@ -373,11 +373,3 @@ export async function getCachedConfig(env: Env, key: string, defaultValue: strin
   env.SHEEPS_CACHE.put(cacheKey, value, { expirationTtl: 600 }).catch(() => {});
   return value;
 }
-
-/**
- * 错误信息国际化翻译（占位实现，后续扩展多语言映射）
- */
-export function translateErrorMessage(error: string, lang: string): string {
-  // TODO: 后续实现多语言错误信息映射表
-  return error;
-}
