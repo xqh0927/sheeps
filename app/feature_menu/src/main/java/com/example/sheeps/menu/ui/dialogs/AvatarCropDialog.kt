@@ -23,11 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.canhub.cropper.CropImageView
+import com.example.sheeps.core.R
 
 /**
  * 全屏头像裁剪弹窗
@@ -60,7 +62,7 @@ fun AvatarCropDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onDismiss) {
-                    Text("取消", color = Color.White, fontSize = 16.sp)
+                    Text(stringResource(R.string.btn_cancel), color = Color.White, fontSize = 16.sp)
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Button(
@@ -75,7 +77,7 @@ fun AvatarCropDialog(
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("确定", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.btn_confirm), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
 

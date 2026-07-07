@@ -359,6 +359,15 @@
     <string name="toast_task_claim_failed">Failed to claim reward</string>
     <string name="toast_task_claim_offline">Offline: points added locally, will sync later</string>
     <string name="toast_unlock_failed_insufficient">Unlock failed, insufficient points</string>
+
+    <string name="game_clear_time">Time %1$s</string>
+    <string name="carry_dialog_title">Choose Items (Retry Level)</string>
+    <string name="carry_dialog_desc">Select items to bring into this level. Tapping confirm will deduct from your backpack.</string>
+    <string name="carry_stock_label">Stock: %1$d</string>
+    <string name="leaderboard_rules_title">Scoring Rules</string>
+    <string name="leaderboard_rules_text">• Base Score = 1000 - Clear Time(s) × 2 - Items Used × 50\n• Minimum 100 points guaranteed\n• Final Score = Base Score × Difficulty Multiplier × Double (if active)\n• Rankings by highest score per level; ties broken by clear time</string>
+    <string name="leaderboard_rules_icon_desc">Scoring Rules</string>
+    <string name="game_restart_desc">Restart</string>
     <string name="toast_unlock_success_level">Points deducted! Level %1$d unlocked</string>
     <string name="toast_unlock_failed_cloud">Unlock failed, cloud sync rejected</string>
     <string name="toast_unlock_offline">Offline: unlocked locally, will sync when reconnected</string>

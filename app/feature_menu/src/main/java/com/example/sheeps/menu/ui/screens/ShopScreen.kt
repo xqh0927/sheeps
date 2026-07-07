@@ -308,7 +308,7 @@ fun ShopScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Lock,
-                            contentDescription = "锁定",
+                            contentDescription = stringResource(id = R.string.cd_locked),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(48.dp)
                         )

@@ -14,6 +14,7 @@ import com.example.sheeps.data.model.ResetPasswordRequest
 import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.ui.screens.ResetPasswordScreen
+import com.example.sheeps.core.R
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
@@ -62,19 +63,19 @@ class ResetPasswordActivity : BaseActivity() {
 
     private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
         if (phone.length != 11) {
-            Toaster.show("请输入正确的11位手机号")
+            Toaster.show(getString(R.string.err_invalid_phone))
             return
         }
         scope.launch {
             try {
                 val response = apiService.sendCode(SendCodeRequest(phone))
                 if (response.success) {
-                    Toaster.show("验证码已发送！测试码为：${response.code}")
+                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
                 } else {
-                    Toaster.show("验证码发送失败")
+                    Toaster.show(getString(R.string.toast_send_code_failed))
                 }
             } catch (e: Exception) {
-                Toaster.show("网络错误，发送失败")
+                Toaster.show(getString(R.string.toast_send_code_network_error))
             }
         }
     }
@@ -93,18 +94,18 @@ class ResetPasswordActivity : BaseActivity() {
                     ResetPasswordRequest(phone, code, newPassword)
                 )
                 if (response.success) {
-                    Toaster.show("密码重置成功")
+                    Toaster.show(getString(R.string.toast_reset_password_success))
                     finish()
                 } else {
                     setLoading(false)
-                    Toaster.show("密码重置失败")
+                    Toaster.show(getString(R.string.toast_reset_password_failed))
                 }
             } catch (e: HttpException) {
                 setLoading(false)
-                Toaster.show(parseAuthError(e, "密码重置失败，请稍后重试"))
+                Toaster.show(parseAuthError(e, getString(R.string.toast_reset_password_failed_retry)))
             } catch (e: Exception) {
                 setLoading(false)
-                Toaster.show("网络连接异常，请稍后重试")
+                Toaster.show(getString(R.string.toast_network_error_retry))
             }
         }
     }

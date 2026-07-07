@@ -79,7 +79,7 @@ fun RegisterScreen(
 
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "注册账号", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.register_title), onBack = onBack)
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {

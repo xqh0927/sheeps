@@ -30,8 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 import com.example.sheeps.ui.components.SheepsLoading
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import kotlinx.coroutines.delay
@@ -69,7 +71,7 @@ fun ResetPasswordScreen(
 
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "找回密码", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.reset_password_title), onBack = onBack)
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -88,7 +90,7 @@ fun ResetPasswordScreen(
                     OutlinedTextField(
                         value = phone,
                         onValueChange = { phone = it; errorMsg = null },
-                        label = { Text("手机号") },
+                        label = { Text(stringResource(R.string.label_phone)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -100,7 +102,7 @@ fun ResetPasswordScreen(
                         OutlinedTextField(
                             value = code,
                             onValueChange = { code = it },
-                            label = { Text("验证码") },
+                            label = { Text(stringResource(R.string.label_code)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -111,7 +113,7 @@ fun ResetPasswordScreen(
                                     onSendCode(phone)
                                     countdown = 60
                                 } else {
-                                    errorMsg = "请输入正确的手机号"
+                                    errorMsg = stringResource(R.string.err_invalid_phone)
                                 }
                             },
                             enabled = countdown == 0,
@@ -120,7 +122,7 @@ fun ResetPasswordScreen(
                             modifier = Modifier.height(48.dp)
                         ) {
                             Text(
-                                text = if (countdown > 0) "${countdown}s" else "获取",
+                                text = if (countdown > 0) "${countdown}s" else stringResource(R.string.btn_get_code),
                                 color = Color.White
                             )
                         }
@@ -129,7 +131,7 @@ fun ResetPasswordScreen(
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it; errorMsg = null },
-                        label = { Text("新密码") },
+                        label = { Text(stringResource(R.string.label_new_password)) },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth()
@@ -151,12 +153,12 @@ fun ResetPasswordScreen(
                         onClick = {
                             when {
                                 newPassword.length < 6 || newPassword.length > 20 -> errorMsg =
-                                    "密码长度需在6-20位之间"
+                                    stringResource(R.string.pwd_err_length)
 
                                 !newPassword.any { it.isDigit() } || !newPassword.any { it.isLetter() } -> errorMsg =
-                                    "密码需同时包含字母和数字"
+                                    stringResource(R.string.pwd_err_alphanumeric)
 
-                                code.length != 6 -> errorMsg = "请输入6位验证码"
+                                code.length != 6 -> errorMsg = stringResource(R.string.pwd_err_code_length)
                                 else -> {
                                     onReset(phone, code, newPassword)
                                     onResetSuccess()
@@ -168,7 +170,7 @@ fun ResetPasswordScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("确认", color = Color.White)
+                        Text(stringResource(R.string.btn_confirm), color = Color.White)
                     }
 
                 }

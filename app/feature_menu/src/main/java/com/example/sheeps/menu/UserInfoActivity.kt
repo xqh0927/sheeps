@@ -21,6 +21,7 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarCropDialog
 import com.example.sheeps.menu.ui.screens.UserInfoScreen
+import com.example.sheeps.core.R
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
@@ -114,13 +115,13 @@ class UserInfoActivity : BaseActivity() {
                                         }
                                     } else {
                                         withContext(Dispatchers.Main) {
-                                            Toaster.show("图片处理失败")
+                                            Toaster.show(context.getString(R.string.toast_image_process_failed))
                                         }
                                     }
                                     tmpFile.delete()
                                 } catch (e: Exception) {
                                     withContext(Dispatchers.Main) {
-                                        Toaster.show("图片处理失败")
+                                        Toaster.show(context.getString(R.string.toast_image_process_failed))
                                     }
                                 }
                             }
@@ -138,19 +139,19 @@ class UserInfoActivity : BaseActivity() {
 
     private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
         if (phone.length != 11) {
-            Toaster.show("请输入正确的11位手机号")
+            Toaster.show(context.getString(R.string.err_invalid_phone))
             return
         }
         scope.launch {
             try {
                 val response = apiService.sendCode(SendCodeRequest(phone))
                 if (response.success) {
-                    Toaster.show("验证码已发送！测试码为：${response.code}")
+                    Toaster.show(context.getString(R.string.toast_send_code_success, response.code))
                 } else {
-                    Toaster.show("验证码发送失败")
+                    Toaster.show(context.getString(R.string.toast_send_code_failed))
                 }
             } catch (e: Exception) {
-                Toaster.show("网络错误，发送失败")
+                Toaster.show(context.getString(R.string.toast_send_code_network_error))
             }
         }
     }
@@ -173,9 +174,9 @@ class UserInfoActivity : BaseActivity() {
                 val url = uploadResponse.avatarUrl ?: ""
                 prefs.setAvatarUrl(url)
                 onSuccess(url)
-                Toaster.show("头像更新成功！")
+                Toaster.show(context.getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show("头像上传失败")
+                Toaster.show(context.getString(R.string.toast_avatar_upload_failed))
             }
         }
     }
@@ -204,9 +205,9 @@ class UserInfoActivity : BaseActivity() {
                     )
                 )
                 onSuccess(nickname)
-                Toaster.show("昵称修改成功！")
+                Toaster.show(context.getString(R.string.toast_nickname_update_success))
             } catch (e: Exception) {
-                Toaster.show("昵称修改失败")
+                Toaster.show(context.getString(R.string.toast_nickname_update_failed))
             } finally {
                 setLoading(false)
             }
@@ -229,16 +230,16 @@ class UserInfoActivity : BaseActivity() {
                 if (response.success) {
                     // 清空本地登录态
                     prefs.logout()
-                    Toaster.show("密码修改成功，请重新登录")
+                    Toaster.show(context.getString(R.string.toast_password_change_success))
                     // 跳转到登录页
                     com.therouter.TheRouter.build("/auth/login").navigation(this@UserInfoActivity)
                     finish()
                 } else {
-                    Toaster.show("密码修改失败")
+                    Toaster.show(context.getString(R.string.toast_password_change_failed))
                     setLoading(false)
                 }
             } catch (e: Exception) {
-                Toaster.show("密码修改失败")
+                Toaster.show(context.getString(R.string.toast_password_change_failed))
                 setLoading(false)
             }
         }

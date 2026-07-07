@@ -17,10 +17,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.sheeps.core.R
 
 /**
  * 统一的二级界面顶部导航栏，高度 44dp（比默认 64dp 低 20dp）。
@@ -58,7 +60,7 @@ fun SheepsTopAppBar(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.btn_back),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }

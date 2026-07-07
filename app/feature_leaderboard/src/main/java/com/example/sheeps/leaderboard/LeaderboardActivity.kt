@@ -133,18 +133,15 @@ class LeaderboardActivity : BaseActivity() {
                         if (showRulesDialog) {
                             AlertDialog(
                                 onDismissRequest = { showRulesDialog = false },
-                                title = { Text("积分计算规则") },
+                                title = { Text(stringResource(id = R.string.leaderboard_rules_title)) },
                                 text = {
                                     Text(
-                                        "• 基础分 = 1000 - 通关用时(秒) × 2 - 使用道具数 × 50\n" +
-                                        "• 最低保底 100 分\n" +
-                                        "• 最终积分 = 基础分 × 关卡难度系数 × 双倍(如有)\n" +
-                                        "• 各关卡按最高分排名，相同分数时用时短者优先"
+                                        stringResource(id = R.string.leaderboard_rules_text)
                                     )
                                 },
                                 confirmButton = {
                                     androidx.compose.material3.TextButton(onClick = { showRulesDialog = false }) {
-                                        Text("知道了")
+                                        Text(stringResource(id = R.string.daily_popup_btn))
                                     }
                                 }
                             )
@@ -271,7 +268,7 @@ fun LeaderboardTabs(
         ) {
             Icon(
                 Icons.Default.Info,
-                contentDescription = "积分规则",
+                contentDescription = stringResource(id = R.string.leaderboard_rules_icon_desc),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )

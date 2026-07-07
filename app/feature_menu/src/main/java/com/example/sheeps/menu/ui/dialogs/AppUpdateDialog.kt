@@ -207,10 +207,14 @@ fun AppUpdateDialog(
                         // 进度文字
                         Text(
                             text = when (downloadState.status) {
-                                UpdateStatus.Downloading -> "下载中 ${downloadState.progress}%"
-                                UpdateStatus.Completed -> "下载完成，准备安装..."
-                                UpdateStatus.NeedPermission -> "请授权\"允许安装未知应用\"后点击安装"
-                                UpdateStatus.Error -> downloadState.error ?: "下载失败"
+                                UpdateStatus.Downloading ->
+                                    stringResource(id = R.string.update_downloading, downloadState.progress)
+                                UpdateStatus.Completed ->
+                                    stringResource(id = R.string.update_completed)
+                                UpdateStatus.NeedPermission ->
+                                    stringResource(id = R.string.update_need_permission)
+                                UpdateStatus.Error ->
+                                    downloadState.error ?: stringResource(id = R.string.update_download_failed)
                                 else -> ""
                             },
                             fontSize = 13.sp,
@@ -232,7 +236,7 @@ fun AppUpdateDialog(
                                         updateInfo.apk_url ?: ""
                                     )
                                 }) {
-                                    Text("重新下载", color = MaterialTheme.colorScheme.primary)
+                                    Text(stringResource(id = R.string.update_retry_download), color = MaterialTheme.colorScheme.primary)
                                 }
                             }
 
@@ -246,7 +250,7 @@ fun AppUpdateDialog(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        "安装更新",
+                                        stringResource(id = R.string.update_install),
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -323,7 +327,7 @@ fun AppUpdateDialog(
                                     stringResource(id = R.string.update_install_success)
 
                                 downloadState.status == UpdateStatus.NeedPermission ->
-                                    "授权后安装"
+                                    stringResource(id = R.string.update_install_after_auth)
 
                                 else -> stringResource(id = R.string.update_btn_now)
                             },
@@ -337,7 +341,7 @@ fun AppUpdateDialog(
                 if (updateInfo.force_update && downloadState.status == UpdateStatus.Downloading) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "下载更新中，请勿退出",
+                        text = stringResource(id = R.string.update_downloading_hint),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )

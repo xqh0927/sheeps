@@ -166,7 +166,10 @@ private fun WonContent(
             val minutes = (state.elapsedMs / 60000).toInt()
             val seconds = ((state.elapsedMs % 60000) / 1000).toInt()
             Text(
-                text = "用时 ${String.format("%02d:%02d", minutes, seconds)}",
+                text = stringResource(
+                    id = R.string.game_clear_time,
+                    String.format("%02d:%02d", minutes, seconds)
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

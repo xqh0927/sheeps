@@ -20,19 +20,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.ImageCompressor
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarPickerDialog
 import com.example.sheeps.menu.ui.dialogs.ProfileChangePasswordDialog
 import com.hjq.toast.Toaster
-import androidx.compose.ui.res.stringResource
-import com.example.sheeps.core.R
 
 /**
  * 个人资料编辑页
@@ -72,9 +72,9 @@ fun ProfileScreen(
                 val base64 = ImageCompressor.compressImage(context, it)
                 avatarBase64 = base64
                 onUploadAvatar(base64)
-                Toaster.show("头像上传成功")
+                Toaster.show(context.getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show("头像处理失败：${e.message}")
+                Toaster.show(context.getString(R.string.toast_avatar_process_failed, e.message))
             }
         }
     }
@@ -94,9 +94,9 @@ fun ProfileScreen(
                 avatarBase64 = base64
                 onUploadAvatar(base64)
                 tempFile.delete()
-                Toaster.show("头像上传成功")
+                Toaster.show(context.getString(R.string.toast_avatar_update_success))
             } catch (e: Exception) {
-                Toaster.show("头像处理失败：${e.message}")
+                Toaster.show(context.getString(R.string.toast_avatar_process_failed, e.message))
             }
         }
     }
@@ -123,14 +123,14 @@ fun ProfileScreen(
             onSendCode = { /* 复用现有验证码发送逻辑 */ },
             onChangePassword = { _, _, _ ->
                 showChangePwdDialog = false
-                Toaster.show("密码修改功能暂未开放，请使用找回密码")
+                Toaster.show(context.getString(R.string.toast_password_feature_locked))
             }
         )
     }
 
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "个人资料", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.profile_edit_title), onBack = onBack)
         }
     ) { paddingValues ->
         LazyColumn(
@@ -158,7 +158,7 @@ fun ProfileScreen(
                                 .data("data:image/jpeg;base64,$avatarBase64")
                                 .crossfade(true)
                                 .build(),
-                            contentDescription = "头像",
+                            contentDescription = stringResource(R.string.cd_avatar),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
@@ -166,7 +166,7 @@ fun ProfileScreen(
                         // 显示默认灰色占位
                         Icon(
                             imageVector = Icons.Default.CameraAlt,
-                            contentDescription = "上传头像",
+                            contentDescription = stringResource(R.string.cd_upload_avatar),
                             tint = Color.Gray,
                             modifier = Modifier.size(36.dp)
                         )

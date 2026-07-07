@@ -74,7 +74,7 @@ fun GameHeader(
             IconButton(onClick = onRestart) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "重玩",
+                    contentDescription = stringResource(id = R.string.game_restart_desc),
                     tint = Text_Secondary_Dark
                 )
             }

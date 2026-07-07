@@ -17,10 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.AnimatedCounter
@@ -109,7 +111,7 @@ fun UserMiniProfileHeader(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text       = if (state.isLoggedIn) state.username else "逑客云游",
+                    text       = if (state.isLoggedIn) state.username else stringResource(id = R.string.guest_name),
                     style      = MaterialTheme.typography.titleLarge,
                     fontFamily = FontFamily.Serif,
                     color      = Text_Primary_Dark
@@ -129,14 +131,14 @@ fun UserMiniProfileHeader(
                             style = MaterialTheme.typography.titleSmall.copy(color = MaterialTheme.colorScheme.secondary)
                         )
                         Text(
-                            text  = " 积分",
+                            text  = stringResource(id = R.string.unit_points),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
                         )
                     }
                 } else {
                     Text(
-                        text  = "登录同步存档 · 解锁演化关卡",
+                        text  = stringResource(id = R.string.login_sync_prompt),
                         style = MaterialTheme.typography.bodySmall,
                         color = Text_Secondary_Dark
                     )
@@ -145,7 +147,7 @@ fun UserMiniProfileHeader(
 
             if (!state.isLoggedIn) {
                 PrimaryButton(
-                    text     = "登录",
+                    text     = stringResource(id = R.string.btn_login),
                     onClick  = onLoginClick,
                     height   = 36.dp,
                     modifier = Modifier.widthIn(min = 64.dp)

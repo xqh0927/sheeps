@@ -20,6 +20,7 @@ import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.ui.screens.LoginScreen
+import com.example.sheeps.core.R
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.TheRouter
@@ -86,19 +87,19 @@ class LoginActivity : BaseActivity() {
 
     private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
         if (phone.length != 11) {
-            Toaster.show("请输入正确的11位手机号")
+            Toaster.show(getString(R.string.err_invalid_phone))
             return
         }
         scope.launch {
             try {
                 val response = apiService.sendCode(SendCodeRequest(phone))
                 if (response.success) {
-                    Toaster.show("验证码已发送！测试码为：${response.code}")
+                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
                 } else {
-                    Toaster.show("验证码发送失败")
+                    Toaster.show(getString(R.string.toast_send_code_failed))
                 }
             } catch (e: Exception) {
-                Toaster.show("网络错误，发送失败")
+                Toaster.show(getString(R.string.toast_send_code_network_error))
             }
         }
     }
@@ -110,7 +111,7 @@ class LoginActivity : BaseActivity() {
         setLoading: (Boolean) -> Unit
     ) {
         if (phone.length != 11 || code.length != 6) {
-            Toaster.show("请输入正确的手机号和6位验证码")
+            Toaster.show(getString(R.string.toast_phone_code_invalid))
             return
         }
         setLoading(true)
@@ -137,14 +138,14 @@ class LoginActivity : BaseActivity() {
                     }
                 } else {
                     setLoading(false)
-                    Toaster.show("登录验证失败")
+                    Toaster.show(getString(R.string.toast_login_verification_failed))
                 }
             } catch (e: HttpException) {
                 setLoading(false)
-                Toaster.show(parseAuthError(e, "验证码错误或已失效"))
+                Toaster.show(parseAuthError(e, getString(R.string.toast_code_invalid_or_expired)))
             } catch (e: Exception) {
                 setLoading(false)
-                Toaster.show("验证码错误或已失效")
+                Toaster.show(getString(R.string.toast_code_invalid_or_expired))
             }
         }
     }
@@ -163,14 +164,14 @@ class LoginActivity : BaseActivity() {
                     saveLoginData(response, scope)
                 } else {
                     setLoading(false)
-                    Toaster.show("登录失败")
+                    Toaster.show(getString(R.string.toast_login_failed))
                 }
             } catch (e: HttpException) {
                 setLoading(false)
-                Toaster.show(parseAuthError(e, "登录失败，请稍后重试"))
+                Toaster.show(parseAuthError(e, getString(R.string.toast_login_failed_retry)))
             } catch (e: Exception) {
                 setLoading(false)
-                Toaster.show("网络连接异常，请稍后重试")
+                Toaster.show(getString(R.string.toast_network_error_retry))
             }
         }
     }
@@ -225,14 +226,14 @@ class LoginActivity : BaseActivity() {
                     )
                 })
 
-                Toaster.show("登录成功！")
+                Toaster.show(getString(R.string.toast_login_success))
                 // 验证码登录后若未设密码，通知 MenuActivity 弹出强制设密
                 if (!response.hasPassword) {
                     com.tencent.mmkv.MMKV.defaultMMKV().encode("need_set_password", true)
                 }
                 finish()
             } catch (e: Exception) {
-                Toaster.show("保存登录数据失败")
+                Toaster.show(getString(R.string.toast_save_login_data_failed))
             }
         }
     }

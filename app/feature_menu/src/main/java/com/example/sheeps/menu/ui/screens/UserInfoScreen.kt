@@ -17,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.ChangePasswordDialog
 import com.example.sheeps.menu.ui.dialogs.NicknameEditDialog
@@ -54,7 +56,7 @@ fun UserInfoScreen(
 
     Scaffold(
         topBar = {
-            SheepsTopAppBar(title = "个人信息", onBack = onBack)
+            SheepsTopAppBar(title = stringResource(R.string.profile_title), onBack = onBack)
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
@@ -105,14 +107,14 @@ fun UserInfoScreen(
                         if (state.avatarUrl.isNotBlank()) {
                             AsyncImage(
                                 model = state.avatarUrl,
-                                contentDescription = "头像",
+                                contentDescription = stringResource(R.string.cd_avatar),
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "上传头像",
+                                contentDescription = stringResource(R.string.cd_upload_avatar),
                                 tint = Color.Gray,
                                 modifier = Modifier.size(36.dp)
                             )
@@ -120,7 +122,7 @@ fun UserInfoScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "点击更换头像",
+                        stringResource(R.string.click_to_change_avatar),
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -138,12 +140,12 @@ fun UserInfoScreen(
                     ) {
                         Column {
                             Text(
-                                "昵称",
+                                stringResource(R.string.label_nickname),
                                 fontSize = 12.sp,
                                 color = Color.Gray
                             )
                             Text(
-                                state.username.ifBlank { "未设置" },
+                                state.username.ifBlank { stringResource(R.string.label_not_set) },
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -151,7 +153,7 @@ fun UserInfoScreen(
                         }
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "修改昵称",
+                            contentDescription = stringResource(R.string.cd_edit_nickname),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
@@ -164,7 +166,7 @@ fun UserInfoScreen(
                     OutlinedTextField(
                         value = state.phone,
                         onValueChange = {},
-                        label = { Text("手机号") },
+                        label = { Text(stringResource(R.string.label_phone)) },
                         readOnly = true,
                         enabled = false,
                         modifier = Modifier.fillMaxWidth()
@@ -181,7 +183,7 @@ fun UserInfoScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("修改密码", color = Color.White)
+                        Text(stringResource(R.string.dialog_title_change_password), color = Color.White)
                     }
                 }
             }

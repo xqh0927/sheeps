@@ -67,7 +67,7 @@ fun UserProfileCard(
                     if (state.avatarUrl.isNotBlank()) {
                         AsyncImage(
                             model = state.avatarUrl,
-                            contentDescription = "头像",
+                            contentDescription = stringResource(id = R.string.cd_avatar),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
@@ -98,7 +98,7 @@ fun UserProfileCard(
                 if (state.isLoggedIn) {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "查看个人信息",
+                        contentDescription = stringResource(id = R.string.cd_view_profile),
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                     )
                 }

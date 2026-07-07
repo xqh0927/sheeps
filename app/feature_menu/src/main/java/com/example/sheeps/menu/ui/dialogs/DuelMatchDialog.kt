@@ -170,7 +170,7 @@ fun DuelMatchDialog(
                 if (state.matchStatus == "matched" && state.matchedGameId != null) {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "对局号: ${state.matchedGameId.takeLast(10)}",
+                        text = stringResource(id = R.string.duel_match_id_label, state.matchedGameId.takeLast(10)),
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
