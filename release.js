@@ -18,6 +18,16 @@ const ADMIN_PHONE = process.env.ADMIN_PHONE || '13800000000';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 /**
+ * 判断错误是否属于「确定性 / 不可重试」错误。
+ * 这类错误（如主键/唯一约束冲突、已存在/已声明等）重试必然再次失败，
+ * 应直接终止以避免无意义的退避与重试。
+ */
+function isNonRetryable(err) {
+    const m = (err && err.message) || '';
+    return /UNIQUE constraint|SQLITE_CONSTRAINT|constraint failed|has already been declared|already exists/i.test(m);
+}
+
+/**
  * 带有指数退避的通用异步重试函数
  */
 async function withRetry(fn, retries = 3, delay = 2000, actionName = "任务") {
@@ -25,6 +35,10 @@ async function withRetry(fn, retries = 3, delay = 2000, actionName = "任务") {
         try {
             return await fn();
         } catch (err) {
+            // 确定性错误（如 D1 主键冲突）立即失败，不再重试，直接抛出根因
+            if (isNonRetryable(err)) {
+                throw new Error(`[${actionName}] 不可重试的错误，立即终止: ${err.message}`);
+            }
             console.warn(`⚠️ [${actionName}] 第 ${i}/${retries} 次失败: ${err.message || err}`);
             if (i === retries) {
                 throw new Error(`[${actionName}] 失败次数已达上限，终止执行！`);
@@ -159,7 +173,7 @@ function run() {
     const nextName = currentName.replace(/(\d+)(?=[^\d]*$)/, (m) => parseInt(m, 10) + 1);
 
     rl.question(`请输入新的 versionCode [回车默认: ${nextCode}]: `, (codeAns) => {
-        const newCode = codeAns.trim() ? parseInt(codeAns.trim(), 10) : nextCode;
+        let newCode = codeAns.trim() ? parseInt(codeAns.trim(), 10) : nextCode;
 
         rl.question(`请输入新的 versionName [回车默认: "${nextName}"]: `, (nameAns) => {
             const newName = nameAns.trim() ? nameAns.trim() : nextName;
@@ -242,6 +256,40 @@ function run() {
                         const apkUrl = `${R2_PUBLIC_BASE}/sheeps_${newName}.apk`;
                         const now = Date.now();
                         const escSql = (s) => s.replace(/'/g, "''");
+
+                        // ─── 发版前先查询 D1 当前最大 version_code（权威基准，避免盲插主键冲突） ───
+                        // 根因：原逻辑直接拿 newCode（= gradle versionCode+1 或交互输入）做 INSERT 主键，
+                        // 若 D1 已存在该值（调试写入 / 上次发版 D1 成功而后继步骤失败导致 gradle 回滚留孤儿记录）
+                        // 必触发 UNIQUE constraint failed: app_version.version_code。
+                        let dbMaxCode = 0;
+                        try {
+                            const maxOut = execSync(
+                                `npx wrangler d1 execute my-app-db --remote --command="SELECT MAX(version_code) AS m FROM app_version"`,
+                                { cwd: serverDir, stdio: 'pipe' }
+                            ).toString();
+                            // 输出可能是 JSON 形如 {"result":[{"results":[{"m":109}]}]} 或 "m": null，用正则稳健提取
+                            const m = maxOut.match(/"m"\s*:\s*(\d+)/);
+                            if (m) {
+                                dbMaxCode = parseInt(m[1], 10);
+                            } else if (/"m"\s*:\s*null/i.test(maxOut)) {
+                                dbMaxCode = 0; // 表为空，无记录
+                            } else {
+                                dbMaxCode = 0;
+                            }
+                        } catch (dbErr) {
+                            // 查询失败不中断发版，降级为以 gradle/newCode 为准，仅给出告警
+                            dbMaxCode = 0;
+                            console.warn(`   ⚠️ [容错] 查询 D1 当前最大 version_code 失败，将以 gradle 推断值继续: ${dbErr.message}`);
+                        }
+
+                        // 以 D1 真实最大值 +1 与 gradle 推断值取较大者，作为本次实际写入的 version_code
+                        const effectiveNewCode = Math.max(dbMaxCode + 1, newCode);
+                        if (effectiveNewCode !== newCode) {
+                            console.warn(`⚠️ D1 当前最大 version_code=${dbMaxCode}，为避免主键冲突，本次 version_code 将使用 ${effectiveNewCode}（gradle 推断值为 ${newCode}）`);
+                            console.warn(`   并已同步回写 gradle（第四步版本文件改写将使用 ${effectiveNewCode}）`);
+                        }
+                        // 统一后续 SQL 与第四步 gradle 改写实际使用的 code 为 effectiveNewCode
+                        newCode = effectiveNewCode;
 
                         // 仅写入 app_version 表；公告改由管理后台 API 写入，不再用 wrangler 写 notice 表
                         const sqlContent = [
