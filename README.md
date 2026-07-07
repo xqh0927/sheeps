@@ -82,6 +82,19 @@
   - WebCrypto `importKey` 从每次调用改为 Worker 实例级单例缓存，省 30-40% CPU；
   - 登录接口 3 次独立 D1 batch 合并为 1 次读 + 最多 1 次写。
 
+### 🖥️ 管理后台 (Admin Console)
+
+* **现代前端架构 (React + Vite + TypeScript)**：
+  - 基于 React 18 与 Vite 构建，采用响应式布局，完美适配桌面端和大屏设备。开发和生产构建极速响应。
+* **组件库与设计系统 (Material-UI - MUI)**：
+  - 使用 `@mui/material` 与 `@mui/icons-material` 构建视觉优雅、质感 premium 的管理界面。所有表格（CrudPage）、对话框（Dialog）、状态开关（Switch）均符合 Material Design 规范，并集成了平滑安全动画。
+* **极简状态管理 (Zustand)**：
+  - 选用轻量级状态管理库 `Zustand` 处理管理员的登录会话（Token）和操作角色权限。支持持久化同步（localStorage），避免页面刷新导致状态丢失。
+* **Axios 请求适配与安全性拦截**：
+  - 网络适配器基于 `Axios` 二次封装，集成了请求/响应拦截器。在每次请求中自动附加管理员身份 Bearer Token；响应拦截器检测到 HTTP 401 凭证过期时会自动清空本地 session 并优雅退回登录页面。
+* **用户背包资产（道具与皮肤）精细化控制**：
+  - 管理员可以通过背包弹窗一键对用户的 8 种游戏局内道具卡数量进行增减，或者使用 `Switch` 开关一键授予/回收用户的 5 种卡牌自绘皮肤。
+
 
 ---
 
@@ -122,6 +135,16 @@
 │   ├── feature_menu/           # 主菜单与商店 Module (签到、公告、任务、道具兑换)
 │   ├── build.gradle.kts        # 根构建文件
 │   └── gradlew.bat             # Gradle 包装脚本
+│
+├── admin-console/              # React 管理后台项目
+│   ├── src/
+│   │   ├── api/                # 后台 API 请求层 (Axios 封装与鉴权拦截)
+│   │   ├── components/         # 公共组件 (CrudPage 通用表格、Layout 导航、反馈提示)
+│   │   ├── pages/              # 业务页面 (用户、公告、任务、关卡、系统配置、审计日志)
+│   │   └── store/              # Zustand 状态管理 (管理员 Auth 会话)
+│   ├── .env                    # 本地调试配置 (指向 localhost API)
+│   ├── .env.production         # 线上生产配置 (指向 api.xqh.cc.cd API)
+│   └── package.json
 │
 ├── server/                     # 后端服务代码 (Cloudflare Worker)
 │   ├── src/
@@ -193,6 +216,32 @@
    ```bash
    adb install app/app/build/outputs/apk/debug/app-debug.apk
    ```
+
+### 4. 管理后台部署与运行 (React Admin Console)
+在 `admin-console` 目录下部署并运行管理后台：
+
+1. 安装依赖：
+   ```bash
+   cd admin-console
+   npm install
+   ```
+2. 环境配置：
+   - 本地调试：检查 `.env` 配置，指向本地服务接口（`VITE_API_BASE=http://127.0.0.1:8787`）。
+   - 生产环境：检查 `.env.production` 配置，指向您的 Cloudflare 自定义 API 域名（`VITE_API_BASE=https://api.xqh.cc.cd`）。
+3. 本地启动预览：
+   ```bash
+   npm run dev
+   ```
+   启动后打开浏览器访问 `http://localhost:5173/`。
+4. 部署至 Cloudflare Pages：
+   - 编译打包：
+     ```bash
+     npm run build
+     ```
+   - 部署至线上（指定分支 `main` 以进行生产级证书与域名绑定）：
+     ```bash
+     npx wrangler pages deploy dist --project-name=miadmin-console --branch=main
+     ```
 
 ---
 
