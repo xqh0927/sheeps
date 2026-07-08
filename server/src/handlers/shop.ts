@@ -31,7 +31,12 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
         // SQL 国际化回退机制：若传入的语言对应列不存在，回退至系统默认字段
         const nameCol = lang ? `COALESCE(name_${lang}, name)` : 'name';
         const descCol = lang ? `COALESCE(description_${lang}, description)` : 'description';
-        const items = await env.DB.prepare(`SELECT id, ${nameCol} as name, ${descCol} as description, image_url, item_type, points_price, stock FROM shop_items`).all();
+        // 排除已下架/废弃的皮肤类型（classic/ink/cyber/keai/daimeng 已从客户端移除）
+        const items = await env.DB.prepare(
+            `SELECT id, ${nameCol} as name, ${descCol} as description, image_url, item_type, points_price, stock
+             FROM shop_items
+             WHERE item_type NOT IN ('CLASSIC', 'SKIN_INK', 'SKIN_CYBER', 'SKIN_KEAI', 'SKIN_DAIMENG')`
+        ).all();
 
         const jsonStr = JSON.stringify(items.results);
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
