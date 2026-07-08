@@ -11,6 +11,13 @@ try { HttpsProxyAgent = require('https-proxy-agent').HttpsProxyAgent; } catch { 
 // 填写你本地的 HTTP/SOCKS 代理地址（已为你默认填好 10808）
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:10808';
 
+// 将代理地址注入当前进程 env，确保 execSync 启动的 wrangler 子进程也能感知并使用代理
+// （wrangler 使用自己的 HTTP 客户端 undici，不接受 Node.js Agent，必须通过环境变量传递）
+if (PROXY_URL) {
+    process.env.HTTPS_PROXY = PROXY_URL;
+    process.env.HTTP_PROXY = PROXY_URL;
+}
+
 // ─── 管理后台 HTTP API 配置（公告发布走后台 API，版本仍用 wrangler） ───
 // 可通过环境变量覆盖，或直接替换占位常量后运行
 const ADMIN_API_BASE = process.env.ADMIN_API_BASE || 'https://api.xqh.cc.cd';
