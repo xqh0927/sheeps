@@ -103,3 +103,5 @@
 -keepclassmembers class **$serializer {
     public static final **$serializer INSTANCE;
 }
+# 保持游戏状态及 ViewModel 数据结构不被混淆
+-keep class com.example.sheeps.game.state.** { *; }
