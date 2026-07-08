@@ -63,8 +63,22 @@
     "params": {}
   },
   {
+    "path": "/endless/leaderboard",
+    "className": "com.example.sheeps.leaderboard.EndlessLeaderboardActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
     "path": "/game/play",
     "className": "com.example.sheeps.game.GameActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/endless/play",
+    "className": "com.example.sheeps.game.EndlessActivity",
     "action": "",
     "description": "",
     "params": {}

@@ -1,6 +1,7 @@
 package com.example.sheeps.menu
 
 import android.os.Bundle
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
@@ -510,6 +511,21 @@ class MenuActivity : BaseActivity() {
         // ViewModel 在创建时自动加载初始数据
     }
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this) {
+            val now = System.currentTimeMillis()
+            if (now - lastBackPressTime < 2000) {
+                // 第二次按下：禁用自身再派发，让系统执行默认返回（无其他回调时即 finish）
+                isEnabled = false
+                this@MenuActivity.onBackPressedDispatcher.onBackPressed()
+            } else {
+                lastBackPressTime = now
+                Toaster.show(this@MenuActivity.getString(R.string.toast_press_back_exit))
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         val kv = MMKV.defaultMMKV()
@@ -531,15 +547,5 @@ class MenuActivity : BaseActivity() {
 
         // 每次回到前台刷新一次数据（如积分、体力等）
         viewModel.sendIntent(MenuViewIntent.LoadData)
-    }
-
-    override fun onBackPressed() {
-        val now = System.currentTimeMillis()
-        if (now - lastBackPressTime < 2000) {
-            super.onBackPressed()
-        } else {
-            lastBackPressTime = now
-            Toaster.show(getString(R.string.toast_press_back_exit))
-        }
     }
 }

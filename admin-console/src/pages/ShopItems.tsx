@@ -5,6 +5,7 @@ import { Chip } from '@mui/material';
 const ITEM_TYPES = [
   'UNDO', 'MOVEOUT', 'SHUFFLE', 'REVIVE', 'HINT', 'BOMB', 'JOKER', 'DOUBLE_POINTS',
   'SKIN_INK', 'SKIN_CYBER', 'SKIN_HENAN', 'SKIN_SICHUAN', 'SKIN_SHUANG',
+  'FREEZE',
 ].map((v) => ({ label: v, value: v }));
 
 const columns: ColumnDef[] = [

@@ -171,7 +171,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
   const nodes: Node[] = coordinates.map((coord, index) => ({ index, coord, assignedType: -1 }));
   const unassigned = new Set<Node>(nodes);
 
-  const numTypes = levelId === 1 ? 3 : Math.min(32, 3 + Math.floor(3 * Math.log(levelId)));
+  const numTypes = levelId === 1 ? 3 : Math.min(12, 3 + Math.floor(3 * Math.log(levelId)));
   const randAssign = lcg(seed + 100);
 
   // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积

@@ -177,9 +177,19 @@ CREATE TABLE leaderboard (
     level_id INTEGER NOT NULL,
     score INTEGER NOT NULL,
     clear_time_ms INTEGER NOT NULL,
+    game_mode INTEGER NOT NULL DEFAULT 0,
     achieved_at INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+
+-- 按模式 + 关卡 + 分数建索引，加速分榜查询（无尽模式 game_mode=1 查询）
+CREATE INDEX idx_leaderboard_mode ON leaderboard(game_mode, level_id, score DESC);
+
+-- ===== 迁移脚本（适用于已存在的库；DBA 执行，幂等）=====
+-- ALTER TABLE leaderboard ADD COLUMN game_mode INTEGER NOT NULL DEFAULT 0;
+-- 说明：0 = 闯关/PvP, 1 = 无尽生存；DEFAULT 0 兼容历史数据。
+-- 若 CREATE TABLE 已包含 game_mode 列，则跳过 ALTER，仅补索引：
+-- CREATE INDEX IF NOT EXISTS idx_leaderboard_mode ON leaderboard(game_mode, level_id, score DESC);
 
 CREATE TABLE levels (
     level_id INTEGER PRIMARY KEY,

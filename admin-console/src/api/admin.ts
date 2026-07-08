@@ -53,6 +53,8 @@ export interface Stats {
   shop_item_count: number;
   task_count: number;
   level_count: number;
+  endless_play_count: number;
+  endless_max_score: number;
 }
 
 const buildQuery = (params: Record<string, string | number | undefined>): string => {

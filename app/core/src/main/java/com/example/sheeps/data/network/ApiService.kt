@@ -101,7 +101,8 @@ interface ApiService {
     @GET("/api/leaderboard")
     suspend fun getLeaderboard(
         @Query("level_id") levelId: Int,
-        @Query("limit") limit: Int = 50
+        @Query("limit") limit: Int = 50,
+        @Query("game_mode") gameMode: Int = 0
     ): LeaderboardResponse
 
     /**

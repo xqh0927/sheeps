@@ -1,5 +1,7 @@
 package com.example.sheeps.menu
 
+import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -10,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
@@ -21,11 +24,11 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarCropDialog
 import com.example.sheeps.menu.ui.screens.UserInfoScreen
-import com.example.sheeps.core.R
 import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,6 +36,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.zibin.luban.api.compressTo
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -43,9 +47,14 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class UserInfoActivity : BaseActivity() {
 
-    @Inject lateinit var apiService: ApiService
-    @Inject lateinit var prefs: UserPreferences
-    @Inject lateinit var localDao: LocalDao
+    @Inject
+    lateinit var apiService: ApiService
+
+    @Inject
+    lateinit var prefs: UserPreferences
+
+    @Inject
+    lateinit var localDao: LocalDao
 
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
@@ -57,11 +66,13 @@ class UserInfoActivity : BaseActivity() {
 
                 // 构建响应式 MenuViewState，修改后即时更新 UI
                 var userInfoState by remember {
-                    mutableStateOf(MenuViewState(
-                        username = prefs.getUsername(),
-                        avatarUrl = prefs.getAvatarUrl(),
-                        phone = prefs.getPhone() ?: ""
-                    ))
+                    mutableStateOf(
+                        MenuViewState(
+                            username = prefs.getUsername(),
+                            avatarUrl = prefs.getAvatarUrl(),
+                            phone = prefs.getPhone() ?: ""
+                        )
+                    )
                 }
 
                 // 待裁剪的图片 Uri（必须在 pickLauncher 之前声明）
@@ -101,11 +112,14 @@ class UserInfoActivity : BaseActivity() {
                             scope.launch(Dispatchers.IO) {
                                 try {
                                     // 将 Bitmap 保存为临时文件再压缩
-                                    val tmpFile = java.io.File(context.cacheDir, "avatar_crop_${System.currentTimeMillis()}.jpg")
+                                    val tmpFile = File(
+                                        context.cacheDir,
+                                        "avatar_crop_${System.currentTimeMillis()}.jpg"
+                                    )
                                     tmpFile.outputStream().use { fos ->
-                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, fos)
+                                        bitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos)
                                     }
-                                    val file = android.net.Uri.fromFile(tmpFile).compressTo(context).getOrNull()
+                                    val file = Uri.fromFile(tmpFile).compressTo(context).getOrNull()
                                     if (file != null && file.exists() && file.canRead()) {
                                         val bytes = file.readBytes()
                                         withContext(Dispatchers.Main) {
@@ -137,7 +151,7 @@ class UserInfoActivity : BaseActivity() {
 
     // -------- 业务逻辑 --------
 
-    private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
+    private fun handleSendCode(phone: String, scope: CoroutineScope) {
         if (phone.length != 11) {
             Toaster.show(getString(R.string.err_invalid_phone))
             return

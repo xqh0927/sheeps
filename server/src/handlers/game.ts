@@ -142,6 +142,9 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const body: any = await request.json();
         if (!body.sign) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
 
+        // 无尽生存模式标记：0=闯关/PvP, 1=无尽；旧客户端不含该字段时默认 0（兼容）
+        const gameMode = Number(body.game_mode) || 0;
+
         // 防作弊校验：使用加盐 SHA256 算法校验签名合法性
         const expectedSign = await sha256(`${body.user_id}_${body.level_id}_${body.clear_time_ms}_folklore`);
         if (body.sign !== expectedSign) return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 403, headers: corsHeaders });
@@ -153,7 +156,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 批量查询：用户信息、此前该关卡的通关次数、当天的每日任务进度
         const [userResult, clearsResult, tasksResult] = await env.DB.batch([
             env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(resolvedUserId),
-            env.DB.prepare('SELECT COUNT(*) as count FROM leaderboard WHERE user_id = ? AND level_id = ?').bind(resolvedUserId, body.level_id),
+            env.DB.prepare('SELECT COUNT(*) as count FROM leaderboard WHERE user_id = ? AND level_id = ? AND game_mode = ?').bind(resolvedUserId, body.level_id, gameMode),
             env.DB.prepare('SELECT ut.task_id, ut.progress, t.target_count, ut.is_completed FROM user_task ut JOIN task t ON ut.task_id = t.id WHERE ut.user_id = ? AND ut.task_date = ?').bind(resolvedUserId, chinaToday)
         ]);
 
@@ -169,8 +172,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         // 自动解锁下一关
         mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now()));
-        // 将成绩录入排行榜表
-        mutations.push(env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, achieved_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, Date.now()));
+        // 将成绩录入排行榜表（无尽模式 game_mode=1，level_id 传 0 占位）
+        mutations.push(env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, achieved_at) VALUES (?, ?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, gameMode, Date.now()));
 
         if (mutations.length > 0) await env.DB.batch(mutations);
 
@@ -267,8 +270,10 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const type = url.searchParams.get('type') || 'history';
         const page = parseInt(url.searchParams.get('page') || '1', 10);
         const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+        // 无尽生存模式：0=闯关/PvP, 1=无尽；默认 0 兼容旧客户端
+        const gameMode = parseInt(url.searchParams.get('game_mode') || '0', 10);
 
-        const cacheKey = `leaderboard_${levelId}_${type}_${page}_${limit}`;
+        const cacheKey = `leaderboard_${levelId}_${gameMode}_${type}_${page}_${limit}`;
         // 读取 Cloudflare KV 缓存以优化并发响应率并降低 D1 读负荷
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: corsHeaders });
@@ -284,8 +289,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         // 执行 SQL：按分数从高到低、通关耗时从短到长进行中国特色消消乐排行榜排序（限制每个用户只取个人的最高记录，防刷榜）
         const results = await env.DB.prepare(
-            `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.achieved_at >= ?) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`
-        ).bind(levelId, timeFilter, limit, offset).all();
+            `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.game_mode = ? AND l.achieved_at >= ?) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`
+        ).bind(levelId, gameMode, timeFilter, limit, offset).all();
 
         const responseData = JSON.stringify({ success: true, rankings: results.results });
         // KV 缓存 300 秒（排行榜数据无需秒级实时性）

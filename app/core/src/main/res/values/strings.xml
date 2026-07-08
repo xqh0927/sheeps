@@ -135,6 +135,32 @@
     <string name="home_match_title">在线匹配对战</string>
     <string name="home_match_desc">与全国玩家在线匹配，切磋消除技巧！</string>
     <string name="home_match_hint">请先登录，方可参与在线匹配！</string>
+    <string name="home_endless_title">无尽生存</string>
+    <string name="home_endless_desc">俄罗斯方块式叠塔消除，冲击最高分！</string>
+    <string name="home_endless_login_hint">请先登录，方可参与无尽生存！</string>
+    <string name="endless_intro_title">无尽生存 · 叠塔模式</string>
+    <string name="endless_intro_desc">卡牌持续下落、层层堆叠，消除三张同花保命；顶到死亡线或卡槽溢出即结束。比拼积分，登顶无尽榜单！</string>
+    <string name="endless_intro_soon">玩法开发中，敬请期待</string>
+    <string name="endless_intro_close">知道了</string>
+
+    <!-- 无尽生存模式（叠塔）客户端文案 -->
+    <string name="endless_score">分数: %1$d</string>
+    <string name="endless_combo">连击: %1$d</string>
+    <string name="endless_wave">波次: %1$d</string>
+    <string name="endless_best">最高: %1$d</string>
+    <string name="endless_freeze">冻结</string>
+    <string name="endless_hold">暂存</string>
+    <string name="endless_pause">暂停</string>
+    <string name="endless_resume">继续</string>
+    <string name="endless_restart">再来一局</string>
+    <string name="endless_game_over">游戏结束</string>
+    <string name="endless_death_line">卡牌触顶！</string>
+    <string name="endless_slot_overflow">卡槽溢出！</string>
+    <string name="endless_start">开始游戏</string>
+    <string name="endless_new_best">新纪录！</string>
+    <string name="endless_wave_banner">Wave %1$d · 提速！</string>
+    <string name="endless_leaderboard_title">无尽生存 · 总榜单</string>
+    <string name="endless_leaderboard_entry">排行榜</string>
     <string name="home_levels_unlocked_desc">消除闯关，解锁更多关卡！</string>
     <string name="home_levels_unlocked_btn">✨ 开始闯关 ✨</string>
     <string name="home_btn_leaderboard">排行榜</string>
@@ -208,9 +234,9 @@
     <string name="level_desc_1">简单关卡</string>
     <string name="level_desc_2">普通关卡</string>
     <string name="level_desc_3">困难关卡</string>
-    <string name="level_desc_other">极难关卡 (含盲盒/锁卡)</string>
+    <string name="level_desc_other">极难关卡 (含盲盒/关卡)</string>
     <string name="level_desc_blind">盲盒关卡</string>
-    <string name="level_desc_sealed">锁卡关卡</string>
+    <string name="level_desc_sealed">封印关卡</string>
     <string name="level_desc_hell">地狱关卡</string>
     <string name="btn_break_array">挑战</string>
     <string name="btn_locked">锁定</string>

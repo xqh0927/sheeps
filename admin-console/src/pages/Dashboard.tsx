@@ -10,6 +10,8 @@ import {
   Store,
   Assignment,
   GridView,
+  Timeline,
+  EmojiEvents,
 } from '@mui/icons-material';
 import { getStats, Stats } from '../api/admin';
 import { extractError } from '../api/client';
@@ -25,6 +27,8 @@ const STAT_CARDS: { key: keyof Stats; label: string; icon: JSX.Element; color: s
   { key: 'shop_item_count', label: '商品数', icon: <Store />, color: '#00838f' },
   { key: 'task_count', label: '任务数', icon: <Assignment />, color: '#5e35b1' },
   { key: 'level_count', label: '关卡数', icon: <GridView />, color: '#827717' },
+  { key: 'endless_play_count', label: '今日无尽挑战次数', icon: <Timeline />, color: '#00695c' },
+  { key: 'endless_max_score', label: '无尽模式历史最高分', icon: <EmojiEvents />, color: '#ad1457' },
 ];
 
 export default function Dashboard() {

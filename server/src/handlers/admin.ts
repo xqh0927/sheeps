@@ -286,6 +286,15 @@ async function getStats(request: Request, env: Env): Promise<Response> {
     env.DB.prepare('SELECT COUNT(*) as c FROM task').bind().first<{ c: number }>(),
     env.DB.prepare('SELECT COUNT(*) as c FROM levels').bind().first<{ c: number }>(),
   ]);
+
+  // 无尽生存模式指标：今日挑战次数 + 历史最高分
+  const endlessPlay = await env.DB.prepare(
+    'SELECT COUNT(*) as c FROM leaderboard WHERE game_mode = 1 AND achieved_at >= ?'
+  ).bind(startOfToday()).first<{ c: number }>();
+  const endlessMax = await env.DB.prepare(
+    'SELECT COALESCE(MAX(score),0) as m FROM leaderboard WHERE game_mode = 1'
+  ).first<{ m: number }>();
+
   return new Response(
     JSON.stringify({
       success: true,
@@ -298,6 +307,8 @@ async function getStats(request: Request, env: Env): Promise<Response> {
       shop_item_count: shop?.c || 0,
       task_count: task?.c || 0,
       level_count: level?.c || 0,
+      endless_play_count: endlessPlay?.c || 0,
+      endless_max_score: endlessMax?.m || 0,
     }),
     { headers: getCorsHeaders(env) }
   );

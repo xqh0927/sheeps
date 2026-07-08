@@ -183,6 +183,16 @@ class UserPreferences @Inject constructor(
         kv.encode("highest_level_cleared", level)
     }
 
+    // --- Endless (叠塔) survival mode best score ---
+
+    fun getEndlessBest(): Int {
+        return kv.decodeInt("endless_best", 0)
+    }
+
+    fun setEndlessBest(best: Int) {
+        kv.encode("endless_best", best)
+    }
+
     fun getLastShownDailyPopupDate(): String {
         return kv.decodeString("last_shown_daily_popup_date", "") ?: ""
     }

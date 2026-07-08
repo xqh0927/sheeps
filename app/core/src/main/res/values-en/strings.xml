@@ -128,6 +128,32 @@
     <string name="home_match_title">PvP Match</string>
     <string name="home_match_desc">Match with other players in real-time PvP!</string>
     <string name="home_match_hint">Please log in to play real-time PvP!</string>
+    <string name="home_endless_title">Endless Survival</string>
+    <string name="home_endless_desc">Tetris-style tile-stacking. Chase the high score!</string>
+    <string name="home_endless_login_hint">Please log in to play Endless Survival!</string>
+    <string name="endless_intro_title">Endless Survival · Stack Tower</string>
+    <string name="endless_intro_desc">Tiles keep falling and stacking; clear three-of-a-kind to survive. Game over when the pile hits the death line or the slot overflows. Compete for the top of the endless leaderboard!</string>
+    <string name="endless_intro_soon">Gameplay in development — stay tuned</string>
+    <string name="endless_intro_close">Got it</string>
+
+    <!-- Endless Survival (Stack Tower) client strings -->
+    <string name="endless_score">Score: %1$d</string>
+    <string name="endless_combo">Combo: %1$d</string>
+    <string name="endless_wave">Wave: %1$d</string>
+    <string name="endless_best">Best: %1$d</string>
+    <string name="endless_freeze">Freeze</string>
+    <string name="endless_hold">Hold</string>
+    <string name="endless_pause">Pause</string>
+    <string name="endless_resume">Resume</string>
+    <string name="endless_restart">Play Again</string>
+    <string name="endless_game_over">Game Over</string>
+    <string name="endless_death_line">Pile hit the death line!</string>
+    <string name="endless_slot_overflow">Slot overflow!</string>
+    <string name="endless_start">Start</string>
+    <string name="endless_new_best">New Best!</string>
+    <string name="endless_wave_banner">Wave %1$d · Speed Up!</string>
+    <string name="endless_leaderboard_title">Endless Survival · Rankings</string>
+    <string name="endless_leaderboard_entry">Rankings</string>
     <string name="home_levels_unlocked_desc">Complete levels to unlock new stages!</string>
     <string name="home_levels_unlocked_btn">✨ Start Level ✨</string>
     <string name="home_btn_leaderboard">Leaderboard</string>

@@ -238,7 +238,9 @@ data class ScoreRequest(
     val level_id: Int,
     val score: Int,
     val clear_time_ms: Long,
-    val sign: String
+    val sign: String,
+    /** 0=闯关/PvP，1=无尽生存；默认 0 保持向后兼容 */
+    val game_mode: Int = 0
 )
 
 @Serializable

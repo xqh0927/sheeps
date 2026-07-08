@@ -26,6 +26,10 @@ import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.GameResultOverlay
 import com.example.sheeps.game.ui.dialogs.CarrySelectionDialog
 import com.example.sheeps.ui.components.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.res.stringResource
+import com.example.sheeps.core.R
 import kotlinx.coroutines.launch
 
 /**
@@ -110,10 +114,12 @@ fun GameScreen(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                GameHeader(
-                    currentLevelId = state.currentLevelId,
+                SheepsTopAppBar(
+                    title = stringResource(id = R.string.prepare_title_unlocked, state.currentLevelId),
                     onBack = onBack,
-                    onRestart = onRestart
+                    showAction = true,
+                    actionIcon = Icons.Default.Refresh,
+                    onActionClick = onRestart
                 )
             }
         ) { paddingValues ->
