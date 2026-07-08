@@ -1,5 +1,6 @@
 package com.example.sheeps.game.state
 
+import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.data.model.Tile
 
 /**
@@ -12,7 +13,7 @@ data class EndlessViewState(
     /** 运行态：READY / PLAYING / PAUSED / GAMEOVER */
     val status: EndlessStatus = EndlessStatus.READY,
     /** 当前卡牌皮肤（来自 UserPreferences，动态跟随） */
-    val currentSkin: String = "classic",
+    val currentSkin: String = SkinConstants.DEFAULT_SKIN,
     /** 棋盘：每列自底向上的牌栈（index 0 = 列底） */
     val columns: List<List<Tile>> = List(6) { emptyList() },
     /** 列高达到此值 = 触顶死亡 */

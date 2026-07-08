@@ -77,7 +77,6 @@
 
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解锁</string>
-    <string name="shop_section_traditional">水墨风卡牌皮肤</string>
     <string name="shop_section_provinces">美食系列卡牌皮肤</string>
     <string name="shop_section_animated">特效皮肤</string>
 
@@ -272,7 +271,10 @@
     <string name="prepare_title_locked">关卡锁定</string>
     <string name="prepare_title_unlocked">挑战准备 (第 %1$d 关)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒关卡！部分卡牌图案隐藏，放入槽位后才显现。</string>
-    <string name="prepare_sealed_warning">🔒 封印关卡！部分卡牌被封印（1~3层），点击逐层解封；完全解封时会触发“碎冰”，相邻封印牌自动减1层。</string>
+    <string name="prepare_sealed_warning">🔒 封印关卡！部分卡牌被封印（1~3层）。需先消除 3 张正常卡牌才能解封 1 张封印牌；点击逐层解封，完全解封时触发“碎冰”，相邻封印牌自动减1层。</string>
+    <string name="sealed_gate_progress">已消除 %1$d / %2$d 张 · 已解锁 %3$d / %4$d 张封印</string>
+    <string name="sealed_gate_need_more">还需消除 %1$d 张正常卡牌</string>
+    <string name="sealed_gate_unlocked">封印解锁！已解锁 %1$d 张封印牌</string>
     <string name="update_discovered">发现新版本 %1$s</string>
     <string name="update_log_title">更新内容：</string>
     <string name="update_default_log">优化游戏体验，修复已知问题。</string>
@@ -315,22 +317,20 @@
     <string name="carried_magic_items">随身道具</string>
 
 
-    <string name="item_skin_classic">经典红黑</string>
-    <string name="item_skin_classic_desc">经典红黑底纹卡牌皮肤</string>
-    <string name="item_skin_ink">写意水墨</string>
-    <string name="item_skin_ink_desc">淡墨金丝，极简水墨卡牌皮肤</string>
-    <string name="item_skin_cyber">赛博霓虹</string>
-    <string name="item_skin_cyber_desc">赛博霓虹灯效卡牌皮肤</string>
     <string name="item_skin_henan">河南美食</string>
     <string name="item_skin_henan_desc">河南特色美食卡牌皮肤</string>
     <string name="item_skin_sichuan">四川美食</string>
     <string name="item_skin_sichuan_desc">四川特色美食卡牌皮肤</string>
-    <string name="item_skin_keai">卡通萌趣</string>
-    <string name="item_skin_keai_desc">卡通动态萌趣卡牌皮肤</string>
-    <string name="item_skin_daimeng">手绘童趣</string>
-    <string name="item_skin_daimeng_desc">手绘质感呆萌卡通卡牌皮肤</string>
     <string name="item_skin_shuang">萌趣竞技</string>
     <string name="item_skin_shuang_desc">12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰</string>
+    <string name="item_skin_electronic">数码潮玩</string>
+    <string name="item_skin_electronic_desc">12款数码设备卡面，科技蓝边框搭配霓虹装饰</string>
+    <string name="item_skin_daily">日常好物</string>
+    <string name="item_skin_daily_desc">12款日常用品卡面，暖橙边框搭配阳光装饰</string>
+    <string name="item_skin_vegetable">蔬菜园</string>
+    <string name="item_skin_vegetable_desc">12款新鲜蔬菜卡面，清新绿边框搭配田园装饰</string>
+    <string name="item_skin_fruit">水果盘</string>
+    <string name="item_skin_fruit_desc">12款时令水果卡面，鲜红边框搭配果香装饰</string>
 
 
     <string name="leaderboard_data_error">数据获取失败</string>

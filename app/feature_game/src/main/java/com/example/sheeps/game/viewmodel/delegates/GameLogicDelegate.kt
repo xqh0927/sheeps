@@ -56,6 +56,17 @@ class GameLogicDelegate @Inject constructor() {
             return
         }
 
+        // 封印门控：未解锁的封印牌不可点击（在记录历史之前拦截，避免产生无效 Undo 步骤）
+        if (tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds) {
+            val remaining = maxOf(
+                1,
+                state.sealedUnlockThreshold - (state.sealedClearCount % state.sealedUnlockThreshold)
+            )
+            setEffect(GameViewEffect.ShowToast("还需消除 $remaining 张正常卡牌"))
+            setEffect(GameViewEffect.Vibrate)
+            return
+        }
+
         if (tile.state != TileState.NORMAL && tile.state != TileState.MOVED_OUT) return
 
         onAddHistory()
@@ -84,25 +95,55 @@ class GameLogicDelegate @Inject constructor() {
             // 从棋盘点击
             if (tile.sealedCount > 0) {
                 // 解锁封印
-                tile.sealedCount--
-                // 碎冰连锁：若封印完全解除，相邻封印牌溅射 -1 层
-                if (tile.sealedCount == 0) {
-                    val shattered = mutableSetOf(tile.id)
-                    shatterSealedNeighbors(tile, state.boardTiles, shattered)
-                }
-                setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
-                setEffect(GameViewEffect.Vibrate)
-                updateState {
-                    copy(boardTiles = calculateBlockedStates(state.boardTiles))
+                val newSealedCount = tile.sealedCount - 1
+                if (newSealedCount == 0) {
+                    // 封印完全解除，直接落槽入盘，不需再额外点击（优化手感与体验）
+                    val clickedTile = tile.copy(sealedCount = 0, isBlind = false, state = TileState.IN_SLOT)
+                    val newSlot = insertIntoSlot(state.slotTiles, clickedTile)
+
+                    // 复制棋盘，应用碎冰连锁
+                    val tempBoard = state.boardTiles.map { it.copy() }
+                    tempBoard.find { it.id == tile.id }?.let { t ->
+                        t.sealedCount = 0
+                        t.state = TileState.IN_SLOT
+                        val shattered = mutableSetOf(t.id)
+                        shatterSealedNeighbors(t, tempBoard, shattered)
+                    }
+                    val newBoard = calculateBlockedStates(tempBoard)
+
+                    updateState {
+                        copy(
+                            boardTiles = newBoard,
+                            slotTiles = newSlot
+                        )
+                    }
+                    scope.launch {
+                        setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+                        delay(FLY_ANIMATION_DELAY_MS)
+                        processSlotMatch()
+                    }
+                } else {
+                    // 未完全解封，播放解封音效并更新层数
+                    val tempBoard = state.boardTiles.map { t ->
+                        if (t.id == tile.id) t.copy(sealedCount = newSealedCount) else t.copy()
+                    }
+                    val newBoard = calculateBlockedStates(tempBoard)
+                    setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
+                    setEffect(GameViewEffect.Vibrate)
+                    updateState {
+                        copy(boardTiles = newBoard)
+                    }
                 }
             } else {
-                // 普通棋盘牌落槽
-                tile.isBlind = false
-                tile.state = TileState.IN_SLOT
-                val newSlot = insertIntoSlot(state.slotTiles, tile)
+                // 普通棋盘牌落槽（纯不可变状态更新，彻底规避引用泄漏与卡牌重复显示）
+                val clickedTile = tile.copy(isBlind = false, state = TileState.IN_SLOT)
+                val newSlot = insertIntoSlot(state.slotTiles, clickedTile)
+                val newBoard = state.boardTiles.map { t ->
+                    if (t.id == tile.id) clickedTile else t.copy()
+                }
                 updateState {
                     copy(
-                        boardTiles = state.boardTiles,
+                        boardTiles = newBoard,
                         slotTiles = newSlot
                     )
                 }
@@ -121,6 +162,7 @@ class GameLogicDelegate @Inject constructor() {
      * @return 本次所获得的得分增量值
      */
     suspend fun processSlotMatchAndCheckEndGame(
+        state: GameViewState,
         board: List<Tile>,
         slot: List<Tile>,
         movedOut: List<Tile>,
@@ -136,6 +178,7 @@ class GameLogicDelegate @Inject constructor() {
 
         // 进行匹配消除检查，循环直到没有可以消除的为止
         var matched = true
+        var totalRemoved = 0
         while (matched) {
             matched = false
             val counts = finalSlot.groupBy { it.type }
@@ -149,6 +192,7 @@ class GameLogicDelegate @Inject constructor() {
                             true
                         } else false
                     }
+                    totalRemoved += removedCount
                     scoreAdd += if (isDoublePoints) 200 else 100
                     matched = true
                     break
@@ -159,6 +203,45 @@ class GameLogicDelegate @Inject constructor() {
         if (matched) {
             setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
         }
+
+        // ===== 封印门控：计数累加 + 跨阈值解锁（sealed-unlock-mechanism-design.md §6）=====
+        val prevClear = state.sealedClearCount
+        val prevUnlockedSize = state.sealedUnlockedIds.size
+        val gateThreshold = state.sealedUnlockThreshold
+        val sealOrder = state.sealedOrder
+        val newClear = prevClear + totalRemoved
+        val newUnlocked = state.sealedUnlockedIds.toMutableSet()
+        while (newUnlocked.size < sealOrder.size
+            && newClear >= (newUnlocked.size + 1) * gateThreshold
+        ) {
+            val nextUnlockId = sealOrder[newUnlocked.size]
+            newUnlocked.add(nextUnlockId)
+
+            // 直接解封：把该封印牌的 sealedCount 设为 0，使其恢复为普通牌并消除带锁图标
+            finalBoard.find { it.id == nextUnlockId }?.let { unlockedTile ->
+                if (unlockedTile.sealedCount > 0) {
+                    unlockedTile.sealedCount = 0
+                    val shattered = mutableSetOf(unlockedTile.id)
+                    shatterSealedNeighbors(unlockedTile, finalBoard, shattered)
+                }
+            }
+        }
+        // 软锁兜底：盘面上已无可交互正常牌、置物架上无正常牌，且仍有未解锁封印牌 → 自动解锁剩余
+        val hasClearableNormal = finalBoard.any { it.sealedCount == 0 && it.state == TileState.NORMAL } || movedOut.isNotEmpty()
+        if (!hasClearableNormal && newUnlocked.size < sealOrder.size) {
+            val toUnlockIds = sealOrder.drop(newUnlocked.size)
+            newUnlocked.addAll(toUnlockIds)
+            for (unlockId in toUnlockIds) {
+                finalBoard.find { it.id == unlockId }?.let { unlockedTile ->
+                    if (unlockedTile.sealedCount > 0) {
+                        unlockedTile.sealedCount = 0
+                        val shattered = mutableSetOf(unlockedTile.id)
+                        shatterSealedNeighbors(unlockedTile, finalBoard, shattered)
+                    }
+                }
+            }
+        }
+        val unlockedNow = newUnlocked.size - prevUnlockedSize
 
         val remainingOnBoard =
             finalBoard.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
@@ -197,8 +280,15 @@ class GameLogicDelegate @Inject constructor() {
                 slotTiles = finalSlot,
                 movedOutTiles = movedOut,
                 score = totalScore,
-                gameStatus = newStatus
+                gameStatus = newStatus,
+                sealedClearCount = newClear,
+                sealedUnlockedIds = newUnlocked
             )
+        }
+
+        if (unlockedNow > 0) {
+            setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
+            setEffect(GameViewEffect.ShowToast("封印解锁！已解锁 $unlockedNow 张封印牌"))
         }
 
         return scoreAdd

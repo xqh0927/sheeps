@@ -113,6 +113,7 @@ fun GameBoard(
                             tileSize = (46 * scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             isHighlighted = isHighlighted,
+                            gateLocked = tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds,
                             modifier = Modifier
                                 .offset(
                                     x = ((tile.x - minX) * spacing * scale).dp,

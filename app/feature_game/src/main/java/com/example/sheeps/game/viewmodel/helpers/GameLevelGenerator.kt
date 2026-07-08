@@ -221,7 +221,7 @@ class GameLevelGenerator @Inject constructor() {
 
         val randProps = lcg(seed + 300)
         val sealedClusters = if (isSealedLevel) {
-            generateSealedClusters(nodes, { randProps() }, sealRatio, clusterCount, maxSealLayer)
+            generateSealedUniformly(nodes, { randProps() }, sealRatio, maxSealLayer)
         } else {
             emptyMap()
         }
@@ -243,20 +243,18 @@ class GameLevelGenerator @Inject constructor() {
     }
 
     /**
-     * 生成封印聚簇：封印牌以簇状分布，相邻卡牌相互连接，形成战略点。
+     * 生成均匀分布的封印牌
      *
      * @param nodes 所有卡牌节点
      * @param rand 随机数生成函数，返回 [0, 1)
      * @param sealRatio 封印卡牌占总卡牌的比例
-     * @param clusterCount 期望簇数
      * @param maxLayer 最大封印层数
      * @return Map<nodeIndex, sealedCount>
      */
-    private fun generateSealedClusters(
+    private fun generateSealedUniformly(
         nodes: List<LocalNode>,
         rand: () -> Double,
         sealRatio: Double,
-        clusterCount: Int,
         maxLayer: Int
     ): Map<Int, Int> {
         if (nodes.isEmpty()) return emptyMap()
@@ -264,60 +262,22 @@ class GameLevelGenerator @Inject constructor() {
         val maxZ = nodes.maxOfOrNull { it.coord.z } ?: 0
         // 封印只生成在较低层（z <= 70% 最高层），保证玩家能优先看到
         val eligible = nodes.filter { it.coord.z <= maxZ * 0.7f }
-            .takeIf { it.size >= clusterCount } ?: nodes.toList()
+            .takeIf { it.isNotEmpty() } ?: nodes.toList()
 
         val totalSealed = maxOf(1, (nodes.size * sealRatio).toInt())
-        val targetPerCluster = maxOf(1, totalSealed / clusterCount)
 
-        // 随机选取簇种子
-        val seeds = mutableListOf<LocalNode>()
-        val available = eligible.toMutableList()
-        repeat(clusterCount) {
-            if (available.isEmpty()) return@repeat
-            val idx = (rand() * available.size).toInt()
-            seeds.add(available.removeAt(idx))
+        // 随机打乱备选节点
+        val shuffled = eligible.toMutableList()
+        for (i in shuffled.indices.reversed()) {
+            val j = (rand() * (i + 1)).toInt()
+            val tmp = shuffled[i]
+            shuffled[i] = shuffled[j]
+            shuffled[j] = tmp
         }
 
         val result = mutableMapOf<Int, Int>()
-        for (seed in seeds) {
-            if (result.size >= totalSealed) break
-            val cluster = mutableSetOf<Int>()
-            val queue = ArrayDeque<Int>()
-            queue.add(seed.index)
-            cluster.add(seed.index)
-
-            while (queue.isNotEmpty() && cluster.size < targetPerCluster) {
-                val current = queue.removeFirst()
-                val currentNode = nodes[current]
-                val neighbors = nodes.mapIndexedNotNull { idx, neighbor ->
-                    if (idx !in cluster &&
-                        neighbor.coord.z == currentNode.coord.z &&
-                        abs(neighbor.coord.x - currentNode.coord.x) <= 1.5f &&
-                        abs(neighbor.coord.y - currentNode.coord.y) <= 1.5f
-                    ) idx else null
-                }
-
-                // 随机打乱邻居，避免簇总是朝同一方向生长
-                val shuffled = neighbors.toMutableList()
-                for (i in shuffled.indices.reversed()) {
-                    val j = (rand() * (i + 1)).toInt()
-                    val tmp = shuffled[i]
-                    shuffled[i] = shuffled[j]
-                    shuffled[j] = tmp
-                }
-
-                for (idx in shuffled) {
-                    if (cluster.size >= targetPerCluster) break
-                    if (result.size >= totalSealed) break
-                    cluster.add(idx)
-                    queue.add(idx)
-                }
-            }
-
-            for (tileIndex in cluster) {
-                if (result.size >= totalSealed) break
-                result[tileIndex] = randomSealLayer(rand, maxLayer)
-            }
+        for (node in shuffled.take(totalSealed)) {
+            result[node.index] = randomSealLayer(rand, maxLayer)
         }
 
         return result
@@ -440,7 +400,7 @@ class GameLevelGenerator @Inject constructor() {
     // ===== 内部数据类 =====
 
     private data class Point3D(val x: Float, val y: Float, val z: Int)
-    private data class LocalNode(val index: Int, val coord: Point3D, var assignedType: Int)
+    private class LocalNode(val index: Int, val coord: Point3D, var assignedType: Int)
     private data class DifficultyInfo(
         val difficulty: Int,
         val subIndex: Int,

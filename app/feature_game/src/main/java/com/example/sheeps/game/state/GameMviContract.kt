@@ -1,5 +1,6 @@
 package com.example.sheeps.game.state
 
+import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.model.Tile
 
@@ -94,7 +95,7 @@ data class GameViewState(
     /** 排行榜数据 */
     val rankings: List<RankingEntry> = emptyList(),
     /** 当前使用的卡牌皮肤主题名称 */
-    val currentSkin: String = "classic",
+    val currentSkin: String = SkinConstants.DEFAULT_SKIN,
     /** 正在抖动的卡牌 ID 集合（用于提示遮挡） */
     val shakingTileIds: Set<String> = emptySet(),
     /** 是否展示携带道具选择弹窗 */
@@ -102,7 +103,17 @@ data class GameViewState(
     /** 背包中每种道具的库存数量 */
     val backpackItemStocks: Map<String, Int> = emptyMap(),
     /** 临时选择准备携带的道具 */
-    val tempCarryItems: Map<String, Int> = emptyMap()
+    val tempCarryItems: Map<String, Int> = emptyMap(),
+
+    // --- 封印门控解锁机制（sealed-unlock-mechanism-design.md §6）---
+    /** 已消除的正常牌张数计数（用于解锁封印牌，支持 Undo 回退） */
+    val sealedClearCount: Int = 0,
+    /** 解锁阈值：每累计消除 N 张正常牌解锁 1 张封印牌，固定为 3 */
+    val sealedUnlockThreshold: Int = 3,
+    /** 已通过门控解锁、可被点击解封的封印牌 id 集合 */
+    val sealedUnlockedIds: Set<String> = emptySet(),
+    /** 封印牌按 z 轴从大到小（自上而下）排序的解锁顺序 */
+    val sealedOrder: List<String> = emptyList()
 )
 
 /**
@@ -164,3 +175,15 @@ sealed interface GameViewEffect {
     /** 触发触觉反馈（振动） */
     object Vibrate : GameViewEffect
 }
+
+/**
+ * 历史状态快照，用于 Undo 撤销操作恢复数据
+ */
+data class GameHistoryState(
+    val boardTiles: List<Tile>,
+    val slotTiles: List<Tile>,
+    val movedOutTiles: List<Tile>,
+    val sealedClearCount: Int,
+    val sealedUnlockedIds: Set<String>
+)
+

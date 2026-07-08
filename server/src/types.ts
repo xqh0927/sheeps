@@ -59,6 +59,7 @@ export interface TileData {
   type: number;      // 卡牌图案类型 (对应 UI 上的图标)
   isBlind: boolean;  // 是否为盲盒卡牌
   sealedCount: number; // 封印层数 (需要额外消除的次数)
+  sealUnlockThreshold?: number; // 封印门控解锁阈值（每消除 N 张正常牌解锁 1 张封印），固定为 3，双端同步
 }
 
 /** WebSocket 玩家会话状态 */

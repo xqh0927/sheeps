@@ -58,17 +58,14 @@ fun ShopItemCard(
     onExchange: (Int) -> Unit,
     onApplySkin: (String) -> Unit
 ) {
-    val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
-    val isUnlocked =
-        if (item.item_type == "CLASSIC") true else backpackCount >= 1
+    val isSkin = item.item_type.startsWith("SKIN_")
+    val isUnlocked = backpackCount >= 1
 
     val skinKey = remember(item.item_type) {
-        if (item.item_type == "CLASSIC") {
-            "classic"
-        } else if (item.item_type.startsWith("SKIN_")) {
+        if (item.item_type.startsWith("SKIN_")) {
             item.item_type.removePrefix("SKIN_").lowercase()
         } else {
-            "classic"
+            ""
         }
     }
     val isCurrentlyApplied = isSkin && currentSkin == skinKey
@@ -85,8 +82,7 @@ fun ShopItemCard(
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 所有皮肤类型（包括 CLASSIC、SKIN_INK、SKIN_CYBER、SKIN_KEAI、SKIN_DAIMENG 以及省份皮肤）
-            // 都用第一张 tile 图片做封面预览
+            // 所有皮肤类型（包括省份皮肤与特效皮肤系列）都用第一张 tile 图片做封面预览
             val isAnySkin = isSkin
             if (isAnySkin) {
                 val context = LocalContext.current

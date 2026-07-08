@@ -65,8 +65,7 @@ test('POST /api/admin/users/:id/items updates user items successfully', async ()
   const token = await generateJWT({ userId: 'user_123', phone: '13800000000', role: 'super', type: 'access', exp: Date.now() + 100000 });
   const payload = {
     items: [
-      { item_type: 'UNDO', count: 10 },
-      { item_type: 'SKIN_INK', count: 1 }
+      { item_type: 'UNDO', count: 10 }
     ]
   };
   const req = {

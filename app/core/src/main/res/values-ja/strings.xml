@@ -74,7 +74,6 @@
 
     <string name="shop_title">ショップ</string>
     <string name="shop_vault_locked">未開放</string>
-    <string name="shop_section_traditional">和風スキン</string>
     <string name="shop_section_provinces">グルメスキン</string>
     <string name="shop_section_animated">エフェクトスキン</string>
 
@@ -225,10 +224,21 @@
     <string name="guide_sec2_desc">一時退避：左側の3枚を一時的にスロット外に退避します。\nシャッフル：残りのカードをランダムに並び替えます。\n元に戻す：直前の操作を取り消します。</string>
     <string name="guide_sec3_title">3. コインの獲得</string>
     <string name="guide_sec3_desc">毎日のログインボーナスや、ステージの初クリアでコインを獲得できます。対戦モードで勝利することでも大量 of コインを獲得できます！</string>
-    <string name="guide_sec4_title">4. ショップ交換</string>
-    <string name="guide_sec4_desc">集めたコインはショップでお助けアイテムや様々なカードスキンと交換できます。</string>
-    <string name="guide_sec5_title">5. 对战ルール</string>
-    <string name="guide_sec5_desc">対戦中、カードを消すごとにゲージがたまります。消費して妨害スキルを発動できます：\n画面隠し（3ゲージ）：相手の画面をこすって消すまで見えなくします。\n枠数制限（6ゲージ）：相手のスロット枠数を6枠に減らします。スロットが満杯になれば勝ちです。\nカード封印（10ゲージ）：相手の表向きのカードをすべて隠します。</string>
+    <string name="item_skin_henan">河南グルメ</string>
+    <string name="item_skin_henan_desc">河南地方のグルメを描いたカードスキン</string>
+    <string name="item_skin_sichuan">四川グルメ</string>
+    <string name="item_skin_sichuan_desc">四川地方のグルメを描いたカードスキン</string>
+    <string name="item_skin_shuang">萌趣競技</string>
+    <string name="item_skin_shuang_desc">スカイブルーのボーダーとサンライトゴールドのアクセントを持つ12種のかわいい羊タイル</string>
+
+    <string name="item_skin_electronic">デジタルガジェット</string>
+    <string name="item_skin_electronic_desc">ネオンブルーのボーダーとテックシルバーのアクセントを持つ12種の電子ガジェットタイル</string>
+    <string name="item_skin_daily">日常のあれこれ</string>
+    <string name="item_skin_daily_desc">暖かいオレンジのボーダーとクリーム色のアクセントを持つ12種の日用品タイル</string>
+    <string name="item_skin_vegetable">畑の野菜</string>
+    <string name="item_skin_vegetable_desc">さわやかなグリーンのボーダーと新芽のアクセントを持つ12種の新鮮野菜タイル</string>
+    <string name="item_skin_fruit">彩りフルーツ</string>
+    <string name="item_skin_fruit_desc">鮮やかな赤のボーダーとフルーティなアクセントを持つ12種のジューシーフルーツタイル</string>
 
     <string name="backpack_magic_section">お助けアイテム</string>
     <string name="backpack_skins_section">カードスキン</string>
@@ -277,22 +287,6 @@
     <string name="slot_not_carried">未所持</string>
     <string name="carried_magic_items">持ち込みアイテム</string>
 
-    <string name="item_skin_classic">クラシック</string>
-    <string name="item_skin_classic_desc">赤黒基調のクラシック調スキン</string>
-    <string name="item_skin_ink">水墨画</string>
-    <string name="item_skin_ink_desc">金色の縁取りとおしゃれな墨絵スキン</string>
-    <string name="item_skin_cyber">サイバーネオン</string>
-    <string name="item_skin_cyber_desc">サイバーパンク風ネオンスキン</string>
-    <string name="item_skin_henan">河南グルメ</string>
-    <string name="item_skin_henan_desc">河南地方のグルメを描いたカードスキン</string>
-    <string name="item_skin_sichuan">四川グルメ</string>
-    <string name="item_skin_sichuan_desc">四川地方のグルメを描いたカードスキン</string>
-    <string name="item_skin_keai">ちびキャラ</string>
-    <string name="item_skin_keai_desc">可愛くてコミカルなちびキャラのスキン</string>
-    <string name="item_skin_daimeng">落書き風</string>
-    <string name="item_skin_daimeng_desc">温かみのある可愛い手描き調スキン</string>
-    <string name="item_skin_shuang">萌趣競技</string>
-    <string name="item_skin_shuang_desc">スカイブルーのボーダーとサンライトゴールドのアクセントを持つ12種のかわいい羊タイル</string>
 
     <string name="leaderboard_data_error">取得失敗</string>
     <string name="leaderboard_load_error">読み込み失敗。通信を確認してください</string>
@@ -445,4 +439,41 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
+
+
+    <!-- ===== 对齐补全：base 缺失 key（ja） ===== -->
+    <string name="sealed_gate_progress">消去 %1$d / %2$d ・ 封印解除 %3$d / %4$d</string>
+    <string name="sealed_gate_need_more">あと %1$d 枚の通常カードを消去してください</string>
+    <string name="sealed_gate_unlocked">封印解除！ %1$d 枚の封印カードを解放</string>
+    <string name="home_endless_title">エンドレス生存</string>
+    <string name="home_endless_desc">テトリス式の積み上げ削りで、ハイスコアを目指そう！</string>
+    <string name="home_endless_login_hint">エンドレス生存に参加するにはログインが必要です！</string>
+    <string name="endless_intro_title">エンドレス生存・積み上げモード</string>
+    <string name="endless_intro_desc">カードが次々と落下し重なり合う中、同じ模様の3枚を消して生き残り。デッドラインに触れるか、スロットが溢れると終了。スコアを競い、エンドレスランキングの頂点を目指そう！</string>
+    <string name="endless_intro_soon">開発中です。お楽しみに。</string>
+    <string name="endless_intro_close">了解</string>
+    <string name="endless_score">スコア: %1$d</string>
+    <string name="endless_combo">コンボ: %1$d</string>
+    <string name="endless_wave">ウェーブ: %1$d</string>
+    <string name="endless_best">最高: %1$d</string>
+    <string name="endless_freeze">凍結</string>
+    <string name="endless_hold">ホールド</string>
+    <string name="endless_pause">一時停止</string>
+    <string name="endless_resume">再開</string>
+    <string name="endless_restart">もう一度</string>
+    <string name="endless_game_over">ゲーム終了</string>
+    <string name="endless_death_line">カードが天井に！</string>
+    <string name="endless_slot_overflow">スロットオーバー！</string>
+    <string name="endless_start">ゲーム開始</string>
+    <string name="endless_new_best">新記録！</string>
+    <string name="endless_wave_banner">Wave %1$d・スピードアップ！</string>
+    <string name="endless_leaderboard_title">エンドレス生存・総合ランキング</string>
+    <string name="endless_leaderboard_entry">ランキング</string>
+    <string name="guide_sec4_title">四、アイテム交換ショップ</string>
+    <string name="guide_sec4_desc">集めたコインは「ショップ」で様々な実用アイテム（シャッフル、取り消しなど）や、豊かなテーマ効果を持つカードスキンと交換できます。</string>
+    <string name="guide_sec5_title">五、オンラインマッチ対戦ルール</string>
+    <string name="guide_sec5_desc">対戦では、カードを消すたびにエネルギーを蓄積できます（最大10）。エネルギーを消費して相手にスキル攻撃が可能です：
+遮り（3消費）：相手の盤面を覆い、相手がふき取るまで回復しません。
+制限（6消費）：相手のスロット1マスをロック（6マスに短縮）、相手のスロットが満杯ならあなたの勝利。
+遮蔽（10消費）：相手の現在の全カードを隠します。</string>
 </resources>

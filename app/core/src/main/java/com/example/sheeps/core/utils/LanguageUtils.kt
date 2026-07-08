@@ -15,14 +15,13 @@ fun getLocalizedItemName(itemType: String): String {
         "BOMB" -> stringResource(id = R.string.item_bomb)
         "JOKER" -> stringResource(id = R.string.item_joker)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points)
-        "SKIN_INK" -> stringResource(id = R.string.item_skin_ink)
-        "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber)
         "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan)
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan)
-        "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai)
-        "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang)
-        "CLASSIC" -> stringResource(id = R.string.item_skin_classic)
+        "SKIN_ELECTRONIC" -> stringResource(id = R.string.item_skin_electronic)
+        "SKIN_DAILY" -> stringResource(id = R.string.item_skin_daily)
+        "SKIN_VEGETABLE" -> stringResource(id = R.string.item_skin_vegetable)
+        "SKIN_FRUIT" -> stringResource(id = R.string.item_skin_fruit)
         else -> itemType
     }
 }
@@ -38,14 +37,13 @@ fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
         "BOMB" -> stringResource(id = R.string.item_bomb_desc)
         "JOKER" -> stringResource(id = R.string.item_joker_desc)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points_desc)
-        "SKIN_INK" -> stringResource(id = R.string.item_skin_ink_desc)
-        "SKIN_CYBER" -> stringResource(id = R.string.item_skin_cyber_desc)
         "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan_desc)
         "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan_desc)
-        "SKIN_KEAI" -> stringResource(id = R.string.item_skin_keai_desc)
-        "SKIN_DAIMENG" -> stringResource(id = R.string.item_skin_daimeng_desc)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang_desc)
-        "CLASSIC" -> stringResource(id = R.string.item_skin_classic_desc)
+        "SKIN_ELECTRONIC" -> stringResource(id = R.string.item_skin_electronic_desc)
+        "SKIN_DAILY" -> stringResource(id = R.string.item_skin_daily_desc)
+        "SKIN_VEGETABLE" -> stringResource(id = R.string.item_skin_vegetable_desc)
+        "SKIN_FRUIT" -> stringResource(id = R.string.item_skin_fruit_desc)
         else -> defaultDesc ?: stringResource(id = R.string.default_item_desc)
     }
 }
@@ -58,11 +56,17 @@ fun getLocalizedSource(source: String): String {
     }
     if (source.startsWith("SHOP_REDEEM_")) {
         val itemType = source.substringAfter("SHOP_REDEEM_")
-        return stringResource(id = R.string.points_source_shop_redeem, getLocalizedItemName(itemType))
+        return stringResource(
+            id = R.string.points_source_shop_redeem,
+            getLocalizedItemName(itemType)
+        )
     }
     if (source.startsWith("DAILY_TASK_")) {
         val taskNameKey = source.substringAfter("DAILY_TASK_")
-        return stringResource(id = R.string.points_source_daily_task, getLocalizedTaskName(taskNameKey))
+        return stringResource(
+            id = R.string.points_source_daily_task,
+            getLocalizedTaskName(taskNameKey)
+        )
     }
     return when (source.uppercase()) {
         "FIRST_CLEAR" -> stringResource(id = R.string.points_source_first_clear)

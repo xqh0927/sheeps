@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
     <style name="Theme.Sheeps.MoYeGold" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FFCCCCCC</item>
     </style>
+
     <style name="Theme.Sheeps.QingRiChun" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FF666666</item>
     </style>
@@ -10,12 +12,15 @@
     <style name="Theme.Sheeps.Sakura" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FFEC407A</item>
     </style>
+
     <style name="Theme.Sheeps.Cosmic" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FF3F51B5</item>
     </style>
+
     <style name="Theme.Sheeps.Sunset" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FFFF9800</item>
     </style>
+
     <style name="Theme.Sheeps.Forest" parent="android:Theme.DeviceDefault.NoActionBar">
         <item name="iconColor">#FF4CAF50</item>
     </style>

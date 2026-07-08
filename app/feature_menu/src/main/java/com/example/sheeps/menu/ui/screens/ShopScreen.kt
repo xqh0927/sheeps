@@ -52,31 +52,13 @@ fun ShopScreen(
     // 当前选中的二级 Tab：0 - 神奇道具, 1 - 角色/图标皮肤
     var selectedSubTab by remember { mutableIntStateOf(0) }
 
-    val classicName = stringResource(id = R.string.item_skin_classic)
-    val classicDesc = stringResource(id = R.string.item_skin_classic_desc)
-
-    // 根据选中的 Tab 过滤展示的商品
-    val displayItems = remember(selectedSubTab, state.shopItems, classicName, classicDesc) {
+    // 根据选中的 Tab 过滤展示 childhood skins 商品
+    val displayItems = remember(selectedSubTab, state.shopItems) {
         if (selectedSubTab == 0) {
             // 过滤出非皮肤类道具
             state.shopItems.filter { !it.item_type.startsWith("SKIN_") }
         } else {
-            val skins = mutableListOf<ShopItem>()
-            // 默认添加经典（默认）皮肤作为选项
-            skins.add(
-                ShopItem(
-                    id = -1,
-                    name = classicName,
-                    description = classicDesc,
-                    image_url = "",
-                    item_type = "CLASSIC",
-                    points_price = 0,
-                    stock = 9999
-                )
-            )
-            // 添加所有从服务器拉取的皮肤商品
-            skins.addAll(state.shopItems.filter { it.item_type.startsWith("SKIN_") })
-            skins
+            state.shopItems.filter { it.item_type.startsWith("SKIN_") }
         }
     }
 
@@ -165,17 +147,16 @@ fun ShopScreen(
                     }
                 } else {
                     // 皮肤类商品：按系列分组纵向排列，每组内部横向滚动
-                    val traditionalSkins = displayItems.filter {
-                        it.item_type == "CLASSIC" || it.item_type == "SKIN_INK" || it.item_type == "SKIN_CYBER"
-                    }
                     val animatedSkins = displayItems.filter {
-                        it.item_type == "SKIN_SHUANG" || it.item_type == "SKIN_KEAI" || it.item_type == "SKIN_DAIMENG"
+                        it.item_type == "SKIN_SHUANG" ||
+                        it.item_type == "SKIN_ELECTRONIC" || it.item_type == "SKIN_DAILY" ||
+                        it.item_type == "SKIN_VEGETABLE" || it.item_type == "SKIN_FRUIT"
                     }
                     val provinceSkins = displayItems.filter {
-                        it.item_type.startsWith("SKIN_") && 
+                        it.item_type.startsWith("SKIN_") &&
                         it.item_type != "SKIN_SHUANG" &&
-                        it.item_type != "SKIN_INK" && it.item_type != "SKIN_CYBER" &&
-                        it.item_type != "SKIN_KEAI" && it.item_type != "SKIN_DAIMENG"
+                        it.item_type != "SKIN_ELECTRONIC" && it.item_type != "SKIN_DAILY" &&
+                        it.item_type != "SKIN_VEGETABLE" && it.item_type != "SKIN_FRUIT"
                     }
 
                     Column(
@@ -184,35 +165,6 @@ fun ShopScreen(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // 区域 1：传统系列皮肤
-                        Text(
-                            text = stringResource(id = R.string.shop_section_traditional),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            lazyItems(traditionalSkins) { item ->
-                                Box(modifier = Modifier.width(160.dp)) {
-                                    val backpackCount = if (item.item_type == "CLASSIC") 1 else {
-                                        state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
-                                    }
-                                    ShopItemCard(
-                                        item = item,
-                                        backpackCount = backpackCount,
-                                        currentSkin = state.currentSkin,
-                                        userPoints = state.points,
-                                        onExchange = { count -> onExchangeClick(item.id, count) },
-                                        onApplySkin = { skin -> onChangeSkin(skin) }
-                                    )
-                                }
-                            }
-                        }
-
                         // 区域 2：灵动动画系列
                         if (animatedSkins.isNotEmpty()) {
                             Text(

@@ -5,6 +5,7 @@ import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.GameViewEffect
 import com.example.sheeps.game.state.GameViewState
+import com.example.sheeps.game.state.GameHistoryState
 import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.SoundType
 import kotlinx.coroutines.CoroutineScope
@@ -22,21 +23,23 @@ class GameToolDelegate @Inject constructor() {
      */
     fun handleUseUndo(
         state: GameViewState,
-        historyStack: MutableList<Triple<List<Tile>, List<Tile>, List<Tile>>>,
+        historyStack: MutableList<GameHistoryState>,
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
         onToolUsed: () -> Unit
     ) {
         if (state.undoCount <= 0 || historyStack.isEmpty()) return
 
-        val (prevBoard, prevSlot, prevMovedOut) = historyStack.removeAt(historyStack.lastIndex)
+        val prev = historyStack.removeAt(historyStack.lastIndex)
         onToolUsed()
 
         updateState {
             copy(
-                boardTiles = calculateBlockedStates(prevBoard),
-                slotTiles = prevSlot,
-                movedOutTiles = prevMovedOut,
+                boardTiles = calculateBlockedStates(prev.boardTiles),
+                slotTiles = prev.slotTiles,
+                movedOutTiles = prev.movedOutTiles,
+                sealedClearCount = prev.sealedClearCount,
+                sealedUnlockedIds = prev.sealedUnlockedIds,
                 undoCount = state.undoCount - 1
             )
         }

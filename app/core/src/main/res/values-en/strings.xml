@@ -74,7 +74,6 @@
 
     <string name="shop_title">Item Shop</string>
     <string name="shop_vault_locked">Locked</string>
-    <string name="shop_section_traditional">Ink Style Skins</string>
     <string name="shop_section_provinces">Food Series Skins</string>
     <string name="shop_section_animated">Effect Skins</string>
 
@@ -303,22 +302,21 @@
     <string name="slot_not_carried">None</string>
     <string name="carried_magic_items">Carried Items</string>
 
-    <string name="item_skin_classic">Classic</string>
-    <string name="item_skin_classic_desc">Classic style red &amp; black theme skin</string>
-    <string name="item_skin_ink">Ink Paint</string>
-    <string name="item_skin_ink_desc">Elegant ink paint style tile skin</string>
-    <string name="item_skin_cyber">Cyber Neon</string>
-    <string name="item_skin_cyber_desc">Vibrant cyber neon style tile skin</string>
     <string name="item_skin_henan">Henan Food</string>
     <string name="item_skin_henan_desc">Special Henan food style tile skin</string>
     <string name="item_skin_sichuan">Sichuan Food</string>
     <string name="item_skin_sichuan_desc">Special Sichuan food style tile skin</string>
-    <string name="item_skin_keai">Cute &amp; Fun</string>
-    <string name="item_skin_keai_desc">Cute dynamic cartoons style tile skin</string>
-    <string name="item_skin_daimeng">Handmade</string>
-    <string name="item_skin_daimeng_desc">Cozy hand-drawn style cartoon skin</string>
     <string name="item_skin_shuang">Shuang Fun Skin</string>
     <string name="item_skin_shuang_desc">12 cute sheep tiles with sky blue borders and sunlit gold accents</string>
+
+    <string name="item_skin_electronic">Digital Gadgets</string>
+    <string name="item_skin_electronic_desc">12 electronic-gadget tiles with neon-blue borders and tech-silver accents</string>
+    <string name="item_skin_daily">Daily Life</string>
+    <string name="item_skin_daily_desc">12 everyday-essentials tiles with warm-orange borders and cream accents</string>
+    <string name="item_skin_vegetable">Fresh Veggies</string>
+    <string name="item_skin_vegetable_desc">12 fresh-vegetable tiles with crisp-green borders and sprout accents</string>
+    <string name="item_skin_fruit">Juicy Fruits</string>
+    <string name="item_skin_fruit_desc">12 juicy-fruit tiles with vivid-red borders and fruity accents</string>
 
     <string name="leaderboard_data_error">Data Error</string>
     <string name="leaderboard_load_error">Load failed, check connection</string>
@@ -472,4 +470,10 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
+
+
+    <!-- ===== 对齐补全：base 缺失 key（en） ===== -->
+    <string name="sealed_gate_progress">Eliminated %1$d / %2$d · Seals unlocked %3$d / %4$d</string>
+    <string name="sealed_gate_need_more">Eliminate %1$d more normal tiles to unlock</string>
+    <string name="sealed_gate_unlocked">Seal broken! %1$d sealed tiles unlocked</string>
 </resources>

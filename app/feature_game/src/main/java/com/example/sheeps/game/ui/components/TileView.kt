@@ -1,5 +1,6 @@
 package com.example.sheeps.game.ui.components
 
+import com.example.sheeps.core.game.SkinConstants
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,10 +37,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.decode.ImageDecoderDecoder
-import coil.request.ImageRequest
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileCardBase
@@ -65,11 +62,12 @@ import com.example.sheeps.game.ui.animations.GameAnimations
 fun TileView(
     tile: Tile,
     onClick: () -> Unit,
-    currentSkin: String = "classic",
+    currentSkin: String = SkinConstants.DEFAULT_SKIN,
     modifier: Modifier = Modifier,
     tileSize: Dp = 48.dp,
     isShaking: Boolean = false,
-    isHighlighted: Boolean = false
+    isHighlighted: Boolean = false,
+    gateLocked: Boolean = false
 ) {
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
@@ -134,15 +132,6 @@ fun TileView(
     ) {
         val context = LocalContext.current
 
-        // Coil ImageLoader 用于渲染动画 WebP（灵动动画系列皮肤）
-        val imageLoader = remember {
-            ImageLoader.Builder(context)
-                .components {
-                    add(ImageDecoderDecoder.Factory())
-                }
-                .build()
-        }
-
         Box(
             modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
@@ -155,28 +144,15 @@ fun TileView(
                 )
             } else {
                 // 情况 2：显示正面图标，若被压制则降低透明度
-                // 灵动动画系列皮肤（keai / daimeng）使用 Coil AsyncImage 渲染动画 WebP
-                val isAnimatedSkin = currentSkin == "keai" || currentSkin == "daimeng"
                 val iconResId = TileIconProvider.getIconResource(context, currentSkin, tile.type)
                 if (iconResId != 0) {
-                    if (isAnimatedSkin) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(iconResId).build(),
-                            contentDescription = "Tile Icon",
-                            imageLoader = imageLoader,
-                            modifier = Modifier
-                                .size(tileSize * 0.9f)
-                                .alpha(if (isBlocked) mask else 1f)
-                        )
-                    } else {
-                        Image(
-                            painter = painterResource(id = iconResId),
-                            contentDescription = "Tile Icon",
-                            modifier = Modifier
-                                .size(tileSize * 0.9f)
-                                .alpha(if (isBlocked) mask else 1f)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = iconResId),
+                        contentDescription = "Tile Icon",
+                        modifier = Modifier
+                            .size(tileSize * 0.9f)
+                            .alpha(if (isBlocked) mask else 1f)
+                    )
                 } else {
                                       Box(
                         modifier = Modifier
@@ -216,41 +192,21 @@ fun TileView(
                     }
                 }
 
-                // 叠加层：封印效果（多层封印有不同视觉）
-                if (isSealed) {
-                    // 1层：冰晶蓝；2层：岩石灰；3层：暗晶紫
-                    val (sealBg, sealBorder, sealEmoji) = when (tile.sealedCount) {
-                        1 -> Triple(Color(0xBB2C3E50), Color(0xFFF1C40F).copy(alpha = 0.8f), "🔒")
-                        2 -> Triple(Color(0xDD5D6D7E), Color(0xFFE67E22).copy(alpha = 0.85f), "⛓️")
-                        else -> Triple(Color(0xDD6C3483), Color(0xFF9B59B6).copy(alpha = 0.85f), "🔐")
-                    }
+                // 叠加层：封印效果（门控锁定态：冰晶蓝背景 + 黄金边框 + 🔒黄色锁头）
+                if (gateLocked) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(sealBg)
-                            .border(1.5.dp, sealBorder, RoundedCornerShape(8.dp)),
+                            .background(Color(0xBB2C3E50))
+                            .border(1.5.dp, Color(0xFFF1C40F).copy(alpha = 0.8f), RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = sealEmoji,
-                                fontSize = 18.sp,
-                                modifier = Modifier.graphicsLayer(scaleX = 1.1f, scaleY = 1.1f)
-                            )
-                            if (tile.sealedCount > 1) {
-                                Text(
-                                    text = "x${tile.sealedCount}",
-                                    color = sealBorder,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 1.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = "🔒",
+                            fontSize = 18.sp,
+                            modifier = Modifier.graphicsLayer(scaleX = 1.1f, scaleY = 1.1f)
+                        )
                     }
                 }
             }

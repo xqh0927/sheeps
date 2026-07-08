@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.example.sheeps.core.game.SkinConstants
 
 @Singleton
 class UserPreferences @Inject constructor(
@@ -139,7 +140,7 @@ class UserPreferences @Inject constructor(
     }
 
     fun getCurrentSkin(): String {
-        return kv.decodeString("current_skin", "classic") ?: "classic"
+        return kv.decodeString("current_skin", SkinConstants.DEFAULT_SKIN) ?: SkinConstants.DEFAULT_SKIN
     }
 
     fun setCurrentSkin(skin: String) {

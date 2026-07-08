@@ -12,7 +12,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -28,12 +27,11 @@ fun TileCardBase(
     
     // 根据皮肤类型定义背景色、边框色和装饰线颜色
     val (bgColor, borderColor, decorColor) = when (normalizedSkin) {
-        "ink" -> Triple(cs.surface, cs.onSurface.copy(alpha = 0.3f), cs.onSurface.copy(alpha = 0.5f)) // 水墨风格
-        "cyber" -> Triple(cs.surface, Color(0xFF00F2FE), Color(0xFFFF2A6D)) // 赛博朋克风格：赛博色保留
-        "keai" -> Triple(cs.surface, cs.primary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.4f)) // 萌趣卡通
-        "daimeng" -> Triple(cs.surface, cs.secondary.copy(alpha = 0.7f), cs.primary.copy(alpha = 0.5f)) // 呆萌手绘
-        "classic" -> Triple(cs.surface, cs.primary, cs.secondary) // 经典中国风
         "shuang" -> Triple(cs.surface, Color(0xFF29B6F6), Color(0xFFFFCA28)) // 萌趣竞技：爽爽蓝边框+阳光金装饰
+        "electronic" -> Triple(cs.surface, Color(0xFF21D4FD), Color(0xFFB721FF)) // 数码潮玩：科技蓝边框+霓虹紫装饰
+        "daily" -> Triple(cs.surface, Color(0xFFFF9800), Color(0xFFFFC107)) // 日常好物：暖橙边框+阳光金装饰
+        "vegetable" -> Triple(cs.surface, Color(0xFF4CAF50), Color(0xFF8BC34A)) // 蔬菜园：清新绿边框+嫩绿装饰
+        "fruit" -> Triple(cs.surface, Color(0xFFFF5252), Color(0xFFFF8A80)) // 水果盘：鲜红边框+浅红装饰
         else -> Triple(cs.surface, cs.primary, cs.secondary) // 默认经典色调
     }
 
@@ -56,31 +54,21 @@ fun TileCardBase(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 根据皮肤绘制边角的装饰线（所有非赛博皮肤走经典装饰，赛博皮肤保留霓虹）
-            if (normalizedSkin != "cyber") {
-                val decorLen = 12.dp.toPx()
-                // 绘制四个角的折线装饰，颜色从 decorColor 读取
-                // 左上角
-                drawLine(decorColor, Offset(0f, decorLen), Offset(0f, 0f), strokeWidth)
-                drawLine(decorColor, Offset(0f, 0f), Offset(decorLen, 0f), strokeWidth)
-                // 右上角
-                drawLine(decorColor, Offset(w - decorLen, 0f), Offset(w, 0f), strokeWidth)
-                drawLine(decorColor, Offset(w, 0f), Offset(w, decorLen), strokeWidth)
-                // 左下角
-                drawLine(decorColor, Offset(0f, h - decorLen), Offset(0f, h), strokeWidth)
-                drawLine(decorColor, Offset(0f, h), Offset(decorLen, h), strokeWidth)
-                // 右下角
-                drawLine(decorColor, Offset(w - decorLen, h), Offset(w, h), strokeWidth)
-                drawLine(decorColor, Offset(w, h), Offset(w, h - decorLen), strokeWidth)
-            } else {
-                // 赛博风格装饰：绘制一条霓虹渐变线
-                drawLine(
-                    brush = Brush.linearGradient(listOf(Color(0xFF00F2FE), Color(0xFFFF2A6D))),
-                    start = Offset(0f, h * 0.8f),
-                    end = Offset(w, h * 0.8f),
-                    strokeWidth = 1.dp.toPx()
-                )
-            }
+            // 根据皮肤绘制边角的装饰线（所有皮肤统一走经典四角折线装饰）
+            val decorLen = 12.dp.toPx()
+            // 绘制四个角的折线装饰，颜色从 decorColor 读取
+            // 左上角
+            drawLine(decorColor, Offset(0f, decorLen), Offset(0f, 0f), strokeWidth)
+            drawLine(decorColor, Offset(0f, 0f), Offset(decorLen, 0f), strokeWidth)
+            // 右上角
+            drawLine(decorColor, Offset(w - decorLen, 0f), Offset(w, 0f), strokeWidth)
+            drawLine(decorColor, Offset(w, 0f), Offset(w, decorLen), strokeWidth)
+            // 左下角
+            drawLine(decorColor, Offset(0f, h - decorLen), Offset(0f, h), strokeWidth)
+            drawLine(decorColor, Offset(0f, h), Offset(decorLen, h), strokeWidth)
+            // 右下角
+            drawLine(decorColor, Offset(w - decorLen, h), Offset(w, h), strokeWidth)
+            drawLine(decorColor, Offset(w, h), Offset(w, h - decorLen), strokeWidth)
         }
         // 在卡牌基座上层叠加具体的图标内容
         content()

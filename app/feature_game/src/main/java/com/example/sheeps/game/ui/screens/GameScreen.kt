@@ -29,6 +29,8 @@ import com.example.sheeps.ui.components.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import kotlinx.coroutines.launch
 
@@ -134,6 +136,11 @@ fun GameScreen(
                 // 1. 顶部状态栏（得分、卡牌数）
                 GameStatusBar(state = state)
 
+                // 封印门控进度条（仅封印关卡显示）
+                if (state.sealedOrder.isNotEmpty()) {
+                    SealedGateProgress(state = state)
+                }
+
                 // 2. 游戏核心棋盘：可自适应高度，置物架出现时自动压缩
                 GameBoard(
                     state = state,
@@ -229,6 +236,44 @@ fun GameScreen(
 
         if (state.isLoading) {
             FullScreenLoading()
+        }
+    }
+}
+
+/**
+ * 封印门控进度条：显示已消除正常牌数 / 阈值，以及已解锁封印牌数
+ */
+@Composable
+private fun SealedGateProgress(state: GameViewState) {
+    val progress = if (state.sealedOrder.isEmpty()) {
+        0f
+    } else {
+        state.sealedUnlockedIds.size.toFloat() / state.sealedOrder.size
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = stringResource(
+                    id = R.string.sealed_gate_progress,
+                    state.sealedClearCount,
+                    state.sealedUnlockThreshold,
+                    state.sealedUnlockedIds.size,
+                    state.sealedOrder.size
+                ),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.secondary,
+                trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+            )
         }
     }
 }

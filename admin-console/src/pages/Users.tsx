@@ -44,8 +44,6 @@ const PROPS_DEFINITIONS = [
 ];
 
 const SKINS_DEFINITIONS = [
-  { type: 'SKIN_INK', label: '水墨江山' },
-  { type: 'SKIN_CYBER', label: '赛博霓虹' },
   { type: 'SKIN_HENAN', label: '河南·省味' },
   { type: 'SKIN_SICHUAN', label: '四川·省味' },
   { type: 'SKIN_SHUANG', label: '萌趣竞技' }

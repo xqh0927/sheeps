@@ -29,71 +29,38 @@ export function lcg(seed: number) {
 }
 
 /**
- * 生成封印聚簇：封印牌以簇状分布，相邻卡牌相互连接，形成战略点。
+ * 封印门控解锁阈值：每累计消除 N 张正常牌（= 消除 1 组三连）即解锁 1 张封印牌。
+ * 与 Android 端 GameViewState.sealedUnlockThreshold 同步，固定为 3（详见 sealed-unlock-mechanism-design.md §6）。
  */
-function generateSealedClusters(
+export const SEAL_UNLOCK_THRESHOLD = 3;
+
+/**
+ * 生成均匀分布的封印牌
+ */
+function generateSealedUniformly(
   nodes: { index: number; coord: Point3D; assignedType: number }[],
   rand: () => number,
   sealRatio: number,
-  clusterCount: number,
   maxLayer: number
 ): Map<number, number> {
   if (nodes.length === 0) return new Map();
 
   const maxZ = Math.max(...nodes.map((n) => n.coord.z));
   let eligible = nodes.filter((n) => n.coord.z <= maxZ * 0.7);
-  if (eligible.length < clusterCount) eligible = nodes;
+  if (eligible.length === 0) eligible = nodes;
 
   const totalSealed = Math.max(1, Math.floor(nodes.length * sealRatio));
-  const targetPerCluster = Math.max(1, Math.floor(totalSealed / clusterCount));
 
-  const seeds: typeof nodes = [];
-  const available = [...eligible];
-  for (let i = 0; i < clusterCount; i++) {
-    if (available.length === 0) break;
-    const idx = Math.floor(rand() * available.length);
-    seeds.push(available.splice(idx, 1)[0]);
+  const shuffled = [...eligible];
+  for (let i = shuffled.length - 1; i >= 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
   const result = new Map<number, number>();
-  for (const seed of seeds) {
-    if (result.size >= totalSealed) break;
-    const cluster = new Set<number>();
-    const queue: number[] = [seed.index];
-    cluster.add(seed.index);
-
-    while (queue.length > 0 && cluster.size < targetPerCluster) {
-      const current = queue.shift()!;
-      const currentNode = nodes[current];
-      const neighbors = nodes
-        .map((n, idx) => ({ n, idx }))
-        .filter(({ n, idx }) => {
-          if (cluster.has(idx)) return false;
-          if (n.coord.z !== currentNode.coord.z) return false;
-          if (Math.abs(n.coord.x - currentNode.coord.x) > 1.5) return false;
-          if (Math.abs(n.coord.y - currentNode.coord.y) > 1.5) return false;
-          return true;
-        })
-        .map(({ idx }) => idx);
-
-      // 随机打乱
-      for (let i = neighbors.length - 1; i > 0; i--) {
-        const j = Math.floor(rand() * (i + 1));
-        [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
-      }
-
-      for (const idx of neighbors) {
-        if (cluster.size >= targetPerCluster) break;
-        if (result.size >= totalSealed) break;
-        cluster.add(idx);
-        queue.push(idx);
-      }
-    }
-
-    for (const tileIndex of cluster) {
-      if (result.size >= totalSealed) break;
-      result.set(tileIndex, randomSealLayer(rand, maxLayer));
-    }
+  const chosen = shuffled.slice(0, totalSealed);
+  for (const node of chosen) {
+    result.set(node.index, randomSealLayer(rand, maxLayer));
   }
 
   return result;
@@ -285,7 +252,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
 
   const randProps = lcg(seed + 300);
   const sealedClusters = isSealedLevel
-    ? generateSealedClusters(nodes, () => randProps(), sealRatio, clusterCount, maxSealLayer)
+    ? generateSealedUniformly(nodes, () => randProps(), sealRatio, maxSealLayer)
     : new Map<number, number>();
 
   return nodes.map((node) => {
@@ -299,7 +266,8 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       z: node.coord.z,
       type: node.assignedType,
       isBlind,
-      sealedCount
+      sealedCount,
+      sealUnlockThreshold: SEAL_UNLOCK_THRESHOLD
     };
   });
 }

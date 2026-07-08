@@ -249,11 +249,13 @@ INSERT INTO app_version (version_code, version_name, apk_url, update_log, update
 (1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 'Initial release', '初始版本發布', '初期リリース', '초기 버전 출시', 0, 1720000000000);
 
 INSERT INTO shop_items (id, name, description, name_en, description_en, name_tw, description_tw, name_ja, description_ja, name_ko, description_ko, item_type, points_price, stock) VALUES 
-(9, '水墨江山 (卡牌皮肤)', '古典水墨底色与墨金边框', 'Ink Landscape Skin', 'Classic ink wash background with dark gold frame', '水墨江山', '古典水墨底色與墨金邊框', '水墨山水', '古典的な水墨画の背景とダークゴールドのフレーム', '수묵강산', '고전적인 수묵화 배경과 다크 골드 프레임', 'SKIN_INK', 200, 9999),
-(10, '赛博霓虹 (卡牌皮肤)', '电子科幻线条与极光发光外框', 'Cyber Neon Skin', 'Electronic sci-fi lines with neon glowing frame', '賽博霓虹', '電子科幻線條與極光發光外框', 'サイバーネオン', 'ネオンに光るフレームを備えた電子SFライン', '사이버 네온', '네온으로 빛나는 프레임이 있는 전자 공상 과학 라인', 'SKIN_CYBER', 500, 9999),
 (1000, '河南·省味 (卡牌皮肤)', '解锁河南省特色美食图标皮肤', 'Henan Gourmet Skin', 'Unlock Henan local gourmet icon skin', '河南·省味', '解鎖河南省特色美食圖標皮膚', '河南・省味', '河南省の特色ある美食アイコンスキンをアンロック', '허난성 맛', '허난성 특색 미식 아이콘 스킨 해제', 'SKIN_HENAN', 200, 9999),
 (1001, '四川·省味 (卡牌皮肤)', '解锁四川省特色美食图标皮肤', 'Sichuan Gourmet Skin', 'Unlock Sichuan local gourmet icon skin', '四川·省味', '解鎖四川省特色美食圖標皮膚', '四川・省味', '四川省の特色ある美食アイコンスキンをアンロック', '쓰촨성 맛', '쓰촨성 특색 미식 아이콘 스킨 해제', 'SKIN_SICHUAN', 200, 9999),
-(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'Shuang Fun Skin', '12 cute sheep tiles with sky blue borders and sunlit gold accents', '萌趣競技', '12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾', '萌趣競技', 'スカイブルーのボーダーとサンライトゴールド的アクセントを持つ12种のかわいい羊タイル', '멍취징지', '하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일', 'SKIN_SHUANG', 300, 9999);
+(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'Shuang Fun Skin', '12 cute sheep tiles with sky blue borders and sunlit gold accents', '萌趣競技', '12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾', '萌趣競技', 'スカイブルーのボーダーとサンライトゴールド的アクセントを持つ12种のかわいい羊タイル', '멍취징지', '하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일', 'SKIN_SHUANG', 300, 9999),
+(2001, '数码潮玩 (卡牌皮肤)', '12款数码设备卡面，科技蓝边框搭配霓虹装饰', 'Electronic Skin', '12 digital gadget tiles with tech-blue borders and neon accents', '數碼潮玩', '12款數碼設備卡面，科技藍邊框搭配霓虹裝飾', '電子ガジェット', 'テックブルーのボーダーとネオン装飾の12種のガジェットタイル', '디지털 스킨', '테크 블루 테두리와 네온 포인트의 12가지 디지털 기기 타일', 'SKIN_ELECTRONIC', 300, 9999),
+(2002, '日常好物 (卡牌皮肤)', '12款日常用品卡面，暖橙边框搭配阳光装饰', 'Daily Skin', '12 daily-life tiles with warm orange borders and sunny accents', '日常好物', '12款日常用品卡面，暖橙邊框搭配陽光裝飾', '日常アイテム', 'ウォームオレンジのボーダーとサンシャイン装飾の12種の日常アイテムタイル', '일상 스킨', '따뜻한 주황 테두리와 햇살 장식의 12가지 일상 용품 타일', 'SKIN_DAILY', 300, 9999),
+(2003, '蔬菜园 (卡牌皮肤)', '12款新鲜蔬菜卡面，清新绿边框搭配田园装饰', 'Vegetable Skin', '12 fresh vegetable tiles with fresh-green borders and garden accents', '蔬菜園', '12款新鮮蔬菜卡面，清新綠邊框搭配田園裝飾', '野菜園', 'フレッシュグリーンのボーダーとガーデン装飾の12種の野菜タイル', '채소 스킨', '싱그러운 초록 테두리와 정원 장식의 12가지 채소 타일', 'SKIN_VEGETABLE', 300, 9999),
+(2004, '水果盘 (卡牌皮肤)', '12款时令水果卡面，鲜红边框搭配果香装饰', 'Fruit Skin', '12 seasonal fruit tiles with vivid-red borders and fruity accents', '水果盤', '12款時令水果卡面，鮮紅邊框搭配果香裝飾', 'フルーツ', 'ビビッドレッドのボーダーとフルーティー装飾の12種のフルーツタイル', '과일 스킨', '선명한 빨강 테두리와 과일 장식의 12가지 제철 과일 타일', 'SKIN_FRUIT', 300, 9999);
 
 
 -- 联机对战匹配队列

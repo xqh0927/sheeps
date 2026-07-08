@@ -53,14 +53,12 @@ fun BackpackCard(
 
     if (selectedItem != null) {
         val item = selectedItem!!
-        val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
+        val isSkin = item.item_type.startsWith("SKIN_")
         val skinKey = remember(item.item_type) {
-            if (item.item_type == "CLASSIC") {
-                "classic"
-            } else if (item.item_type.startsWith("SKIN_")) {
+            if (item.item_type.startsWith("SKIN_")) {
                 item.item_type.removePrefix("SKIN_").lowercase()
             } else {
-                "classic"
+                ""
             }
         }
         val isCurrentlyApplied = isSkin && state.currentSkin == skinKey
@@ -91,14 +89,10 @@ fun BackpackCard(
             )
 
             val magicItems = remember(state.backpackItems) {
-                state.backpackItems.filter { !it.item_type.startsWith("SKIN_") && it.item_type != "CLASSIC" }
+                state.backpackItems.filter { !it.item_type.startsWith("SKIN_") }
             }
             val skinItems = remember(state.backpackItems) {
-                val list = state.backpackItems.filter { it.item_type.startsWith("SKIN_") || it.item_type == "CLASSIC" }.toMutableList()
-                if (list.none { it.item_type == "CLASSIC" }) {
-                    list.add(0, com.example.sheeps.data.model.UserItem("CLASSIC", 1))
-                }
-                list
+                state.backpackItems.filter { it.item_type.startsWith("SKIN_") }
             }
 
             if (magicItems.isNotEmpty()) {
@@ -153,14 +147,12 @@ private fun BackpackItem(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
+    val isSkin = item.item_type.startsWith("SKIN_")
     val skinKey = remember(item.item_type) {
-        if (item.item_type == "CLASSIC") {
-            "classic"
-        } else if (item.item_type.startsWith("SKIN_")) {
+        if (item.item_type.startsWith("SKIN_")) {
             item.item_type.removePrefix("SKIN_").lowercase()
         } else {
-            "classic"
+            ""
         }
     }
 
@@ -180,7 +172,7 @@ private fun BackpackItem(
                 .padding(bottom = 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER"
+            val isProvinceSkin = item.item_type.startsWith("SKIN_")
             if (isSkin && isProvinceSkin) {
                 val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
                 if (iconRes != 0) {
@@ -231,14 +223,12 @@ private fun BackpackItemDetailDialog(
     onGoToPlay: () -> Unit
 ) {
     val context = LocalContext.current
-    val isSkin = item.item_type.startsWith("SKIN_") || item.item_type == "CLASSIC"
+    val isSkin = item.item_type.startsWith("SKIN_")
     val skinKey = remember(item.item_type) {
-        if (item.item_type == "CLASSIC") {
-            "classic"
-        } else if (item.item_type.startsWith("SKIN_")) {
+        if (item.item_type.startsWith("SKIN_")) {
             item.item_type.removePrefix("SKIN_").lowercase()
         } else {
-            "classic"
+            ""
         }
     }
 
@@ -264,7 +254,7 @@ private fun BackpackItemDetailDialog(
                         .padding(bottom = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val isProvinceSkin = item.item_type.startsWith("SKIN_") && item.item_type != "SKIN_INK" && item.item_type != "SKIN_CYBER"
+                    val isProvinceSkin = item.item_type.startsWith("SKIN_")
                     if (isSkin && isProvinceSkin) {
                         val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
                         Image(

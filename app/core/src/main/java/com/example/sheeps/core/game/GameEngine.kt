@@ -34,7 +34,7 @@ object GameEngine {
         val grid = buildGrid(board)
         return board.map { tile ->
             if (tile.state != TileState.NORMAL && tile.state != TileState.BLOCKED) {
-                tile
+                tile.copy()
             } else {
                 val covered = calculateCoveredArea(tile, grid)
                 val blocked = covered > TILE * TILE * COVERAGE_THRESHOLD

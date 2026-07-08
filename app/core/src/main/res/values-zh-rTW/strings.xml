@@ -74,7 +74,6 @@
 
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解鎖</string>
-    <string name="shop_section_traditional">水墨風卡牌皮膚</string>
     <string name="shop_section_provinces">美食系列卡牌皮膚</string>
     <string name="shop_section_animated">特效皮膚</string>
 
@@ -277,22 +276,21 @@
     <string name="slot_not_carried">未帶</string>
     <string name="carried_magic_items">隨身道具</string>
 
-    <string name="item_skin_classic">經典難紅</string>
-    <string name="item_skin_classic_desc">經典紅黑底紋卡牌皮膚</string>
-    <string name="item_skin_ink">寫意水墨</string>
-    <string name="item_skin_ink_desc">淡墨金絲，極簡水墨卡牌皮膚</string>
-    <string name="item_skin_cyber">賽博霓虹</string>
-    <string name="item_skin_cyber_desc">賽博霓虹燈效卡牌皮膚</string>
     <string name="item_skin_henan">中原美食</string>
     <string name="item_skin_henan_desc">河南特色美食卡牌皮膚</string>
     <string name="item_skin_sichuan">巴蜀美食</string>
     <string name="item_skin_sichuan_desc">四川特色美食卡牌皮膚</string>
-    <string name="item_skin_keai">卡通萌趣</string>
-    <string name="item_skin_keai_desc">卡通動態萌趣卡牌皮膚</string>
-    <string name="item_skin_daimeng">手繪童趣</string>
-    <string name="item_skin_daimeng_desc">手繪質感呆萌卡通卡牌皮膚</string>
     <string name="item_skin_shuang">萌趣競技</string>
     <string name="item_skin_shuang_desc">12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾</string>
+
+    <string name="item_skin_electronic">數碼潮玩</string>
+    <string name="item_skin_electronic_desc">12款數碼設備卡面，科技藍邊框搭配霓虹裝飾</string>
+    <string name="item_skin_daily">日常好物</string>
+    <string name="item_skin_daily_desc">12款日常用品卡面，暖橙邊框搭配陽光裝飾</string>
+    <string name="item_skin_vegetable">蔬菜園</string>
+    <string name="item_skin_vegetable_desc">12款新鮮蔬菜卡面，清新綠邊框搭配田園裝飾</string>
+    <string name="item_skin_fruit">水果盤</string>
+    <string name="item_skin_fruit_desc">12款時令水果卡面，鮮紅邊框搭配果香裝飾</string>
 
     <string name="leaderboard_data_error">數據獲取失敗</string>
     <string name="leaderboard_load_error">加載失敗，請檢查網絡連接</string>
@@ -445,4 +443,34 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
+
+
+    <!-- ===== 对齐补全：base 缺失 key（zh_rTW） ===== -->
+    <string name="sealed_gate_progress">已消除 %1$d / %2$d 張 ・ 已解鎖 %3$d / %4$d 張封印</string>
+    <string name="sealed_gate_need_more">還需消除 %1$d 張正常卡牌</string>
+    <string name="sealed_gate_unlocked">封印解鎖！已解鎖 %1$d 張封印牌</string>
+    <string name="home_endless_title">無盡生存</string>
+    <string name="home_endless_desc">俄羅斯方塊式疊塔消除，衝擊最高分！</string>
+    <string name="home_endless_login_hint">請先登錄，方可參與無盡生存！</string>
+    <string name="endless_intro_title">無盡生存 · 疊塔模式</string>
+    <string name="endless_intro_desc">卡牌持續下落、層層堆疊，消除三張同花保命；頂到死亡線或卡槽溢出即結束。比拼積分，登頂無盡榜單！</string>
+    <string name="endless_intro_soon">玩法開發中，敬請期待</string>
+    <string name="endless_intro_close">知道了</string>
+    <string name="endless_score">分數: %1$d</string>
+    <string name="endless_combo">連擊: %1$d</string>
+    <string name="endless_wave">波次: %1$d</string>
+    <string name="endless_best">最高: %1$d</string>
+    <string name="endless_freeze">凍結</string>
+    <string name="endless_hold">暫存</string>
+    <string name="endless_pause">暫停</string>
+    <string name="endless_resume">繼續</string>
+    <string name="endless_restart">再來一局</string>
+    <string name="endless_game_over">遊戲結束</string>
+    <string name="endless_death_line">卡牌觸頂！</string>
+    <string name="endless_slot_overflow">卡槽溢出！</string>
+    <string name="endless_start">開始遊戲</string>
+    <string name="endless_new_best">新紀錄！</string>
+    <string name="endless_wave_banner">Wave %1$d · 提速！</string>
+    <string name="endless_leaderboard_title">無盡生存 · 總榜單</string>
+    <string name="endless_leaderboard_entry">排行榜</string>
 </resources>

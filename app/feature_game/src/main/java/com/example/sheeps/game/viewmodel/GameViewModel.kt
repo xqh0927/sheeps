@@ -15,6 +15,7 @@ import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.game.state.BoardBounds
 import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.GameViewEffect
+import com.example.sheeps.game.state.GameHistoryState
 import com.example.sheeps.game.state.GameViewIntent
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.game.state.SoundType
@@ -57,7 +58,7 @@ class GameViewModel @Inject constructor(
     private var tickJob: kotlinx.coroutines.Job? = null
 
     // 历史状态栈（用于撤销功能）
-    private val historyStack = mutableListOf<Triple<List<Tile>, List<Tile>, List<Tile>>>()
+    private val historyStack = mutableListOf<GameHistoryState>()
 
     init {
         sendIntent(GameViewIntent.InitUser)
@@ -280,6 +281,11 @@ class GameViewModel @Inject constructor(
                 maxY = tiles.maxOf { it.y }
             )
         }
+        val sealedOrder = tiles
+            .filter { it.sealedCount > 0 }
+            .sortedByDescending { it.z }
+            .map { it.id }
+
         updateState {
             copy(
                 isLoading = false,
@@ -298,6 +304,10 @@ class GameViewModel @Inject constructor(
                 isDoublePointsActive = false,
                 score = 0,
                 gameStatus = GameStatus.PLAYING,
+                sealedClearCount = 0,
+                sealedUnlockThreshold = 3,
+                sealedUnlockedIds = emptySet(),
+                sealedOrder = sealedOrder,
                 currentSkin = prefs.getCurrentSkin()
             )
         }
@@ -317,6 +327,7 @@ class GameViewModel @Inject constructor(
     private suspend fun processSlotMatchAndCheckEndGame() {
         val state = currentState
         logicDelegate.processSlotMatchAndCheckEndGame(
+            state,
             state.boardTiles,
             state.slotTiles,
             state.movedOutTiles,
@@ -407,10 +418,13 @@ class GameViewModel @Inject constructor(
 
     private fun saveHistoryState() {
         historyStack.add(
-            Triple(
-                currentState.boardTiles.map { it.copy() },
-                currentState.slotTiles.map { it.copy() },
-                currentState.movedOutTiles.map { it.copy() })
+            GameHistoryState(
+                boardTiles = currentState.boardTiles.map { it.copy() },
+                slotTiles = currentState.slotTiles.map { it.copy() },
+                movedOutTiles = currentState.movedOutTiles.map { it.copy() },
+                sealedClearCount = currentState.sealedClearCount,
+                sealedUnlockedIds = currentState.sealedUnlockedIds
+            )
         )
     }
 

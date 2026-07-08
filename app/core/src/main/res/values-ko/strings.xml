@@ -74,7 +74,6 @@
 
     <string name="shop_title">아이템 상점</string>
     <string name="shop_vault_locked">잠김</string>
-    <string name="shop_section_traditional">전통 스타일 스킨</string>
     <string name="shop_section_provinces">푸드 시리즈 스킨</string>
     <string name="shop_section_animated">이펙트 스킨</string>
 
@@ -277,22 +276,21 @@
     <string name="slot_not_carried">없음</string>
     <string name="carried_magic_items">가져온 아이템</string>
 
-    <string name="item_skin_classic">클래식</string>
-    <string name="item_skin_classic_desc">클래식한 분위기의 기본 스킨</string>
-    <string name="item_skin_ink">수묵화</string>
-    <string name="item_skin_ink_desc">수묵 기법의 깔끔한 스킨</string>
-    <string name="item_skin_cyber">사이버 네온</string>
-    <string name="item_skin_cyber_desc">네온 테마의 독특한 스킨</string>
     <string name="item_skin_henan">허난 음식</string>
     <string name="item_skin_henan_desc">허난성 맛집 테마의 스킨</string>
     <string name="item_skin_sichuan">사천 음식</string>
     <string name="item_skin_sichuan_desc">사천성 요리 테마의 스킨</string>
-    <string name="item_skin_keai">큐트 캐릭터</string>
-    <string name="item_skin_keai_desc">귀여운 일러스트 중심의 스킨</string>
-    <string name="item_skin_daimeng">손그림 스타일</string>
-    <string name="item_skin_daimeng_desc">따뜻한 손그림 느낌의 스킨</string>
     <string name="item_skin_shuang">멍취징지</string>
     <string name="item_skin_shuang_desc">하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일</string>
+
+    <string name="item_skin_electronic">디지털 가젯</string>
+    <string name="item_skin_electronic_desc">네온 블루 테두리와 테크 실버 장식이 있는 12가지 전자 기기 타일</string>
+    <string name="item_skin_daily">일상의 순간</string>
+    <string name="item_skin_daily_desc">따뜻한 오렌지 테두리와 크림색 장식이 있는 12가지 일상 필수품 타일</string>
+    <string name="item_skin_vegetable">신선 채소</string>
+    <string name="item_skin_vegetable_desc">산뜻한 녹색 테두리와 새싹 장식이 있는 12가지 신선한 채소 타일</string>
+    <string name="item_skin_fruit">싱그러운 과일</string>
+    <string name="item_skin_fruit_desc">선명한 빨강 테두리와 과일 장식이 있는 12가지 즙이 많은 과일 타일</string>
 
     <string name="leaderboard_data_error">데이터 오류</string>
     <string name="leaderboard_load_error">로드 실패, 네트워크 확인</string>
@@ -445,4 +443,34 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
+
+
+    <!-- ===== 对齐补全：base 缺失 key（ko） ===== -->
+    <string name="sealed_gate_progress">제거 %1$d / %2$d ・ 봉인 해제 %3$d / %4$d</string>
+    <string name="sealed_gate_need_more">일반 카드 %1$d장을 더 제거하세요</string>
+    <string name="sealed_gate_unlocked">봉인 해제! 봉인 카드 %1$d장 해제됨</string>
+    <string name="home_endless_title">무한 서바이벌</string>
+    <string name="home_endless_desc">테트리스식 쌓기 삭제로 최고 점수에 도전하세요!</string>
+    <string name="home_endless_login_hint">무한 서바이벌에 참여하려면 먼저 로그인하세요!</string>
+    <string name="endless_intro_title">무한 서바이벌 · 쌓기 모드</string>
+    <string name="endless_intro_desc">카드가 계속 떨어지고 층층이 쌓이는 가운데, 같은 무늬 3장을 없애며 생존하세요. 데드라인에 닿거나 슬롯이 넘치면 종료됩니다. 점수를 겨루며 무한 랭킹 정상에 도전하세요!</string>
+    <string name="endless_intro_soon">게임 준비 중입니다. 기대해 주세요.</string>
+    <string name="endless_intro_close">확인</string>
+    <string name="endless_score">점수: %1$d</string>
+    <string name="endless_combo">콤보: %1$d</string>
+    <string name="endless_wave">웨이브: %1$d</string>
+    <string name="endless_best">최고: %1$d</string>
+    <string name="endless_freeze">동결</string>
+    <string name="endless_hold">홀드</string>
+    <string name="endless_pause">일시정지</string>
+    <string name="endless_resume">계속</string>
+    <string name="endless_restart">다시 시작</string>
+    <string name="endless_game_over">게임 종료</string>
+    <string name="endless_death_line">카드가 천장에 닿았습니다!</string>
+    <string name="endless_slot_overflow">슬롯 초과!</string>
+    <string name="endless_start">게임 시작</string>
+    <string name="endless_new_best">신기록!</string>
+    <string name="endless_wave_banner">Wave %1$d · 속도 업!</string>
+    <string name="endless_leaderboard_title">무한 서바이벌 · 종합 랭킹</string>
+    <string name="endless_leaderboard_entry">랭킹</string>
 </resources>
