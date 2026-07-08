@@ -195,9 +195,9 @@ function run() {
                     }
 
                     // ─── 管理后台凭据守卫：缺少凭据则拒绝继续 ───
-                    if (ADMIN_PHONE === 'REPLACE_WITH_ADMIN_PHONE' || ADMIN_PASSWORD === 'REPLACE_WITH_ADMIN_PASSWORD') {
+                    if (!ADMIN_PHONE || !ADMIN_PASSWORD) {
                         console.error(`\n❌ 缺少管理后台登录凭据！`);
-                        console.error(`   请通过环境变量设置 ADMIN_PHONE / ADMIN_PASSWORD，或直接替换 release.js 中的占位常量。`);
+                        console.error(`   请通过环境变量设置 ADMIN_PHONE / ADMIN_PASSWORD。`);
                         console.error(`   例如: ADMIN_PHONE=138xxxx ADMIN_PASSWORD=xxxx node release.js`);
                         rl.close();
                         process.exit(1);
@@ -216,7 +216,7 @@ function run() {
                             rl.close(); process.exit(1);
                         }
                         // 先拉取远程最新代码，避免 push 时发生冲突导致 D1 已写入
-                        execSync('git pull origin main --rebase', { stdio: 'pipe' });
+                        execSync('git pull origin main --rebase', { stdio: 'pipe', timeout: 30000 });
                         console.log("   ✓ 分支检查通过，已同步远程最新代码");
                     } catch (gitErr) {
                         console.error(`\n❌ Git 前置检查失败: ${gitErr.message}`);
@@ -265,7 +265,7 @@ function run() {
                         try {
                             const maxOut = execSync(
                                 `npx wrangler d1 execute my-app-db --remote --command="SELECT MAX(version_code) AS m FROM app_version"`,
-                                { cwd: serverDir, stdio: 'pipe' }
+                                { cwd: serverDir, stdio: 'pipe', timeout: 30000 }
                             ).toString();
                             // 输出可能是 JSON 形如 {"result":[{"results":[{"m":109}]}]} 或 "m": null，用正则稳健提取
                             const m = maxOut.match(/"m"\s*:\s*(\d+)/);
@@ -293,7 +293,7 @@ function run() {
 
                         // 仅写入 app_version 表；公告改由管理后台 API 写入，不再用 wrangler 写 notice 表
                         const sqlContent = [
-                            `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${newName}', '${apkUrl}', '${escSql(updateLog)}', 0, ${now});`
+                            `INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES (${newCode}, '${escSql(newName)}', '${escSql(apkUrl)}', '${escSql(updateLog)}', 0, ${now});`
                         ].join('\n');
 
                         fs.writeFileSync(tempSqlPath, sqlContent, 'utf8');
@@ -301,7 +301,7 @@ function run() {
                         await withRetry(() => {
                             return new Promise((res, rej) => {
                                 try {
-                                    execSync(`npx wrangler d1 execute my-app-db --remote --file="${tempSqlPath}"`, { cwd: serverDir, stdio: 'pipe' });
+                                    execSync(`npx wrangler d1 execute my-app-db --remote --file="${tempSqlPath}"`, { cwd: serverDir, stdio: 'pipe', timeout: 30000 });
                                     res();
                                 } catch (e) { rej(e); }
                             });
@@ -342,8 +342,8 @@ function run() {
 
                         let kvAllOk = true;
                         for (const [lang, item] of Object.entries(noticesByLang)) {
-                            // ⚠️ 修复 KV key 不匹配：使用 notices_${lang}_v2（旧版缺 _v2 后缀）
-                            const cacheKey = `notices_${lang}_v2`;
+                            // KV key 格式：有语言后缀时用 notices_{lang}_v2，无语言时用 notices_v2（避免双下划线）
+                            const cacheKey = lang ? `notices_${lang}_v2` : `notices_v2`;
                             try {
                                 await withRetry(() => {
                                     return new Promise((res, rej) => {
