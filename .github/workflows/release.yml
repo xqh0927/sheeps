@@ -46,7 +46,7 @@ jobs:
             "s3://sheeps-apk/sheeps_${{ env.VERSION_NAME }}.apk" \
             --endpoint-url "https://${{ secrets.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
             --content-type "application/vnd.android.package-archive" \
-            --cache-control "public, max-age=31536000, immutable"
+            --cache-control "no-cache, no-store, must-revalidate"
           echo "R2 URL: https://apk.xqh.cc.cd/sheeps_${{ env.VERSION_NAME }}.apk"
 
       - name: List APK outputs
