@@ -155,7 +155,7 @@ fun GameHomeScreen(
         // PvP 对战入口与无尽生存入口上下两行展示
         Column(modifier = Modifier.fillMaxWidth()) {
             // 上行：在线匹配对战（PvP）入口 — 服务端可通过 game_modes.battle=false 关闭
-            val battleEnabled = state.appUpdateInfo?.game_modes?.battle == true
+            val battleEnabled = state.gameModes?.battle == true
             if (battleEnabled) {
                 Card(
                     shape = RoundedCornerShape(14.dp),
@@ -245,7 +245,7 @@ fun GameHomeScreen(
 
             // 下行：无尽生存入口（皮肤感知；未登录时拦截跳登录，登录后打开介绍弹窗）
             // 服务端可通过 /api/app/check-update 返回 game_modes.endless=false 来关闭此模式
-            val endlessEnabled = state.appUpdateInfo?.game_modes?.endless == true
+            val endlessEnabled = state.gameModes?.endless == true
             if (endlessEnabled) {
                 EndlessModeEntry(
                     currentSkin = state.currentSkin,

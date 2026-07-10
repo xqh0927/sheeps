@@ -55,8 +55,10 @@ data class MenuViewState(
     /** 当前应用生效的语言代码（如 "zh", "en"） */
     val language: String = "",
 
-    /** 应用版本更新信息 */
+    /** 应用版本更新信息（启动仅检测一次，用户可 dismiss） */
     val appUpdateInfo: AppUpdateResponse? = null,
+    /** 游戏模式开关（无尽/对战等），可每次回前台静默刷新，独立于更新提示 */
+    val gameModes: GameModes? = null,
     /** 当前生效的卡牌皮肤 ID */
     val currentSkin: String = SkinConstants.DEFAULT_SKIN,
 

@@ -552,13 +552,20 @@ class MenuViewModel @Inject constructor(
     }
 
     private fun checkAppUpdateOnce() {
+        // 记录起始时间，避免紧随其后的 onResume 立即重复请求
+        lastGameModesRefreshMs = System.currentTimeMillis()
         viewModelScope.launch {
             try {
                 if (networkMonitor.isOnline()) {
                     val info = context.packageManager.getPackageInfo(context.packageName, 0)
                     val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
                     val appUpdate = apiService.checkUpdate(vCode)
-                    updateState { copy(appUpdateInfo = appUpdate) }
+                    updateState {
+                        copy(
+                            appUpdateInfo = appUpdate,
+                            gameModes = appUpdate.game_modes
+                        )
+                    }
                 }
             } catch (e: Exception) {}
         }
@@ -566,10 +573,23 @@ class MenuViewModel @Inject constructor(
 
     /**
      * 公开方法：供 Activity onResume 等前台回归场景调用，刷新游戏模式开关状态。
-     * 内部复用 [checkAppUpdateOnce] 的逻辑，通过 check-update 接口拉取最新的 [AppUpdateResponse.game_modes]。
+     * 仅回写 [MenuViewState.gameModes]，绝不触碰 [MenuViewState.appUpdateInfo]，
+     * 以避免覆盖用户已 dismiss 的更新提示。带 60s 节流，避免冷启动 / 快速切页时的重复请求。
      */
     fun refreshGameModes() {
-        checkAppUpdateOnce()
+        val now = System.currentTimeMillis()
+        if (now - lastGameModesRefreshMs < GAME_MODES_REFRESH_THROTTLE_MS) return
+        lastGameModesRefreshMs = now
+        viewModelScope.launch {
+            try {
+                if (networkMonitor.isOnline()) {
+                    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+                    val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+                    val appUpdate = apiService.checkUpdate(vCode)
+                    updateState { copy(gameModes = appUpdate.game_modes) }
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     /**
@@ -607,5 +627,10 @@ class MenuViewModel @Inject constructor(
     companion object {
         /** 商城定时静默刷新间隔：30 分钟。 */
         private const val SHOP_REFRESH_INTERVAL_MS = 30L * 60 * 1000
+        /** 游戏模式刷新节流：同一前台回归若间隔小于该值则跳过，避免重复请求。 */
+        private const val GAME_MODES_REFRESH_THROTTLE_MS = 60L * 1000
     }
+
+    /** 上次刷新游戏模式的时间戳（毫秒），用于 onResume 节流。 */
+    private var lastGameModesRefreshMs = 0L
 }
