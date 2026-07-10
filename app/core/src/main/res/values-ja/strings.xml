@@ -71,11 +71,10 @@
     <string name="item_bomb">爆弾</string>
     <string name="item_joker">ジョーカー</string>
     <string name="item_double_points">ダブルコイン</string>
+    <string name="item_freeze">フリーズ</string>
 
     <string name="shop_title">ショップ</string>
     <string name="shop_vault_locked">未開放</string>
-    <string name="shop_section_provinces">グルメスキン</string>
-    <string name="shop_section_animated">エフェクトスキン</string>
 
     <string name="task_play_3">3回プレイする</string>
     <string name="task_play_5">5回プレイする</string>
@@ -224,21 +223,9 @@
     <string name="guide_sec2_desc">一時退避：左側の3枚を一時的にスロット外に退避します。\nシャッフル：残りのカードをランダムに並び替えます。\n元に戻す：直前の操作を取り消します。</string>
     <string name="guide_sec3_title">3. コインの獲得</string>
     <string name="guide_sec3_desc">毎日のログインボーナスや、ステージの初クリアでコインを獲得できます。対戦モードで勝利することでも大量 of コインを獲得できます！</string>
-    <string name="item_skin_henan">河南グルメ</string>
-    <string name="item_skin_henan_desc">河南地方のグルメを描いたカードスキン</string>
-    <string name="item_skin_sichuan">四川グルメ</string>
-    <string name="item_skin_sichuan_desc">四川地方のグルメを描いたカードスキン</string>
     <string name="item_skin_shuang">萌趣競技</string>
     <string name="item_skin_shuang_desc">スカイブルーのボーダーとサンライトゴールドのアクセントを持つ12種のかわいい羊タイル</string>
 
-    <string name="item_skin_electronic">デジタルガジェット</string>
-    <string name="item_skin_electronic_desc">ネオンブルーのボーダーとテックシルバーのアクセントを持つ12種の電子ガジェットタイル</string>
-    <string name="item_skin_daily">日常のあれこれ</string>
-    <string name="item_skin_daily_desc">暖かいオレンジのボーダーとクリーム色のアクセントを持つ12種の日用品タイル</string>
-    <string name="item_skin_vegetable">畑の野菜</string>
-    <string name="item_skin_vegetable_desc">さわやかなグリーンのボーダーと新芽のアクセントを持つ12種の新鮮野菜タイル</string>
-    <string name="item_skin_fruit">彩りフルーツ</string>
-    <string name="item_skin_fruit_desc">鮮やかな赤のボーダーとフルーティなアクセントを持つ12種のジューシーフルーツタイル</string>
 
     <string name="backpack_magic_section">お助けアイテム</string>
     <string name="backpack_skins_section">カードスキン</string>
@@ -291,6 +278,7 @@
     <string name="leaderboard_data_error">取得失敗</string>
     <string name="leaderboard_load_error">読み込み失敗。通信を確認してください</string>
     <string name="leaderboard_empty">ランキング情報はありません</string>
+    <string name="leaderboard_endless_disabled">エンドレスモードは利用できません</string>
     <string name="leaderboard_title_format">ステージ %1$d · ランキング</string>
     <string name="leaderboard_tab_daily">デイリー</string>
     <string name="leaderboard_tab_weekly">ウィークリー</string>
@@ -306,6 +294,7 @@
     <string name="item_bomb_desc">スロットの末尾2枚を消去します</string>
     <string name="item_joker_desc">万能カードとして自動消去に使用されます</string>
     <string name="item_double_points_desc">獲得するコインを2倍にします</string>
+    <string name="item_freeze_desc">4秒間落下を停止し、一息つく時間を作ります</string>
     <string name="btn_go_to_play">挑戦</string>
     <string name="skin_apply_success">スキンを変更しました</string>
 
@@ -319,8 +308,6 @@
     <string name="btn_disagree_exit">同意しない（終了）</string>
     <string name="btn_agree_start">同意して開始</string>
     <string name="toast_offline_fallback">ネットワークエラー。ローカルのオフラインデータを読み込みました</string>
-    <string name="province_skin_title">%1$sグルメ</string>
-    <string name="province_skin_desc">%1$sの特色あるグルメアイコンスキンをアンロック</string>
     <string name="toast_login_failed">ログインに失敗しました</string>
     <string name="toast_login_failed_retry">ログインに失敗しました。後で再試行してください</string>
     <string name="toast_network_error_retry">ネットワーク接続エラー。後で再試行してください</string>

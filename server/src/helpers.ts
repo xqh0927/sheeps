@@ -373,3 +373,17 @@ export async function getCachedConfig(env: Env, key: string, defaultValue: strin
   env.SHEEPS_CACHE.put(cacheKey, value, { expirationTtl: 600 }).catch(() => {});
   return value;
 }
+
+/**
+ * 读取游戏模式开关状态。
+ * 闯关模式（gamemode_stage）默认开，无尽生存模式（gamemode_endless）默认关。
+ * 复用 getCachedConfig（KV 缓存，低频变更）。
+ *
+ * @returns { stage: boolean; endless: boolean } 各模式是否开启
+ */
+export async function getGameModeStatus(env: Env): Promise<{ stage: boolean; endless: boolean; battle: boolean }> {
+  const stage = await getCachedConfig(env, 'gamemode_stage', 'on');
+  const endless = await getCachedConfig(env, 'gamemode_endless', 'off');
+  const battle = await getCachedConfig(env, 'gamemode_battle', 'off');
+  return { stage: stage === 'on', endless: endless === 'on', battle: battle === 'on' };
+}

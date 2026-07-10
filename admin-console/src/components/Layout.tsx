@@ -18,14 +18,17 @@ import {
 import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
-  Store as StoreIcon,
+  Collections as CollectionsIcon,
+  Extension as ExtensionIcon,
   Campaign as CampaignIcon,
   Assignment as AssignmentIcon,
   GridView as GridViewIcon,
   Settings as SettingsIcon,
-  ManageAccounts as ManageAccountsIcon,
   History as HistoryIcon,
   Logout as LogoutIcon,
+  SystemUpdateAlt as SystemUpdateAltIcon,
+  Translate as TranslateIcon,
+  Leaderboard as LeaderboardIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../store/auth';
 import { setSessionExpiredHandler } from '../api/client';
@@ -42,12 +45,15 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: '概览', icon: <DashboardIcon /> },
   { to: '/users', label: '用户管理', icon: <PeopleIcon /> },
-  { to: '/shop-items', label: '商品管理', icon: <StoreIcon /> },
+  { to: '/skin-products', label: '卡片皮肤管理', icon: <CollectionsIcon /> },
+  { to: '/prop-products', label: '道具管理', icon: <ExtensionIcon /> },
   { to: '/notices', label: '公告管理', icon: <CampaignIcon /> },
   { to: '/tasks', label: '任务管理', icon: <AssignmentIcon /> },
   { to: '/levels', label: '关卡管理', icon: <GridViewIcon /> },
+  { to: '/app-versions', label: 'App 版本', icon: <SystemUpdateAltIcon /> },
+  { to: '/i18n', label: '多语言管理', icon: <TranslateIcon /> },
+  { to: '/leaderboards', label: '排行榜管理', icon: <LeaderboardIcon /> },
   { to: '/config', label: '系统配置', icon: <SettingsIcon /> },
-  { to: '/accounts', label: '管理员账户', icon: <ManageAccountsIcon />, superOnly: true },
   { to: '/audit-logs', label: '审计日志', icon: <HistoryIcon />, superOnly: true },
 ];
 

@@ -52,7 +52,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.ui.components.ItemIcon
+import com.example.sheeps.core.game.TileIconProvider
 import com.hjq.toast.Toaster
 
 @Composable
@@ -278,8 +279,9 @@ fun PrepareGameDialog(
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.spacedBy(4.dp)
                                             ) {
-                                                ItemAnimationIcon(
+                                                ItemIcon(
                                                     itemType = type,
+                                                    imageUrl = TileIconProvider.getItemIconUrl(type),
                                                     size = 38.dp,
                                                     isGray = isGray
                                                 )

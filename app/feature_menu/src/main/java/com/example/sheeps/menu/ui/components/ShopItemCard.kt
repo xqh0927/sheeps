@@ -1,7 +1,6 @@
 package com.example.sheeps.menu.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,10 +42,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileIconProvider
-import com.example.sheeps.core.utils.getLocalizedItemDesc
-import com.example.sheeps.core.utils.getLocalizedItemName
+import com.example.sheeps.core.utils.getShopItemDesc
+import com.example.sheeps.core.utils.getShopItemName
 import com.example.sheeps.data.model.ShopItem
-import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.ui.components.ItemIcon
+import com.example.sheeps.ui.components.RemoteImage
 
 @Composable
 fun ShopItemCard(
@@ -83,31 +82,20 @@ fun ShopItemCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 所有皮肤类型（包括省份皮肤与特效皮肤系列）都用第一张 tile 图片做封面预览
+            // v2：URL 优先（Coil），缺失/失败回退默认皮肤本地 drawable
             val isAnySkin = isSkin
             if (isAnySkin) {
                 val context = LocalContext.current
-                val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
-                if (iconRes != 0) {
-                    Image(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = "Skin Preview",
-                        modifier = Modifier.size(64.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.size(64.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "?",
-                            fontSize = 24.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                RemoteImage(
+                    url = TileIconProvider.getTileUrl(skinKey, 1),
+                    fallbackResId = TileIconProvider.getFallbackResId(context, 1),
+                    modifier = Modifier.size(64.dp),
+                    contentDescription = "Skin Preview"
+                )
             } else {
-                ItemAnimationIcon(
+                ItemIcon(
                     itemType = item.item_type,
+                    imageUrl = item.image_url,
                     size = 64.dp
                 )
             }
@@ -115,14 +103,14 @@ fun ShopItemCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = getLocalizedItemName(item.item_type),
+                text = getShopItemName(item),
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
-                text = getLocalizedItemDesc(item.item_type, item.description),
+                text = getShopItemDesc(item),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 minLines = 2,
@@ -230,7 +218,7 @@ fun ShopItemCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = getLocalizedItemName(item.item_type),
+                        text = getShopItemName(item),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

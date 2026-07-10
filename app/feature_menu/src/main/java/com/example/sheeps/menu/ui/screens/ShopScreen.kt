@@ -146,17 +146,21 @@ fun ShopScreen(
                         }
                     }
                 } else {
-                    // 皮肤类商品：按系列分组纵向排列，每组内部横向滚动
-                    val animatedSkins = displayItems.filter {
-                        it.item_type == "SKIN_SHUANG" ||
-                        it.item_type == "SKIN_ELECTRONIC" || it.item_type == "SKIN_DAILY" ||
-                        it.item_type == "SKIN_VEGETABLE" || it.item_type == "SKIN_FRUIT"
-                    }
-                    val provinceSkins = displayItems.filter {
-                        it.item_type.startsWith("SKIN_") &&
-                        it.item_type != "SKIN_SHUANG" &&
-                        it.item_type != "SKIN_ELECTRONIC" && it.item_type != "SKIN_DAILY" &&
-                        it.item_type != "SKIN_VEGETABLE" && it.item_type != "SKIN_FRUIT"
+                    // 皮肤类商品：按 group 主题系列分组纵向排列，每组内部横向滚动
+                    // 分组头完全由服务端 ShopItem.group 动态驱动（多语言动态下发，方案 A）。
+                    // 保留服务端返回顺序；未分组的皮肤归入稳定的「其他系列」兜底分组。
+                    val groupedSkins = remember(displayItems) {
+                        val ungroupedLabel = "其他系列"
+                        val orderedHeaders = displayItems.mapNotNull { it.group }.distinct()
+                        val groupsWithItems = orderedHeaders.mapNotNull { header ->
+                            val itemsInGroup = displayItems.filter { it.group == header }
+                            if (itemsInGroup.isEmpty()) null else (header to itemsInGroup)
+                        }.toMutableList()
+                        val ungrouped = displayItems.filter { it.group.isNullOrBlank() }
+                        if (ungrouped.isNotEmpty()) {
+                            groupsWithItems.add(ungroupedLabel to ungrouped)
+                        }
+                        groupsWithItems
                     }
 
                     Column(
@@ -165,10 +169,10 @@ fun ShopScreen(
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // 区域 2：灵动动画系列
-                        if (animatedSkins.isNotEmpty()) {
+                        groupedSkins.forEach { (header, itemsInGroup) ->
+                            // 分组头：展示系列名
                             Text(
-                                text = stringResource(id = R.string.shop_section_animated),
+                                text = header,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
@@ -178,36 +182,7 @@ fun ShopScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                lazyItems(animatedSkins) { item ->
-                                    Box(modifier = Modifier.width(160.dp)) {
-                                        val backpackCount = state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
-                                        ShopItemCard(
-                                            item = item,
-                                            backpackCount = backpackCount,
-                                            currentSkin = state.currentSkin,
-                                            userPoints = state.points,
-                                            onExchange = { count -> onExchangeClick(item.id, count) },
-                                            onApplySkin = { skin -> onChangeSkin(skin) }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        // 区域 3：各省份美食特色皮肤
-                        if (provinceSkins.isNotEmpty()) {
-                            Text(
-                                text = stringResource(id = R.string.shop_section_provinces),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 8.dp)
-                            )
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                lazyItems(provinceSkins) { item ->
+                                lazyItems(itemsInGroup) { item ->
                                     Box(modifier = Modifier.width(160.dp)) {
                                         val backpackCount = state.backpackItems.find { it.item_type == item.item_type }?.count ?: 0
                                         ShopItemCard(

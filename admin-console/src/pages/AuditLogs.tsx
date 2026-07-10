@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -25,6 +25,68 @@ import { extractError } from '../api/client';
 import { useAuth } from '../store/auth';
 import { useFeedback } from '../components/feedback';
 
+/** 审计操作 action 的中文说明映射 */
+const ACTION_LABELS: Record<string, string> = {
+  'LOGIN_SUCCESS': '登录成功',
+  'UPDATE_APP_VERSION': '更新App版本',
+  'CREATE_APP_VERSION': '创建App版本',
+  'SAVE_ITEM_ICON': '保存道具图标',
+  'SAVE_SKIN_TILES': '保存皮肤卡面',
+  'CREATE_LEVEL': '创建关卡',
+  'UPDATE_LEVEL': '更新关卡',
+  'DELETE_LEVEL': '删除关卡',
+  'CREATE_NOTICE': '创建公告',
+  'UPDATE_NOTICE': '更新公告',
+  'DELETE_NOTICE': '删除公告',
+  'CREATE_TASK': '创建任务',
+  'UPDATE_TASK': '更新任务',
+  'DELETE_TASK': '删除任务',
+  'CREATE_SHOP_ITEM': '创建商品',
+  'UPDATE_SHOP_ITEM': '更新商品',
+  'DELETE_SHOP_ITEM': '删除商品',
+  'ADJUST_POINTS': '调整积分',
+  'BAN_USER': '封禁用户',
+  'UNBAN_USER': '解封用户',
+  'RENAME_USER': '重命名用户',
+  'DELETE_USER': '删除用户',
+  'UPDATE_USER_ITEMS': '更新用户资产',
+  'UPDATE_CONFIG': '更新配置',
+  'CREATE_ADMIN': '创建管理员',
+  'UPDATE_ADMIN_ROLE': '更新管理员角色',
+  'DISABLE_ADMIN': '禁用管理员',
+  'CREATE_LEADERBOARD': '创建排行榜记录',
+  'UPDATE_LEADERBOARD': '更新排行榜记录',
+  'DELETE_LEADERBOARD': '删除排行榜记录',
+  'CREATE_I18N': '创建多语言条目',
+  'UPDATE_I18N': '更新多语言条目',
+  'DELETE_I18N': '删除多语言条目',
+};
+
+/** 反向映射：中文 → 英文 action，用于搜索时将中文输入转为英文传给后端 */
+const ACTION_LABELS_REVERSE: Record<string, string> = {};
+Object.entries(ACTION_LABELS).forEach(([en, zh]) => {
+  ACTION_LABELS_REVERSE[zh] = en;
+});
+
+/** 判断字符串是否包含中文字符 */
+function containsChinese(s: string): boolean {
+  return /[\u4e00-\u9fff]/.test(s);
+}
+
+/** 将中文 action 输入反向映射为英文 action；若无匹配则原样返回 */
+function resolveActionInput(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  if (!containsChinese(trimmed)) return trimmed;
+  // 精确匹配
+  if (ACTION_LABELS_REVERSE[trimmed]) return ACTION_LABELS_REVERSE[trimmed];
+  // 模糊匹配：查找包含该中文的任意条目
+  for (const [zh, en] of Object.entries(ACTION_LABELS_REVERSE)) {
+    if (zh.includes(trimmed)) return en;
+  }
+  return trimmed;
+}
+
 export default function AuditLogs() {
   const isSuper = useAuth((s) => s.isSuper());
   const { show, Feedback } = useFeedback();
@@ -46,7 +108,8 @@ export default function AuditLogs() {
     setLoading(true);
     const from = fromDate ? new Date(fromDate).getTime() : undefined;
     const to = toDate ? new Date(toDate).getTime() + 86400000 : undefined;
-    listAuditLogs({ page: page + 1, pageSize, action: action.trim() || undefined, admin_id: adminId.trim() || undefined, from, to })
+    const resolvedAction = resolveActionInput(action);
+    listAuditLogs({ page: page + 1, pageSize, action: resolvedAction || undefined, admin_id: adminId.trim() || undefined, from, to })
       .then((d) => {
         setRows(d.list);
         setTotal(d.total);
@@ -58,6 +121,20 @@ export default function AuditLogs() {
   useEffect(() => {
     if (isSuper) load();
   }, [load, isSuper]);
+
+  /** 筛选：先校验起止日期合理性，再重置到第 0 页并重新加载 */
+  const handleSearch = () => {
+    if (fromDate && toDate && new Date(fromDate).getTime() > new Date(toDate).getTime()) {
+      show('起始日期不能晚于结束日期', 'warning');
+      return;
+    }
+    setPage(0);
+    load();
+  };
+
+  const handleEnter = (e: any) => {
+    if (e.key === 'Enter') handleSearch();
+  };
 
   if (!isSuper) {
     return (
@@ -73,11 +150,11 @@ export default function AuditLogs() {
       <Typography variant="h5" sx={{ mb: 2, fontWeight: 700 }}>操作审计日志</Typography>
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        <TextField size="small" label="操作类型" value={action} onChange={(e) => setAction(e.target.value)} />
-        <TextField size="small" label="管理员 ID" value={adminId} onChange={(e) => setAdminId(e.target.value)} />
-        <TextField size="small" label="起始日期" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} />
-        <TextField size="small" label="结束日期" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} />
-        <Button variant="outlined" onClick={() => { setPage(0); load(); }}>筛选</Button>
+        <TextField size="small" label="操作类型" value={action} onChange={(e) => setAction(e.target.value)} onKeyDown={handleEnter} />
+        <TextField size="small" label="管理员 ID" value={adminId} onChange={(e) => setAdminId(e.target.value)} onKeyDown={handleEnter} />
+        <TextField size="small" label="起始日期" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} InputLabelProps={{ shrink: true }} onKeyDown={handleEnter} />
+        <TextField size="small" label="结束日期" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} InputLabelProps={{ shrink: true }} onKeyDown={handleEnter} />
+        <Button variant="outlined" onClick={handleSearch}>筛选</Button>
         <Button onClick={() => { setAction(''); setAdminId(''); setFromDate(''); setToDate(''); setPage(0); }}>重置</Button>
       </Stack>
 
@@ -112,7 +189,7 @@ export default function AuditLogs() {
                     <TableCell>{new Date(r.created_at).toLocaleString()}</TableCell>
                     <TableCell>{r.admin_phone}</TableCell>
                     <TableCell><Chip size="small" label={r.admin_role} /></TableCell>
-                    <TableCell><Chip size="small" label={r.action} color="info" /></TableCell>
+                    <TableCell><Chip size="small" label={ACTION_LABELS[r.action] || r.action} color="info" /></TableCell>
                     <TableCell>{r.target_type ? `${r.target_type}:${r.target_id}` : '-'}</TableCell>
                     <TableCell>{r.source_ip}</TableCell>
                     <TableCell align="right">
@@ -136,7 +213,7 @@ export default function AuditLogs() {
       </Card>
 
       <Dialog open={!!detail} onClose={() => setDetail(null)} maxWidth="md" fullWidth>
-        <DialogTitle>审计详情 · {detail?.action}</DialogTitle>
+        <DialogTitle>审计详情 · {detail ? (ACTION_LABELS[detail.action] || detail.action) : ''}</DialogTitle>
         <DialogContent>
           <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f5f5f5', padding: 12, borderRadius: 8 }}>
             {detail ? JSON.stringify(

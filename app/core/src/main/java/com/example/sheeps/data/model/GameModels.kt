@@ -34,7 +34,8 @@ data class UserInfo(
 @Serializable
 data class UserItem(
     val item_type: String, // UNDO, SHUFFLE, MOVEOUT, REVIVE, HINT, BOMB, JOKER, DOUBLE_POINTS
-    val count: Int
+    val count: Int,
+    val image_url: String? = null // v2 图片服务器下发：道具图标远程 URL；缺失时 ItemIcon 回退本地占位
 )
 
 @Serializable
@@ -42,10 +43,12 @@ data class ShopItem(
     val id: Int,
     val name: String,
     val description: String? = null,
-    val image_url: String? = null,
+    val image_url: String? = null,        // 封面(皮肤) / 道具图标 —— 统一展示字段（镜像自 skin_tiles[1] 或 item_icons）
     val item_type: String,
     val points_price: Int,
-    val stock: Int
+    val stock: Int,
+    val group: String? = null,            // v2 新增：主题系列分组（可空，如 地域系列/萌系系列/数码系列/生活系列）
+    val tiles: List<String>? = null       // v2 新增：仅皮肤项 12 张卡面 URL，index 0..11 对应 tile 1..12
 )
 
 @Serializable
@@ -222,12 +225,6 @@ data class CheckPasswordResponse(
 )
 
 @Serializable
-data class RegisterRequest(
-    val id: String,
-    val username: String
-)
-
-@Serializable
 data class RenameRequest(
     val new_username: String
 )
@@ -255,7 +252,9 @@ data class RankingEntry(
 @Serializable
 data class LeaderboardResponse(
     val success: Boolean,
-    val rankings: List<RankingEntry> = emptyList()
+    val rankings: List<RankingEntry> = emptyList(),
+    val total: Int = 0,
+    val disabled: Boolean = false
 )
 
 @Serializable
@@ -273,12 +272,20 @@ data class RefreshResponse(
 )
 
 @Serializable
+data class GameModes(
+    val stage: Boolean = true,
+    val endless: Boolean = false,
+    val battle: Boolean = false
+)
+
+@Serializable
 data class AppUpdateResponse(
     val has_update: Boolean = false,
     val version_name: String? = null,
     val apk_url: String? = null,
     val update_log: String? = null,
-    val force_update: Boolean = false
+    val force_update: Boolean = false,
+    val game_modes: GameModes? = null
 )
 
 @Serializable

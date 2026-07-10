@@ -18,7 +18,6 @@ import com.example.sheeps.data.model.PasswordLoginRequest
 import com.example.sheeps.data.model.PointRecord
 import com.example.sheeps.data.model.RefreshResponse
 import com.example.sheeps.data.model.RegisterAuthRequest
-import com.example.sheeps.data.model.RegisterRequest
 import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.ResetPasswordRequest
 import com.example.sheeps.data.model.ScoreRequest
@@ -46,15 +45,6 @@ import retrofit2.http.Part
 import retrofit2.http.Query
 
 interface ApiService {
-
-    /**
-     * 用户注册 — 通过手机号注册新账号
-     *
-     * @param request 注册请求体，包含手机号等注册信息
-     * @return GenericResponse 通用响应，包含 success 状态
-     */
-    @POST("/api/register")
-    suspend fun register(@Body request: RegisterRequest): GenericResponse
 
     /**
      * 用户改名 — 修改用户昵称
@@ -92,10 +82,11 @@ interface ApiService {
     ): GenericResponse
 
     /**
-     * 获取排行榜（基础版） — 查询指定关卡的积分排行
+     * 获取排行榜（基础版） — 查询指定关卡的积分排行或无尽生存模式总榜
      *
-     * @param levelId 关卡编号
+     * @param levelId 关卡编号（无尽模式传 0 表示无关卡概念）
      * @param limit 返回条目数量上限，默认 50
+     * @param gameMode 游戏模式：0=闯关/PvP, 1=无尽；默认 0
      * @return LeaderboardResponse 包含排行榜列表的响应
      */
     @GET("/api/leaderboard")

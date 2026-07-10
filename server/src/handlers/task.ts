@@ -1,5 +1,6 @@
 import { Env } from '../types';
 import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
+import { getI18nBatch, resolveI18n } from '../i18n';
 
 /**
  * 处理玩家每日任务相关的 HTTP 路由请求
@@ -30,17 +31,16 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const nameCol = lang ? `COALESCE(name_${lang}, name)` : 'name';
-        const descCol = lang ? `COALESCE(description_${lang}, description)` : 'description';
 
-        // 批量查询系统全局任务模板和该用户当天的任务进度
+        // 批量查询系统全局任务模板和该用户当天的任务进度（方案 B：先取基列，再经 i18n 解析）
         const [allTasks, userTasks] = await env.DB.batch([
-            env.DB.prepare(`SELECT id, ${nameCol} as name, ${descCol} as description, target_count, points_reward FROM task`),
+            env.DB.prepare('SELECT id, name, description, target_count, points_reward FROM task'),
             env.DB.prepare('SELECT task_id, progress, is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_date = ?').bind(authUser.userId, chinaToday)
         ]);
 
         const taskList = allTasks.results as any[];
         const userTaskList = userTasks.results as any[];
+        const i18nMap = await getI18nBatch(env, 'task', lang);
         const inserts = [], list = [];
 
         // 任务初始化对齐逻辑：遍历系统所有任务，如果用户今天未生成该任务进度条目，则进行懒加载插入
@@ -50,7 +50,16 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
                 inserts.push(env.DB.prepare('INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 0, 0, 0)').bind(authUser.userId, task.id, chinaToday));
                 ut = { task_id: task.id, progress: 0, is_completed: 0, is_rewarded: 0 };
             }
-            list.push({ task_id: task.id, name: task.name, description: task.description, progress: ut.progress, target_count: task.target_count, is_completed: ut.is_completed === 1, is_rewarded: ut.is_rewarded === 1, points_reward: task.points_reward });
+            list.push({
+                task_id: task.id,
+                name: resolveI18n(i18nMap, `task.${task.id}.name`, task.name),
+                description: resolveI18n(i18nMap, `task.${task.id}.description`, task.description),
+                progress: ut.progress,
+                target_count: task.target_count,
+                is_completed: ut.is_completed === 1,
+                is_rewarded: ut.is_rewarded === 1,
+                points_reward: task.points_reward
+            });
         }
 
         // 批量将缺失的进度条目插入 D1 数据库

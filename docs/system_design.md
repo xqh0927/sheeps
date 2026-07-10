@@ -1,332 +1,355 @@
-# 秘境消消乐 · 管理后台架构设计 + 任务分解（v1.1）
+# sheeps · JSON 字符串列拆表 —— 系统架构设计 + 任务分解
 
-> 文档性质：架构设计稿（仅设计，不写实现代码）。确认后再进入开发。
-> 作者：架构师高见远 ｜ 版本：v1.1（依据 `docs/admin-prd.md` v0.1 增量 PRD 修订）｜ 语言：中文
-> 基线：v1.0 已落盘并源码核实；本版**仅修订角色模型、鉴权分层、审计日志、seed 脚本**四处，其余（前端栈、Pages 独立站、明文 JSON、CORS、密钥迁 Secrets、接口清单、部署）沿用 v1.0。
+> 作者：架构师 高见远（Gao） ｜ 团队：software-jsonsplit ｜ 日期：2025-07-09
+> 背景：用户明确要求「数据库中不要存 json 字符串，json 字符串可以拆表，拆了后完善相关会影响的代码」。
+> 本文给出**实现方案、新表结构、迁移方案、文件清单、类图、时序图、有序任务列表、依赖包、共享约定与待明确事项**。
 
 ---
 
-## 0. 现状核实与本轮修订点
+## Part A · 系统设计
 
-### 0.1 源码核实结论（沿用 v1.0，已读 server/src）
-- 路由：`index.ts` 用 `if/else` 按 `path.startsWith` 分发；`/api/admin` 原与 `/api/app`、`/api/notice` 同属 `handleSystemRoutes`。
-- 🔴 `/api/admin/config`（GET/POST）在 `handlers/system.ts` 中**完全无鉴权**。
-- 🔴 `crypto.ts` 硬编码 `JWT_SECRET='antigravity_secret_key'` 与 `AES_KEY_HEX`；payload 原仅 `{userId, phone, type, exp}` 无 role。
-- 现有鉴权：`helpers.ts: getAuthenticatedUser()` 校验 `type==='access'`；CORS `Allow-Origin:'*'`、仅 GET/POST。
-- 加密中间件：`middleware.ts` 仅在 body 含 `{encrypted}` 时解密，且响应仅在请求被加密时才加密 → **后台 Web 发明文 JSON 即可直通，无需客户端 AES**。
-- 用户表：`users(id, phone, username, avatar, points, password_hash, avatar_url, created_at)`；`migrateSchema()` 幂等加列。
-- 密码：`auth-utils.ts` PBKDF2-SHA256 10 万次，存 `salt_hex:hash_hex`，可直接复用。
+### 1. 实现方案 + 框架选型
 
-### 0.2 本轮修订点（对比 v1.0）
-| v1.0 | v1.1（PRD 要求） |
+**技术栈确认（沿用现有，不引入 ORM）**
+- 后端：Hono + TypeScript，运行于 Cloudflare Worker + D1（SQLite 兼容）。
+- 数据访问：全部手写参数化 SQL（`env.DB.prepare(...).bind(...).run()/.all()/.first()`），**不引入 ORM**。
+- 迁移机制：复用现有 `migrateSchema(env)`（Worker 首次请求时触发，靠模块级 `schemaMigrated` 标记幂等）。本次递增式迁移（建新表 + ALTER 加列 + 回填 + 择机 DROP 旧列）。
+- 前端：admin-console（React + TS + MUI），通过 REST 调用后台；本次**后端 API 契约保持不变**，前端原则上零改动（见第 9 节）。
+
+**核心难点与选型**
+| 难点 | 选型 / 策略 |
 |---|---|
-| `users` 加 `is_admin INTEGER`（二值） | 改为 `role TEXT`（super/operator/readonly，默认 readonly），取消 `is_admin`；保留 `is_banned` |
-| JWT payload `role:'admin'`（固定） | payload 携带**真实角色** `role`（super/operator/readonly） |
-| `requireAdmin` 仅校验 `type==='access'` | 三级校验 `role IN (super,operator,readonly)` → 401；**写操作追加 `role!='readonly'` → 403**；super 专属接口追加 `role==='super'` → 403 |
-| 无审计 | 新增 `admin_audit_log` 表，关键写操作 + 登录必落审计，记录不可改/删 |
-| seed 脚本细节未定 | 从环境变量 `ADMIN_PHONE`/`ADMIN_PASSWORD` 读取，幂等，创建首个 `super` |
+| 把 JSON 数组/对象变成关系表 | 按「父表 + 子表」拆分；数组 → 子表多行；对象 → KV 子表（`field, old_val, new_val`） |
+| D1 无原生数组/JSON 类型 | 用 TEXT 存标量，子表承载集合；回填用 SQLite JSON1 的 `json_each` |
+| 迁移不能丢数据 | 采用「建新表 → 从旧 JSON 列回填 → 保留旧列（标记 deprecated，停止写入） → 验证后择机 DROP」的稳妥路径 |
+| 审计快照键不固定 | KV 子表 `admin_audit_changes(change_id, field, old_val, new_val)` 最合适 |
+| 前端 AuditLogs 弹窗要能展示快照 | 读取时由子表**重组为与原结构一致的 JSON 字符串**回填 `before_snapshot/after_snapshot`，前端契约不变 |
+| game_commands 高频 + 嵌套 payload | **推荐保留 `command_data` 为 TEXT（唯一例外）**，理由见下 |
+
+**关于 game_commands 的明确推荐（需主理人拍板）**
+- `game_commands.command_data` 是**联机对战的实时中继缓冲**：唯一读路径是 `SELECT id, command_data ... WHERE game_id=? AND id>?` 后 `socket.send(row.command_data)` 原样下发，无任何结构化查询/过滤。
+- 若严格拆成「主表 + `game_command_payloads` KV 子表」，则**每一条 WS 消息都要多写 N 条 KV 行，且轮询循环（250ms）每条消息都要从 KV 重组回 JSON 再下发**——写放大 + 读重组命中高频热路径，收益为零（它本就不是领域实体，只是传输缓冲）。
+- **推荐：保留 `command_data` 为 TEXT，不拆表**。这是全库唯一例外。若主理人坚持「全库零 JSON 字符串」，则改用备选方案（主表 `game_commands(id, game_id, sender_id, seq_id, command_ts, command_type)` + KV 子表 `game_command_payloads(command_id, payload_key, payload_val)`），代价见待明确事项 §1。
+
+**迁移策略（D1 安全路径）**
+1. 新建子表（`CREATE TABLE IF NOT EXISTS`，幂等 try/catch）。
+2. 必要 ALTER：`ALTER TABLE backup_save_log ADD COLUMN points INTEGER`（幂等）。
+3. 回填：用 `json_each` 从旧 JSON 列解析写入新表；审计回填用 TS 函数复用写入逻辑（保证编码一致，见 §3/§4）。
+4. 旧列处理：回填后**先保留旧列、停止写入**（标记 deprecated）；验证无误后由 DBA 择机 `ALTER TABLE ... DROP COLUMN`（D1 较新版本支持，失败则保留旧列不读，不影响正确性）。
 
 ---
 
-## 1. 实现方案 + 框架选型
+### 2. 文件列表（全部相对仓库根 `E:/file/sheeps`）
 
-### 1.1 总体架构（同 v1.0，略）
-Cloudflare Pages（React+Vite）独立站 → fetch 调现有 Worker `/api/admin/*`；明文 JSON + `Authorization: Bearer`；CORS 用 `ADMIN_WEB_ORIGIN` 具体源。
+**新增文件**
+| 路径 | 作用 |
+|---|---|
+| `server/src/lib/audit.ts` | 审计变更写入/重组 helper：`writeAuditChanges()`、`reassembleAuditSnapshots()` |
+| `server/src/lib/level-tiles.ts` | 关卡 tile 读写 helper：`writeLevelTiles()`、`readLevelTilesByLevels()`、`assembleLayoutData()` |
+| `server/src/lib/migrate.ts` | 各域回填函数：`backfillLevels()`、`backfillBackups()`、`backfillAudit()`，由 `index.ts` 调用 |
 
-### 1.2 前端框架选型（同 v1.0）
-React18 + Vite5 + MUI5 + React Router6 + Zustand(token 持久化) + Axios(拦截器挂 Bearer/401 跳登录)。不引入客户端 AES。
+**修改文件**
+| 路径 | 改动点 |
+|---|---|
+| `server/schema.sql` | 删除 `levels.layout_data` / `backup_save_log.save_data` / `admin_audit_log.before_snapshot,after_snapshot` 列定义；新增 `points` 列；新增 4 张子表 DDL；`DROP TABLE IF EXISTS` 列表补子表 |
+| `server/src/index.ts` | `migrateSchema()`：建新表、ALTER 加 `points`、调用 `migrate.backfill*()`、择机 DROP 旧列 |
+| `server/src/types.ts` | 新增 `LevelTileRow` / `BackupUnlockedLevelRow` / `BackupItemRow` / `AuditChangeRow` 接口 |
+| `server/src/handlers/admin.ts` | ① `writeAudit` 改调 `audit.ts` 写 `admin_audit_changes`；② `listAuditLogs` 用子查询重组 `before/after`；③ 关卡 GET/POST/PUT/DELETE 改用 `level_tiles`；④ `deleteUser` 级联删备份子表 |
+| `server/src/handlers/user.ts` | `/api/user/sync` 备份改为写 `backup_save_log` + 子表；7 天清理连带子表 |
+| `server/src/handlers/auth.ts` | 游客合并删除 `tablesToDelete` 增加备份子表（用 IN 子查询，因其无 `user_id` 列） |
 
-### 1.3 后端如何挂载 `/api/admin/*`（同 v1.0）
-`index.ts` 把 `/api/admin` 从 system 分支拆出 → `handleAdminRoutes`；`/api/admin/login`、`/api/admin/refresh` 不鉴权，其余先过 `requireAdmin`。
-
-### 1.4 管理员账户 + 三级角色模型（本轮修订核心）
-
-- **数据模型**：复用 `users` 表，新增 `role TEXT`（取值 `super`/`operator`/`readonly`，默认 `readonly`）取代 `is_admin`；保留 `is_banned INTEGER DEFAULT 0`。"是否管理员" = `role != 'readonly'`（派生，不单列）。
-- **管理员登录** `POST /api/admin/login {phone, password}`：按 phone 查用户 → 校验 `role != 'readonly'`（否则 `401 该账号无管理员权限`）→ `verifyPassword` → 签发带**真实角色**的 access(2h)/refresh(7d) JWT。
-- **JWT payload**：`{userId, phone, role, type:'access'|'refresh', exp}`，`role` 携带真实角色；刷新（`/api/admin/refresh`）须保留 `role`。
-- **鉴权分层**（后端为最终防线，前端禁用仅为体验）：
-  1. `requireAdmin(request, env)`：校验 `type==='access' && role IN ('super','operator','readonly')`，否则返回 `401`（无 token/无效/非管理员/被封禁）。
-  2. 写操作守卫 `assertCanWrite(payload)`：若 `role==='readonly'` → `403`（POST/PUT/DELETE 业务接口统一调用）。
-  3. 超级守卫 `assertSuper(payload)`：若 `role!=='super'` → `403`（管理员账户管理、审计日志查看专属）。
-- **被封禁管理员**：登录时 `is_banned=1` 直接拒绝；已登录者 `requireAdmin` 额外校验 `is_banned!=1` → 401。
-
-### 1.5 密钥迁移到 Worker Secrets（同 v1.0）
-`crypto.ts` 新增 `configureSecrets(env)` 注入 `JWT_SECRET`/`AES_KEY_HEX`（保留 dev fallback）；`Env` 增加 `JWT_SECRET`、`AES_KEY_HEX`、`ADMIN_WEB_ORIGIN`；部署 `wrangler secret put`。
+> **前端文件（admin-console）本次无需改动**：后端读取时重组为原 JSON 字符串契约（`layout_data` 字符串、`before_snapshot/after_snapshot` 字符串），`Levels.tsx` 与 `AuditLogs.tsx` 行为不变。结构化 tile 编辑器为可选增强（见 §9）。
 
 ---
 
-## 2. 文件列表及相对路径（标注新增/修改）
-
-> 仅列出与 v1.0 的差异点；未提及的文件（前端 `admin-console/*` 全套、后端 `index.ts` 路由分发、`system.ts` 移除 config 等）同 v1.0 §2。
-
-### 2.1 后端（现有 `server/`）
-
-| 路径 | 状态 | 本轮改动要点 |
-|---|---|---|
-| `server/src/crypto.ts` | 【修改】 | `configureSecrets(env)`；`generateJWT/verifyJWT` 透传任意 payload（含 `role`） |
-| `server/src/helpers.ts` | 【修改】 | `requireAdmin()` 三级校验 + `is_banned` 校验；新增 `assertCanWrite(payload)`、`assertSuper(payload)`；`getCorsHeaders()` 支持 `ADMIN_WEB_ORIGIN` 与 PUT/DELETE |
-| `server/src/types.ts` | 【修改】 | `Env` 增加 `JWT_SECRET`、`AES_KEY_HEX`、`ADMIN_WEB_ORIGIN` |
-| `server/src/index.ts` | 【修改】 | `configureSecrets` 调用；`migrateSchema` 加 `role TEXT DEFAULT 'readonly'` 与 `is_banned INTEGER DEFAULT 0`（**不再加 `is_admin`**） |
-| `server/src/handlers/system.ts` | 【修改】 | 移除 `/api/admin/config`（迁 admin，加鉴权） |
-| `server/src/handlers/admin.ts` | 【新增】 | 全部后台接口 + 三级角色守卫 + **落审计**（`writeAudit`）+ 管理员账户管理/审计查看（super） |
-| `server/schema.sql` | 【修改】 | `users` 加 `role`/`is_banned`；**新增 `admin_audit_log` 表 + 索引**（见 §3.3） |
-| `server/scripts/seed-admin.mjs` | 【新增】 | 读 `ADMIN_PHONE`/`ADMIN_PASSWORD` 环境变量，幂等创建首个 `super`（PBKDF2 哈希） |
-
-### 2.2 前端（新建 `admin-console/`，同 v1.0）
-全套文件同 v1.0 §2.2。本轮需在前端补充：
-- `src/store/auth.ts`：`user.role` 持久化，暴露 `useCanWrite()`（role!=='readonly'）、`isSuper`（role==='super'）。
-- `src/components/Layout.tsx`：按 `isSuper` 显隐「管理员账户管理」「审计日志」导航；按 `useCanWrite` 禁用写按钮。
-- `src/pages/{Users,ShopItems,Notices,Tasks,Levels,Config}.tsx`：写按钮 `disabled={!canWrite}`；`src/pages/Accounts.tsx`、`src/pages/AuditLogs.tsx`（super 专属，P1）。
-- `src/api/admin.ts`：补充 `refreshAdmin`、`listAccounts`/`setRole`/`disableAccount`、`listAuditLogs`。
-
----
-
-## 3. 数据结构和接口
-
-### 3.1 类图（详见 `docs/class-diagram.mermaid`）
+### 3. 数据模型与接口（类图）
 
 ```mermaid
 classDiagram
-    class User {
-        +string id
-        +string phone
-        +string username
-        +number points
-        +string password_hash
-        +string avatar_url
-        +string role
-        +number is_banned
-        +number created_at
+    class levels {
+        +INTEGER level_id PK
+        +INTEGER difficulty
+        +INTEGER created_at
     }
-    class AdminAuditLog {
-        +number id
-        +string admin_id
-        +string admin_phone
-        +string admin_role
-        +string action
-        +string target_type
-        +string target_id
-        +string before_snapshot
-        +string after_snapshot
-        +string source_ip
-        +string user_agent
-        +number created_at
+    class level_tiles {
+        +INTEGER level_id FK
+        +INTEGER tile_index
+        +TEXT tile_id
+        +INTEGER x
+        +INTEGER y
+        +INTEGER z
+        +INTEGER type
+        +INTEGER is_blind
+        +INTEGER sealed_count
+        +INTEGER seal_unlock_threshold
     }
-    class JwtUtil {
-        +configureSecrets(env)
-        +generateJWT(payload, secret) string
-        +verifyJWT(token, secret) payload
+    class backup_save_log {
+        +INTEGER id PK
+        +TEXT user_id FK
+        +INTEGER points
+        +INTEGER created_at
     }
-    class AdminAuthService {
-        +login(phone, password, env) AdminToken
-        +requireAdmin(request, env) AdminPayload
-        +assertCanWrite(payload) void
-        +assertSuper(payload) void
+    class backup_unlocked_levels {
+        +INTEGER backup_id FK
+        +INTEGER level_id
     }
-    class AdminApiHandler {
-        +handleAdminRoutes(...)
-        +listUsers / adjustPoints / banUser / updateUser
-        +crudShopItem / crudNotice / crudTask / crudLevel
-        +getConfig / setConfig
-        +listAccounts / setRole / disableAccount   // super
-        +listAuditLogs                              // super
-        +getStats
-        +writeAudit(log)   // 落审计，无改/删接口
+    class backup_save_items {
+        +INTEGER backup_id FK
+        +TEXT item_type
+        +INTEGER count
     }
-    class AdminApiClient { +login / refreshAdmin / getUsers / ... / listAccounts / listAuditLogs }
-    class AuthStore { +token +user +login / logout / isAuthenticated / isSuper / canWrite }
+    class admin_audit_log {
+        +INTEGER id PK
+        +TEXT admin_id
+        +TEXT admin_phone
+        +TEXT admin_role
+        +TEXT action
+        +TEXT target_type
+        +TEXT target_id
+        +TEXT source_ip
+        +TEXT user_agent
+        +INTEGER created_at
+    }
+    class admin_audit_changes {
+        +INTEGER change_id FK
+        +TEXT field
+        +TEXT old_val
+        +TEXT new_val
+    }
+    class game_commands {
+        +INTEGER id PK
+        +TEXT game_id
+        +TEXT sender_id
+        +TEXT command_data
+        +INTEGER created_at
+    }
 
-    User "1" --> "0..*" AdminAuditLog : 操作人
-    AdminApiHandler ..> AdminAuthService : 三级鉴权+角色守卫
-    AdminApiHandler ..> AdminAuditLog : 落审计(只读表)
-    AdminApiHandler ..> User : 读写
-    AdminAuthService ..> JwtUtil : 签发/校验
-    AdminApiClient ..> AdminApiHandler : HTTP /api/admin/*
-    AuthStore ..> AdminApiClient : 登录/刷新
+    levels "1" *-- "0..*" level_tiles : level_id
+    backup_save_log "1" *-- "0..*" backup_unlocked_levels : backup_id
+    backup_save_log "1" *-- "0..*" backup_save_items : backup_id
+    admin_audit_log "1" *-- "0..*" admin_audit_changes : id == change_id
+    note for game_commands "command_data 保留为 TEXT（高频中继缓冲，唯一例外）"
 ```
 
-### 3.2 接口表（后台 `/api/admin/*`，明文 JSON + Bearer）
+**新表字段说明**
+| 表 | 字段 | 类型 | 说明 |
+|---|---|---|---|
+| `level_tiles` | `level_id` | INTEGER | 外键 → `levels.level_id` |
+| | `tile_index` | INTEGER | 数组下标，从 0 起，用于稳定排序/重组 |
+| | `tile_id` | TEXT | 原 `TileData.id` |
+| | `x/y/z` | INTEGER | 原 `TileData.x/y/z` |
+| | `type` | INTEGER | 原 `TileData.type`（SQL 关键字加双引号兼容） |
+| | `is_blind` | INTEGER | 原 `isBlind`（0/1） |
+| | `sealed_count` | INTEGER | 原 `sealedCount` |
+| | `seal_unlock_threshold` | INTEGER | 原 `sealUnlockThreshold`（可空） |
+| `backup_unlocked_levels` | `backup_id` | INTEGER | 外键 → `backup_save_log.id` |
+| | `level_id` | INTEGER | 原 `unlocked_levels[]` 元素 |
+| `backup_save_items` | `backup_id` | INTEGER | 外键 → `backup_save_log.id` |
+| | `item_type` | TEXT | 原 `items[].item_type` |
+| | `count` | INTEGER | 原 `items[].count` |
+| `admin_audit_changes` | `change_id` | INTEGER | 外键 → `admin_audit_log.id` |
+| | `field` | TEXT | 被变更字段名 |
+| | `old_val` | TEXT | 变更前值，`JSON.stringify` 后的文本（可 NULL） |
+| | `new_val` | TEXT | 变更后值，`JSON.stringify` 后的文本（可 NULL） |
 
-> 统一：成功 `{success:true,...}`；失败 `{error:"msg"}`：无 token/无效/非管理员/被封禁 → **401**；readonly 调写接口 / 非 super 调 super 专属 → **403**。
-
-#### 3.2.1 管理员登录 / 刷新（无鉴权）
-- `POST /api/admin/login` `{phone,password}` → `{success, token, refreshToken, user:{id,phone,username,role,is_banned}}`；失败 `401`。
-- `POST /api/admin/refresh` `{refreshToken}` → `{success, token, refreshToken}`（保留 `role`）；失败 `401`。
-
-#### 3.2.2 用户管理
-| 方法 & 路径 | 角色 | 请求/响应 |
-|---|---|---|
-| `GET /api/admin/users?page&pageSize&keyword` | 全部 | `{list,total,page,pageSize}` |
-| `POST /api/admin/users/:id/points` `{amount,reason}` | super/operator | `{success,current_points}`；落 `ADJUST_POINTS` 审计 |
-| `POST /api/admin/users/:id/ban` `{banned}` | super/operator | `{success}`；落 `BAN/UNBAN_USER` 审计 |
-| `PUT /api/admin/users/:id` `{username}` | super/operator | `{success}` |
-
-#### 3.2.3 商品 / 公告 / 任务 / 关卡 CRUD（同 v1.0 §3.2.3–3.2.6）
-- 读（GET）全部角色；写（POST/PUT/DELETE）super/operator，readonly → 403；每类写操作落对应 `CREATE/UPDATE/DELETE_*` 审计（关卡 `layout_data` 仅记长度/hash）。
-
-#### 3.2.7 系统配置（迁自 system，加鉴权）
-- `GET/POST /api/admin/config`：POST 仅 super/operator；落 `UPDATE_CONFIG` 审计。
-
-#### 3.2.8 概览统计 `GET /api/admin/stats`（全部角色）
-返回：`users_total, today_signup, exchange_total, points_total, notice_count, banned_count, shop_item_count, task_count, level_count`。
-
-#### 3.2.9 管理员账户管理（super 专属，P1）
-| 方法 & 路径 | 角色 | 说明 |
-|---|---|---|
-| `GET /api/admin/accounts` | super | 列出管理员账号（role!='readonly' 或含全部，按设计） |
-| `POST /api/admin/accounts` `{phone, role}` | super | 将已有用户提升为 operator/readonly（落 `CREATE_ADMIN`） |
-| `PUT /api/admin/accounts/:id/role` `{role}` | super | 改他人角色（落 `UPDATE_ADMIN_ROLE`） |
-| `POST /api/admin/accounts/:id/disable` `{disabled}` | super | 禁用/启用其他管理员（落 `DISABLE_ADMIN`） |
-
-#### 3.2.10 审计日志查看（super 专属，P1）
-- `GET /api/admin/audit-logs?page&pageSize&admin_id&action&from&to` → `{list,total}`（只读，可导出 CSV；**无写/删接口**）。
+**索引建议（按需创建）**
+- `CREATE INDEX IF NOT EXISTS idx_level_tiles_level ON level_tiles(level_id);`
+- `CREATE INDEX IF NOT EXISTS idx_backup_items_backup ON backup_save_items(backup_id);`
+- `CREATE INDEX IF NOT EXISTS idx_backup_unlock_backup ON backup_unlocked_levels(backup_id);`
+- `CREATE INDEX IF NOT EXISTS idx_audit_changes_change ON admin_audit_changes(change_id);`
 
 ---
 
-### 3.3 审计表结构（新增 `admin_audit_log`，PRD §5.1）
+### 4. 程序调用流程（时序图）
 
-```sql
-CREATE TABLE IF NOT EXISTS admin_audit_log (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  admin_id        TEXT    NOT NULL,
-  admin_phone     TEXT    NOT NULL,
-  admin_role      TEXT    NOT NULL,
-  action          TEXT    NOT NULL,   -- 见 3.4 枚举
-  target_type     TEXT,               -- user/shop_item/notice/task/level/config/admin_account
-  target_id       TEXT,
-  before_snapshot TEXT,
-  after_snapshot  TEXT,
-  source_ip       TEXT,
-  user_agent      TEXT,
-  created_at      INTEGER NOT NULL
-);
-CREATE INDEX idx_audit_admin   ON admin_audit_log(admin_id);
-CREATE INDEX idx_audit_created ON admin_audit_log(created_at);
-```
-
-### 3.4 必须落审计的 action 枚举（PRD §5.2）
-`LOGIN_SUCCESS` / `LOGIN_FAILED`（记 attempted phone）/ `ADJUST_POINTS` / `BAN_USER` `UNBAN_USER` / `CREATE|UPDATE|DELETE_SHOP_ITEM` / `CREATE|UPDATE|DELETE_NOTICE` / `CREATE|UPDATE|DELETE_TASK` / `CREATE|UPDATE|DELETE_LEVEL`（layout 仅记长度/hash）/ `UPDATE_CONFIG` / `CREATE_ADMIN` `UPDATE_ADMIN_ROLE` `DISABLE_ADMIN`。
-**不记录**：所有读操作、readonly 查看、静态资源。
-
----
-
-## 4. 程序调用流程（时序图）
-
-> 完整 Mermaid 见 `docs/sequence-diagram.mermaid`。要点：登录（带 role）→ 写操作经 `requireAdmin`(401) + `assertCanWrite`(403) → DB 变更成功后 `writeAudit` 落审计。
-
+**4.1 创建关卡并写审计（写新表）**
 ```mermaid
 sequenceDiagram
-    actor Admin as 管理员
-    participant FE as 前端(AdminConsole)
-    participant MW as requireAdmin+角色守卫
-    participant H as AdminApiHandler
+    participant F as Admin 前端
+    participant H as admin.ts POST /api/admin/levels
+    participant DB as D1 (levels / level_tiles)
+    participant W as audit.ts writeAudit
+    participant AC as admin_audit_changes
+
+    F->>H: POST {level_id, difficulty, layout_data(JSON字符串)}
+    H->>H: 解析 layout_data → TileData[]
+    H->>DB: INSERT INTO levels (level_id, difficulty, created_at)
+    H->>DB: 批量 INSERT level_tiles(level_id, tile_index, tile_id, x, y, z, "type", is_blind, sealed_count, seal_unlock_threshold)
+    H->>W: writeAudit(CREATE_LEVEL, after=layout摘要)
+    W->>DB: INSERT admin_audit_log → lastRowId = change_id
+    W->>AC: writeAuditChanges(change_id, before=null, after={layout_length, layout_hash})
+    H-->>F: {success:true, id}
+```
+
+**4.2 审计列表读取重组（前端契约不变）**
+```mermaid
+sequenceDiagram
+    participant F as AuditLogs.tsx
+    participant H as admin.ts listAuditLogs
     participant DB as D1
-    participant AL as admin_audit_log
 
-    Note over Admin, FE: ① 登录（带真实 role）
-    Admin->>FE: 输入手机号 + 密码
-    FE->>H: POST /api/admin/login {phone,password}
-    H->>DB: SELECT * FROM users WHERE phone=?
-    H->>H: role!='readonly' 且 verifyPassword 且 is_banned=0
-    H->>H: generateJWT(role=真实角色)
-    H->>AL: INSERT LOGIN_SUCCESS
-    H-->>FE: {token, refreshToken, user{role}}
+    F->>H: GET /api/admin/audit-logs?page=...
+    H->>DB: SELECT * FROM admin_audit_log WHERE ... ORDER BY created_at DESC LIMIT/OFFSET
+    DB-->>H: rows[] (已无 before/after 列)
+    H->>DB: SELECT change_id, field, old_val, new_val FROM admin_audit_changes WHERE change_id IN (ids)
+    DB-->>H: changes[]
+    H->>H: 按 change_id 聚合为 before/after 对象 (JSON.parse)
+    H->>H: 每行 before_snapshot/after_snapshot = JSON.stringify(obj)
+    H-->>F: {list:[{...,before_snapshot,after_snapshot}], total}
+    F->>F: safeParse(before_snapshot) 弹窗展示（代码不变）
+```
 
-    Note over Admin, AL: ② readonly 调写接口 → 403
-    Admin->>FE: (readonly) 点"新建商品"
-    FE->>MW: POST /api/admin/shop-items (Bearer)
-    MW->>MW: requireAdmin OK, assertCanWrite → role=='readonly'
-    MW-->>FE: 403 {error:'无写权限'}
+**4.3 用户同步写备份（save_data 拆表）**
+```mermaid
+sequenceDiagram
+    participant C as 客户端 /api/user/sync
+    participant U as user.ts handleUserRoutes
+    participant DB as D1
 
-    Note over Admin, AL: ③ operator 改积分（成功路径）
-    Admin->>FE: (operator) 改用户积分
-    FE->>MW: POST /api/admin/users/:id/points (Bearer)
-    MW->>MW: requireAdmin OK, assertCanWrite OK
-    MW->>H: 放行
-    H->>DB: UPDATE users SET points...; INSERT point_record
-    H->>AL: INSERT ADJUST_POINTS(before/after/reason)
-    H-->>FE: {success, current_points}
+    C->>U: POST {points, unlocked_levels, items}
+    U->>DB: 读取旧 points/levels/items（备份前快照）
+    U->>DB: INSERT backup_save_log(user_id, points, created_at) → backup_id
+    U->>DB: 批量 INSERT backup_unlocked_levels(backup_id, level_id)
+    U->>DB: 批量 INSERT backup_save_items(backup_id, item_type, count)
+    U->>DB: DELETE backup_save_log WHERE created_at < now-7d（级联删子表）
+    U->>DB: 合并写入 users / level_unlock / user_items
+    U-->>C: {success, user, unlocked_levels, items}
 ```
 
 ---
 
-## 5. 任务列表（有序、含依赖）
+### 5. 待明确事项（假设 + 需拍板点）
 
-> 共 **5 个任务**（硬上限），每任务 ≥3 文件；本轮重点更新 T01（角色模型+分层鉴权+JWT role）与 T02（admin handler+审计+seed）。
-
-| Task | 名称 | 分类 | 源文件 | 依赖 | 优先级 |
-|---|---|---|---|---|---|
-| **T01** | 后端安全与鉴权基座（三级角色） | 后端+安全 | `server/src/crypto.ts`【修改】、`server/src/helpers.ts`【修改】、`server/src/types.ts`【修改】、`server/src/index.ts`【修改】、`server/src/handlers/system.ts`【修改】 | 无 | P0 |
-| **T02** | 后端管理接口 + 数据层 + 审计 + seed | 后端 | `server/src/handlers/admin.ts`【新增】、`server/schema.sql`【修改】、`server/scripts/seed-admin.mjs`【新增】 | T01 | P0 |
-| **T03** | 前端工程基础设施 | 前端 | `admin-console/package.json`、`vite.config.ts`、`tsconfig.json`、`index.html`、`src/main.tsx`、`src/api/client.ts` | 无 | P0 |
-| **T04** | 前端登录/布局/用户管理/角色守卫 | 前端 | `src/pages/Login.tsx`、`src/components/Layout.tsx`、`src/components/ProtectedRoute.tsx`、`src/store/auth.ts` | T03 | P0 |
-| **T05** | 前端其余页面/路由/审计与账户页/部署 | 前端+部署 | `src/App.tsx`、`src/pages/{Dashboard,Users,ShopItems,Notices,Tasks,Levels,Config,Accounts,AuditLogs}.tsx`、`src/api/admin.ts`、`.github/workflows/deploy-pages.yml` | T03,T04 | P1 |
-
-**执行顺序**：T01 与 T03 并行；T02 依赖 T01；T04 依赖 T03；T05 依赖 T03+T04。后端线（T01→T02）与前端线（T03→T04→T05）并行，最后联调。
-**P1 端点归属**：账户管理（§3.2.9）、审计查看（§3.2.10）、token 静默刷新（§3.2.1）在设计中已预留，随 T02（后端）/T05（前端）一并实现。
+1. **game_commands 是否强拆**：我推荐保留 `command_data` 为 TEXT（唯一例外）。若主理人要求「全库零 JSON 字符串」，则改用主表 + `game_command_payloads` KV 子表（写放大 + 轮询重组代价，见 §1）。**需确认**。
+2. **旧列删留时机**：我建议「回填 + 保留旧列(deprecated) → 验证后 DROP」。是否要求迁移中直接 DROP（`ALTER TABLE ... DROP COLUMN`，依赖 D1 版本）？
+3. **审计值编码**：`old_val/new_val` 统一用 `JSON.stringify(value)` 存储、读取 `JSON.parse` 重组 → 完整保留类型（数字/布尔/字符串/嵌套对象）。是否接受？
+4. **备份 points 落点**：`points` 作为 `backup_save_log` 标量列（非 KV）。是否同意？
+5. **关卡前端编辑器**：保持 textarea（后端重组 `layout_data` 字符串，零改动）即可；结构化 tile 编辑器为可选增强，是否纳入本次？
+6. **回填充幂等**：默认「子表为空才回填」。是否需要额外开关/日志？
+7. **FK 级联**：子表声明 FK（文档/完整性用），但清理用显式 DELETE（与现有 `deleteUser` 风格一致，不依赖 D1 `PRAGMA foreign_keys`）。是否同意？
+8. **确认 `/api/level` 不读 `levels.layout_data`**：调研结论称游戏侧实时生成、不读该列。请工程师实现前再 grep `game.ts`/`level.ts` 确认。
 
 ---
 
-## 6. 依赖包列表（同 v1.0，略）
+## Part B · 任务分解
 
-前端：react, react-dom, react-router-dom, @mui/material, @emotion/react, @emotion/styled, @mui/icons-material, zustand, axios, vite, @vitejs/plugin-react, typescript。后端无新运行时依赖。
+### 6. 依赖包列表
+
+**无需引入新依赖。**
+- SQL 层回填：`json_each`（D1 已启用 JSON1 扩展）做数组拆分。
+- 应用层：`JSON.parse` / `JSON.stringify`（内置）做快照序列化；可选复用既有 `zod`（已随 `@hono/zod-openapi` 存在）对 `TileData[]` 做解析校验，非必须。
+- 前端：保持 MUI + React，无新增依赖。
+
+```
+- @hono/zod-openapi（已存在，可选 zod 校验 TileData）
+- 无新增第三方包
+```
+
+### 7. 任务列表（按依赖与实现顺序排列，≤5 个）
+
+> 说明：项目已存在，故「基础设施」任务 = 数据库 schema + 迁移骨架 + 共享类型（全体任务的前置依赖）。
+
+**T01 · 数据库 schema + 迁移骨架 + 共享类型（基建，P0）**
+- 源文件：`server/schema.sql`、`server/src/index.ts`、`server/src/types.ts`
+- 改动点：
+  - `schema.sql`：新增 4 张子表 DDL + `backup_save_log.points` 列；删除主表旧 JSON 列定义；`DROP TABLE IF EXISTS` 列表补子表。
+  - `index.ts`：`migrateSchema()` 增加 CREATE 新表（幂等）、`ALTER TABLE backup_save_log ADD COLUMN points INTEGER`、调用 `migrate.backfillLevels/Backups/Audit()`、择机 DROP 旧列。
+  - `types.ts`：新增 `LevelTileRow`、`BackupUnlockedLevelRow`、`BackupItemRow`、`AuditChangeRow` 接口。
+- 依赖：无 ｜ 优先级：**P0**
+
+**T02 · 审计快照拆分（admin_audit_log → admin_audit_changes，P0）**
+- 源文件：`server/src/lib/audit.ts`（新增）、`server/src/handlers/admin.ts`、`server/src/lib/migrate.ts`（新增）
+- 改动点：
+  - `lib/audit.ts`：`writeAuditChanges(change_id, before, after)`（按字段 `JSON.stringify` 写入 KV，`env.DB.batch` 原子）、`reassembleAuditSnapshots(changeIds)`（读取并聚合为 before/after 对象）。
+  - `admin.ts`：`writeAudit` 写完 `admin_audit_log` 取 `lastRowId` 后调 `writeAuditChanges`；`listAuditLogs` 用子查询重组 `before_snapshot/after_snapshot` 字符串（前端不变）。
+  - `migrate.ts`：`backfillAudit()`：`SELECT id, before_snapshot, after_snapshot` → 复用 `writeAuditChanges` 回填（保证编码一致）。
+- 依赖：**T01** ｜ 优先级：**P0**
+
+**T03 · 关卡 layout_data 拆表（levels → level_tiles，P0）**
+- 源文件：`server/src/lib/level-tiles.ts`（新增）、`server/src/handlers/admin.ts`、`server/src/lib/migrate.ts`
+- 改动点：
+  - `lib/level-tiles.ts`：`writeLevelTiles(level_id, tiles)`（先删后插/REPLACE）、`readLevelTilesByLevels(ids)`、`assembleLayoutData(tiles)`（重组为 `TileData[]` → `JSON.stringify` 供前端）。
+  - `admin.ts`：关卡 GET 改为自定义（分页后批量取 tiles 并重组 `layout_data` 字符串）；POST 剥离 `layout_data` 写主表 + `writeLevelTiles`；PUT 替换 tiles；DELETE 先删 `level_tiles` 再删主表；审计摘要 sha256 仍基于重组后的 layout。
+  - `migrate.ts`：`backfillLevels()`：`INSERT ... SELECT ... FROM levels, json_each(layout_data)` 回填（tile_index=CAST(j.key), 字段用 `json_extract`，`isBlind`→0/1）。
+- 依赖：**T01** ｜ 优先级：**P0**
+
+**T04 · 备份 save_data 拆表 + 级联删除（P0）**
+- 源文件：`server/src/handlers/user.ts`、`server/src/handlers/auth.ts`、`server/src/handlers/admin.ts`、`server/src/lib/migrate.ts`
+- 改动点：
+  - `user.ts`：`/api/user/sync` 备份改为 `INSERT backup_save_log(user_id, points, created_at)` + 批量 `backup_unlocked_levels` + 批量 `backup_save_items`；7 天清理连带删子表。
+  - `auth.ts`：游客合并删除 `tablesToDelete` 增加 `backup_unlocked_levels`/`backup_save_items`（用 `WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id=?)`，因其无 `user_id` 列）。
+  - `admin.ts`：`deleteUser` 级联增加上述两子表删除（先于删 `backup_save_log`）。
+  - `migrate.ts`：`backfillBackups()`：`json_each` 拆 `items`/`unlocked_levels` + `UPDATE points=json_extract(save_data,'$.points')`。
+- 依赖：**T01** ｜ 优先级：**P0**
+
+> game_commands：按 §1 推荐**不拆**，无任务；若主理人要求强拆，新增 T05（主表 + `game_command_payloads`，写放大 + 轮询重组）。
+
+### 8. 共享知识（跨文件约定）
+
+- **命名约定**：子表 = `<父表>_<实体>`（`level_tiles` / `backup_unlocked_levels` / `backup_save_items` / `admin_audit_changes`）。变更 KV 列固定为 `(change_id, field, old_val, new_val)`。
+- **写函数封装位置**：按域放 `server/src/lib/`（`audit.ts`、`level-tiles.ts`）；回填统一放 `server/src/lib/migrate.ts` 由 `index.ts` 调用。
+- **重组（payload/快照还原）工具**：同一 lib 文件内提供 `*reassemble*` / `assemble*` 函数；**读取端一律重组为原 JSON 字符串契约**，保证前端零改动。
+- **值编码**：审计 KV 值统一 `JSON.stringify(value)` 存、`JSON.parse` 取，保类型。
+- **原子性**：多行写入一律 `env.DB.batch([...])`。
+- **迁移幂等**：建表 `IF NOT EXISTS`；回填前判断「目标子表该父键无记录才插」；`DROP 旧列` 包 try/catch 兜底。
+- **级联清理**：显式 DELETE 子表（不依赖 D1 `PRAGMA foreign_keys`），顺序先子后父。
+- **game_commands**：`command_data` 保留 TEXT，不在此约定范围（特例，见 §1）。
+
+### 9. 任务依赖图
+
+```mermaid
+graph TD
+    T01["T01 schema+迁移+类型(P0)"] --> T02["T02 审计快照拆分(P0)"]
+    T01 --> T03["T03 关卡 tiles 拆表(P0)"]
+    T01 --> T04["T04 备份 save_data 拆表(P0)"]
+    T02 -.共享 migrate.ts.-> T03
+    T02 -.共享 migrate.ts.-> T04
+    T03 -.共享 admin.ts.-> T04
+```
+
+### 10. 落地检查清单（给工程师）
+
+- [ ] `schema.sql` 与 `migrateSchema` 双路一致（全新库 / 存量库都能跑通）。
+- [ ] 回填脚本在本地产线 DB 跑一遍，核对行数（level_tiles 总数 == Σ数组长度；backup 子表条数 == 原 items/unlocked 长度之和；audit 变更条数 == 原快照键数之和）。
+- [ ] 旧列 DROP 前，确认无任何 handler 仍 SELECT/INSERT 旧列（grep `layout_data|save_data|before_snapshot|after_snapshot`）。
+- [ ] 前端 `Levels.tsx` / `AuditLogs.tsx` 回归：列表、编辑、审计弹窗展示正常（应零改动通过）。
+- [ ] `game_commands` 路径（WS 联机）压测确认未受本次改动影响。
 
 ---
 
-## 7. 共享知识（跨文件约定，含本轮修订）
+## 附录 · 关键回填 SQL 示意（供工程师实现参考，非最终代码）
 
-- **Admin Token 与角色**：localStorage 持久化；Axios 拦截器统一加 `Authorization: Bearer`；`requireAdmin` 校验 `type==='access' && role IN (super,operator,readonly) && is_banned=0`，失败 401。`refresh`（`/api/admin/refresh`）须保留 `role`，避免刷新后角色丢失。
-- **写/超级守卫**：所有 POST/PUT/DELETE 业务接口在 `requireAdmin` 之后调用 `assertCanWrite(payload)`（readonly→403）；super 专属接口（账户管理、审计查看）额外 `assertSuper(payload)`（非 super→403）。**前端禁用仅为体验，后端 403 是唯一防线**。
-- **统一错误响应**：`{error:"msg"}`（4xx/5xx）；前端非 2xx → toast，401 清 token 跳登录，403 提示"无权限"。
-- **分页规范**：`?page=1&pageSize=20`（默认 20，最大 100），响应 `{list,total,page,pageSize}`，后端 `LIMIT/OFFSET`。审计列表复用同一规范。
-- **审计落库约定**：业务 handler 在 **DB 变更成功后** 调用 `writeAudit({admin_id, admin_phone, admin_role, action, target_type, target_id, before_snapshot, after_snapshot, source_ip, user_agent})`；`source_ip` 取自 `CF-Connecting-IP` 否则 `x-forwarded-for`；`user_agent` 取自 `User-Agent`。**审计表无任何写/删接口**，保证不可篡改。快照为 JSON 摘要；关卡 `layout_data` 仅记长度/hash。
-- **CORS**：`Allow-Origin` 读 `env.ADMIN_WEB_ORIGIN`（Pages 域名，弃用 `*`）；`Allow-Methods` 扩为 `GET,POST,PUT,DELETE,OPTIONS`；后台明文 JSON 不触发加密中间件。
-- **密钥与 seed 环境变量**：`configureSecrets(env)` 注入生产密钥；seed 脚本运行期读取 `ADMIN_PHONE`/`ADMIN_PASSWORD`（本地/CI 环境变量，非 Worker Secret），幂等（已存在则确保 `role='super'`），仅运行一次。
-- **前端角色助手**：`useCanWrite()` 返回 `role!=='readonly'`；`isSuper` 返回 `role==='super'`，用于控制导航显隐与按钮 `disabled`。
+```sql
+-- 关卡 tiles 回填（D1 json_each 可用）
+INSERT INTO level_tiles (level_id, tile_index, tile_id, x, y, z, "type", is_blind, sealed_count, seal_unlock_threshold)
+SELECT l.level_id,
+       CAST(j.key AS INTEGER),
+       json_extract(j.value, '$.id'),
+       json_extract(j.value, '$.x'),
+       json_extract(j.value, '$.y'),
+       json_extract(j.value, '$.z'),
+       json_extract(j.value, '$.type'),
+       CASE WHEN json_extract(j.value, '$.isBlind') THEN 1 ELSE 0 END,
+       json_extract(j.value, '$.sealedCount'),
+       json_extract(j.value, '$.sealUnlockThreshold')
+FROM levels l, json_each(l.layout_data) j
+WHERE NOT EXISTS (SELECT 1 FROM level_tiles lt WHERE lt.level_id = l.level_id);
 
----
+-- 备份 items 回填
+INSERT INTO backup_save_items (backup_id, item_type, count)
+SELECT b.id, json_extract(j.value, '$.item_type'), json_extract(j.value, '$.count')
+FROM backup_save_log b, json_each(json_extract(b.save_data, '$.items')) j
+WHERE NOT EXISTS (SELECT 1 FROM backup_save_items bi WHERE bi.backup_id = b.id);
 
-## 8. 待明确事项（v1.0 七项经 PRD §7 已确认，本轮无新增悬而未决）
+-- 备份 unlocked_levels 回填
+INSERT INTO backup_unlocked_levels (backup_id, level_id)
+SELECT b.id, CAST(json_extract(j.value, '$') AS INTEGER)
+FROM backup_save_log b, json_each(json_extract(b.save_data, '$.unlocked_levels')) j
+WHERE NOT EXISTS (SELECT 1 FROM backup_unlocked_levels bul WHERE bul.backup_id = b.id);
 
-| 原 v1.0 问题 | PRD 确认结论 |
-|---|---|
-| 初始账号创建 | seed 脚本读 `ADMIN_PHONE`/`ADMIN_PASSWORD`，幂等建首个 super |
-| 审计日志 | 已纳入（§3.3/§3.4），本期 P0 落审计，查看页 P1（super） |
-| 自定义域 | 不建，用 `ADMIN_WEB_ORIGIN` 具体源 CORS |
-| 登录态持久化 | localStorage 默认；access 2h / refresh 7d 静默刷新（P1-5） |
-| 封禁实时拦截游戏端 | 二期（P2-1），本期仅数据标记 |
-| 管理员是否分级 | **三级**（super/operator/readonly），本期落地 |
-| 多语言字段维护 | 本期仅默认语言，P2-2 |
+-- 备份 points 回填
+UPDATE backup_save_log SET points = CAST(json_extract(save_data, '$.points') AS INTEGER)
+WHERE points IS NULL;
+```
 
-> 结论：设计已与 PRD 完全对齐，无新增需用户决策项，可进入开发。
-
----
-
-## 9. 部署方案（同 v1.0，seed 部分更新）
-
-### 9.1 前端（Cloudflare Pages）
-连 Git 仓库，`npm run build` → `dist`，设 `VITE_API_BASE`=Worker 地址；`.github/workflows/deploy-pages.yml` 自动发布；免费额度内。
-
-### 9.2 后端（现有 Worker）
-1. **密钥注入**：
-   ```
-   cd server
-   wrangler secret put JWT_SECRET
-   wrangler secret put AES_KEY_HEX
-   wrangler secret put ADMIN_WEB_ORIGIN
-   ```
-2. **D1 加列**（幂等，`migrateSchema` 首请求自动执行；如需立即生效）：
-   ```
-   wrangler d1 execute my-app-db --remote --command="ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'readonly'; ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0;"
-   ```
-3. **初始化首个 super**（读环境变量，幂等，仅一次）：
-   ```
-   ADMIN_PHONE=13800000000 ADMIN_PASSWORD='初始强密码' node server/scripts/seed-admin.mjs
-   ```
-4. **发布**：`wrangler deploy`（绑定不变）。
-
-### 9.3 跨域（同 v1.0）
-`Allow-Origin=Pages源` + Bearer（非 Cookie）即可；`OPTIONS` 预检由 `index.ts` 统一返回 CORS 头（已扩 PUT/DELETE）。
-
-### 9.4 整体结论
-复用现有 Worker + D1/KV/R2，仅新增 Secrets、两列与一张审计表；前端独立 Pages 站。两端均落 Cloudflare 免费额度内。安全改造（密钥迁移 + 三级鉴权 + 审计）为上线前置硬条件。
+> 审计 `admin_audit_changes` 回填**不走纯 SQL**（需与 `writeAuditChanges` 编码一致），用 `lib/migrate.ts: backfillAudit()` 在 TS 层 `JSON.parse` 旧快照后复用 `writeAuditChanges` 写入。

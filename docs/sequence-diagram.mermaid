@@ -1,38 +1,48 @@
 sequenceDiagram
-    actor Admin as 管理员
-    participant FE as 前端(AdminConsole)
-    participant MW as requireAdmin+角色守卫
-    participant H as AdminApiHandler
+    participant F as Admin 前端
+    participant H as admin.ts POST /api/admin/levels
+    participant DB as D1 (levels / level_tiles)
+    participant W as audit.ts writeAudit
+    participant AC as admin_audit_changes
+
+    F->>H: POST {level_id, difficulty, layout_data(JSON字符串)}
+    H->>H: 解析 layout_data → TileData[]
+    H->>DB: INSERT INTO levels (level_id, difficulty, created_at)
+    H->>DB: 批量 INSERT level_tiles(level_id, tile_index, tile_id, x, y, z, "type", is_blind, sealed_count, seal_unlock_threshold)
+    H->>W: writeAudit(CREATE_LEVEL, after=layout摘要)
+    W->>DB: INSERT admin_audit_log → lastRowId = change_id
+    W->>AC: writeAuditChanges(change_id, before=null, after={layout_length, layout_hash})
+    H-->>F: {success:true, id}
+
+---
+
+sequenceDiagram
+    participant F as AuditLogs.tsx
+    participant H as admin.ts listAuditLogs
     participant DB as D1
-    participant AL as admin_audit_log
 
-    Note over Admin, FE: ① 登录（携带真实 role）
-    Admin->>FE: 输入手机号 + 密码
-    FE->>H: POST /api/admin/login {phone,password}
-    H->>DB: SELECT * FROM users WHERE phone=?
-    H->>H: role!='readonly' 且 verifyPassword 且 is_banned=0
-    H->>H: generateJWT(role=真实角色)
-    H->>AL: INSERT LOGIN_SUCCESS
-    H-->>FE: {token, refreshToken, user{role}}
+    F->>H: GET /api/admin/audit-logs?page=...
+    H->>DB: SELECT * FROM admin_audit_log WHERE ... ORDER BY created_at DESC LIMIT/OFFSET
+    DB-->>H: rows[] (已无 before/after 列)
+    H->>DB: SELECT change_id, field, old_val, new_val FROM admin_audit_changes WHERE change_id IN (ids)
+    DB-->>H: changes[]
+    H->>H: 按 change_id 聚合为 before/after 对象 (JSON.parse)
+    H->>H: 每行 before_snapshot/after_snapshot = JSON.stringify(obj)
+    H-->>F: {list:[{...,before_snapshot,after_snapshot}], total}
+    F->>F: safeParse(before_snapshot) 弹窗展示（代码不变）
 
-    Note over Admin, AL: ② readonly 调写接口 → 403（后端最终防线）
-    Admin->>FE: (readonly) 点"新建商品"
-    FE->>MW: POST /api/admin/shop-items (Authorization: Bearer)
-    MW->>MW: requireAdmin OK, assertCanWrite → role=='readonly'
-    MW-->>FE: 403 {error:'无写权限'}
+---
 
-    Note over Admin, AL: ③ operator 改积分（成功路径）
-    Admin->>FE: (operator) 改用户积分
-    FE->>MW: POST /api/admin/users/:id/points (Bearer)
-    MW->>MW: requireAdmin OK, assertCanWrite OK
-    MW->>H: 放行
-    H->>DB: UPDATE users SET points...; INSERT point_record
-    H->>AL: INSERT ADJUST_POINTS(before/after/reason)
-    H-->>FE: {success, current_points}
-    FE-->>Admin: 提示成功
+sequenceDiagram
+    participant C as 客户端 /api/user/sync
+    participant U as user.ts handleUserRoutes
+    participant DB as D1
 
-    Note over Admin, AL: ④ super 专属接口（非 super → 403）
-    Admin->>FE: (operator) 打开"管理员账户管理"
-    FE->>MW: GET /api/admin/accounts (Bearer)
-    MW->>MW: requireAdmin OK, assertSuper → role!='super'
-    MW-->>FE: 403 {error:'需要超级管理员权限'}
+    C->>U: POST {points, unlocked_levels, items}
+    U->>DB: 读取旧 points/levels/items（备份前快照）
+    U->>DB: INSERT backup_save_log(user_id, points, created_at) → backup_id
+    U->>DB: 批量 INSERT backup_unlocked_levels(backup_id, level_id)
+    U->>DB: 批量 INSERT backup_save_items(backup_id, item_type, count)
+    U->>DB: DELETE backup_save_log WHERE created_at < now-7d（级联删子表）
+    U->>DB: 合并写入 users / level_unlock / user_items
+    U-->>C: {success, user, unlocked_levels, items}

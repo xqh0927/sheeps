@@ -52,7 +52,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         // ─── 合并查询：一次 D1 batch 完成所有读操作 ───
         const [codeRecord, userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
             env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT id, phone, username, avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
@@ -81,7 +81,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
             const insertQueries = [
                 // 插入用户主表
-                env.DB.prepare('INSERT INTO users (id, phone, username, avatar, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(uuid, body.phone, defaultUsername, null, 0, Date.now()),
+                env.DB.prepare('INSERT INTO users (id, phone, username, role, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(uuid, body.phone, defaultUsername, 'user', 0, Date.now()),
                 // 默认解锁第 1 关
                 env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
             ];
@@ -125,8 +125,13 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
                 }
 
                 // 级联删除游客在各个业务表中的历史数据，防止外键冲突或脏数据残留
-                const tablesToDelete = ['level_unlock', 'user_items', 'leaderboard', 'point_record', 'exchange_record', 'sign_record', 'user_task', 'backup_save_log'];
-                for (const table of tablesToDelete) mergeMutations.push(env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(body.device_uuid));
+                const userTables = ['level_unlock', 'user_items', 'leaderboard', 'point_record', 'exchange_record', 'sign_record', 'user_task', 'backup_save_log'];
+                for (const table of userTables) {
+                    mergeMutations.push(env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(body.device_uuid));
+                }
+                // backup_save_log 子表无 user_id 列，用 IN 子查询按 backup_id 级联删除
+                mergeMutations.push(env.DB.prepare('DELETE FROM backup_unlocked_levels WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(body.device_uuid));
+                mergeMutations.push(env.DB.prepare('DELETE FROM backup_save_items WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(body.device_uuid));
                 mergeMutations.push(env.DB.prepare('DELETE FROM users WHERE id = ?').bind(body.device_uuid));
                 await env.DB.batch(mergeMutations);
             }
@@ -210,8 +215,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
 
         const insertQueries = [
-            env.DB.prepare('INSERT INTO users (id, phone, username, avatar, points, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                .bind(uuid, body.phone, defaultUsername, null, 0, pwHash, Date.now()),
+            env.DB.prepare('INSERT INTO users (id, phone, username, role, points, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+                .bind(uuid, body.phone, defaultUsername, 'user', 0, pwHash, Date.now()),
             env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
         ];
         for (const item of ['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE']) {
@@ -248,7 +253,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
         const [userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
+            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),

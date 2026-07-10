@@ -71,11 +71,10 @@
     <string name="item_bomb">Bomb</string>
     <string name="item_joker">Joker</string>
     <string name="item_double_points">Double Coins</string>
+    <string name="item_freeze">Freeze</string>
 
     <string name="shop_title">Item Shop</string>
     <string name="shop_vault_locked">Locked</string>
-    <string name="shop_section_provinces">Food Series Skins</string>
-    <string name="shop_section_animated">Effect Skins</string>
 
     <string name="task_play_3">Play 3 games</string>
     <string name="task_play_5">Play 5 games</string>
@@ -302,25 +301,14 @@
     <string name="slot_not_carried">None</string>
     <string name="carried_magic_items">Carried Items</string>
 
-    <string name="item_skin_henan">Henan Food</string>
-    <string name="item_skin_henan_desc">Special Henan food style tile skin</string>
-    <string name="item_skin_sichuan">Sichuan Food</string>
-    <string name="item_skin_sichuan_desc">Special Sichuan food style tile skin</string>
     <string name="item_skin_shuang">Shuang Fun Skin</string>
     <string name="item_skin_shuang_desc">12 cute sheep tiles with sky blue borders and sunlit gold accents</string>
 
-    <string name="item_skin_electronic">Digital Gadgets</string>
-    <string name="item_skin_electronic_desc">12 electronic-gadget tiles with neon-blue borders and tech-silver accents</string>
-    <string name="item_skin_daily">Daily Life</string>
-    <string name="item_skin_daily_desc">12 everyday-essentials tiles with warm-orange borders and cream accents</string>
-    <string name="item_skin_vegetable">Fresh Veggies</string>
-    <string name="item_skin_vegetable_desc">12 fresh-vegetable tiles with crisp-green borders and sprout accents</string>
-    <string name="item_skin_fruit">Juicy Fruits</string>
-    <string name="item_skin_fruit_desc">12 juicy-fruit tiles with vivid-red borders and fruity accents</string>
 
     <string name="leaderboard_data_error">Data Error</string>
     <string name="leaderboard_load_error">Load failed, check connection</string>
     <string name="leaderboard_empty">No records</string>
+    <string name="leaderboard_endless_disabled">Endless mode is not available</string>
     <string name="leaderboard_title_format">Stage %1$d · Leaderboard</string>
     <string name="leaderboard_tab_daily">Daily</string>
     <string name="leaderboard_tab_weekly">Weekly</string>
@@ -336,6 +324,7 @@
     <string name="item_bomb_desc">Remove last 2 tiles from slots</string>
     <string name="item_joker_desc">Acts as a joker card to clear matches</string>
     <string name="item_double_points_desc">Double the coins earned on win</string>
+    <string name="item_freeze_desc">Pause falling for 4 seconds to catch a breath</string>
     <string name="btn_go_to_play">Play</string>
     <string name="skin_apply_success">Skin applied successfully</string>
 
@@ -349,8 +338,6 @@
     <string name="btn_disagree_exit">Disagree &amp; Exit</string>
     <string name="btn_agree_start">Agree &amp; Start</string>
     <string name="toast_offline_fallback">Network error, loaded local offline data</string>
-    <string name="province_skin_title">%1$s Gourmet</string>
-    <string name="province_skin_desc">Unlock %1$s local gourmet icon skin</string>
     <string name="toast_login_failed">Login failed</string>
     <string name="toast_login_failed_retry">Login failed, please try again later</string>
     <string name="toast_network_error_retry">Network connection abnormal, please try again later</string>

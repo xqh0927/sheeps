@@ -30,7 +30,8 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.ui.components.ItemIcon
+import com.example.sheeps.core.game.TileIconProvider
 
 @Composable
 fun CarrySelectionDialog(
@@ -120,8 +121,9 @@ fun CarrySelectionDialog(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        ItemAnimationIcon(
+                                        ItemIcon(
                                             itemType = type,
+                                            imageUrl = TileIconProvider.getItemIconUrl(type),
                                             size = 36.dp,
                                             isGray = isGray
                                         )

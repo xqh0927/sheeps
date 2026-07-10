@@ -1,0 +1,52 @@
+classDiagram
+    class FieldDef {
+        +string name
+        +string label
+        +multilingual?: boolean
+    }
+    class MultilingualFieldProps {
+        +string baseName
+        +string label
+        +Record~string,any~ form
+        +setForm(updater) void
+        +boolean multiline
+        +boolean required
+    }
+    class CrudPage {
+        +FieldDef[] fields
+        +openCreate() void
+        +handleSubmit() void
+        +renderMultilingual(f) void
+    }
+    class locales {
+        +I18N_LOCALES = [zh,en,tw,ja,ko]
+        +LOCALE_LABELS
+        +LOCALE_SUFFIX
+    }
+    class i18n {
+        +seedI18nForEntity(env, module, entityId, fields) Promise~void~
+        +localeValuesFromBody(body, baseField) LocaleValues
+        +stripLocaleSuffixedKeys(body) Record
+    }
+    class i18n_strings {
+        +str_key TEXT
+        +locale TEXT
+        +module TEXT
+        +value TEXT
+        +category TEXT
+    }
+    class admin_handlers {
+        +genericCreate(...) Response
+        +genericUpdate(...) Response
+        +createAppVersion(...) Response
+        +onCreated(id, body) Promise~void~
+    }
+
+    FieldDef <.. CrudPage : 驱动渲染
+    CrudPage "1" *-- "0..*" MultilingualFieldProps : 新建态渲染
+    MultilingualFieldProps ..> locales : 用 LOCALE_SUFFIX/LABELS
+    CrudPage ..> i18n : 无直接依赖(契约对齐)
+    admin_handlers ..> i18n : 调用 seedI18nForEntity / localeValuesFromBody / stripLocaleSuffixedKeys
+    i18n ..> i18n_strings : INSERT OR IGNORE
+    note for i18n_strings "UNIQUE(str_key,locale,module,category)；本次 category=NULL"
+    note for i18n "传 string=仅 zh(兼容)；传 LocaleValues=按语言；缺失→空占位"

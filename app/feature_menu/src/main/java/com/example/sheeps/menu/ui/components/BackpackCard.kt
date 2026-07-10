@@ -1,7 +1,6 @@
 package com.example.sheeps.menu.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -29,8 +27,10 @@ import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.core.utils.getLocalizedItemDesc
+import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.ui.components.ItemIcon
+import com.example.sheeps.ui.components.RemoteImage
 import com.hjq.toast.Toaster
 
 /**
@@ -38,16 +38,26 @@ import com.hjq.toast.Toaster
  * 横向展示用户拥有的道具及其数量，并支持点击交互使用或应用皮肤
  *
  * @param state 界面状态数据，包含背包物品列表
+ * @param shopItems 商城商品缓存（来自 ShopCache，已按请求语言本地化）。按 item_type 索引后，
+ *                  用于为背包中仅有 [com.example.sheeps.data.model.UserItem.item_type]（无 name / image_url）
+ *                  的物品补全本地化名称与远程图标，修复「显示原始 key」与「显示默认 app 图标」两个问题。
  * @param onApplySkin 应用/切换皮肤回调
  * @param onGoToPlay 前往游戏关卡回调
  */
 @Composable
 fun BackpackCard(
     state: MenuViewState,
+    shopItems: List<ShopItem>,
     onApplySkin: (String) -> Unit,
     onGoToPlay: () -> Unit
 ) {
     if (!state.isLoggedIn || state.backpackItems.isEmpty()) return
+
+    // 按 item_type 建立索引，便于从 ShopItem 缓存中查找本地化的 name / image_url / description
+    val shopItemMap = remember(shopItems) { shopItems.associateBy { it.item_type } }
+    // 构建后台多语言映射（道具名 / 道具描述），传入 getLocalizedItemName/Desc 优先使用
+    val itemI18nName = remember(shopItems) { shopItems.associate { it.item_type.uppercase() to (it.name ?: it.item_type) } }
+    val itemI18nDesc = remember(shopItems) { shopItems.associate { it.item_type.uppercase() to (it.description ?: "") } }
 
     var selectedItem by remember { mutableStateOf<com.example.sheeps.data.model.UserItem?>(null) }
 
@@ -65,6 +75,9 @@ fun BackpackCard(
 
         BackpackItemDetailDialog(
             item = item,
+            shopItemMap = shopItemMap,
+            itemI18nName = itemI18nName,
+            itemI18nDesc = itemI18nDesc,
             isCurrentSkin = isCurrentlyApplied,
             onDismiss = { selectedItem = null },
             onApplySkin = { onApplySkin(skinKey) },
@@ -108,7 +121,7 @@ fun BackpackCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     magicItems.forEach { item ->
-                        BackpackItem(item = item, onClick = { selectedItem = item })
+                        BackpackItem(item = item, shopItemMap = shopItemMap, itemI18nName = itemI18nName, onClick = { selectedItem = item })
                     }
                 }
             }
@@ -130,7 +143,7 @@ fun BackpackCard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     skinItems.forEach { item ->
-                        BackpackItem(item = item, onClick = { selectedItem = item })
+                        BackpackItem(item = item, shopItemMap = shopItemMap, itemI18nName = itemI18nName, onClick = { selectedItem = item })
                     }
                 }
             }
@@ -140,10 +153,14 @@ fun BackpackCard(
 
 /**
  * 单个背包物品条目
+ *
+ * @param shopItemMap 按 item_type 索引的商城商品缓存，用于补全 name 与 image_url
  */
 @Composable
 private fun BackpackItem(
     item: com.example.sheeps.data.model.UserItem,
+    shopItemMap: Map<String, ShopItem>,
+    itemI18nName: Map<String, String>,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -155,6 +172,8 @@ private fun BackpackItem(
             ""
         }
     }
+    // 从商城缓存中查找对应的 ShopItem，优先使用其本地化 name / image_url
+    val shopItem = remember(item.item_type) { shopItemMap[item.item_type] }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -172,30 +191,26 @@ private fun BackpackItem(
                 .padding(bottom = 4.dp),
             contentAlignment = Alignment.Center
         ) {
-            val isProvinceSkin = item.item_type.startsWith("SKIN_")
-            if (isSkin && isProvinceSkin) {
-                val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
-                if (iconRes != 0) {
-                    Image(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = "Skin Preview",
-                        modifier = Modifier.size(36.dp)
-                    )
-                } else {
-                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                        Text("?", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+            if (isSkin) {
+                RemoteImage(
+                    url = TileIconProvider.getTileUrl(skinKey, 1),
+                    fallbackResId = TileIconProvider.getFallbackResId(context, 1),
+                    modifier = Modifier.size(36.dp),
+                    contentDescription = "Skin Preview"
+                )
             } else {
-                ItemAnimationIcon(
+                // 优先使用 ShopItem 的远程图标，服务端未下发（UserItem.image_url 为 null）时回退
+                ItemIcon(
                     itemType = item.item_type,
+                    imageUrl = shopItem?.image_url ?: item.image_url,
                     size = 36.dp
                 )
             }
         }
 
+        // 名称：优先使用 ShopItem 本地化名称，取不到再回退到本地映射
         Text(
-            text = getLocalizedItemName(item.item_type),
+            text = shopItem?.name ?: getLocalizedItemName(item.item_type, itemI18nName),
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
@@ -213,10 +228,15 @@ private fun BackpackItem(
 
 /**
  * 背包物品详细信息与使用/应用弹窗
+ *
+ * @param shopItemMap 按 item_type 索引的商城商品缓存，用于补全 name 与 description
  */
 @Composable
 private fun BackpackItemDetailDialog(
     item: com.example.sheeps.data.model.UserItem,
+    shopItemMap: Map<String, ShopItem>,
+    itemI18nName: Map<String, String>,
+    itemI18nDesc: Map<String, String>,
     isCurrentSkin: Boolean,
     onDismiss: () -> Unit,
     onApplySkin: () -> Unit,
@@ -231,6 +251,8 @@ private fun BackpackItemDetailDialog(
             ""
         }
     }
+    // 从商城缓存中查找对应的 ShopItem，优先使用其本地化 name / description
+    val shopItem = remember(item.item_type) { shopItemMap[item.item_type] }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -254,25 +276,26 @@ private fun BackpackItemDetailDialog(
                         .padding(bottom = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val isProvinceSkin = item.item_type.startsWith("SKIN_")
-                    if (isSkin && isProvinceSkin) {
-                        val iconRes = TileIconProvider.getIconResource(context, skinKey, 1)
-                        Image(
-                            painter = painterResource(id = iconRes),
-                            contentDescription = "Skin Preview",
-                            modifier = Modifier.size(64.dp)
+                    if (isSkin) {
+                        RemoteImage(
+                            url = TileIconProvider.getTileUrl(skinKey, 1),
+                            fallbackResId = TileIconProvider.getFallbackResId(context, 1),
+                            modifier = Modifier.size(64.dp),
+                            contentDescription = "Skin Preview"
                         )
                     } else {
-                        ItemAnimationIcon(
+                        // 优先使用 ShopItem 的远程图标，服务端未下发（UserItem.image_url 为 null）时回退
+                        ItemIcon(
                             itemType = item.item_type,
+                            imageUrl = shopItem?.image_url ?: item.image_url,
                             size = 64.dp
                         )
                     }
                 }
 
-                // 道具/皮肤名称
+                // 道具/皮肤名称：优先使用 ShopItem 本地化名称，取不到再回退到本地映射
                 Text(
-                    text = getLocalizedItemName(item.item_type),
+                    text = shopItem?.name ?: getLocalizedItemName(item.item_type, itemI18nName),
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.primary,
@@ -291,14 +314,14 @@ private fun BackpackItemDetailDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 功能描述
+                // 功能描述：优先使用 ShopItem 本地化描述，取不到再回退到本地映射
                 Card(
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = getLocalizedItemDesc(item.item_type, null),
+                        text = shopItem?.description ?: getLocalizedItemDesc(item.item_type, null, itemI18nDesc),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp,

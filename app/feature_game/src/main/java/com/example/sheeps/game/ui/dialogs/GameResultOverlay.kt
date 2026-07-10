@@ -178,15 +178,18 @@ private fun WonContent(
 
     Spacer(Modifier.height(20.dp))
 
+    // 排行榜 - 单独一行（全宽）
+    SecondaryButton(
+        text     = stringResource(id = R.string.btn_leaderboard),
+        onClick  = onShowLeaderboard,
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(Modifier.height(10.dp))
+    // 返回首页 + 下一关 - 一行
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        SecondaryButton(
-            text     = stringResource(id = R.string.btn_leaderboard),
-            onClick  = onShowLeaderboard,
-            modifier = Modifier.weight(1f)
-        )
         SecondaryButton(
             text     = stringResource(id = R.string.btn_home),
             onClick  = onBack,
@@ -195,7 +198,7 @@ private fun WonContent(
         PrimaryButton(
             text     = stringResource(id = R.string.btn_next_level),
             onClick  = onNextLevel,
-            modifier = Modifier.weight(1.5f)
+            modifier = Modifier.weight(1f)
         )
     }
 }

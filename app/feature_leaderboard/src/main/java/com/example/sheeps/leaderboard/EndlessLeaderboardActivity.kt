@@ -47,7 +47,7 @@ import javax.inject.Inject
  * 无尽生存排行榜页面（总榜单，无 Tab）。
  *
  * - [com.therouter.router.Route] 路径 "/endless/leaderboard"，由介绍弹窗的"排行榜"按钮跳转。
- * - 调用 [ApiService.getLeaderboard]（levelId=0 表示无尽模式无关卡概念，gameMode=1 区分无尽榜），
+ * - 调用 [ApiService.getLeaderboard]（levelId=0 表示无尽模式无关卡概念，game_mode=1 区分无尽榜），
  *   一次拉取前 100 名总榜。
  * - 数据加载后自动定位到当前登录用户所在行（[UserPreferences.getUsername]）。
  * - 复用同包下的 [RankingRow] 渲染每一行，并高亮当前用户。
@@ -76,10 +76,11 @@ class EndlessLeaderboardActivity : BaseActivity() {
     private fun EndlessLeaderboardContent() {
         var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
+        var isDisabled by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val context = LocalContext.current
 
-        // 加载总榜单（无分页 / 无 Tab；levelId=0 表示无尽模式无关卡概念，gameMode=1 区分无尽榜）
+        // 加载总榜单（无分页 / 无 Tab；levelId=0 表示无尽模式无关卡概念，game_mode=1 区分无尽榜）
         LaunchedEffect(Unit) {
             isLoading = true
             lifecycleScope.launch {
@@ -87,6 +88,7 @@ class EndlessLeaderboardActivity : BaseActivity() {
                     val resp = apiService.getLeaderboard(0, 100, 1)
                     if (resp.success) {
                         rankings = resp.rankings
+                        isDisabled = resp.disabled
                         // 自动定位到当前用户
                         val myIndex = rankings.indexOfFirst { it.username == userPrefs.getUsername() }
                         if (myIndex >= 0) {
@@ -118,6 +120,17 @@ class EndlessLeaderboardActivity : BaseActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (isDisabled) {
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(id = R.string.leaderboard_endless_disabled),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                            fontSize = 15.sp
+                        )
                     }
                 } else if (rankings.isEmpty()) {
                     Box(

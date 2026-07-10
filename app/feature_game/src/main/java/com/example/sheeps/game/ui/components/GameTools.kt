@@ -26,7 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.theme.Text_Disabled_Dark
 import com.example.sheeps.theme.Text_Secondary_Dark
-import com.example.sheeps.ui.components.ItemAnimationIcon
+import com.example.sheeps.ui.components.ItemIcon
+import com.example.sheeps.core.game.TileIconProvider
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
@@ -124,8 +125,9 @@ private fun CarriedItemIcon(
     ) {
         // 图标部分
         if (count > 0) {
-            ItemAnimationIcon(
+            ItemIcon(
                 itemType = type,
+                imageUrl = TileIconProvider.getItemIconUrl(type),
                 size = 36.dp,
                 isGray = false
             )

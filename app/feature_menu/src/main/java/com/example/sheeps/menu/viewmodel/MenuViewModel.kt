@@ -3,7 +3,8 @@ package com.example.sheeps.menu.viewmodel
 import androidx.lifecycle.viewModelScope
 import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseMviViewModel
-import com.example.sheeps.core.game.SkinConstants
+import com.example.sheeps.core.cache.ShopCache
+import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.utils.NetworkMonitor
 import com.example.sheeps.data.local.LocalDao
@@ -22,8 +23,14 @@ import com.example.sheeps.menu.viewmodel.delegates.SocialActionDelegate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -43,6 +50,7 @@ class MenuViewModel @Inject constructor(
     private val apiService: ApiService,
     private val prefs: UserPreferences,
     private val json: Json,
+    private val shopCache: ShopCache,
     private val localDao: LocalDao,
     private val syncRepository: SyncRepository,
     private val networkMonitor: NetworkMonitor,
@@ -54,9 +62,36 @@ class MenuViewModel @Inject constructor(
 
     private var pendingLoginResponse: LoginResponse? = null
 
+    /** 切回前台 / 定时静默刷新的进程级生命周期观察者，onCleared 时移除，避免泄漏。 */
+    private val shopRefreshObserver = object : DefaultLifecycleObserver {
+        override fun onStart(owner: LifecycleOwner) {
+            // 忽略进程首次启动（initData 已拉取），仅当切回前台时静默刷新
+            if (firstForegroundPassed) {
+                refreshShopItems()
+            } else {
+                firstForegroundPassed = true
+            }
+        }
+    }
+
+    /** 进程首次 onStart 不触发刷新（initData 已覆盖启动拉取）。 */
+    private var firstForegroundPassed = false
+
+    /** 定时刷新协程句柄，onCleared 时取消。 */
+    private var periodicRefreshJob: Job? = null
+
     init {
         setupObservers()
         initData()
+        // 切回前台 / 定时（约 30min）静默刷新商城（多语言动态下发 + 本地缓存变更检测）
+        ProcessLifecycleOwner.get().lifecycle.addObserver(shopRefreshObserver)
+        startPeriodicShopRefresh()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(shopRefreshObserver)
+        periodicRefreshJob?.cancel()
     }
 
     private fun setupObservers() {
@@ -92,7 +127,9 @@ class MenuViewModel @Inject constructor(
                 todaySigned = prefs.getTodaySigned(),
                 signStreak = prefs.getSignStreak(),
                 highestLevelCleared = prefs.getHighestLevelCleared(),
-                avatarUrl = prefs.getAvatarUrl()
+                avatarUrl = prefs.getAvatarUrl(),
+                // 首屏先用本地缓存快照，避免空白；后续 handleLoadData 会拉取并比对刷新
+                shopItems = shopCache.getCachedItems()
             )
         }
         handleLoadData()
@@ -172,10 +209,10 @@ class MenuViewModel @Inject constructor(
                     if (isLoggedIn && networkMonitor.isOnline()) {
                         val authHeader = "Bearer ${prefs.getToken()}"
 
-                        // Sync（先推后拉，必须顺序）+ 拉取头像，合并为一条协程
+                        // Sync：先拉后推，避免本地旧数据覆盖服务器新数据（管理后台修改后）
                         val profileDef = async {
-                            syncRepository.syncDirtyData()
                             syncRepository.pullCloudProfile()
+                            syncRepository.syncDirtyData()
                             try { apiService.getUserProfile(authHeader).avatarUrl ?: "" }
                             catch (e: Exception) { prefs.getAvatarUrl() }
                         }
@@ -228,38 +265,27 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 拉取商城列表（方案 A：多语言动态下发 + 本地缓存 + 变更检测）。
+     *
+     *  - 直接信任服务端 /api/shop/items 返回的（已按请求语言本地化的）[ShopItem] 列表，
+     *    不再在客户端用 context.getString(R.string.xxx) 本地拼装皮肤 / 道具文案。
+     *  - 注入 [TileIconProvider] URL 注册表（图片下发核心），保持卡面渲染能力。
+     *  - 通过 [ShopCache.saveIfChanged] 做内容比对：仅当服务端内容相对本地缓存有变化时才写盘；
+     *    返回结果始终交给 UI，用户完全无感。
+     *  - 离线 / 首启 / 请求失败时回退到 [ShopCache.getCachedItems] 上次缓存快照，保证有内容可显示。
+     */
     private suspend fun fetchShopItems(): List<ShopItem> {
         return try {
             val remoteItems = apiService.getShopItems()
-            val remoteTypes = remoteItems.map { it.item_type }.toSet()
-
-            val allExistingTypes = remoteTypes
-            val specialSkins = SkinConstants.specialSkins.mapIndexed { index, s ->
-                ShopItem(
-                    3000 + index,
-                    context.getString(s.nameRes),
-                    context.getString(s.descRes),
-                    "",
-                    "SKIN_${s.id.uppercase()}",
-                    s.price,
-                    9999
-                )
-            }.filter { it.item_type !in allExistingTypes }
-
-            val gourmetSkins = SkinConstants.provinces.mapIndexed { index, province ->
-                ShopItem(
-                    1000 + index,
-                    context.getString(R.string.province_skin_title, province.name),
-                    context.getString(R.string.province_skin_desc, province.name),
-                    "",
-                    "SKIN_${province.id.uppercase()}",
-                    200,
-                    9999
-                )
-            }.filter { it.item_type !in allExistingTypes }
-            remoteItems + specialSkins + gourmetSkins
+            // 注入 URL 注册表：建立 skin_tiles / item_icons 映射与分组数据（v2 图片下发核心）
+            TileIconProvider.setShopItems(remoteItems)
+            // 本地缓存 + 变更检测：仅内容变化时写盘（返回是否有变化，调用方据此决定是否刷新）
+            shopCache.saveIfChanged(remoteItems)
+            remoteItems
         } catch (e: Exception) {
-            currentState.shopItems
+            // 离线 / 首启 / 请求失败：回退到上次缓存快照（MMKV 持久化）
+            shopCache.getCachedItems()
         }
     }
 
@@ -536,5 +562,50 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {}
         }
+    }
+
+    /**
+     * 公开方法：供 Activity onResume 等前台回归场景调用，刷新游戏模式开关状态。
+     * 内部复用 [checkAppUpdateOnce] 的逻辑，通过 check-update 接口拉取最新的 [AppUpdateResponse.game_modes]。
+     */
+    fun refreshGameModes() {
+        checkAppUpdateOnce()
+    }
+
+    /**
+     * 启动定时（约 30 分钟）静默刷新协程；仅在 ViewModel 存活期间运行，onCleared 时取消。
+     */
+    private fun startPeriodicShopRefresh() {
+        periodicRefreshJob = viewModelScope.launch {
+            while (isActive) {
+                delay(SHOP_REFRESH_INTERVAL_MS)
+                refreshShopItems()
+            }
+        }
+    }
+
+    /**
+     * 静默刷新商城（切回前台 / 定时触发）。
+     * 直接信任服务端已本地化字段；仅当内容相对本地缓存有变化时才更新 UI，用户完全无感。
+     */
+    private fun refreshShopItems() {
+        viewModelScope.launch {
+            val remoteItems = try {
+                apiService.getShopItems()
+            } catch (e: Exception) {
+                return@launch
+            }
+            // 注入 URL 注册表（图片下发核心）
+            TileIconProvider.setShopItems(remoteItems)
+            // 仅内容变化时回写缓存并刷新 UI
+            if (shopCache.saveIfChanged(remoteItems)) {
+                updateState { copy(shopItems = remoteItems) }
+            }
+        }
+    }
+
+    companion object {
+        /** 商城定时静默刷新间隔：30 分钟。 */
+        private const val SHOP_REFRESH_INTERVAL_MS = 30L * 60 * 1000
     }
 }

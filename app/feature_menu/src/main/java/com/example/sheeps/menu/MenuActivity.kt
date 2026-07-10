@@ -547,5 +547,8 @@ class MenuActivity : BaseActivity() {
 
         // 每次回到前台刷新一次数据（如积分、体力等）
         viewModel.sendIntent(MenuViewIntent.LoadData)
+
+        // 每次回到前台重新拉取游戏模式开关状态，确保管理后台变更即时生效
+        viewModel.refreshGameModes()
     }
 }

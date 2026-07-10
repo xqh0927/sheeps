@@ -50,6 +50,13 @@ export async function handleWebSocketSession(socket: WebSocket, gameId: string, 
         socket.send(row.command_data);
         lastReadId = Math.max(lastReadId, row.id);
       }
+
+      // 清理过期的中继指令（1 小时前的对局必然已结束），避免 game_commands 表无限膨胀
+      try {
+        await env.DB.prepare('DELETE FROM game_commands WHERE created_at < ?').bind(Date.now() - 3600_000).run();
+      } catch (e) {
+        console.error('清理过期 game_commands 失败:', e);
+      }
     } catch (err) {
       console.error('轮询指令出错:', err);
     }

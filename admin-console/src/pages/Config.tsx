@@ -20,16 +20,29 @@ import {
   Stack,
   Tooltip,
 } from '@mui/material';
-import { Add, Edit, Save } from '@mui/icons-material';
-import { getConfig, updateConfig } from '../api/admin';
+import { Add, Edit, Save, Cached } from '@mui/icons-material';
+import { getConfig, updateConfig, clearCache } from '../api/admin';
 import { extractError } from '../api/client';
 import { useAuth } from '../store/auth';
 import { useFeedback } from '../components/feedback';
+import GameModeSwitch from '../components/GameModeSwitch';
 
 interface ConfigRow {
   key: string;
   value: string;
 }
+
+/** 系统配置 Key 的中文说明映射 */
+const CONFIG_LABELS: Record<string, string> = {
+  'level_2_unlock_points': '第2关解锁所需积分',
+  'level_3_unlock_points': '第3关解锁所需积分',
+  'level_4_unlock_points': '第4关解锁所需积分',
+  'sign_rewards': '签到奖励积分（逗号分隔，7天）',
+  'gamemode_stage': '闯关模式开关（on/off）',
+  'gamemode_endless': '无尽生存模式开关（on/off）',
+  'gamemode_battle': '对战模式开关（on/off）',
+  'i18n_dual_write': 'i18n双写开关（已废弃）',
+};
 
 export default function Config() {
   const canWrite = useAuth((s) => s.canWrite());
@@ -92,10 +105,30 @@ export default function Config() {
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           系统配置
         </Typography>
-        <Button variant="contained" startIcon={<Add />} disabled={!canWrite} onClick={openCreate}>
-          新增配置
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            color="warning"
+            startIcon={<Cached />}
+            disabled={!canWrite}
+            onClick={async () => {
+              try {
+                const res = await clearCache();
+                show(`已清空 ${res.deleted} 个缓存键`, 'success');
+              } catch (e) {
+                show(extractError(e), 'error');
+              }
+            }}
+          >
+            清空缓存
+          </Button>
+          <Button variant="contained" startIcon={<Add />} disabled={!canWrite} onClick={openCreate}>
+            新增配置
+          </Button>
+        </Stack>
       </Stack>
+
+      <GameModeSwitch />
 
       <Card elevation={2}>
         <TableContainer>
@@ -103,6 +136,7 @@ export default function Config() {
             <TableHead>
               <TableRow>
                 <TableCell>配置 Key</TableCell>
+                <TableCell>说明</TableCell>
                 <TableCell>配置 Value</TableCell>
                 {canWrite && <TableCell align="right">操作</TableCell>}
               </TableRow>
@@ -110,13 +144,13 @@ export default function Config() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 5 }} color="text.secondary">
+                  <TableCell colSpan={4} align="center" sx={{ py: 5 }} color="text.secondary">
                     暂无配置
                   </TableCell>
                 </TableRow>
@@ -124,6 +158,7 @@ export default function Config() {
                 rows.map((r) => (
                   <TableRow key={r.key}>
                     <TableCell>{r.key}</TableCell>
+                    <TableCell>{CONFIG_LABELS[r.key] || '-'}</TableCell>
                     <TableCell>
                       <Box component="span" sx={{ wordBreak: 'break-all' }}>{r.value}</Box>
                     </TableCell>

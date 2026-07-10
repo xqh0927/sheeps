@@ -62,6 +62,41 @@ export interface TileData {
   sealUnlockThreshold?: number; // 封印门控解锁阈值（每消除 N 张正常牌解锁 1 张封印），固定为 3，双端同步
 }
 
+/** 关卡 tile 子表行（levels.layout_data 拆表后的规范化存储） */
+export interface LevelTileRow {
+  level_id: number;            // 外键 → levels.level_id
+  tile_index: number;          // 数组下标，从 0 起，用于稳定排序/重组
+  tile_id: string;             // 原 TileData.id
+  x: number;
+  y: number;
+  z: number;
+  type: number;                // 原 TileData.type（SQL 关键字，建表用双引号包裹）
+  is_blind: number;            // 原 TileData.isBlind（0/1）
+  sealed_count: number;        // 原 TileData.sealedCount
+  seal_unlock_threshold: number | null; // 原 TileData.sealUnlockThreshold（可空）
+}
+
+/** 备份解锁关卡子表行（backup_save_log.save_data.unlocked_levels 拆表） */
+export interface BackupUnlockedLevelRow {
+  backup_id: number;           // 外键 → backup_save_log.id
+  level_id: number;            // 原 unlocked_levels[] 元素
+}
+
+/** 备份道具子表行（backup_save_log.save_data.items 拆表） */
+export interface BackupItemRow {
+  backup_id: number;           // 外键 → backup_save_log.id
+  item_type: string;           // 原 items[].item_type
+  count: number;               // 原 items[].count
+}
+
+/** 审计变更子表行（admin_audit_log.before/after_snapshot 拆表） */
+export interface AuditChangeRow {
+  change_id: number;           // 外键 → admin_audit_log.id
+  field: string;               // 被变更字段名
+  old_val: string | null;      // 变更前值，JSON.stringify 后的文本（NULL 表示字段在 before 中不存在）
+  new_val: string | null;      // 变更后值，JSON.stringify 后的文本（NULL 表示字段在 after 中不存在）
+}
+
 /** WebSocket 玩家会话状态 */
 export interface PlayerSession {
   playerId: string;

@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "deploy-backend": "node deploy-backend.js",
+    "deploy-admin": "node deploy-admin.js"
+  },
   "dependencies": {
     "https-proxy-agent": "^9.1.0"
   }

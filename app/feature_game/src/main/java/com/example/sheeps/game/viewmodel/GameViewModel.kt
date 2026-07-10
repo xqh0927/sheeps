@@ -6,7 +6,6 @@ import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
-import com.example.sheeps.data.model.RegisterRequest
 import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
@@ -157,14 +156,6 @@ class GameViewModel @Inject constructor(
                 unlockedLevel = prefs.getUnlockedLevel(),
                 gameStatus = if (accepted) GameStatus.MENU else GameStatus.INIT
             )
-        }
-        if (accepted) {
-            viewModelScope.launch {
-                try {
-                    apiService.register(RegisterRequest(prefs.getUserId(), prefs.getUsername()))
-                } catch (e: Exception) {
-                }
-            }
         }
     }
 

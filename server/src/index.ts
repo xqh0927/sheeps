@@ -1,5 +1,6 @@
 import { Env } from './types';
 import { getCorsHeaders, getLangSuffix, translateErrorMessage } from './helpers';
+import { ensureI18nSeeded } from './i18n';
 import { configureSecrets } from './crypto';
 import { handleWebSocketSession } from './websocket';
 import { handleAuthRoutes } from './handlers/auth';
@@ -10,6 +11,7 @@ import { handleTaskRoutes } from './handlers/task';
 import { handleGameRoutes } from './handlers/game';
 import { handleSystemRoutes } from './handlers/system';
 import { handleAdminRoutes } from './handlers/admin';
+import { backfillLevels, backfillBackups, backfillAudit } from './lib/migrate';
 import { decryptRequest, encryptResponse } from './middleware';
 import { privacyHtml, agreementHtml } from './legal-docs';
 export {
@@ -56,7 +58,7 @@ async function migrateSchema(env: Env): Promise<void> {
   } catch (_) { /* 列已存在，忽略 */ }
   // 管理后台：三级角色模型（取代 is_admin 二值）+ 封禁标记
   try {
-    await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'readonly'").run();
+    await env.DB.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run();
   } catch (_) { /* 列已存在，忽略 */ }
   try {
     await env.DB.prepare('ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0').run();
@@ -71,8 +73,6 @@ async function migrateSchema(env: Env): Promise<void> {
       action          TEXT    NOT NULL,
       target_type     TEXT,
       target_id       TEXT,
-      before_snapshot TEXT,
-      after_snapshot  TEXT,
       source_ip       TEXT,
       user_agent      TEXT,
       created_at      INTEGER NOT NULL
@@ -84,7 +84,214 @@ async function migrateSchema(env: Env): Promise<void> {
   try {
     await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_log(created_at)').run();
   } catch (_) { /* 索引已存在，忽略 */ }
+
+  // 图片资源 CDN（v2）：skin_tiles / item_icons 表 + shop_items."group" 列
+  try {
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS skin_tiles (
+        skin_type   TEXT    NOT NULL,
+        tile_index  INTEGER NOT NULL,
+        image_url   TEXT    NOT NULL,
+        PRIMARY KEY (skin_type, tile_index)
+      )`
+    ).run();
+  } catch (_) { /* 表已存在，忽略 */ }
+  try {
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_skin_tiles_type ON skin_tiles(skin_type)').run();
+  } catch (_) { /* 索引已存在，忽略 */ }
+  try {
+    await env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS item_icons (
+        item_type  TEXT    NOT NULL PRIMARY KEY,
+        image_url  TEXT    NOT NULL
+      )`
+    ).run();
+  } catch (_) { /* 表已存在，忽略 */ }
+  try {
+    // "group" 为 SQL 关键字，需用双引号包裹
+    await env.DB.prepare('ALTER TABLE shop_items ADD COLUMN "group" TEXT').run();
+  } catch (_) { /* 列已存在，忽略 */ }
+
+  // ============ 方案 B：i18n 归一化底座 ============
+  // 1) i18n_strings 单表（建表幂等）
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS i18n_strings (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      str_key    TEXT    NOT NULL,
+      locale     TEXT    NOT NULL DEFAULT 'zh',
+      module     TEXT    NOT NULL DEFAULT 'system',
+      category   TEXT,
+      value      TEXT,
+      updated_at INTEGER,
+      UNIQUE(str_key, locale, module, category)
+    )`).run();
+  } catch (_) { /* 表已存在，忽略 */ }
+  try {
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_i18n ON i18n_strings(module, category, locale)').run();
+  } catch (_) { /* 索引已存在，忽略 */ }
+  try {
+    await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_i18n_key ON i18n_strings(str_key, locale)').run();
+  } catch (_) { /* 索引已存在，忽略 */ }
+
+  // 2) app_version 加列（download_url / status / release_time，幂等）
+  try {
+    await env.DB.prepare('ALTER TABLE app_version ADD COLUMN download_url TEXT').run();
+  } catch (_) { /* 列已存在，忽略 */ }
+  try {
+    await env.DB.prepare('ALTER TABLE app_version ADD COLUMN status INTEGER DEFAULT 0').run();
+  } catch (_) { /* 列已存在，忽略 */ }
+  try {
+    await env.DB.prepare('ALTER TABLE app_version ADD COLUMN release_time INTEGER').run();
+  } catch (_) { /* 列已存在，忽略 */ }
+  // 历史数据回填：将原 apk_url 同步到 download_url
+  try {
+    await env.DB.prepare('UPDATE app_version SET download_url = apk_url WHERE download_url IS NULL').run();
+  } catch (_) { /* 无数据或列缺失，忽略 */ }
+
+  // 3) config 种子：游戏模式开关（默认闯关开、无尽关）
+  try {
+    await env.DB.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('gamemode_stage', 'on')").run();
+    await env.DB.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('gamemode_endless', 'off')").run();
+    await env.DB.prepare("INSERT OR IGNORE INTO config (key, value) VALUES ('gamemode_battle', 'off')").run();
+  } catch (_) { /* 键已存在，忽略 */ }
+
+  // 3.5) shop_items 种子：冻结符（FREEZE），幂等插入
+  try {
+    await env.DB.prepare("INSERT OR IGNORE INTO shop_items (name, description, item_type, points_price, stock) VALUES ('冻结符 (Freeze)', '暂停下落4秒，获得操作窗口', 'FREEZE', 35, 30)").run();
+  } catch (_) { /* 已存在，忽略 */ }
+
+  // 4) ETL 兜底：若 i18n_strings 为空，触发一次宽列→i18n 迁移
+  await ensureI18nSeeded(env);
+
+  // ============ JSON 字符串列拆表迁移（T01~T04） ============
+  // 1) 新建子表（幂等）
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS level_tiles (
+      level_id INTEGER NOT NULL,
+      tile_index INTEGER NOT NULL,
+      tile_id TEXT NOT NULL,
+      x INTEGER,
+      y INTEGER,
+      z INTEGER,
+      "type" INTEGER,
+      is_blind INTEGER DEFAULT 0,
+      sealed_count INTEGER DEFAULT 0,
+      seal_unlock_threshold INTEGER,
+      PRIMARY KEY (level_id, tile_index),
+      FOREIGN KEY(level_id) REFERENCES levels(level_id)
+    )`).run();
+  } catch (_) { /* 表已存在，忽略 */ }
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_level_tiles_level ON level_tiles(level_id)').run(); } catch (_) {}
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS backup_unlocked_levels (
+      backup_id INTEGER NOT NULL,
+      level_id INTEGER NOT NULL,
+      PRIMARY KEY (backup_id, level_id),
+      FOREIGN KEY(backup_id) REFERENCES backup_save_log(id)
+    )`).run();
+  } catch (_) {}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_backup_unlock_backup ON backup_unlocked_levels(backup_id)').run(); } catch (_) {}
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS backup_save_items (
+      backup_id INTEGER NOT NULL,
+      item_type TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (backup_id, item_type),
+      FOREIGN KEY(backup_id) REFERENCES backup_save_log(id)
+    )`).run();
+  } catch (_) {}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_backup_items_backup ON backup_save_items(backup_id)').run(); } catch (_) {}
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS admin_audit_changes (
+      change_id INTEGER NOT NULL,
+      field TEXT NOT NULL,
+      old_val TEXT,
+      new_val TEXT,
+      PRIMARY KEY (change_id, field),
+      FOREIGN KEY(change_id) REFERENCES admin_audit_log(id)
+    )`).run();
+  } catch (_) {}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_audit_changes_change ON admin_audit_changes(change_id)').run(); } catch (_) {}
+
+  // 2) backup_save_log 提升 points 标量列（幂等）
+  try {
+    await env.DB.prepare('ALTER TABLE backup_save_log ADD COLUMN points INTEGER').run();
+  } catch (_) { /* 列已存在，忽略 */ }
+
+  // 3) 彻底删除 deprecated JSON 列（不再保留），单条 ALTER + try/catch 保证幂等
+  await dropDeprecatedColumn(env, 'levels', 'layout_data');
+  await dropDeprecatedColumn(env, 'backup_save_log', 'save_data');
+  await dropDeprecatedColumn(env, 'admin_audit_log', 'before_snapshot');
+  await dropDeprecatedColumn(env, 'admin_audit_log', 'after_snapshot');
+
+  // 4) users.avatar 合并到 avatar_url 后删除 avatar 列
+  try {
+    await env.DB.prepare(
+      "UPDATE users SET avatar_url = avatar WHERE avatar IS NOT NULL AND (avatar_url IS NULL OR avatar_url = '')"
+    ).run();
+  } catch (_) { /* 无数据或列缺失，忽略 */ }
+  await dropDeprecatedColumn(env, 'users', 'avatar');
+
+  // 5) 补索引（高频轮询 / 定期清理），幂等
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_game_commands_game_id ON game_commands(game_id)').run(); } catch (_) {}
+  try { await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_backup_created ON backup_save_log(created_at)').run(); } catch (_) {}
+
+  // 6) 存量数据回填（幂等，失败不阻断）
+  await backfillLevels(env);
+  await backfillBackups(env);
+  await backfillAudit(env);
+
+  // 7) 清理宽列（D1 归一化）：移除各业务表的多语言宽列，统一由 i18n_strings 管理
+  // shop_items 8 列
+  await dropDeprecatedColumn(env, 'shop_items', 'name_en');
+  await dropDeprecatedColumn(env, 'shop_items', 'name_tw');
+  await dropDeprecatedColumn(env, 'shop_items', 'name_ja');
+  await dropDeprecatedColumn(env, 'shop_items', 'name_ko');
+  await dropDeprecatedColumn(env, 'shop_items', 'description_en');
+  await dropDeprecatedColumn(env, 'shop_items', 'description_tw');
+  await dropDeprecatedColumn(env, 'shop_items', 'description_ja');
+  await dropDeprecatedColumn(env, 'shop_items', 'description_ko');
+  // task 8 列
+  await dropDeprecatedColumn(env, 'task', 'name_en');
+  await dropDeprecatedColumn(env, 'task', 'name_tw');
+  await dropDeprecatedColumn(env, 'task', 'name_ja');
+  await dropDeprecatedColumn(env, 'task', 'name_ko');
+  await dropDeprecatedColumn(env, 'task', 'description_en');
+  await dropDeprecatedColumn(env, 'task', 'description_tw');
+  await dropDeprecatedColumn(env, 'task', 'description_ja');
+  await dropDeprecatedColumn(env, 'task', 'description_ko');
+  // notice 8 列
+  await dropDeprecatedColumn(env, 'notice', 'title_en');
+  await dropDeprecatedColumn(env, 'notice', 'title_tw');
+  await dropDeprecatedColumn(env, 'notice', 'title_ja');
+  await dropDeprecatedColumn(env, 'notice', 'title_ko');
+  await dropDeprecatedColumn(env, 'notice', 'content_en');
+  await dropDeprecatedColumn(env, 'notice', 'content_tw');
+  await dropDeprecatedColumn(env, 'notice', 'content_ja');
+  await dropDeprecatedColumn(env, 'notice', 'content_ko');
+  // app_version 4 列
+  await dropDeprecatedColumn(env, 'app_version', 'update_log_en');
+  await dropDeprecatedColumn(env, 'app_version', 'update_log_tw');
+  await dropDeprecatedColumn(env, 'app_version', 'update_log_ja');
+  await dropDeprecatedColumn(env, 'app_version', 'update_log_ko');
+
   schemaMigrated = true;
+}
+
+/**
+ * 安全地删除某列（用于清理 deprecated / 合并的冗余列）。
+ * 使用单条 ALTER TABLE DROP COLUMN，绝不塞进 env.DB.batch()（D1 的 batch 对 DDL 不可靠，
+ * 且 RENAME 会自动把子表外键改成临时名、DROP 后悬空）。
+ * 列不存在时静默忽略，保证迁移幂等。
+ */
+async function dropDeprecatedColumn(
+  env: Env,
+  table: string,
+  column: string
+): Promise<void> {
+  try {
+    await env.DB.prepare(`ALTER TABLE ${table} DROP COLUMN ${column}`).run();
+  } catch (_) { /* 列已不存在，忽略 */ }
 }
 
 /**

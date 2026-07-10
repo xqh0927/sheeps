@@ -1,7 +1,15 @@
-import { Env } from '../types';
-import { getCorsHeaders, jsonError, requireAdmin, assertCanWrite, assertSuper, AdminPayload } from '../helpers';
+import { Env, TileData } from '../types';
+import { getCorsHeaders, jsonError, requireAdmin, assertCanWrite, assertSuper, AdminPayload, getGameModeStatus } from '../helpers';
 import { generateJWT, verifyJWT, sha256 } from '../crypto';
+import { putR2Image, validateImage, purgeShopCache, putR2Object } from '../lib/r2';
 import { verifyPassword, hashPassword } from '../auth-utils';
+import { writeAuditChanges, reassembleAuditSnapshots } from '../lib/audit';
+import { writeLevelTiles, readLevelTilesByLevels, assembleLayoutData, parseLayoutData } from '../lib/level-tiles';
+import {
+  seedI18nForEntity,
+  localeValuesFromBody,
+  stripLocaleSuffixedKeys,
+} from '../i18n';
 
 /**
  * 管理后台路由处理器
@@ -44,10 +52,10 @@ async function writeAudit(
   target: { type?: string; id?: string; before?: any; after?: any }
 ): Promise<void> {
   try {
-    await env.DB.prepare(
+    const info = await env.DB.prepare(
       `INSERT INTO admin_audit_log
-        (admin_id, admin_phone, admin_role, action, target_type, target_id, before_snapshot, after_snapshot, source_ip, user_agent, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (admin_id, admin_phone, admin_role, action, target_type, target_id, source_ip, user_agent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         admin.userId,
@@ -56,13 +64,16 @@ async function writeAudit(
         action,
         target.type || null,
         target.id || null,
-        target.before !== undefined ? JSON.stringify(target.before) : null,
-        target.after !== undefined ? JSON.stringify(target.after) : null,
         getClientIp(request),
         request.headers.get('User-Agent') || 'unknown',
         Date.now()
       )
       .run();
+    // 写主表后取 lastRowId，将快照按字段拆入 admin_audit_changes 子表（旧 before/after_snapshot 列停止写入）
+    const changeId = info.meta.last_row_id;
+    if (changeId != null && changeId !== undefined) {
+      await writeAuditChanges(env, changeId, target.before, target.after);
+    }
   } catch (e) {
     console.error('writeAudit failed:', e);
   }
@@ -79,7 +90,7 @@ async function adminLogin(request: Request, env: Env): Promise<Response> {
   const row = await env.DB.prepare('SELECT id, phone, username, role, password_hash, is_banned FROM users WHERE phone = ?')
     .bind(body.phone)
     .first<{ id: string; phone: string; username: string; role: string; password_hash: string; is_banned: number }>();
-  if (!row || !row.role || row.role === 'readonly') {
+  if (!row || !row.role || !['super', 'operator', 'readonly'].includes(row.role)) {
     return jsonError('账号不存在或无后台权限', 401, env);
   }
   if (row.is_banned === 1) {
@@ -129,12 +140,18 @@ async function adminRefresh(request: Request, env: Env): Promise<Response> {
 async function listUsers(request: Request, env: Env, admin: AdminPayload, url: URL): Promise<Response> {
   const { page, pageSize, offset } = parsePaging(url);
   const keyword = (url.searchParams.get('keyword') || '').trim();
-  let where = '';
+  const role = (url.searchParams.get('role') || '').trim();
+  const wheres: string[] = [];
   const binds: any[] = [];
   if (keyword) {
-    where = 'WHERE phone LIKE ? OR username LIKE ?';
+    wheres.push('(phone LIKE ? OR username LIKE ?)');
     binds.push(`%${keyword}%`, `%${keyword}%`);
   }
+  if (role) {
+    wheres.push('role = ?');
+    binds.push(role);
+  }
+  const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : '';
   const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM users ${where}`).bind(...binds).first<{ c: number }>();
   const rows = await env.DB.prepare(
     `SELECT id, phone, username, points, role, is_banned, avatar_url, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
@@ -186,6 +203,36 @@ async function renameUser(request: Request, env: Env, admin: AdminPayload, id: s
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+async function deleteUser(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
+  const guard = assertSuper(admin);
+  if (guard) return guard;
+  const user = await env.DB.prepare('SELECT id, phone, username, role FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ id: string; phone: string; username: string; role: string }>();
+  if (!user) return jsonError('用户不存在', 404, env);
+  // 安全护栏：禁止移除管理员账户，避免后台被锁死
+  if (['super', 'operator', 'readonly'].includes(user.role)) return jsonError('不能移除管理员账户', 403, env);
+  // 安全护栏：禁止移除当前登录账户
+  if (admin.userId === id) return jsonError('不能移除当前登录账户', 403, env);
+  // 级联删除该用户在相关表中的全部数据（同一原子事务）
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM level_unlock WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM user_items WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM exchange_record WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM point_record WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM sign_record WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM user_task WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM leaderboard WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM backup_unlocked_levels WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(id),
+    env.DB.prepare('DELETE FROM backup_save_items WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(id),
+    env.DB.prepare('DELETE FROM backup_save_log WHERE user_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id),
+    env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(user.phone),
+  ]);
+  await writeAudit(env, request, admin, 'DELETE_USER', { type: 'users', id, before: pick(user, ['phone', 'username', 'role']) });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
 // ============ 通用 CRUD 辅助 ============
 
 interface CrudConfig {
@@ -193,12 +240,31 @@ interface CrudConfig {
   action: string;
   idColumn?: string;
   snapshotCols?: string[];
+  /** 搜索关键字时匹配的列名列表（为空则不支持关键字搜索） */
+  searchCols?: string[];
+  /**
+   * 创建成功后的回调，用于 i18n 播种等后处理。
+   * entityId: 新记录的 ID（auto-increment 则为 lastRowId，TEXT PK 则为 body 中的 id 字段）
+   * body: 原始请求体
+   */
+  onCreated?: (entityId: string, body: Record<string, any>) => Promise<void>;
 }
 
 async function genericList(request: Request, env: Env, cfg: CrudConfig, url: URL): Promise<Response> {
   const { page, pageSize, offset } = parsePaging(url);
-  const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM ${cfg.table}`).bind().first<{ c: number }>();
-  const rows = await env.DB.prepare(`SELECT * FROM ${cfg.table} ORDER BY rowid DESC LIMIT ? OFFSET ?`).bind(pageSize, offset).all();
+  const keyword = (url.searchParams.get('keyword') || '').trim();
+
+  // 构建 WHERE 子句：支持关键字搜索
+  let where = '';
+  const whereBinds: any[] = [];
+  if (keyword && cfg.searchCols && cfg.searchCols.length > 0) {
+    const clauses = cfg.searchCols.map((col) => `"${col}" LIKE ?`);
+    where = `WHERE (${clauses.join(' OR ')})`;
+    cfg.searchCols.forEach(() => whereBinds.push(`%${keyword}%`));
+  }
+
+  const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM ${cfg.table} ${where}`).bind(...whereBinds).first<{ c: number }>();
+  const rows = await env.DB.prepare(`SELECT * FROM ${cfg.table} ${where} ORDER BY rowid DESC LIMIT ? OFFSET ?`).bind(...whereBinds, pageSize, offset).all();
   return new Response(JSON.stringify({ success: true, list: rows.results, total: totalRow?.c || 0, page, pageSize }), { headers: getCorsHeaders(env) });
 }
 
@@ -207,13 +273,25 @@ async function genericCreate(request: Request, env: Env, admin: AdminPayload, cf
   if (guard) return guard;
   const body = (await request.json().catch(() => null)) as Record<string, any> | null;
   if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
-  const cols = Object.keys(body).filter((k) => body[k] !== undefined);
+  // 业务表 INSERT 前剔除仅用于 i18n 传输的 locale 后缀键（宽列已 DROP，否则会引用不存在的列）
+  const insertBody = stripLocaleSuffixedKeys(body);
+  const cols = Object.keys(insertBody).filter((k) => insertBody[k] !== undefined);
   if (cols.length === 0) return jsonError('无有效字段', 400, env);
   const placeholders = cols.map(() => '?').join(', ');
-  const sql = `INSERT INTO ${cfg.table} (${cols.join(', ')}) VALUES (${placeholders})`;
-  const info = await env.DB.prepare(sql).bind(...cols.map((c) => body[c])).run();
+  // 列名统一用双引号包裹，兼容 SQL 关键字列（如 shop_items 的 "group"）
+  const quotedCols = cols.map((c) => `"${c}"`).join(', ');
+  const sql = `INSERT INTO ${cfg.table} (${quotedCols}) VALUES (${placeholders})`;
+  const info = await env.DB.prepare(sql).bind(...cols.map((c) => insertBody[c])).run();
   const newId = (info as any).lastRowId?.toString() || null;
   await writeAudit(env, request, admin, `CREATE_${cfg.action}`, { type: cfg.table, id: newId, after: pick(body, cfg.snapshotCols) });
+
+  // 创建后回调：i18n 播种等（失败不阻塞主流程响应）。
+  // 注意：传入**完整 body**（含后缀键），供 onCreated 通过 localeValuesFromBody 读取多语言值。
+  if (cfg.onCreated) {
+    const entityId = newId || '';
+    cfg.onCreated(entityId, body).catch((e) => console.error(`onCreated failed for ${cfg.table}:`, e));
+  }
+
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
 
@@ -225,11 +303,14 @@ async function genericUpdate(request: Request, env: Env, admin: AdminPayload, cf
   if (!before) return jsonError('记录不存在', 404, env);
   const body = (await request.json().catch(() => null)) as Record<string, any> | null;
   if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
-  const cols = Object.keys(body).filter((k) => body[k] !== undefined && k !== idCol);
+  // 编辑态前端只发 zh 基列，但为稳妥仍先剔除 locale 后缀键（防御性，避免引用不存在的列）
+  const writeBody = stripLocaleSuffixedKeys(body);
+  const cols = Object.keys(writeBody).filter((k) => writeBody[k] !== undefined && k !== idCol);
   if (cols.length === 0) return jsonError('无有效字段', 400, env);
-  const sets = cols.map((c) => `${c} = ?`).join(', ');
-  const sql = `UPDATE ${cfg.table} SET ${sets} WHERE ${idCol} = ?`;
-  await env.DB.prepare(sql).bind(...cols.map((c) => body[c]), id).run();
+  // 列名统一用双引号包裹，兼容 SQL 关键字列（如 shop_items 的 "group"）
+  const sets = cols.map((c) => `"${c}" = ?`).join(', ');
+  const sql = `UPDATE ${cfg.table} SET ${sets} WHERE "${idCol}" = ?`;
+  await env.DB.prepare(sql).bind(...cols.map((c) => writeBody[c]), id).run();
   const after = await env.DB.prepare(`SELECT * FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id).first();
   await writeAudit(env, request, admin, `UPDATE_${cfg.action}`, { type: cfg.table, id, before: pick(before, cfg.snapshotCols), after: pick(after, cfg.snapshotCols) });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
@@ -262,12 +343,14 @@ async function getConfig(request: Request, env: Env): Promise<Response> {
 }
 
 async function updateConfig(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
-  const guard = assertCanWrite(admin);
+  const guard = assertSuper(admin);
   if (guard) return guard;
   const body = await request.json<{ key?: string; value?: string }>().catch(() => null);
   if (!body || !body.key) return jsonError('缺少配置 key', 400, env);
   const before = await env.DB.prepare('SELECT key, value FROM config WHERE key = ?').bind(body.key).first();
   await env.DB.prepare('INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').bind(body.key, body.value ?? '', body.value ?? '').run();
+  // 清除对应 KV 缓存，使 getCachedConfig 立即读到新值
+  await env.SHEEPS_CACHE.delete(`config_${body.key}`).catch(() => {});
   await writeAudit(env, request, admin, 'UPDATE_CONFIG', { type: 'config', id: body.key, before, after: { key: body.key, value: body.value } });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
@@ -349,9 +432,9 @@ async function setAccountRole(request: Request, env: Env, admin: AdminPayload, i
   const guard = assertSuper(admin);
   if (guard) return guard;
   const body = await request.json<{ role?: string }>().catch(() => null);
-  if (!body || !['super', 'operator', 'readonly'].includes(body.role || '')) return jsonError('角色非法', 400, env);
-  const before = await env.DB.prepare("SELECT role FROM users WHERE id = ? AND role IN ('super','operator','readonly')").bind(id).first<{ role: string }>();
-  if (!before) return jsonError('管理员账号不存在', 404, env);
+  if (!body || !['user', 'super', 'operator', 'readonly'].includes(body.role || '')) return jsonError('角色非法', 400, env);
+  const before = await env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(id).first<{ role: string }>();
+  if (!before) return jsonError('用户不存在', 404, env);
   if (before.role === 'super' && body.role !== 'super') {
     // 防止把最后一个 super 降级导致锁死：允许但审计
   }
@@ -389,7 +472,22 @@ async function listAuditLogs(request: Request, env: Env, url: URL): Promise<Resp
   const whereSql = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
   const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM admin_audit_log ${whereSql}`).bind(...binds).first<{ c: number }>();
   const rows = await env.DB.prepare(`SELECT * FROM admin_audit_log ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...binds, pageSize, offset).all();
-  return new Response(JSON.stringify({ success: true, list: rows.results, total: totalRow?.c || 0, page, pageSize }), { headers: getCorsHeaders(env) });
+  const list = rows.results as any[];
+  // 新数据：before/after 已拆至 admin_audit_changes，按 change_id 重组为快照字符串；
+  // 旧数据（迁移前写入）：admin_audit_log 的 before/after_snapshot 旧列仍有效，直接复用。
+  const ids = list.map((r) => r.id);
+  if (ids.length) {
+    const changeMap = await reassembleAuditSnapshots(env, ids);
+    for (const row of list) {
+      const recon = changeMap.get(row.id);
+      if (recon) {
+        row.before_snapshot = recon.before;
+        row.after_snapshot = recon.after;
+      }
+      // 无 KV 子表记录时保留 deprecated 列值（可能为 JSON 字符串或 null），前端契约不变
+    }
+  }
+  return new Response(JSON.stringify({ success: true, list, total: totalRow?.c || 0, page, pageSize }), { headers: getCorsHeaders(env) });
 }
 
 // ============ 用户资产背包管理 ============
@@ -417,6 +515,638 @@ async function updateUserItems(request: Request, env: Env, admin: AdminPayload, 
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+// ============ 图片资源（R2 + D1）============
+// 商品封面 / 皮肤 12 张卡面 / 道具图标 的「上传 + 写库 + 镜像 image_url + 刷缓存」
+
+/**
+ * 通用图片上传：multipart 的 file + key（或 folder 由后端拼 key）→ 校验 → 写 R2 → 返回公开 URL。
+ * 鉴权：requireAdmin 已过，内部再 assertCanWrite（只读角色 403）。
+ * 路径约束：key 必须以 `images/` 开头，且不得包含 `..`，防越权写其它前缀。
+ */
+async function uploadImage(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+
+  const contentType = request.headers.get('Content-Type') || '';
+  if (!contentType.includes('multipart/form-data')) {
+    return jsonError('Expected multipart/form-data', 400, env);
+  }
+
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  if (!file) return jsonError('缺少图片文件', 400, env);
+
+  // key 优先取前端指定；否则按 folder + 时间戳生成
+  let key = (formData.get('key') as string | null) || '';
+  if (!key) {
+    const folder = (formData.get('folder') as string | null) || 'images';
+    const safeName = (file.name || 'upload.png').replace(/[^\w.\-]/g, '_');
+    key = `${folder}/${Date.now()}_${safeName}`;
+  }
+  // 安全护栏：仅允许写入 images/ 前缀，禁止越权路径 / 目录穿越
+  if (!key.startsWith('images/') || key.includes('..')) {
+    return jsonError('非法的存储键（必须以 images/ 开头）', 400, env);
+  }
+
+  const err = validateImage(file);
+  if (err) return jsonError(err, 400, env);
+
+  const url = await putR2Image(env, key, file);
+  return new Response(JSON.stringify({ success: true, url }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 获取某皮肤的 12 张卡面（GET，供管理后台预填）。
+ */
+async function getSkinTiles(request: Request, env: Env, skinType: string): Promise<Response> {
+  const rows = await env.DB.prepare(
+    'SELECT tile_index, image_url FROM skin_tiles WHERE skin_type = ? ORDER BY tile_index ASC'
+  ).bind(skinType).all();
+  return new Response(JSON.stringify({ success: true, skin_type: skinType, tiles: rows.results }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 批量保存某皮肤的 12 张卡面（PUT）。
+ * 1) 逐条 UPSERT 到 skin_tiles；
+ * 2) 封面镜像：取 tile_index=1 的 URL 写回 shop_items.image_url（决策 #6）；
+ * 3) purgeShopCache。
+ */
+async function saveSkinTiles(request: Request, env: Env, admin: AdminPayload, skinType: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+
+  const body = (await request.json().catch(() => null)) as { tiles?: { tile_index: number; image_url: string }[] } | null;
+  if (!body || !Array.isArray(body.tiles)) return jsonError('请求体无效', 400, env);
+
+  const base = env.R2_PUBLIC_URL || 'https://file.xqh.cc.cd';
+  const clean = body.tiles
+    .filter((t) => t && t.tile_index >= 1 && t.tile_index <= 12 && typeof t.image_url === 'string' && t.image_url.startsWith(base))
+    .map((t) => ({ tile_index: t.tile_index, image_url: t.image_url }));
+  if (clean.length === 0) return jsonError('无有效卡面数据', 400, env);
+
+  // 1) 逐条 UPSERT（存在则覆盖 image_url）
+  for (const t of clean) {
+    await env.DB.prepare(
+      `INSERT INTO skin_tiles (skin_type, tile_index, image_url) VALUES (?, ?, ?)
+       ON CONFLICT(skin_type, tile_index) DO UPDATE SET image_url = excluded.image_url`
+    ).bind(skinType, t.tile_index, t.image_url).run();
+  }
+
+  // 2) 封面镜像（决策 #6）：tile_index=1 的 URL 写回 shop_items.image_url
+  const cover = clean.find((t) => t.tile_index === 1);
+  if (cover) {
+    const itemType = `SKIN_${skinType.toUpperCase()}`;
+    await env.DB.prepare('UPDATE shop_items SET image_url = ? WHERE item_type = ?').bind(cover.image_url, itemType).run();
+  }
+
+  // 3) 刷 KV 缓存
+  await purgeShopCache(env);
+  await writeAudit(env, request, admin, 'SAVE_SKIN_TILES', { type: 'skin_tiles', id: skinType, after: clean });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 获取某道具图标的当前 URL（GET，供管理后台预填）。
+ */
+async function getItemIcon(request: Request, env: Env, itemType: string): Promise<Response> {
+  const row = await env.DB.prepare('SELECT item_type, image_url FROM item_icons WHERE item_type = ?').bind(itemType).first();
+  return new Response(JSON.stringify({ success: true, item_type: itemType, icon: row || null }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 保存某道具图标（PUT）：写 item_icons（真身，决策 #4）+ 镜像 shop_items.image_url（决策 #6）+ 刷缓存。
+ */
+async function saveItemIcon(request: Request, env: Env, admin: AdminPayload, itemType: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+
+  const body = (await request.json().catch(() => null)) as { image_url?: string } | null;
+  if (!body || typeof body.image_url !== 'string' || !body.image_url) return jsonError('请求体无效', 400, env);
+
+  const base = env.R2_PUBLIC_URL || 'https://file.xqh.cc.cd';
+  if (!body.image_url.startsWith(base)) return jsonError('图标 URL 必须来自本站点 R2', 400, env);
+
+  // 1) 写 item_icons 真身
+  await env.DB.prepare(
+    `INSERT INTO item_icons (item_type, image_url) VALUES (?, ?)
+     ON CONFLICT(item_type) DO UPDATE SET image_url = excluded.image_url`
+  ).bind(itemType, body.image_url).run();
+
+  // 2) 镜像到 shop_items.image_url（决策 #6）
+  await env.DB.prepare('UPDATE shop_items SET image_url = ? WHERE item_type = ?').bind(body.image_url, itemType).run();
+
+  // 3) 刷 KV 缓存
+  await purgeShopCache(env);
+  await writeAudit(env, request, admin, 'SAVE_ITEM_ICON', { type: 'item_icons', id: itemType, after: { image_url: body.image_url } });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 商品写接口包装：复用 genericUpdate，写完额外刷新 shop KV 缓存（image_url / group 变更需生效）。
+ */
+async function updateShopItemRoute(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
+  const res = await genericUpdate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', idColumn: 'id', snapshotCols: ['item_type', 'points_price', 'stock'] }, id);
+  await purgeShopCache(env);
+  return res;
+}
+
+// ============ App 版本管理 ============
+
+/**
+ * 新增 App 版本：写入 created_at；download_url 可填外部 URL 或由 /api/admin/upload-apk 回填。
+ */
+async function createAppVersion(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+  if (body.version_code === undefined || body.version_code === null || body.version_code === '') {
+    return jsonError('缺少 version_code', 400, env);
+  }
+  if (!body.version_name) return jsonError('缺少 version_name', 400, env);
+  // 数值字段强转 Number（CrudPage select 以字符串提交）
+  if (body.status !== undefined) body.status = Number(body.status);
+  if (body.is_force_update !== undefined) body.is_force_update = Number(body.is_force_update);
+  // 新建即发布：status=1 且 release_time 为空时写 release_time
+  if (body.status === 1 && (body.release_time === undefined || body.release_time === null)) {
+    body.release_time = Date.now();
+  }
+  if (body.created_at === undefined) body.created_at = Date.now();
+  // 业务表 INSERT 前剔除仅用于 i18n 传输的 locale 后缀键（宽列已 DROP）
+  const writeBody = stripLocaleSuffixedKeys(body);
+  const cols = Object.keys(writeBody).filter((k) => writeBody[k] !== undefined);
+  const placeholders = cols.map(() => '?').join(', ');
+  // 列名统一双引号包裹，兼容 SQL 关键字列
+  const quoted = cols.map((c) => `"${c}"`).join(', ');
+  const info = await env.DB.prepare(`INSERT INTO app_version (${quoted}) VALUES (${placeholders})`)
+    .bind(...cols.map((c) => writeBody[c]))
+    .run();
+  const newId = String(body.version_code);
+  await writeAudit(env, request, admin, 'CREATE_APP_VERSION', { type: 'app_version', id: newId, after: pick(body, ['version_name', 'status', 'apk_url', 'download_url']) });
+
+  // 自动播种 i18n 多语言行（update_log 字段，5 种语言真实落库）
+  if (body.update_log !== undefined && body.update_log !== null) {
+    seedI18nForEntity(env, 'app_version', newId, { update_log: localeValuesFromBody(body, 'update_log') }).catch((e) => console.error('seedI18nForEntity failed for app_version:', e));
+  }
+
+  return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 编辑 App 版本：status 变 1（已发布）且 release_time 为空时，自动写入 release_time=now。
+ */
+async function updateAppVersion(request: Request, env: Env, admin: AdminPayload, code: number): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const before = await env.DB.prepare('SELECT * FROM app_version WHERE version_code = ?').bind(code).first();
+  if (!before) return jsonError('记录不存在', 404, env);
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+
+  // 数值字段强转 Number（CrudPage select 以字符串提交，避免 status==='1' 漏判发布）
+  if (body.status !== undefined) body.status = Number(body.status);
+  if (body.is_force_update !== undefined) body.is_force_update = Number(body.is_force_update);
+
+  // 发布：status 变 1 且 release_time 空时写 release_time
+  if (body.status === 1 && before.release_time === null && (body.release_time === undefined || body.release_time === null)) {
+    body.release_time = Date.now();
+  }
+
+  const cols = Object.keys(body).filter((k) => body[k] !== undefined && k !== 'version_code');
+  if (cols.length === 0) return jsonError('无有效字段', 400, env);
+  const sets = cols.map((c) => `"${c}" = ?`).join(', ');
+  await env.DB.prepare(`UPDATE app_version SET ${sets} WHERE version_code = ?`)
+    .bind(...cols.map((c) => body[c]), code)
+    .run();
+  const after = await env.DB.prepare('SELECT * FROM app_version WHERE version_code = ?').bind(code).first();
+  await writeAudit(env, request, admin, 'UPDATE_APP_VERSION', {
+    type: 'app_version',
+    id: String(code),
+    before: pick(before, ['version_name', 'status', 'release_time']),
+    after: pick(after, ['version_name', 'status', 'release_time']),
+  });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+// ============ i18n 多语言统一管 ============
+
+/** 从 str_key 解析 entity_ref（module 与 field 之间的部分） */
+function parseEntityRef(strKey: string, module: string): string | null {
+  const prefix = `${module}.`;
+  if (!strKey.startsWith(prefix)) return null;
+  const rest = strKey.slice(prefix.length);
+  const idx = rest.lastIndexOf('.');
+  if (idx < 0) return null;
+  return rest.slice(0, idx);
+}
+
+/** 业务模块列表（需在 i18n 列表里 enrich entity_label 可读名） */
+const I18N_BUSINESS_MODULES = ['shop_items', 'task', 'notice', 'app_version'];
+
+/**
+ * 为 i18n 列表行补充 entity_label（业务模块显示实体可读名，如商品名）。
+ */
+async function enrichEntityLabels(env: Env, list: any[]): Promise<void> {
+  const modulesInList = [...new Set(list.map((r) => r.module))].filter((m) => I18N_BUSINESS_MODULES.includes(m));
+  for (const m of modulesInList) {
+    const refs = [...new Set(list.filter((r) => r.module === m).map((r) => parseEntityRef(r.str_key, m)))].filter((x) => x !== null);
+    if (refs.length === 0) continue;
+    let labelMap: Record<string, string> = {};
+    const placeholders = refs.map(() => '?').join(', ');
+    if (m === 'shop_items') {
+      const r = await env.DB.prepare(`SELECT id, name FROM shop_items WHERE id IN (${placeholders})`).bind(...refs).all();
+      for (const row of r.results as any[]) labelMap[String(row.id)] = row.name;
+    } else if (m === 'task') {
+      const r = await env.DB.prepare(`SELECT id, name FROM task WHERE id IN (${placeholders})`).bind(...refs).all();
+      for (const row of r.results as any[]) labelMap[String(row.id)] = row.name;
+    } else if (m === 'notice') {
+      const r = await env.DB.prepare(`SELECT id, title FROM notice WHERE id IN (${placeholders})`).bind(...refs).all();
+      for (const row of r.results as any[]) labelMap[String(row.id)] = row.title;
+    } else if (m === 'app_version') {
+      const r = await env.DB.prepare(`SELECT version_code, version_name FROM app_version WHERE version_code IN (${placeholders})`).bind(...refs).all();
+      for (const row of r.results as any[]) labelMap[String(row.version_code)] = row.version_name;
+    }
+    for (const row of list) {
+      if (row.module === m) {
+        const ref = parseEntityRef(row.str_key, m);
+        if (ref !== null) row.entity_label = labelMap[String(ref)] || null;
+      }
+    }
+  }
+}
+
+/**
+ * 多语言列表：支持 module / locale / keyword 过滤；业务模块 enrich entity_label。
+ */
+async function listI18n(request: Request, env: Env, url: URL): Promise<Response> {
+  const module = (url.searchParams.get('module') || '').trim();
+  const locale = (url.searchParams.get('locale') || '').trim();
+  const keyword = (url.searchParams.get('keyword') || '').trim();
+
+  const wheres: string[] = [];
+  const binds: any[] = [];
+  if (module) { wheres.push('module = ?'); binds.push(module); }
+  if (locale) { wheres.push('locale = ?'); binds.push(locale); }
+  if (keyword) { wheres.push('(str_key LIKE ? OR value LIKE ?)'); binds.push(`%${keyword}%`, `%${keyword}%`); }
+  const whereSql = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
+
+  // 不分页，返回全部匹配行（当前数据量约235条，每个str_key最多5个locale），
+  // 前端按 str_key 聚合后做客户端分页，避免按单行分页导致聚合后条目骤减的问题。
+  const rows = await env.DB.prepare(`SELECT * FROM i18n_strings ${whereSql} ORDER BY module, str_key, locale LIMIT 2000`)
+    .bind(...binds)
+    .all();
+  const list = rows.results as any[];
+  await enrichEntityLabels(env, list);
+  return new Response(JSON.stringify({ success: true, list, total: list.length }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 新增 i18n 键：写入 i18n_strings（含 updated_at）；业务 key 模式双写基列。
+ */
+async function createI18n(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+  if (!body.str_key || !body.locale || !body.module) return jsonError('缺少 str_key/locale/module', 400, env);
+  if (body.updated_at === undefined) body.updated_at = Date.now();
+  const cols = Object.keys(body).filter((k) => body[k] !== undefined);
+  const placeholders = cols.map(() => '?').join(', ');
+  const quoted = cols.map((c) => `"${c}"`).join(', ');
+  const info = await env.DB.prepare(`INSERT INTO i18n_strings (${quoted}) VALUES (${placeholders})`)
+    .bind(...cols.map((c) => body[c]))
+    .run();
+  const newId = (info as any).lastRowId?.toString() || null;
+  await writeAudit(env, request, admin, 'CREATE_I18N', { type: 'i18n_strings', id: newId, after: pick(body, ['str_key', 'locale', 'module', 'value']) });
+  return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 编辑 i18n 值：写 value + updated_at；业务 key 模式双写基列（过渡期保持 fallback 同步）。
+ */
+async function updateI18n(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const before = (await env.DB.prepare('SELECT * FROM i18n_strings WHERE id = ?').bind(id).first()) as {
+    str_key: string;
+    module: string;
+    locale: string;
+    value: string | null;
+  } | null;
+  if (!before) return jsonError('记录不存在', 404, env);
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+
+  const patch: Record<string, any> = {};
+  if (body.value !== undefined) patch.value = body.value;
+  patch.updated_at = Date.now();
+  const cols = Object.keys(patch);
+  const sets = cols.map((c) => `"${c}" = ?`).join(', ');
+  await env.DB.prepare(`UPDATE i18n_strings SET ${sets} WHERE id = ?`).bind(...cols.map((c) => patch[c]), id).run();
+
+  await writeAudit(env, request, admin, 'UPDATE_I18N', {
+    type: 'i18n_strings',
+    id,
+    before: pick(before, ['str_key', 'locale', 'value']),
+    after: { value: body.value },
+  });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+// ============ APK 上传（R2）============
+
+/**
+ * 上传 APK 安装包到 R2：复用通用上传 putR2Object，放宽前缀（apks/）与文件类型约束，
+ * 返回 { url } 供后台回填 app_version.download_url。
+ */
+async function uploadApk(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const contentType = request.headers.get('Content-Type') || '';
+  if (!contentType.includes('multipart/form-data')) {
+    return jsonError('Expected multipart/form-data', 400, env);
+  }
+  const formData = await request.formData();
+  const file = formData.get('file') as File | null;
+  if (!file) return jsonError('缺少 APK 文件', 400, env);
+  // 仅放行 .apk
+  if (!file.name || !file.name.toLowerCase().endsWith('.apk')) {
+    return jsonError('仅支持 .apk 安装包', 400, env);
+  }
+  const safeName = (file.name || 'app.apk').replace(/[^\w.\-]/g, '_');
+  const key = `apks/${Date.now()}_${safeName}`;
+  const url = await putR2Object(env, key, file, 'application/vnd.android.package-archive');
+  return new Response(JSON.stringify({ success: true, url }), { headers: getCorsHeaders(env) });
+}
+
+// ============ 排行榜手动管理 ============
+
+/**
+ * 排行榜列表（后台）：JOIN users 取 username，按 score DESC；
+ * game_mode=1 且 gamemode_endless=off 时返回空列表 + disabled 提示。
+ */
+async function listLeaderboard(request: Request, env: Env, url: URL): Promise<Response> {
+  const { stage, endless } = await getGameModeStatus(env);
+  const gameMode = parseInt(url.searchParams.get('game_mode') || '0', 10);
+  if (gameMode === 1 && !endless) {
+    return new Response(
+      JSON.stringify({ success: true, list: [], total: 0, page: 1, pageSize: 20, disabled: true, message: '无尽生存模式未开启' }),
+      { headers: getCorsHeaders(env) }
+    );
+  }
+
+  const { page, pageSize, offset } = parsePaging(url);
+  const wheres: string[] = ['l.game_mode = ?'];
+  const binds: any[] = [gameMode];
+  const levelId = url.searchParams.get('level_id');
+  if (levelId !== null && levelId !== '') {
+    wheres.push('l.level_id = ?');
+    binds.push(parseInt(levelId, 10));
+  }
+  const whereSql = `WHERE ${wheres.join(' AND ')}`;
+  const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM leaderboard l ${whereSql}`).bind(...binds).first<{ c: number }>();
+  const rows = await env.DB.prepare(
+    `SELECT l.id, l.user_id, u.username, l.level_id, l.score, l.clear_time_ms, l.game_mode, l.achieved_at
+     FROM leaderboard l JOIN users u ON l.user_id = u.id ${whereSql} ORDER BY l.score DESC LIMIT ? OFFSET ?`
+  )
+    .bind(...binds, pageSize, offset)
+    .all();
+
+  return new Response(
+    JSON.stringify({ success: true, list: rows.results, total: totalRow?.c || 0, page, pageSize }),
+    { headers: getCorsHeaders(env) }
+  );
+}
+
+/**
+ * 新增排行榜行（手动补录/校正）：校验 user 存在，写 achieved_at。
+ */
+async function createLeaderboardRow(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+  if (!body.user_id) return jsonError('缺少 user_id', 400, env);
+  const user = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(body.user_id).first();
+  if (!user) return jsonError('用户不存在', 404, env);
+
+  const score = Number(body.score) || 0;
+  const clearTime = Number(body.clear_time_ms) || 0;
+  const levelId = Number(body.level_id) || 0;
+  const gameMode = Number(body.game_mode) || 0;
+
+  const info = await env.DB.prepare(
+    'INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, achieved_at) VALUES (?, ?, ?, ?, ?, ?)'
+  )
+    .bind(body.user_id, levelId, score, clearTime, gameMode, Date.now())
+    .run();
+  const newId = (info as any).lastRowId?.toString();
+  await writeAudit(env, request, admin, 'CREATE_LEADERBOARD', {
+    type: 'leaderboard',
+    id: newId,
+    after: pick(body, ['user_id', 'level_id', 'score', 'game_mode']),
+  });
+  return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 改排行榜分（手动改分）：仅允许修改 score / clear_time_ms / level_id / game_mode。
+ */
+async function updateLeaderboardRow(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const before = await env.DB.prepare('SELECT * FROM leaderboard WHERE id = ?').bind(id).first();
+  if (!before) return jsonError('记录不存在', 404, env);
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+
+  const editable = ['score', 'clear_time_ms', 'level_id', 'game_mode'];
+  const cols = Object.keys(body).filter((k) => editable.includes(k) && body[k] !== undefined);
+  if (cols.length === 0) return jsonError('无有效字段（仅可改分数/耗时/关卡/模式）', 400, env);
+  const sets = cols.map((c) => `"${c}" = ?`).join(', ');
+  await env.DB.prepare(`UPDATE leaderboard SET ${sets} WHERE id = ?`)
+    .bind(...cols.map((c) => Number(body[c])), id)
+    .run();
+  const after = await env.DB.prepare('SELECT * FROM leaderboard WHERE id = ?').bind(id).first();
+  await writeAudit(env, request, admin, 'UPDATE_LEADERBOARD', {
+    type: 'leaderboard',
+    id,
+    before: pick(before, ['score', 'clear_time_ms', 'level_id']),
+    after: pick(after, ['score', 'clear_time_ms', 'level_id']),
+  });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 用户搜索（反查 id）：按手机号 / 昵称 LIKE 反查，供排行榜手动改分 UserPicker 选用户。
+ */
+async function searchUsers(request: Request, env: Env, url: URL): Promise<Response> {
+  const keyword = (url.searchParams.get('q') ?? url.searchParams.get('keyword') ?? '').trim();
+  if (!keyword) {
+    return new Response(JSON.stringify({ success: true, list: [] }), { headers: getCorsHeaders(env) });
+  }
+  const rows = await env.DB.prepare(
+    'SELECT id, username, phone FROM users WHERE phone LIKE ? OR username LIKE ? ORDER BY created_at DESC LIMIT 20'
+  )
+    .bind(`%${keyword}%`, `%${keyword}%`)
+    .all();
+  return new Response(JSON.stringify({ success: true, list: rows.results }), { headers: getCorsHeaders(env) });
+}
+
+// ============ 关卡（layout_data 拆表：主表 levels + 子表 level_tiles） ============
+
+/**
+ * 关卡列表：分页读取 levels，再按本页 level_id 批量读取 level_tiles 重组 layout_data 字符串。
+ * 未回填的存量数据回退使用 levels.layout_data 旧列（deprecated），保证前端契约不变。
+ */
+async function listLevels(request: Request, env: Env, url: URL): Promise<Response> {
+  const { page, pageSize, offset } = parsePaging(url);
+  const totalRow = await env.DB.prepare('SELECT COUNT(*) as c FROM levels').bind().first<{ c: number }>();
+  const rows = await env.DB.prepare(
+    'SELECT level_id, difficulty, created_at FROM levels ORDER BY rowid DESC LIMIT ? OFFSET ?'
+  )
+    .bind(pageSize, offset)
+    .all();
+  const list = rows.results as any[];
+  const ids = list.map((r) => r.level_id);
+  const tileMap = await readLevelTilesByLevels(env, ids);
+  for (const row of list) {
+    const tiles = tileMap.get(row.level_id);
+    if (tiles && tiles.length) {
+      // 已回填：由子表规范化数据重组
+      row.layout_data = assembleLayoutData(tiles);
+    } else if (row.layout_data != null) {
+      // 存量数据尚未回填，直接复用旧 JSON 列
+      row.layout_data = row.layout_data;
+    } else {
+      row.layout_data = '[]';
+    }
+  }
+  return new Response(
+    JSON.stringify({ success: true, list, total: totalRow?.c || 0, page, pageSize }),
+    { headers: getCorsHeaders(env) }
+  );
+}
+
+/**
+ * 创建关卡：layout_data(JSON 字符串) → 解析为 TileData[] 写入 level_tiles 子表；
+ * 主表仅写 level_id/difficulty/created_at（停止写 layout_data 旧列）。
+ * 若旧库 levels.layout_data 仍为 NOT NULL 且迁移未放开约束，则回退写入旧列兜底，避免创建失败。
+ */
+async function createLevel(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+  if (body.level_id === undefined || body.level_id === null || body.level_id === '') {
+    return jsonError('缺少 level_id', 400, env);
+  }
+  let tiles: TileData[] = [];
+  if (body.layout_data !== undefined && body.layout_data !== null) {
+    try {
+      tiles = parseLayoutData(body.layout_data);
+    } catch {
+      return jsonError('layout_data 不是合法的 JSON 数组', 400, env);
+    }
+  }
+  const levelId = Number(body.level_id);
+  const difficulty = body.difficulty !== undefined ? Number(body.difficulty) : null;
+  try {
+    await env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at) VALUES (?, ?, ?)')
+      .bind(levelId, difficulty, Date.now())
+      .run();
+  } catch (e: any) {
+    // 兜底：旧库 layout_data 仍为 NOT NULL 时，回退写入旧列，避免创建失败
+    const msg = String(e?.message || '');
+    if (msg.includes('NOT NULL') || msg.includes('constraint')) {
+      await env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at, layout_data) VALUES (?, ?, ?, ?)')
+        .bind(levelId, difficulty, Date.now(), assembleLayoutData(tiles))
+        .run();
+    } else {
+      throw e;
+    }
+  }
+  await writeLevelTiles(env, levelId, tiles);
+  const layoutStr = assembleLayoutData(tiles);
+  const layoutSummary = tiles.length
+    ? { layout_length: layoutStr.length, layout_hash: await sha256(layoutStr) }
+    : null;
+  await writeAudit(env, request, admin, 'CREATE_LEVEL', { type: 'levels', id: String(levelId), after: layoutSummary });
+  return new Response(JSON.stringify({ success: true, id: String(levelId) }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 更新关卡：difficulty 变更 UPDATE 主表；layout_data 变更则重写 level_tiles（先删后插）。
+ */
+async function updateLevel(request: Request, env: Env, admin: AdminPayload, levelIdStr: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const levelId = levelIdStr;
+  const beforeRow = await env.DB.prepare('SELECT 1 FROM levels WHERE level_id = ?').bind(levelId).first();
+  if (!beforeRow) return jsonError('关卡不存在', 404, env);
+  const beforeTiles = await readLevelTilesByLevels(env, [Number(levelId)]);
+  const beforeLayout = beforeTiles.get(Number(levelId));
+  const body = (await request.json().catch(() => null)) as Record<string, any> | null;
+  if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
+
+  if (body.difficulty !== undefined) {
+    await env.DB.prepare('UPDATE levels SET difficulty = ? WHERE level_id = ?').bind(Number(body.difficulty), levelId).run();
+  }
+  let afterLayout = beforeLayout;
+  if (body.layout_data !== undefined && body.layout_data !== null) {
+    let tiles: TileData[];
+    try {
+      tiles = parseLayoutData(body.layout_data);
+    } catch {
+      return jsonError('layout_data 不是合法的 JSON 数组', 400, env);
+    }
+    await writeLevelTiles(env, Number(levelId), tiles);
+    afterLayout = tiles;
+  }
+  const beforeSummary = beforeLayout
+    ? { layout_length: assembleLayoutData(beforeLayout).length, layout_hash: await sha256(assembleLayoutData(beforeLayout)) }
+    : null;
+  const afterSummary = afterLayout
+    ? { layout_length: assembleLayoutData(afterLayout).length, layout_hash: await sha256(assembleLayoutData(afterLayout)) }
+    : (body.layout_data !== undefined ? {} : null);
+  await writeAudit(env, request, admin, 'UPDATE_LEVEL', { type: 'levels', id: levelId, before: beforeSummary, after: afterSummary });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+/**
+ * 删除关卡：先删 level_tiles 子表，再删主表。
+ */
+async function deleteLevel(request: Request, env: Env, admin: AdminPayload, levelIdStr: string): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const levelId = levelIdStr;
+  const beforeRow = await env.DB.prepare('SELECT 1 FROM levels WHERE level_id = ?').bind(levelId).first();
+  if (!beforeRow) return jsonError('关卡不存在', 404, env);
+  const beforeTiles = await readLevelTilesByLevels(env, [Number(levelId)]);
+  const beforeLayout = beforeTiles.get(Number(levelId));
+  await env.DB.prepare('DELETE FROM level_tiles WHERE level_id = ?').bind(Number(levelId)).run();
+  await env.DB.prepare('DELETE FROM levels WHERE level_id = ?').bind(levelId).run();
+  const beforeSummary = beforeLayout ? { layout_length: assembleLayoutData(beforeLayout).length } : null;
+  await writeAudit(env, request, admin, 'DELETE_LEVEL', { type: 'levels', id: levelId, before: beforeSummary });
+  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+/** 清空 SHEEPS_CACHE KV 中所有键，返回删除数量 */
+async function clearAllCache(request: Request, env: Env): Promise<Response> {
+  let cursor: string | undefined;
+  let deleted = 0;
+  do {
+    const list = await env.SHEEPS_CACHE.list({ cursor, limit: 1000 });
+    const keys = list.keys.map(k => k.name);
+    if (keys.length > 0) {
+      await Promise.all(keys.map(k => env.SHEEPS_CACHE.delete(k).catch(() => {})));
+      deleted += keys.length;
+    }
+    cursor = list.list_complete ? undefined : list.cursor;
+  } while (cursor);
+  return new Response(JSON.stringify({ success: true, deleted }), { headers: getCorsHeaders(env) });
+}
+
 // ============ 路由分发 ============
 
 export async function handleAdminRoutes(request: Request, env: Env, path: string, url: URL): Promise<Response | null> {
@@ -438,6 +1168,7 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (m && method === 'POST') return banUser(request, env, admin, m[1]);
   m = path.match(/^\/api\/admin\/users\/([^/]+)$/);
   if (m && method === 'PUT') return renameUser(request, env, admin, m[1]);
+  if (m && method === 'DELETE') return deleteUser(request, env, admin, m[1]);
   m = path.match(/^\/api\/admin\/users\/([^/]+)\/items$/);
   if (m && method === 'GET') return listUserItems(request, env, admin, m[1]);
   if (m && method === 'POST') return updateUserItems(request, env, admin, m[1]);
@@ -450,61 +1181,45 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (path === '/api/admin/stats' && method === 'GET') return getStats(request, env);
 
   // 商品
-  if (path === '/api/admin/shop-items' && method === 'GET') return genericList(request, env, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'] }, url);
-  if (path === '/api/admin/shop-items' && method === 'POST') return genericCreate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'] });
+  if (path === '/api/admin/shop-items' && method === 'GET') return genericList(request, env, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], searchCols: ['name', 'item_type'] }, url);
+  if (path === '/api/admin/shop-items' && method === 'POST') return genericCreate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], onCreated: (id, body) => seedI18nForEntity(env, 'shop_items', id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
   m = path.match(/^\/api\/admin\/shop-items\/([^/]+)$/);
-  if (m && method === 'PUT') return genericUpdate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', idColumn: 'id', snapshotCols: ['item_type', 'points_price', 'stock'] }, m[1]);
+  if (m && method === 'PUT') return updateShopItemRoute(request, env, admin, m[1]);
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', idColumn: 'id', snapshotCols: ['item_type', 'points_price', 'stock'] }, m[1]);
 
+  // 图片上传（通用）
+  if (path === '/api/admin/upload-image' && method === 'POST') return uploadImage(request, env, admin);
+
+  // 皮肤 12 张卡面
+  m = path.match(/^\/api\/admin\/skin-tiles\/([^/]+)$/);
+  if (m && method === 'GET') return getSkinTiles(request, env, m[1]);
+  if (m && method === 'PUT') return saveSkinTiles(request, env, admin, m[1]);
+
+  // 道具图标（item_icons 真身 + 镜像 image_url）
+  m = path.match(/^\/api\/admin\/item-icons\/([^/]+)$/);
+  if (m && method === 'GET') return getItemIcon(request, env, m[1]);
+  if (m && method === 'PUT') return saveItemIcon(request, env, admin, m[1]);
+
   // 公告
-  if (path === '/api/admin/notices' && method === 'GET') return genericList(request, env, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'] }, url);
-  if (path === '/api/admin/notices' && method === 'POST') return genericCreate(request, env, admin, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'] });
+  if (path === '/api/admin/notices' && method === 'GET') return genericList(request, env, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], searchCols: ['title', 'content'] }, url);
+  if (path === '/api/admin/notices' && method === 'POST') return genericCreate(request, env, admin, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], onCreated: (id, body) => seedI18nForEntity(env, 'notice', id, { title: localeValuesFromBody(body, 'title'), content: localeValuesFromBody(body, 'content') }) });
   m = path.match(/^\/api\/admin\/notices\/([^/]+)$/);
   if (m && method === 'PUT') return genericUpdate(request, env, admin, { table: 'notice', action: 'NOTICE', idColumn: 'id', snapshotCols: ['title', 'content', 'type'] }, m[1]);
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'notice', action: 'NOTICE', idColumn: 'id', snapshotCols: ['title', 'content', 'type'] }, m[1]);
 
   // 任务
-  if (path === '/api/admin/tasks' && method === 'GET') return genericList(request, env, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'] }, url);
-  if (path === '/api/admin/tasks' && method === 'POST') return genericCreate(request, env, admin, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'] });
+  if (path === '/api/admin/tasks' && method === 'GET') return genericList(request, env, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], searchCols: ['name', 'id'] }, url);
+  if (path === '/api/admin/tasks' && method === 'POST') return genericCreate(request, env, admin, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], onCreated: (_rowid, body) => seedI18nForEntity(env, 'task', body.id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
   m = path.match(/^\/api\/admin\/tasks\/([^/]+)$/);
   if (m && method === 'PUT') return genericUpdate(request, env, admin, { table: 'task', action: 'TASK', idColumn: 'id', snapshotCols: ['target_count', 'points_reward'] }, m[1]);
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'task', action: 'TASK', idColumn: 'id', snapshotCols: ['target_count', 'points_reward'] }, m[1]);
 
-  // 关卡（layout_data 仅记长度/hash）
-  if (path === '/api/admin/levels' && method === 'GET') return genericList(request, env, { table: 'levels', action: 'LEVEL', snapshotCols: ['layout_data'] }, url);
-  if (path === '/api/admin/levels' && method === 'POST') {
-    const guard = assertCanWrite(admin); if (guard) return guard;
-    const body = (await request.json().catch(() => null)) as Record<string, any> | null;
-    if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
-    const cols = Object.keys(body).filter((k) => body[k] !== undefined);
-    const placeholders = cols.map(() => '?').join(', ');
-    const info = await env.DB.prepare(`INSERT INTO levels (${cols.join(', ')}) VALUES (${placeholders})`).bind(...cols.map((c) => body[c])).run();
-    const newId = (info as any).lastRowId?.toString();
-    const layoutSummary = body.layout_data ? { layout_length: String(body.layout_data).length, layout_hash: await sha256(String(body.layout_data)) } : null;
-    await writeAudit(env, request, admin, 'CREATE_LEVEL', { type: 'levels', id: newId, after: layoutSummary });
-    return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
-  }
+  // 关卡（layout_data 拆表：主表 + level_tiles 子表，读取重组 layout_data 字符串）
+  if (path === '/api/admin/levels' && method === 'GET') return listLevels(request, env, url);
+  if (path === '/api/admin/levels' && method === 'POST') return createLevel(request, env, admin);
   m = path.match(/^\/api\/admin\/levels\/([^/]+)$/);
-  if (m && method === 'PUT') {
-    const guard = assertCanWrite(admin); if (guard) return guard;
-    const before = await env.DB.prepare('SELECT layout_data FROM levels WHERE level_id = ?').bind(m[1]).first();
-    const body = (await request.json().catch(() => null)) as Record<string, any> | null;
-    if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
-    const cols = Object.keys(body).filter((k) => body[k] !== undefined && k !== 'id');
-    if (cols.length === 0) return jsonError('无有效字段', 400, env);
-    const sets = cols.map((c) => `${c} = ?`).join(', ');
-    await env.DB.prepare(`UPDATE levels SET ${sets} WHERE level_id = ?`).bind(...cols.map((c) => body[c]), m[1]).run();
-    const after = body.layout_data ? { layout_length: String(body.layout_data).length, layout_hash: await sha256(String(body.layout_data)) } : {};
-    await writeAudit(env, request, admin, 'UPDATE_LEVEL', { type: 'levels', id: m[1], before: before ? { layout_length: String(before.layout_data).length, layout_hash: await sha256(String(before.layout_data)) } : null, after });
-    return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
-  }
-  if (m && method === 'DELETE') {
-    const guard = assertCanWrite(admin); if (guard) return guard;
-    const before = await env.DB.prepare('SELECT layout_data FROM levels WHERE level_id = ?').bind(m[1]).first();
-    await env.DB.prepare('DELETE FROM levels WHERE level_id = ?').bind(m[1]).run();
-    await writeAudit(env, request, admin, 'DELETE_LEVEL', { type: 'levels', id: m[1], before: before ? { layout_length: String(before.layout_data).length } : null });
-    return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
-  }
+  if (m && method === 'PUT') return updateLevel(request, env, admin, m[1]);
+  if (m && method === 'DELETE') return deleteLevel(request, env, admin, m[1]);
 
   // 超级管理员专属
   if (path === '/api/admin/accounts' && method === 'GET') { const g = assertSuper(admin); if (g) return g; return listAccounts(request, env); }
@@ -515,6 +1230,41 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (m && method === 'POST') return disableAccount(request, env, admin, m[1]);
 
   if (path === '/api/admin/audit-logs' && method === 'GET') { const g = assertSuper(admin); if (g) return g; return listAuditLogs(request, env, url); }
+
+  // ============ App 版本管理 ============
+  if (path === '/api/admin/app-versions' && method === 'GET')
+    return genericList(request, env, { table: 'app_version', action: 'APP_VERSION', idColumn: 'version_code', snapshotCols: ['version_name', 'status'], searchCols: ['version_name'] }, url);
+  if (path === '/api/admin/app-versions' && method === 'POST') return createAppVersion(request, env, admin);
+  m = path.match(/^\/api\/admin\/app-versions\/([^/]+)$/);
+  if (m && method === 'PUT') return updateAppVersion(request, env, admin, parseInt(m[1], 10));
+  if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'app_version', action: 'APP_VERSION', idColumn: 'version_code', snapshotCols: ['version_name', 'status'] }, m[1]);
+
+  // ============ APK 上传（R2）============
+  if (path === '/api/admin/upload-apk' && method === 'POST') return uploadApk(request, env, admin);
+
+  // ============ 多语言统一管（i18n_strings）============
+  if (path === '/api/admin/i18n' && method === 'GET') return listI18n(request, env, url);
+  if (path === '/api/admin/i18n' && method === 'POST') return createI18n(request, env, admin);
+  m = path.match(/^\/api\/admin\/i18n\/([^/]+)$/);
+  if (m && method === 'PUT') return updateI18n(request, env, admin, m[1]);
+  if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'i18n_strings', action: 'I18N', idColumn: 'id', snapshotCols: ['str_key', 'locale', 'module'] }, m[1]);
+
+  // ============ 排行榜手动管理 ============
+  if (path === '/api/admin/leaderboard' && method === 'GET') return listLeaderboard(request, env, url);
+  if (path === '/api/admin/leaderboard' && method === 'POST') return createLeaderboardRow(request, env, admin);
+  m = path.match(/^\/api\/admin\/leaderboard\/([^/]+)$/);
+  if (m && method === 'PUT') return updateLeaderboardRow(request, env, admin, m[1]);
+  if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'leaderboard', action: 'LEADERBOARD', idColumn: 'id', snapshotCols: ['user_id', 'score'] }, m[1]);
+
+  // ============ 用户搜索（反查 id）============
+  if (path === '/api/admin/users/search' && method === 'GET') return searchUsers(request, env, url);
+
+  // ============ 清空 KV 缓存 ============
+  if (path === '/api/admin/cache/clear' && method === 'POST') {
+    const g = assertSuper(admin);
+    if (g) return g;
+    return clearAllCache(request, env);
+  }
 
   return jsonError('Not Found', 404, env);
 }

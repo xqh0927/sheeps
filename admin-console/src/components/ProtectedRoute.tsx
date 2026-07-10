@@ -16,5 +16,11 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // 角色兜底：玩家(role=user)会被后端登录拦截，此处再防一层
+  const role = user.role;
+  if (role && !['super', 'operator', 'readonly'].includes(role)) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
   return <>{children}</>;
 }

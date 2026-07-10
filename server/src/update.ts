@@ -1,4 +1,5 @@
 import { Env, GitHubRelease, GitHubReleaseAsset, AppUpdatePayload, ApkStatus } from './types';
+import { getI18nBatch, resolveI18n } from './i18n';
 
 // Github 接口及缓存策略
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/xqh0927/sheeps-releases/releases/latest';
@@ -31,24 +32,34 @@ export async function checkApkExists(url: string): Promise<boolean> {
 }
 
 /** * 数据库兜底更新检查逻辑 
- * 当 GitHub API 不可用时，从 D1 数据库中查找并校验更新
+ * 当 GitHub API 不可用时，从 D1 数据库中查找并校验更新。
+ *
+ * 方案 B 改造：
+ *  - 下载链接优先 download_url，回退 apk_url（COALESCE(download_url, apk_url)）；
+ *  - 仅 status=1（已发布）的版本参与更新判定；
+ *  - update_log 经 i18n 读取（缺值回退基列宽列）。
  */
 export async function getDatabaseAppUpdate(env: Env, currentCode: number, lang: string): Promise<AppUpdatePayload> {
-  const logCol = lang ? `COALESCE(update_log_${lang}, update_log)` : 'update_log';
+  const i18nMap = await getI18nBatch(env, 'app_version', lang);
   const versions = await env.DB.prepare(
-    `SELECT version_code, version_name, apk_url, ${logCol} as update_log, is_force_update FROM app_version WHERE version_code > ? ORDER BY version_code DESC LIMIT 5`
+    `SELECT version_code, version_name, apk_url, download_url, update_log, status, is_force_update
+     FROM app_version
+     WHERE version_code > ? AND status = 1
+     ORDER BY version_code DESC LIMIT 5`
   ).bind(currentCode).all<any>();
 
   if (versions.results && versions.results.length > 0) {
     for (const release of versions.results) {
-      if (release.apk_url) {
-        const exists = await checkApkExists(release.apk_url); // 确保链接有效
+      const downloadUrl = release.download_url || release.apk_url;
+      if (downloadUrl) {
+        const exists = await checkApkExists(downloadUrl); // 确保链接有效
         if (exists) {
+          const updateLog = resolveI18n(i18nMap, `app_version.${release.version_code}.update_log`, release.update_log);
           return {
             has_update: true,
             version_name: release.version_name,
-            apk_url: release.apk_url,
-            update_log: release.update_log,
+            apk_url: downloadUrl,
+            update_log: updateLog ?? '',
             force_update: release.is_force_update === 1
           };
         }

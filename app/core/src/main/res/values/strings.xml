@@ -74,11 +74,10 @@
     <string name="item_bomb">炸弹</string>
     <string name="item_joker">万能牌</string>
     <string name="item_double_points">双倍金币</string>
+    <string name="item_freeze">冻结符</string>
 
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解锁</string>
-    <string name="shop_section_provinces">美食系列卡牌皮肤</string>
-    <string name="shop_section_animated">特效皮肤</string>
 
     <string name="task_play_3">累计游玩3次</string>
     <string name="task_play_5">累计游玩5次</string>
@@ -317,25 +316,14 @@
     <string name="carried_magic_items">随身道具</string>
 
 
-    <string name="item_skin_henan">河南美食</string>
-    <string name="item_skin_henan_desc">河南特色美食卡牌皮肤</string>
-    <string name="item_skin_sichuan">四川美食</string>
-    <string name="item_skin_sichuan_desc">四川特色美食卡牌皮肤</string>
     <string name="item_skin_shuang">萌趣竞技</string>
     <string name="item_skin_shuang_desc">12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰</string>
-    <string name="item_skin_electronic">数码潮玩</string>
-    <string name="item_skin_electronic_desc">12款数码设备卡面，科技蓝边框搭配霓虹装饰</string>
-    <string name="item_skin_daily">日常好物</string>
-    <string name="item_skin_daily_desc">12款日常用品卡面，暖橙边框搭配阳光装饰</string>
-    <string name="item_skin_vegetable">蔬菜园</string>
-    <string name="item_skin_vegetable_desc">12款新鲜蔬菜卡面，清新绿边框搭配田园装饰</string>
-    <string name="item_skin_fruit">水果盘</string>
-    <string name="item_skin_fruit_desc">12款时令水果卡面，鲜红边框搭配果香装饰</string>
 
 
     <string name="leaderboard_data_error">数据获取失败</string>
     <string name="leaderboard_load_error">加载失败，请检查网络连接</string>
     <string name="leaderboard_empty">暂无排行榜数据</string>
+    <string name="leaderboard_endless_disabled">无尽模式未开启</string>
     <string name="leaderboard_title_format">第 %1$d 关 · 排行榜</string>
     <string name="leaderboard_tab_daily">今日排行</string>
     <string name="leaderboard_tab_weekly">本周排行</string>
@@ -351,6 +339,7 @@
     <string name="item_bomb_desc">炸毁槽位最末尾的2张卡牌</string>
     <string name="item_joker_desc">作为万能牌与前两张卡牌自动消除</string>
     <string name="item_double_points_desc">本局结算时金币奖励翻倍</string>
+    <string name="item_freeze_desc">暂停下落4秒，获得喘息窗口</string>
     <string name="btn_go_to_play">去闯关</string>
     <string name="skin_apply_success">皮肤更换成功</string>
 
@@ -364,8 +353,6 @@
     <string name="btn_disagree_exit">不同意并退出</string>
     <string name="btn_agree_start">同意并开始</string>
     <string name="toast_offline_fallback">连接服务异常，已载入本地离线数据</string>
-    <string name="province_skin_title">%1$s美食</string>
-    <string name="province_skin_desc">解锁%1$s省特色美食图标皮肤</string>
     <string name="toast_login_failed">登录失败</string>
     <string name="toast_login_failed_retry">登录失败，请稍后重试</string>
     <string name="toast_network_error_retry">网络连接异常，请稍后重试</string>

@@ -2,46 +2,85 @@ package com.example.sheeps.core.game
 
 import android.content.Context
 import com.example.sheeps.core.R
+import com.example.sheeps.data.model.ShopItem
 
 /**
- * 负责根据皮肤和类型提供对应的图片资源 ID
+ * 卡牌皮肤 / 道具图标 资源注册表。
  *
- * 回退策略：
- * 1. 尝试皮肤专属资源（如 tile_classic_1、tile_province_beijing_1）
- * 2. 如果当前不是经典皮肤，回退到经典皮肤资源（tile_1、tile_2...）
- * 3. 如果仍然找不到，返回 0（UI 层应显示类型编号或占位符）
+ * v2 改为「URL 注册表 + 本地兜底」模式：
+ *  - [setShopItems] 从商城列表注入数据，建立：
+ *      · 皮肤渲染键(skinKey) → 12 张远程卡面 URL（来自 skin_tiles）
+ *      · 道具 item_type → 远程图标 URL（来自 item_icons，镜像于 shop_items.image_url）
+ *      · 皮肤按 group 分组数据
+ *  - 渲染时优先返回远程 URL，由 Coil 加载；URL 缺失或加载失败，回退到默认皮肤
+ *    [SkinConstants.DEFAULT_SKIN]（shuang）的本地 drawable `tile_shuang_{type}`。
+ *
+ * 单一数据源：所有图片 URL 来自后端，Android 不再写死非兜底皮肤的本地 drawable 映射。
+ * 向后兼容：注册表为空（旧版 / 离线）时，所有皮肤回退默认皮肤本地图。
  */
 object TileIconProvider {
 
-    fun getIconResource(context: Context, skin: String, type: Int): Int {
-        val normalizedSkin = skin.lowercase()
+    /** skinKey(小写渲染键) -> 12 张卡面 URL（index 0..11 对应 tile 1..12，缺失为 null） */
+    private val skinTileUrls = mutableMapOf<String, List<String?>>()
 
-        // 1. 尝试皮肤专属资源
-        val resName = buildResName(normalizedSkin, type)
-        var resId = context.resources.getIdentifier(resName, "drawable", context.packageName)
-        if (resId != 0) return resId
+    /** item_type(大写) -> 道具图标 URL */
+    private val itemIconUrls = mutableMapOf<String, String?>()
 
-        // 2. 回退到经典皮肤（如果当前不是经典皮肤）
-        if (normalizedSkin != "classic" && normalizedSkin != "default") {
-            val classicResName = "tile_$type"
-            resId = context.resources.getIdentifier(classicResName, "drawable", context.packageName)
-            if (resId != 0) return resId
+    /** 分组数据：group(可空) -> 该组皮肤商品（按原始顺序） */
+    private val groups = mutableMapOf<String?, MutableList<ShopItem>>()
+
+    /** 最近一次注入的全部商品 */
+    private var allItems: List<ShopItem> = emptyList()
+
+    /**
+     * 注入商城商品列表，重建注册表与分组数据。
+     * 应在每次拉取/刷新 shop 列表后调用。
+     */
+    fun setShopItems(items: List<ShopItem>) {
+        allItems = items
+        skinTileUrls.clear()
+        itemIconUrls.clear()
+        groups.clear()
+        for (item in items) {
+            if (item.item_type.startsWith("SKIN_")) {
+                val key = item.item_type.removePrefix("SKIN_").lowercase()
+                skinTileUrls[key] = item.tiles ?: emptyList()
+                groups.getOrPut(item.group) { mutableListOf() }.add(item)
+            } else {
+                itemIconUrls[item.item_type.uppercase()] = item.image_url
+            }
         }
-
-        // 3. 所有回退均失败，返回 0
-        // UI 层应处理 resId=0 的情况（显示类型编号或占位符）
-        // 不再使用 R.drawable.tile_1 作为最终兜底，
-        // 否则所有缺失的类型都会显示为类型 1 的图标
-        return 0
     }
 
-    private fun buildResName(skin: String, type: Int): String {
-        return if (SkinConstants.provinceIds.contains(skin)) {
-            "tile_${skin}_$type"
-        } else if (skin == "classic" || skin == "default") {
-            "tile_$type"
-        } else {
-            "tile_${skin}_$type"
-        }
+    /**
+     * 获取某皮肤某类型卡面的远程 URL（1-based tileIndex）。
+     * @return URL 字符串；无远程数据返回 null（调用方应回退本地默认皮肤）。
+     */
+    fun getTileUrl(skinKey: String, tileIndex: Int): String? {
+        val list = skinTileUrls[skinKey.lowercase()] ?: return null
+        if (tileIndex !in 1..12) return null
+        val idx = tileIndex - 1
+        return if (idx < list.size) list[idx] else null
+    }
+
+    /**
+     * 获取某道具图标的远程 URL。
+     * @return URL 字符串；无远程数据返回 null（调用方应回退静态占位 drawable）。
+     */
+    fun getItemIconUrl(itemType: String): String? = itemIconUrls[itemType.uppercase()]
+
+    /** 当前分组数据（key 为 group 值，可为 null 表示未分组） */
+    fun getGroups(): Map<String?, List<ShopItem>> = groups
+
+    /** 最近一次注入的全部商品 */
+    fun getAllItems(): List<ShopItem> = allItems
+
+    /**
+     * 回退到默认皮肤（[SkinConstants.DEFAULT_SKIN]，即 shuang）的本地 drawable。
+     * 当远程 URL 缺失或加载失败时作为兜底，保证离线/弱网可用。
+     */
+    fun getFallbackResId(context: Context, tileIndex: Int): Int {
+        val resName = "tile_${SkinConstants.DEFAULT_SKIN}_$tileIndex"
+        return context.resources.getIdentifier(resName, "drawable", context.packageName)
     }
 }

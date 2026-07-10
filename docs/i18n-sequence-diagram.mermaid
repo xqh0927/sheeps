@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor Admin as 管理员
+    participant CP as CrudPage（新建态）
+    participant MF as MultilingualField
+    participant API as admin.ts createShopItem
+    participant GC as genericCreate
+    participant SEED as seedI18nForEntity
+    participant DB as D1 (shop_items / i18n_strings)
+
+    Admin->>CP: 点「新建」
+    CP->>CP: openCreate 初始化 name/name_en/_tw/_ja/_ko = ''
+    Admin->>MF: 填写 5 语言（name 等）
+    MF->>CP: 写回 form[name..name_ko]
+    Admin->>CP: 点「保存」
+    CP->>CP: handleSubmit 校验 multilingual 字段 5 语言全非空
+    alt 任一语言为空
+        CP-->>Admin: show 警告「请完整填写 5 种语言：名称（缺失 en/tw...）」并拦截
+    else 全部非空
+        CP->>API: POST /api/admin/shop-items {name,name_en,...,description,...,item_type,...}
+        API->>GC: body（含后缀键）
+        GC->>GC: insertBody = stripLocaleSuffixedKeys(body)
+        GC->>DB: INSERT INTO shop_items (name, description, item_type, ...) VALUES (...)
+        GC->>SEED: onCreated(id, body)  // 完整 body
+        SEED->>DB: 遍历 I18N_LOCALES INSERT OR IGNORE i18n_strings(str_key,locale,module,value,updated_at)
+        GC-->>API: {success:true, id}
+        API-->>CP: 成功
+        CP->>CP: 刷新列表；I18nManager 现已可编辑真实多语言值
+    end

@@ -65,6 +65,11 @@ SELECT '${userId}', '${phone}', '${username}', 'super', '${passwordHash}', 0, ${
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE phone = '${phone}');
 `;
 
+  if (process.env.SQL_ONLY === 'true') {
+    console.log(sql.trim());
+    return;
+  }
+
   console.log('=== 请将以下 SQL 在 D1 上执行（或集成进部署流程） ===');
   console.log(sql);
   console.log('=== 提示 ===');

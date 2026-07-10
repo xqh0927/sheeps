@@ -3,9 +3,25 @@ package com.example.sheeps.core.utils
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
+import com.example.sheeps.data.model.ShopItem
+
+/**
+ * 商品展示名称 / 描述的本地化辅助。
+ *
+ * **多语言策略（后台接口驱动）**：
+ * - 优先使用 [itemI18n] 参数传入的后台 /api/shop/items 多语言数据。
+ * - 无后台数据时回退本地 R.string 硬编码（仅在游戏中或离线场景触发）。
+ *
+ * 调用方：
+ * - 背包 / 历史等有 [ShopItem] 缓存的场景，应传入 itemI18n 以获得后台统一多语言。
+ * - 游戏内对局（准备对话框 / 道具栏 / 带出选择等）传 null，走本地 R.string 兜底。
+ */
 
 @Composable
-fun getLocalizedItemName(itemType: String): String {
+fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null): String {
+    // 优先：后台接口多语言
+    itemI18n?.get(itemType.uppercase())?.let { return it }
+    // 回退：本地 R.string
     return when (itemType.uppercase()) {
         "UNDO" -> stringResource(id = R.string.item_undo)
         "MOVEOUT" -> stringResource(id = R.string.item_moveout)
@@ -13,21 +29,19 @@ fun getLocalizedItemName(itemType: String): String {
         "REVIVE" -> stringResource(id = R.string.item_revive)
         "HINT" -> stringResource(id = R.string.item_hint)
         "BOMB" -> stringResource(id = R.string.item_bomb)
+        "FREEZE" -> stringResource(id = R.string.item_freeze)
         "JOKER" -> stringResource(id = R.string.item_joker)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points)
-        "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan)
-        "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang)
-        "SKIN_ELECTRONIC" -> stringResource(id = R.string.item_skin_electronic)
-        "SKIN_DAILY" -> stringResource(id = R.string.item_skin_daily)
-        "SKIN_VEGETABLE" -> stringResource(id = R.string.item_skin_vegetable)
-        "SKIN_FRUIT" -> stringResource(id = R.string.item_skin_fruit)
         else -> itemType
     }
 }
 
 @Composable
-fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
+fun getLocalizedItemDesc(itemType: String, defaultDesc: String?, itemI18n: Map<String, String>? = null): String {
+    // 优先：后台接口多语言
+    itemI18n?.get(itemType.uppercase())?.let { return it }
+    // 回退：本地 R.string
     return when (itemType.uppercase()) {
         "UNDO" -> stringResource(id = R.string.item_undo_desc)
         "MOVEOUT" -> stringResource(id = R.string.item_moveout_desc)
@@ -35,21 +49,44 @@ fun getLocalizedItemDesc(itemType: String, defaultDesc: String?): String {
         "REVIVE" -> stringResource(id = R.string.item_revive_desc)
         "HINT" -> stringResource(id = R.string.item_hint_desc)
         "BOMB" -> stringResource(id = R.string.item_bomb_desc)
+        "FREEZE" -> stringResource(id = R.string.item_freeze_desc)
         "JOKER" -> stringResource(id = R.string.item_joker_desc)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points_desc)
-        "SKIN_HENAN" -> stringResource(id = R.string.item_skin_henan_desc)
-        "SKIN_SICHUAN" -> stringResource(id = R.string.item_skin_sichuan_desc)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang_desc)
-        "SKIN_ELECTRONIC" -> stringResource(id = R.string.item_skin_electronic_desc)
-        "SKIN_DAILY" -> stringResource(id = R.string.item_skin_daily_desc)
-        "SKIN_VEGETABLE" -> stringResource(id = R.string.item_skin_vegetable_desc)
-        "SKIN_FRUIT" -> stringResource(id = R.string.item_skin_fruit_desc)
         else -> defaultDesc ?: stringResource(id = R.string.default_item_desc)
     }
 }
 
+/**
+ * 商店商品显示名：优先使用服务端已本地化的 [ShopItem.name]。
+ * 仅当默认皮肤 shuang 且服务端名为空时，回退本地 R.string.item_skin_shuang，保证离线必显。
+ */
 @Composable
-fun getLocalizedSource(source: String): String {
+fun getShopItemName(item: ShopItem): String {
+    if (item.item_type.equals("SKIN_SHUANG", ignoreCase = true)) {
+        val server = item.name
+        if (!server.isNullOrBlank()) return server
+        return stringResource(id = R.string.item_skin_shuang)
+    }
+    return item.name ?: item.item_type
+}
+
+/**
+ * 商店商品显示描述：优先使用服务端已本地化的 [ShopItem.description]。
+ * 仅当默认皮肤 shuang 且服务端描述为空时，回退本地 R.string.item_skin_shuang_desc。
+ */
+@Composable
+fun getShopItemDesc(item: ShopItem): String {
+    if (item.item_type.equals("SKIN_SHUANG", ignoreCase = true)) {
+        val server = item.description
+        if (!server.isNullOrBlank()) return server
+        return stringResource(id = R.string.item_skin_shuang_desc)
+    }
+    return item.description ?: ""
+}
+
+@Composable
+fun getLocalizedSource(source: String, itemI18n: Map<String, String>? = null): String {
     if (source.startsWith("UNLOCK_LEVEL_")) {
         val levelId = source.substringAfter("UNLOCK_LEVEL_")
         return stringResource(id = R.string.points_source_unlock_level, levelId)
@@ -58,7 +95,7 @@ fun getLocalizedSource(source: String): String {
         val itemType = source.substringAfter("SHOP_REDEEM_")
         return stringResource(
             id = R.string.points_source_shop_redeem,
-            getLocalizedItemName(itemType)
+            getLocalizedItemName(itemType, itemI18n)
         )
     }
     if (source.startsWith("DAILY_TASK_")) {

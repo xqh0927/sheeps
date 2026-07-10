@@ -71,11 +71,10 @@
     <string name="item_bomb">炸彈</string>
     <string name="item_joker">萬能牌</string>
     <string name="item_double_points">雙倍金幣</string>
+    <string name="item_freeze">凍結符</string>
 
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解鎖</string>
-    <string name="shop_section_provinces">美食系列卡牌皮膚</string>
-    <string name="shop_section_animated">特效皮膚</string>
 
     <string name="task_play_3">累計遊玩3次</string>
     <string name="task_play_5">累計遊玩5次</string>
@@ -276,25 +275,14 @@
     <string name="slot_not_carried">未帶</string>
     <string name="carried_magic_items">隨身道具</string>
 
-    <string name="item_skin_henan">中原美食</string>
-    <string name="item_skin_henan_desc">河南特色美食卡牌皮膚</string>
-    <string name="item_skin_sichuan">巴蜀美食</string>
-    <string name="item_skin_sichuan_desc">四川特色美食卡牌皮膚</string>
     <string name="item_skin_shuang">萌趣競技</string>
     <string name="item_skin_shuang_desc">12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾</string>
 
-    <string name="item_skin_electronic">數碼潮玩</string>
-    <string name="item_skin_electronic_desc">12款數碼設備卡面，科技藍邊框搭配霓虹裝飾</string>
-    <string name="item_skin_daily">日常好物</string>
-    <string name="item_skin_daily_desc">12款日常用品卡面，暖橙邊框搭配陽光裝飾</string>
-    <string name="item_skin_vegetable">蔬菜園</string>
-    <string name="item_skin_vegetable_desc">12款新鮮蔬菜卡面，清新綠邊框搭配田園裝飾</string>
-    <string name="item_skin_fruit">水果盤</string>
-    <string name="item_skin_fruit_desc">12款時令水果卡面，鮮紅邊框搭配果香裝飾</string>
 
     <string name="leaderboard_data_error">數據獲取失敗</string>
     <string name="leaderboard_load_error">加載失敗，請檢查網絡連接</string>
     <string name="leaderboard_empty">暫無排行榜數據</string>
+    <string name="leaderboard_endless_disabled">無盡模式未開啟</string>
     <string name="leaderboard_title_format">第 %1$d 關 · 排行榜</string>
     <string name="leaderboard_tab_daily">今日排行</string>
     <string name="leaderboard_tab_weekly">本周排行</string>
@@ -310,6 +298,7 @@
     <string name="item_bomb_desc">炸毀槽位最末尾的2張卡牌</string>
     <string name="item_joker_desc">作為萬能牌與前兩張卡牌自動消除</string>
     <string name="item_double_points_desc">本局結算時金幣獎勵翻倍</string>
+    <string name="item_freeze_desc">暫停下落4秒，獲得喘息窗口</string>
     <string name="btn_go_to_play">去闖關</string>
     <string name="skin_apply_success">皮膚更換成功</string>
 
@@ -323,8 +312,6 @@
     <string name="btn_disagree_exit">不同意並退出</string>
     <string name="btn_agree_start">同意並開始</string>
     <string name="toast_offline_fallback">連接服務異常，已載入本地離線數據</string>
-    <string name="province_skin_title">%1$s美食</string>
-    <string name="province_skin_desc">解鎖%1$s省特色美食圖標皮膚</string>
     <string name="toast_login_failed">登入失敗</string>
     <string name="toast_login_failed_retry">登入失敗，請稍後重試</string>
     <string name="toast_network_error_retry">網路連接異常，請稍後重試</string>

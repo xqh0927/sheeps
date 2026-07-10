@@ -40,26 +40,48 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const [oldUserResult, oldLevelsResult, oldItemsResult] = await env.DB.batch(backupQueries);
         const oldUser = oldUserResult.results[0] as { points: number } | undefined;
 
-        const mutationStatements = [];
+        // 第一步：写备份。save_data JSON 已拆表：
+        //   - points 提升为 backup_save_log.points 标量列
+        //   - unlocked_levels → backup_unlocked_levels 子表
+        //   - items → backup_save_items 子表
+        // 7 天清理连带删除子表（显式 DELETE，不依赖 FK 级联）。
         if (oldUser) {
-            const backupPayload = JSON.stringify({ points: oldUser.points, unlocked_levels: oldLevelsResult.results.map((r: any) => r.level_id), items: oldItemsResult.results });
-            // 将备份写入日志，并自动清理 7 天前过期的历史备份，防 D1 爆库
-            mutationStatements.push(
-                env.DB.prepare('INSERT INTO backup_save_log (user_id, save_data, created_at) VALUES (?, ?, ?)').bind(authUser.userId, backupPayload, Date.now()),
-                env.DB.prepare('DELETE FROM backup_save_log WHERE created_at < ?').bind(Date.now() - 7 * 86400000)
+            const insertInfo = await env.DB.prepare('INSERT INTO backup_save_log (user_id, points, created_at) VALUES (?, ?, ?)')
+                .bind(authUser.userId, oldUser.points, Date.now())
+                .run();
+            const backupId = insertInfo.meta.last_row_id;
+            const backupStatements = [];
+            for (const r of oldLevelsResult.results as any[]) {
+                backupStatements.push(
+                    env.DB.prepare('INSERT INTO backup_unlocked_levels (backup_id, level_id) VALUES (?, ?)').bind(backupId, r.level_id)
+                );
+            }
+            for (const it of oldItemsResult.results as any[]) {
+                backupStatements.push(
+                    env.DB.prepare('INSERT INTO backup_save_items (backup_id, item_type, count) VALUES (?, ?, ?)').bind(backupId, it.item_type, it.count)
+                );
+            }
+            const cutoff = Date.now() - 7 * 86400000;
+            backupStatements.push(
+                env.DB.prepare('DELETE FROM backup_unlocked_levels WHERE backup_id IN (SELECT id FROM backup_save_log WHERE created_at < ?)').bind(cutoff),
+                env.DB.prepare('DELETE FROM backup_save_items WHERE backup_id IN (SELECT id FROM backup_save_log WHERE created_at < ?)').bind(cutoff),
+                env.DB.prepare('DELETE FROM backup_save_log WHERE created_at < ?').bind(cutoff)
             );
+            await env.DB.batch(backupStatements);
         }
+
+        const mutationStatements = [];
 
         // 第二步：合并客户端传上来的积分数据（取本地和云端极大值），合并关卡解锁进度，以及叠加或更新背包道具
         if (body.points !== undefined && body.points > 0) mutationStatements.push(env.DB.prepare('UPDATE users SET points = MAX(points, ?) WHERE id = ?').bind(body.points, authUser.userId));
         if (body.unlocked_levels) for (const lvl of body.unlocked_levels) mutationStatements.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, lvl, Date.now()));
-        if (body.items) for (const item of body.items) mutationStatements.push(env.DB.prepare('INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, COALESCE((SELECT MAX(count, ?) FROM user_items WHERE user_id = ? AND item_type = ?), ?))').bind(authUser.userId, item.item_type, item.count, authUser.userId, item.item_type, item.count));
+        if (body.items) for (const item of body.items) mutationStatements.push(env.DB.prepare('INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, COALESCE((SELECT MAX(count) FROM user_items WHERE user_id = ? AND item_type = ?), ?))').bind(authUser.userId, item.item_type, authUser.userId, item.item_type, item.count));
 
         if (mutationStatements.length > 0) await env.DB.batch(mutationStatements);
 
         // 第三步：返回用户最新同步完的最终权威云端数据，供端侧刷新本地 Room 状态
         const [updatedUserResult, updatedLevelsResult, updatedItemsResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId)
         ]);
@@ -81,7 +103,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar, points, avatar_url FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, avatar_url FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),

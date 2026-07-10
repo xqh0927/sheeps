@@ -45,6 +45,7 @@ import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.ui.animations.GameAnimations
+import com.example.sheeps.ui.components.RemoteImage
 
 /**
  * 秘境消消乐 · 卡牌组件（重构版）
@@ -144,20 +145,30 @@ fun TileView(
                 )
             } else {
                 // 情况 2：显示正面图标，若被压制则降低透明度
-                val iconResId = TileIconProvider.getIconResource(context, currentSkin, tile.type)
-                if (iconResId != 0) {
-                    Image(
-                        painter = painterResource(id = iconResId),
+                // v2：URL 优先（Coil），缺失/失败回退默认皮肤本地 drawable，再无则显示类型编号
+                val tileUrl = TileIconProvider.getTileUrl(currentSkin, tile.type)
+                val fallbackResId = TileIconProvider.getFallbackResId(context, tile.type)
+                val iconAlpha = if (isBlocked) mask else 1f
+                when {
+                    tileUrl != null -> RemoteImage(
+                        url = tileUrl,
+                        fallbackResId = fallbackResId,
+                        modifier = Modifier
+                            .size(tileSize * 0.9f)
+                            .alpha(iconAlpha),
+                        contentDescription = "Tile Icon"
+                    )
+                    fallbackResId != 0 -> Image(
+                        painter = painterResource(id = fallbackResId),
                         contentDescription = "Tile Icon",
                         modifier = Modifier
                             .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) mask else 1f)
+                            .alpha(iconAlpha)
                     )
-                } else {
-                                      Box(
+                    else -> Box(
                         modifier = Modifier
                             .size(tileSize * 0.9f)
-                            .alpha(if (isBlocked) mask else 1f),
+                            .alpha(iconAlpha),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

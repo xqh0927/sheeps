@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api, setTokens, setTokensRefreshedHandler } from '../api/client';
 
-export type AdminRole = 'super' | 'operator' | 'readonly';
+export type AdminRole = 'super' | 'operator' | 'readonly' | 'user';
 
 export interface AdminUser {
   id: string;
@@ -78,6 +78,6 @@ export const useAuth = create<AuthState>((set, get) => {
     },
 
     isSuper: () => get().user?.role === 'super',
-    canWrite: () => get().user?.role !== 'readonly',
+    canWrite: () => { const role = get().user?.role; return role === 'super' || role === 'operator'; },
   };
 });

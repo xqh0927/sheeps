@@ -2,8 +2,8 @@ import CrudPage, { FieldDef, ColumnDef } from '../components/CrudPage';
 import { listLevels, createLevel, updateLevel, deleteLevel } from '../api/admin';
 
 const columns: ColumnDef[] = [
-  { key: 'level_id', label: '关卡 ID' },
-  { key: 'difficulty', label: '难度', render: (r: any) => (r.difficulty ?? '-') },
+  { key: 'level_id', label: '关卡 ID', sortable: true },
+  { key: 'difficulty', label: '难度', sortable: true, render: (r: any) => (r.difficulty ?? '-') },
   {
     key: 'layout_data',
     label: '布局数据',
@@ -18,7 +18,7 @@ const columns: ColumnDef[] = [
 const fields: FieldDef[] = [
   // levels.level_id 是整数主键，新建时必须提供
   { name: 'level_id', label: '关卡 ID（整数）', type: 'number', required: true },
-  { name: 'difficulty', label: '难度', type: 'number' },
+  { name: 'difficulty', label: '难度', type: 'number', nullable: true },
   { name: 'layout_data', label: '布局数据（JSON 字符串）', type: 'textarea', required: true },
 ];
 
@@ -33,6 +33,10 @@ export default function Levels() {
       creator={createLevel}
       updater={updateLevel}
       deleter={deleteLevel}
+      searchable
+      searchPlaceholder="搜索关卡 ID"
+      getDeleteConfirmText={(row: any) => `确定要删除「关卡#${row.level_id}」吗？此操作不可撤销。`}
+      sortable
     />
   );
 }

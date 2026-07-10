@@ -1,5 +1,5 @@
 import { Env } from '../types';
-import { getCorsHeaders, getAuthenticatedUser, getCachedConfig } from '../helpers';
+import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus } from '../helpers';
 import { generateSolvableLevel } from '../level';
 import { sha256 } from '../crypto';
 
@@ -165,7 +165,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         // 如果用户在主表不存在（可能是游客网络异常直接结算），在此自动补全用户及解锁前 3 关
         if (!userExists) {
-            mutations.push(env.DB.prepare('INSERT INTO users (id, username, points, created_at) VALUES (?, ?, 0, ?)').bind(resolvedUserId, `玩家_${resolvedUserId.slice(-4)}`, Date.now()));
+            mutations.push(env.DB.prepare('INSERT INTO users (id, username, role, points, created_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, `玩家_${resolvedUserId.slice(-4)}`, 'user', 0, Date.now()));
             for (const lvl of [1, 2, 3]) mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, lvl, Date.now()));
             userExists = { points: 0 };
         }
@@ -273,8 +273,19 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 无尽生存模式：0=闯关/PvP, 1=无尽；默认 0 兼容旧客户端
         const gameMode = parseInt(url.searchParams.get('game_mode') || '0', 10);
 
-        const cacheKey = `leaderboard_${levelId}_${gameMode}_${type}_${page}_${limit}`;
-        // 读取 Cloudflare KV 缓存以优化并发响应率并降低 D1 读负荷
+        // 方案 B·游戏模式网关：无尽模式关闭时返回空榜 + disabled 提示
+        if (gameMode === 1) {
+            const { endless } = await getGameModeStatus(env);
+            if (!endless) {
+                return new Response(JSON.stringify({ success: true, rankings: [], total: 0, disabled: true }), { headers: corsHeaders });
+            }
+        }
+
+        // per_user=all 显示全部得分记录，默认 per_user=best 每人只取最高分
+        const perUser = url.searchParams.get('per_user') || 'best';
+        const showAll = perUser === 'all';
+
+        const cacheKey = `leaderboard_${levelId}_${gameMode}_${type}_${perUser}_${page}_${limit}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: corsHeaders });
 
@@ -287,14 +298,36 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         if (type === 'daily') timeFilter = todayStart;
         else if (type === 'weekly') timeFilter = todayStart - ((new Date(now + 8 * 3600000).getDay() + 6) % 7) * 24 * 3600000;
 
-        // 执行 SQL：按分数从高到低、通关耗时从短到长进行中国特色消消乐排行榜排序（限制每个用户只取个人的最高记录，防刷榜）
-        const results = await env.DB.prepare(
-            `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.level_id = ? AND l.game_mode = ? AND l.achieved_at >= ?) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`
-        ).bind(levelId, gameMode, timeFilter, limit, offset).all();
+        const whereClause = 'l.level_id = ? AND l.game_mode = ? AND l.achieved_at >= ?';
 
-        const responseData = JSON.stringify({ success: true, rankings: results.results });
-        // KV 缓存 300 秒（排行榜数据无需秒级实时性）
-        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });
+        // 查询总数（用于分页）
+        let totalSql: string;
+        let totalBinds: any[];
+        if (showAll) {
+            totalSql = `SELECT COUNT(*) as c FROM leaderboard l WHERE ${whereClause}`;
+            totalBinds = [levelId, gameMode, timeFilter];
+        } else {
+            totalSql = `SELECT COUNT(DISTINCT l.user_id) as c FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause}`;
+            totalBinds = [levelId, gameMode, timeFilter];
+        }
+        const totalRow = await env.DB.prepare(totalSql).bind(...totalBinds).first<{ c: number }>();
+        const total = totalRow?.c || 0;
+
+        let resultsSql: string;
+        if (showAll) {
+            // per_user=all：显示全部得分记录（用于无尽生存模式查看历史记录）
+            resultsSql = `SELECT l.id, u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause} ORDER BY l.score DESC, l.clear_time_ms ASC LIMIT ? OFFSET ?`;
+        } else {
+            // per_user=best：每人只取最高分（防刷榜）
+            resultsSql = `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause}) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`;
+        }
+
+        const results = await env.DB.prepare(resultsSql).bind(levelId, gameMode, timeFilter, limit, offset).all();
+
+        const responseData = JSON.stringify({ success: true, rankings: results.results, total });
+        // KV 缓存 60 秒（排行榜数据无需秒级实时性，per_user=all 缓存更短）
+        const ttl = showAll ? 60 : 300;
+        await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: ttl });
         return new Response(responseData, { headers: corsHeaders });
     }
 
@@ -307,6 +340,15 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
      * 响应: { success, top3: [{ username, points }], yesterdayRank: <number> }
      */
     if (path === '/api/leaderboard/daily-popup' && request.method === 'GET') {
+        // 无尽生存模式网关：仅当显式请求 game_mode=1 且模式关闭时返回 disabled
+        const gmParam = url.searchParams.get('game_mode');
+        if (gmParam === '1') {
+            const { endless } = await getGameModeStatus(env);
+            if (!endless) {
+                return new Response(JSON.stringify({ success: true, top3: [], yesterdayRank: 0, disabled: true }), { headers: corsHeaders });
+            }
+        }
+
         const authUser1 = await getAuthenticatedUser(request, env);
         const now1 = Date.now();
         const chinaToday1 = new Date(new Date(now1 + 8 * 3600000).toISOString().split('T')[0] + 'T00:00:00+08:00').getTime();

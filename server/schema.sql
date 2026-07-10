@@ -17,17 +17,20 @@ DROP TABLE IF EXISTS app_version;
 DROP TABLE IF EXISTS matchmaking_queue;
 DROP TABLE IF EXISTS game_commands;
 DROP TABLE IF EXISTS admin_audit_log;
+DROP TABLE IF EXISTS level_tiles;
+DROP TABLE IF EXISTS backup_unlocked_levels;
+DROP TABLE IF EXISTS backup_save_items;
+DROP TABLE IF EXISTS admin_audit_changes;
 
 CREATE TABLE users (
     id TEXT PRIMARY KEY,
     phone TEXT UNIQUE,
     username TEXT NOT NULL,
-    avatar TEXT,
     points INTEGER DEFAULT 0,
     password_hash TEXT,
     avatar_url TEXT,
     created_at INTEGER NOT NULL,
-    role TEXT DEFAULT 'readonly',
+    role TEXT DEFAULT 'user',
     is_banned INTEGER DEFAULT 0
 );
 
@@ -57,15 +60,8 @@ CREATE TABLE shop_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT,
-    name_en TEXT,
-    description_en TEXT,
-    name_tw TEXT,
-    description_tw TEXT,
-    name_ja TEXT,
-    description_ja TEXT,
-    name_ko TEXT,
-    description_ko TEXT,
     image_url TEXT,
+    "group" TEXT,
     item_type TEXT NOT NULL,
     points_price INTEGER NOT NULL,
     stock INTEGER DEFAULT 100
@@ -108,14 +104,6 @@ CREATE TABLE task (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT NOT NULL,
-    name_en TEXT,
-    description_en TEXT,
-    name_tw TEXT,
-    description_tw TEXT,
-    name_ja TEXT,
-    description_ja TEXT,
-    name_ko TEXT,
-    description_ko TEXT,
     target_count INTEGER NOT NULL,
     points_reward INTEGER NOT NULL
 );
@@ -136,14 +124,6 @@ CREATE TABLE notice (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
-    title_en TEXT,
-    content_en TEXT,
-    title_tw TEXT,
-    content_tw TEXT,
-    title_ja TEXT,
-    content_ja TEXT,
-    title_ko TEXT,
-    content_ko TEXT,
     type TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -162,8 +142,6 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
     action          TEXT    NOT NULL,
     target_type     TEXT,
     target_id       TEXT,
-    before_snapshot TEXT,
-    after_snapshot  TEXT,
     source_ip       TEXT,
     user_agent      TEXT,
     created_at      INTEGER NOT NULL
@@ -194,68 +172,119 @@ CREATE INDEX idx_leaderboard_mode ON leaderboard(game_mode, level_id, score DESC
 CREATE TABLE levels (
     level_id INTEGER PRIMARY KEY,
     difficulty INTEGER,
-    layout_data TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
 
 CREATE TABLE backup_save_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
-    save_data TEXT NOT NULL,
+    points INTEGER,    -- 备份时的积分标量（save_data 拆表后由 save_data.points 提升）
     created_at INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
+CREATE INDEX IF NOT EXISTS idx_backup_created ON backup_save_log(created_at);
+
+-- ===================== JSON 字符串列拆表：子表（T01，幂等建表） =====================
+
+-- 关卡 tile 子表（levels.layout_data 拆表）
+CREATE TABLE IF NOT EXISTS level_tiles (
+    level_id            INTEGER NOT NULL,
+    tile_index          INTEGER NOT NULL,
+    tile_id             TEXT    NOT NULL,
+    x                   INTEGER,
+    y                   INTEGER,
+    z                   INTEGER,
+    "type"              INTEGER,
+    is_blind            INTEGER DEFAULT 0,
+    sealed_count        INTEGER DEFAULT 0,
+    seal_unlock_threshold INTEGER,
+    PRIMARY KEY (level_id, tile_index),
+    FOREIGN KEY(level_id) REFERENCES levels(level_id)
+);
+CREATE INDEX IF NOT EXISTS idx_level_tiles_level ON level_tiles(level_id);
+
+-- 备份解锁关卡子表（backup_save_log.save_data.unlocked_levels 拆表）
+CREATE TABLE IF NOT EXISTS backup_unlocked_levels (
+    backup_id INTEGER NOT NULL,
+    level_id INTEGER NOT NULL,
+    PRIMARY KEY (backup_id, level_id),
+    FOREIGN KEY(backup_id) REFERENCES backup_save_log(id)
+);
+CREATE INDEX IF NOT EXISTS idx_backup_unlock_backup ON backup_unlocked_levels(backup_id);
+
+-- 备份道具子表（backup_save_log.save_data.items 拆表）
+CREATE TABLE IF NOT EXISTS backup_save_items (
+    backup_id  INTEGER NOT NULL,
+    item_type  TEXT    NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (backup_id, item_type),
+    FOREIGN KEY(backup_id) REFERENCES backup_save_log(id)
+);
+CREATE INDEX IF NOT EXISTS idx_backup_items_backup ON backup_save_items(backup_id);
+
+-- 审计变更子表（admin_audit_log.before/after_snapshot 拆表）
+CREATE TABLE IF NOT EXISTS admin_audit_changes (
+    change_id INTEGER NOT NULL,
+    field     TEXT    NOT NULL,
+    old_val   TEXT,
+    new_val   TEXT,
+    PRIMARY KEY (change_id, field),
+    FOREIGN KEY(change_id) REFERENCES admin_audit_log(id)
+);
+CREATE INDEX IF NOT EXISTS idx_audit_changes_change ON admin_audit_changes(change_id);
 
 -- 导入初始多语言配置数据
-INSERT INTO task (id, name, description, name_en, description_en, name_tw, description_tw, name_ja, description_ja, name_ko, description_ko, target_count, points_reward) VALUES 
-('PLAY_3_GAMES', '小试牛刀', '游玩3局游戏', 'First Steps', 'Play 3 games', '小試牛刀', '遊玩3局遊戲', '初めの一歩', '3回ゲームをプレイする', '첫걸음', '게임 3회 플레이', 3, 20),
-('PLAY_5_GAMES', '大显身手', '游玩5局游戏', 'Master Show', 'Play 5 games', '大顯身手', '遊玩5局遊戲', '実力発揮', '5回ゲームをプレイする', '기량 발휘', '게임 5회 플레이', 5, 40),
-('SIGN_IN_ONCE', '每日晨曦', '完成一次签到', 'Daily Dawn', 'Complete a sign-in', '每日晨曦', '完成一次簽到', '毎日の夜明け', 'ログインチェックを完了する', '매일 아침', '로그인 체크 완료', 1, 10);
+INSERT INTO task (id, name, description, target_count, points_reward) VALUES 
+('PLAY_3_GAMES', '小试牛刀', '游玩3局游戏', 3, 20),
+('PLAY_5_GAMES', '大显身手', '游玩5局游戏', 5, 40),
+('SIGN_IN_ONCE', '每日晨曦', '完成一次签到', 1, 10);
 
-INSERT INTO notice (title, content, title_en, content_en, title_tw, content_tw, title_ja, content_ja, title_ko, content_ko, type, created_at) VALUES 
-('国风消消乐2.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'Folk Match 2.0 Grand Opening', 'Celebrate the new Ink-and-Wash cultivation version with multiple benefits!', '國風消消樂2.0盛大開啟', '喜迎全新水墨修真版本，多重福利送不停！', '国風パズル2.0グランドオープン', '新しい水墨修行バージョンを迎え、複数の特典が満載！', '국풍 퍼즐 2.0 그랜드 오픈', '새로운 수묵 수행 버전을 맞이하여 다양한 혜택이 가득!', 'ACTIVITY', 1720000000000),
-('版本优化公告', '优化了层叠卡牌飞入和重叠状态计算性能', 'Version Optimization Notice', 'Optimized performance for cascading card entry and overlapping state calculation', '版本優化公告', '優化了層疊卡牌飛入和重疊狀態計算性能', 'バージョン最適化のお知らせ', '重ね合わせカードの入場と重複状態の計算パフォーマンスを最適化しました', '버전 최적화 안내', '버전 최적화 안내', 'UPDATE', 1720000000100);
+INSERT INTO notice (title, content, type, created_at) VALUES 
+('国风消消乐2.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000),
+('版本优化公告', '优化了层叠卡牌飞入和重叠状态计算性能', 'UPDATE', 1720000000100);
 
-INSERT INTO shop_items (name, description, name_en, description_en, name_tw, description_tw, name_ja, description_ja, name_ko, description_ko, item_type, points_price, stock) VALUES 
-('乾坤符 (Undo)', '撤销上一步操作', 'Qiankun Charm', 'Undo the last operation', '乾坤符', '撤銷上一步操作', '乾坤符', '前の操作を取り消す', '건곤부', '이전 조작 취소', 'UNDO', 20, 100),
-('缩地咒 (MoveOut)', '从卡槽移出前三张卡牌', 'Earth-Shrink Spell', 'Move the first three cards out of the slot', '縮地咒', '從卡槽移出前三張卡牌', '縮地呪', 'スロットから最初の3枚のカードを移動する', '축지법', '슬롯에서 앞의 카드 3장 꺼내기', 'MOVEOUT', 30, 80),
-('流沙契 (Shuffle)', '重新打乱桌面剩余卡牌', 'Quicksand Treaty', 'Reshuffle remaining cards on the board', '流沙契', '重新打亂桌面剩餘卡牌', '流砂契', 'ボード上に残ったカードを再シャッフルする', '유사계', '보드에 남은 카드 섞기', 'SHUFFLE', 20, 99),
-('还魂丹 (Revive)', '消除失败时免除惩罚复活', 'Resurrection Pill', 'Resurrect and avoid penalties when you fail', '還魂丹', '消除失敗時免除懲罰復活', '還魂丹', '失敗時にペナルティなしで復活する', '환혼단', '실패 시 페널티 없이 부활', 'REVIVE', 50, 20),
-('天眼符 (Hint)', '自动高亮出一组可消卡牌', 'Heaven-Eye Charm', 'Automatically highlight a matching set', '天眼符', '自動高亮出一組可消卡牌', '天眼符', '一致するセットを自动的にハイライトする', '천안부', '일치하는 세트를 자동으로 하이라이트', 'HINT', 15, 150),
-('雷震子 (Bomb)', '直接炸毁卡槽中最后2张卡牌', 'Thunder Strike', 'Directly destroy the last two cards in the slot', '雷震子', '直接炸毀卡槽中最後2張卡牌', '雷震子', 'スロット内の最後の2枚のカードを直接破壊する', '뇌진자', '슬롯의 마지막 카드 2장 파괴', 'BOMB', 40, 30),
-('太极牌 (Joker)', '作为任意图案卡牌与前两张直接凑对消除', 'Tai Chi Joker', 'Acts as any tile to complete a match', '太極牌', '作為任意圖案卡牌與前兩張直接湊對消除', '太極牌', '任意のカードとしてマッチを完了する', '태극패', '임의의 카드로 간주하여 매치 완료', 'JOKER', 60, 10),
-('双倍符 (Double)', '结算时获得双倍积分卡', 'Double Charm', 'Double points earned upon level clearance', '雙倍符', '結算時獲得雙倍積分卡', '倍増符', 'クリア時に獲得ポイントが2倍になります', '더블 부적', '클리어 시 획득 포인트가 2배가 됩니다', 'DOUBLE_POINTS', 25, 50);
+INSERT INTO shop_items (name, description, item_type, points_price, stock) VALUES 
+('乾坤符 (Undo)', '撤销上一步操作', 'UNDO', 20, 100),
+('缩地咒 (MoveOut)', '从卡槽移出前三张卡牌', 'MOVEOUT', 30, 80),
+('流沙契 (Shuffle)', '重新打乱桌面剩余卡牌', 'SHUFFLE', 20, 99),
+('还魂丹 (Revive)', '消除失败时免除惩罚复活', 'REVIVE', 50, 20),
+('天眼符 (Hint)', '自动高亮出一组可消卡牌', 'HINT', 15, 150),
+('雷震子 (Bomb)', '直接炸毁卡槽中最后2张卡牌', 'BOMB', 40, 30),
+('太极牌 (Joker)', '作为任意图案卡牌与前两张直接凑对消除', 'JOKER', 60, 10),
+('双倍符 (Double)', '结算时获得双倍积分卡', 'DOUBLE_POINTS', 25, 50),
+('冻结符 (Freeze)', '暂停下落4秒，获得操作窗口', 'FREEZE', 35, 30);
 
 INSERT INTO config (key, value) VALUES 
 ('level_2_unlock_points', '50'),
 ('level_3_unlock_points', '100'),
 ('level_4_unlock_points', '200'),
-('sign_rewards', '20,20,30,30,40,50,100');
+('sign_rewards', '20,20,30,30,40,50,100'),
+('gamemode_stage', 'on'),               -- 方案 B：闯关模式（默认开）
+('gamemode_endless', 'off');            -- 方案 B：无尽生存模式（默认关）
 
 CREATE TABLE IF NOT EXISTS app_version (
     version_code INTEGER PRIMARY KEY,
     version_name TEXT NOT NULL,
     apk_url TEXT NOT NULL,
+    download_url TEXT,                    -- 方案 B：独立下载链接（外部URL 或 R2 直链）
     update_log TEXT,
-    update_log_en TEXT,
-    update_log_tw TEXT,
-    update_log_ja TEXT,
-    update_log_ko TEXT,
     is_force_update INTEGER DEFAULT 0,
+    status INTEGER DEFAULT 0,             -- 方案 B：0=草稿 1=已发布 2=已下线（仅已发布对 check-update 生效）
+    release_time INTEGER,                 -- 方案 B：发布时间(ms)，发布时写入
     created_at INTEGER NOT NULL
 );
 
-INSERT INTO app_version (version_code, version_name, apk_url, update_log, update_log_en, update_log_tw, update_log_ja, update_log_ko, is_force_update, created_at) VALUES
-(1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 'Initial release', '初始版本發布', '初期リリース', '초기 버전 출시', 0, 1720000000000);
+INSERT INTO app_version (version_code, version_name, apk_url, update_log, is_force_update, created_at) VALUES
+(1, '1.0.0', 'https://pub-xxxxxx.r2.dev/sheeps_v1.0.0.apk', '初始版本发布', 0, 1720000000000);
 
-INSERT INTO shop_items (id, name, description, name_en, description_en, name_tw, description_tw, name_ja, description_ja, name_ko, description_ko, item_type, points_price, stock) VALUES 
-(1000, '河南·省味 (卡牌皮肤)', '解锁河南省特色美食图标皮肤', 'Henan Gourmet Skin', 'Unlock Henan local gourmet icon skin', '河南·省味', '解鎖河南省特色美食圖標皮膚', '河南・省味', '河南省の特色ある美食アイコンスキンをアンロック', '허난성 맛', '허난성 특색 미식 아이콘 스킨 해제', 'SKIN_HENAN', 200, 9999),
-(1001, '四川·省味 (卡牌皮肤)', '解锁四川省特色美食图标皮肤', 'Sichuan Gourmet Skin', 'Unlock Sichuan local gourmet icon skin', '四川·省味', '解鎖四川省特色美食圖標皮膚', '四川・省味', '四川省の特色ある美食アイコンスキンをアンロック', '쓰촨성 맛', '쓰촨성 특색 미식 아이콘 스킨 해제', 'SKIN_SICHUAN', 200, 9999),
-(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'Shuang Fun Skin', '12 cute sheep tiles with sky blue borders and sunlit gold accents', '萌趣競技', '12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾', '萌趣競技', 'スカイブルーのボーダーとサンライトゴールド的アクセントを持つ12种のかわいい羊タイル', '멍취징지', '하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일', 'SKIN_SHUANG', 300, 9999),
-(2001, '数码潮玩 (卡牌皮肤)', '12款数码设备卡面，科技蓝边框搭配霓虹装饰', 'Electronic Skin', '12 digital gadget tiles with tech-blue borders and neon accents', '數碼潮玩', '12款數碼設備卡面，科技藍邊框搭配霓虹裝飾', '電子ガジェット', 'テックブルーのボーダーとネオン装飾の12種のガジェットタイル', '디지털 스킨', '테크 블루 테두리와 네온 포인트의 12가지 디지털 기기 타일', 'SKIN_ELECTRONIC', 300, 9999),
-(2002, '日常好物 (卡牌皮肤)', '12款日常用品卡面，暖橙边框搭配阳光装饰', 'Daily Skin', '12 daily-life tiles with warm orange borders and sunny accents', '日常好物', '12款日常用品卡面，暖橙邊框搭配陽光裝飾', '日常アイテム', 'ウォームオレンジのボーダーとサンシャイン装飾の12種の日常アイテムタイル', '일상 스킨', '따뜻한 주황 테두리와 햇살 장식의 12가지 일상 용품 타일', 'SKIN_DAILY', 300, 9999),
-(2003, '蔬菜园 (卡牌皮肤)', '12款新鲜蔬菜卡面，清新绿边框搭配田园装饰', 'Vegetable Skin', '12 fresh vegetable tiles with fresh-green borders and garden accents', '蔬菜園', '12款新鮮蔬菜卡面，清新綠邊框搭配田園裝飾', '野菜園', 'フレッシュグリーンのボーダーとガーデン装飾の12種の野菜タイル', '채소 스킨', '싱그러운 초록 테두리와 정원 장식의 12가지 채소 타일', 'SKIN_VEGETABLE', 300, 9999),
-(2004, '水果盘 (卡牌皮肤)', '12款时令水果卡面，鲜红边框搭配果香装饰', 'Fruit Skin', '12 seasonal fruit tiles with vivid-red borders and fruity accents', '水果盤', '12款時令水果卡面，鮮紅邊框搭配果香裝飾', 'フルーツ', 'ビビッドレッドのボーダーとフルーティー装飾の12種のフルーツタイル', '과일 스킨', '선명한 빨강 테두리와 과일 장식의 12가지 제철 과일 타일', 'SKIN_FRUIT', 300, 9999);
+INSERT INTO shop_items (id, name, description, item_type, points_price, stock) VALUES 
+(1000, '河南·省味 (卡牌皮肤)', '解锁河南省特色美食图标皮肤', 'SKIN_HENAN', 200, 9999),
+(1001, '四川·省味 (卡牌皮肤)', '解锁四川省特色美食图标皮肤', 'SKIN_SICHUAN', 200, 9999),
+(2000, '萌趣竞技 (卡牌皮肤)', '12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰', 'SKIN_SHUANG', 300, 9999),
+(2001, '数码潮玩 (卡牌皮肤)', '12款数码设备卡面，科技蓝边框搭配霓虹装饰', 'SKIN_ELECTRONIC', 300, 9999),
+(2002, '日常好物 (卡牌皮肤)', '12款日常用品卡面，暖橙边框搭配阳光装饰', 'SKIN_DAILY', 300, 9999),
+(2003, '蔬菜园 (卡牌皮肤)', '12款新鲜蔬菜卡面，清新绿边框搭配田园装饰', 'SKIN_VEGETABLE', 300, 9999),
+(2004, '水果盘 (卡牌皮肤)', '12款时令水果卡面，鲜红边框搭配果香装饰', 'SKIN_FRUIT', 300, 9999);
 
 
 -- 联机对战匹配队列
@@ -276,3 +305,43 @@ CREATE TABLE IF NOT EXISTS game_commands (
     command_data TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_game_commands_game_id ON game_commands(game_id);
+
+-- ===================== 多语言归一化表（方案 B，幂等） =====================
+CREATE TABLE IF NOT EXISTS i18n_strings (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    str_key    TEXT    NOT NULL,                 -- 归一化键：{module}.{entity_ref}.{field}
+    locale     TEXT    NOT NULL DEFAULT 'zh',    -- zh/en/tw/ja/ko
+    module     TEXT    NOT NULL DEFAULT 'system',-- shop_items/task/notice/app_version/system/gamemode
+    category   TEXT,                             -- 子分组（可选）：如 shop_items 的 "group" 系列
+    value      TEXT,                             -- 文案内容
+    updated_at INTEGER,
+    UNIQUE(str_key, locale, module, category)
+);
+CREATE INDEX IF NOT EXISTS idx_i18n ON i18n_strings(module, category, locale);
+CREATE INDEX IF NOT EXISTS idx_i18n_key ON i18n_strings(str_key, locale);
+
+-- ===================== 图片资源 CDN（v2 增补，幂等） =====================
+-- 1) 每皮肤 12 张卡面 URL（按 tile_index 1..12 排序）
+CREATE TABLE IF NOT EXISTS skin_tiles (
+    skin_type   TEXT    NOT NULL,   -- 渲染键，= item_type 去掉 "SKIN_" 前缀并小写，如 'henan'
+    tile_index  INTEGER NOT NULL,   -- 1..12
+    image_url   TEXT    NOT NULL,
+    PRIMARY KEY (skin_type, tile_index)
+);
+CREATE INDEX IF NOT EXISTS idx_skin_tiles_type ON skin_tiles(skin_type);
+
+-- 2) 道具图标单一数据源（真身）。item_type 与 shop_items.item_type 对齐（如 'UNDO'）
+CREATE TABLE IF NOT EXISTS item_icons (
+    item_type  TEXT    NOT NULL PRIMARY KEY,
+    image_url  TEXT    NOT NULL
+);
+
+-- 3) shop_items 增加分组列（主题系列；可空）。GROUP 为 SQL 保留字，建表已用双引号包裹。
+--    已上线库若未含该列，由 Worker 启动时 migrateSchema() 自动 ALTER 补齐（见 index.ts）。
+-- ===================== 生产迁移注释（DBA 执行，幂等） =====================
+-- ALTER TABLE shop_items ADD COLUMN "group" TEXT;
+-- 说明：分组维度默认为"主题系列"（地域系列/萌系系列/数码系列/生活系列），可空。
+-- 已上线库若无 item_icons / skin_tiles 表，按上方 CREATE TABLE IF NOT EXISTS 补齐即可
+-- （Worker 启动 migrateSchema 也会自动建）。
+

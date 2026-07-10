@@ -1,5 +1,6 @@
 import { Env } from '../types';
 import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
+import { getI18nBatch, resolveI18n } from '../i18n';
 
 /**
  * 处理积分商城相关的 HTTP 路由请求
@@ -28,17 +29,53 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: corsHeaders });
 
-        // SQL 国际化回退机制：若传入的语言对应列不存在，回退至系统默认字段
-        const nameCol = lang ? `COALESCE(name_${lang}, name)` : 'name';
-        const descCol = lang ? `COALESCE(description_${lang}, description)` : 'description';
-        // 排除已下架/废弃的皮肤类型（classic/ink/cyber/keai/daimeng 已从客户端移除）
+        // 方案 B：先取基列（zh 兜底），再用 i18n_strings 解析本地化文案
         const items = await env.DB.prepare(
-            `SELECT id, ${nameCol} as name, ${descCol} as description, image_url, item_type, points_price, stock
+            `SELECT id, name, description, image_url, item_type, points_price, stock, "group"
              FROM shop_items
              WHERE item_type NOT IN ('CLASSIC', 'SKIN_INK', 'SKIN_CYBER', 'SKIN_KEAI', 'SKIN_DAIMENG')`
         ).all();
 
-        const jsonStr = JSON.stringify(items.results);
+        // 为皮肤项批量装配 tiles[]（12 张卡面，按 tile_index 1..12 排序，缺失项为 null）
+        const skinItems = items.results.filter(
+            (i: any) => typeof i.item_type === 'string' && i.item_type.startsWith('SKIN_')
+        );
+        const tilesBySkin: Record<string, (string | null)[]> = {};
+        if (skinItems.length > 0) {
+            const skinTypes = skinItems.map((i: any) => i.item_type.replace('SKIN_', '').toLowerCase());
+            const placeholders = skinTypes.map(() => '?').join(', ');
+            const rows = await env.DB.prepare(
+                `SELECT skin_type, tile_index, image_url FROM skin_tiles WHERE skin_type IN (${placeholders})`
+            ).bind(...skinTypes).all();
+            for (const r of rows.results as any[]) {
+                const arr = (tilesBySkin[r.skin_type] = tilesBySkin[r.skin_type] || new Array(12).fill(null));
+                if (r.tile_index >= 1 && r.tile_index <= 12) arr[r.tile_index - 1] = r.image_url;
+            }
+        }
+
+        // 批量读取 shop_items 模块的本地化文案，命中优先、缺值回退基列
+        const i18nMap = await getI18nBatch(env, 'shop_items', lang);
+        const result = items.results.map((i: any) => {
+            const name = resolveI18n(i18nMap, `shop_items.${i.id}.name`, i.name);
+            const description = resolveI18n(i18nMap, `shop_items.${i.id}.description`, i.description);
+            const base = {
+                id: i.id,
+                name,
+                description,
+                image_url: i.image_url,
+                item_type: i.item_type,
+                points_price: i.points_price,
+                stock: i.stock,
+                "group": i.group,
+            };
+            if (typeof i.item_type === 'string' && i.item_type.startsWith('SKIN_')) {
+                const skinType = i.item_type.replace('SKIN_', '').toLowerCase();
+                return { ...base, tiles: tilesBySkin[skinType] || [] };
+            }
+            return base;
+        });
+
+        const jsonStr = JSON.stringify(result);
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
         return new Response(jsonStr, { headers: corsHeaders });
     }

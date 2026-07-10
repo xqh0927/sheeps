@@ -5,14 +5,14 @@ import { Chip } from '@mui/material';
 const NOTICE_TYPES = ['ACTIVITY', 'UPDATE', 'MAINTENANCE', 'NOTICE'].map((v) => ({ label: v, value: v }));
 
 const columns: ColumnDef[] = [
-  { key: 'title', label: '标题' },
-  { key: 'type', label: '类型', render: (r: any) => <Chip size="small" label={r.type} color="info" /> },
+  { key: 'title', label: '标题', sortable: true },
+  { key: 'type', label: '类型', sortable: true, render: (r: any) => <Chip size="small" label={r.type} color="info" /> },
   { key: 'content', label: '内容', render: (r: any) => <span style={{ display: 'inline-block', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.content}</span> },
 ];
 
 const fields: FieldDef[] = [
-  { name: 'title', label: '标题', required: true },
-  { name: 'content', label: '内容', type: 'textarea', required: true },
+  { name: 'title', label: '标题', required: true, multilingual: true },
+  { name: 'content', label: '内容', type: 'textarea', required: true, multilingual: true },
   { name: 'type', label: '类型', type: 'select', options: NOTICE_TYPES, required: true },
 ];
 
@@ -27,6 +27,10 @@ export default function Notices() {
       creator={createNotice}
       updater={updateNotice}
       deleter={deleteNotice}
+      searchable
+      searchPlaceholder="搜索公告标题"
+      deleteNameField="title"
+      sortable
     />
   );
 }

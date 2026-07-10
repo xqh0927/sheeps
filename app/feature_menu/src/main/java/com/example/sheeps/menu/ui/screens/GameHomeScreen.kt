@@ -154,106 +154,113 @@ fun GameHomeScreen(
 
         // PvP 对战入口与无尽生存入口上下两行展示
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 上行：在线匹配对战（PvP）入口，完整保留原有登录门控与自动跳转逻辑
-            Card(
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        if (!state.isLoggedIn) {
-                            onLoginClick()
-                            Toaster.show(matchHint)
-                        } else {
-                            showDuelMatch = true
+            // 上行：在线匹配对战（PvP）入口 — 服务端可通过 game_modes.battle=false 关闭
+            val battleEnabled = state.appUpdateInfo?.game_modes?.battle == true
+            if (battleEnabled) {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (!state.isLoggedIn) {
+                                onLoginClick()
+                                Toaster.show(matchHint)
+                            } else {
+                                showDuelMatch = true
+                            }
                         }
-                    }
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 太极小图标
-                    val tp = MaterialTheme.colorScheme.primary
-                    Canvas(modifier = Modifier.size(36.dp)) {
-                        val r = size.width / 2f
-                        val centerOffset = center
-                        drawCircle(color = Color.White, radius = r, center = centerOffset)
-                        drawArc(
-                            color = tp,
-                            startAngle = -90f,
-                            sweepAngle = 180f,
-                            useCenter = true,
-                            size = size
-                        )
-                        drawCircle(
-                            color = tp,
-                            radius = r / 2f,
-                            center = Offset(centerOffset.x, centerOffset.y - r / 2f)
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = r / 2f,
-                            center = Offset(centerOffset.x, centerOffset.y + r / 2f)
-                        )
-                        drawCircle(
-                            color = Color.White,
-                            radius = r * 0.15f,
-                            center = Offset(centerOffset.x, centerOffset.y - r / 2f)
-                        )
-                        drawCircle(
-                            color = tp,
-                            radius = r * 0.15f,
-                            center = Offset(centerOffset.x, centerOffset.y + r / 2f)
-                        )
-                        drawCircle(
-                            color = tp,
-                            radius = r,
-                            center = centerOffset,
-                            style = Stroke(width = 2.dp.toPx())
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 太极小图标
+                        val tp = MaterialTheme.colorScheme.primary
+                        Canvas(modifier = Modifier.size(36.dp)) {
+                            val r = size.width / 2f
+                            val centerOffset = center
+                            drawCircle(color = Color.White, radius = r, center = centerOffset)
+                            drawArc(
+                                color = tp,
+                                startAngle = -90f,
+                                sweepAngle = 180f,
+                                useCenter = true,
+                                size = size
+                            )
+                            drawCircle(
+                                color = tp,
+                                radius = r / 2f,
+                                center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = r / 2f,
+                                center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                            )
+                            drawCircle(
+                                color = Color.White,
+                                radius = r * 0.15f,
+                                center = Offset(centerOffset.x, centerOffset.y - r / 2f)
+                            )
+                            drawCircle(
+                                color = tp,
+                                radius = r * 0.15f,
+                                center = Offset(centerOffset.x, centerOffset.y + r / 2f)
+                            )
+                            drawCircle(
+                                color = tp,
+                                radius = r,
+                                center = centerOffset,
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(id = R.string.home_match_title),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontFamily = FontFamily.Serif
+                            )
+                            Text(
+                                text = stringResource(id = R.string.home_match_desc),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                         )
                     }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(id = R.string.home_match_title),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontFamily = FontFamily.Serif
-                        )
-                        Text(
-                            text = stringResource(id = R.string.home_match_desc),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    )
                 }
+
+                // 行间分隔
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
-            // 行间分隔
-            Spacer(modifier = Modifier.height(10.dp))
-
             // 下行：无尽生存入口（皮肤感知；未登录时拦截跳登录，登录后打开介绍弹窗）
-            EndlessModeEntry(
-                currentSkin = state.currentSkin,
-                isLoggedIn = state.isLoggedIn,
-                onOpenIntro = { showEndlessIntro = true },
-                onLoginClick = {
-                    onLoginClick()
-                    Toaster.show(endlessLoginHint)
-                },
-                onShowLeaderboard = {
-                    TheRouter.build("/endless/leaderboard").navigation(context)
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 服务端可通过 /api/app/check-update 返回 game_modes.endless=false 来关闭此模式
+            val endlessEnabled = state.appUpdateInfo?.game_modes?.endless == true
+            if (endlessEnabled) {
+                EndlessModeEntry(
+                    currentSkin = state.currentSkin,
+                    isLoggedIn = state.isLoggedIn,
+                    onOpenIntro = { showEndlessIntro = true },
+                    onLoginClick = {
+                        onLoginClick()
+                        Toaster.show(endlessLoginHint)
+                    },
+                    onShowLeaderboard = {
+                        TheRouter.build("/endless/leaderboard").navigation(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

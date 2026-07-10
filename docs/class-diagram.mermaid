@@ -1,70 +1,64 @@
 classDiagram
-    class User {
-        +string id
-        +string phone
-        +string username
-        +number points
-        +string password_hash
-        +string avatar_url
-        +string role
-        +number is_banned
-        +number created_at
+    class levels {
+        +INTEGER level_id PK
+        +INTEGER difficulty
+        +INTEGER created_at
     }
-    class AdminAuditLog {
-        +number id
-        +string admin_id
-        +string admin_phone
-        +string admin_role
-        +string action
-        +string target_type
-        +string target_id
-        +string before_snapshot
-        +string after_snapshot
-        +string source_ip
-        +string user_agent
-        +number created_at
+    class level_tiles {
+        +INTEGER level_id FK
+        +INTEGER tile_index
+        +TEXT tile_id
+        +INTEGER x
+        +INTEGER y
+        +INTEGER z
+        +INTEGER type
+        +INTEGER is_blind
+        +INTEGER sealed_count
+        +INTEGER seal_unlock_threshold
     }
-    class JwtUtil {
-        +configureSecrets(env)
-        +generateJWT(payload, secret) string
-        +verifyJWT(token, secret) payload
+    class backup_save_log {
+        +INTEGER id PK
+        +TEXT user_id FK
+        +INTEGER points
+        +INTEGER created_at
     }
-    class AdminAuthService {
-        +login(phone, password, env) AdminToken
-        +requireAdmin(request, env) AdminPayload
-        +assertCanWrite(payload) void
-        +assertSuper(payload) void
+    class backup_unlocked_levels {
+        +INTEGER backup_id FK
+        +INTEGER level_id
     }
-    class AdminApiHandler {
-        +handleAdminRoutes(...)
-        +listUsers / adjustPoints / banUser / updateUser
-        +crudShopItem / crudNotice / crudTask / crudLevel
-        +getConfig / setConfig
-        +listAccounts / setRole / disableAccount   // super
-        +listAuditLogs                              // super
-        +getStats
-        +writeAudit(log)   // 落审计，无改/删接口
+    class backup_save_items {
+        +INTEGER backup_id FK
+        +TEXT item_type
+        +INTEGER count
     }
-    class AdminApiClient {
-        +login / refreshAdmin
-        +getUsers / adjustPoints / banUser
-        +crudShopItems / crudNotices / crudTasks / crudLevels
-        +getConfig / setConfig
-        +listAccounts / setRole / disableAccount
-        +listAuditLogs
+    class admin_audit_log {
+        +INTEGER id PK
+        +TEXT admin_id
+        +TEXT admin_phone
+        +TEXT admin_role
+        +TEXT action
+        +TEXT target_type
+        +TEXT target_id
+        +TEXT source_ip
+        +TEXT user_agent
+        +INTEGER created_at
     }
-    class AuthStore {
-        +token: string
-        +user: AdminUser
-        +login() / logout()
-        +isAuthenticated: boolean
-        +isSuper(): boolean
-        +canWrite(): boolean
+    class admin_audit_changes {
+        +INTEGER change_id FK
+        +TEXT field
+        +TEXT old_val
+        +TEXT new_val
     }
-    User "1" --> "0..*" AdminAuditLog : 操作人
-    AdminApiHandler ..> AdminAuthService : 三级鉴权+角色守卫
-    AdminApiHandler ..> AdminAuditLog : 落审计(只读表)
-    AdminApiHandler ..> User : 读写
-    AdminAuthService ..> JwtUtil : 签发/校验(携带 role)
-    AdminApiClient ..> AdminApiHandler : HTTP /api/admin/*
-    AuthStore ..> AdminApiClient : 登录/刷新
+    class game_commands {
+        +INTEGER id PK
+        +TEXT game_id
+        +TEXT sender_id
+        +TEXT command_data
+        +INTEGER created_at
+    }
+
+    levels "1" *-- "0..*" level_tiles : level_id
+    backup_save_log "1" *-- "0..*" backup_unlocked_levels : backup_id
+    backup_save_log "1" *-- "0..*" backup_save_items : backup_id
+    admin_audit_log "1" *-- "0..*" admin_audit_changes : id == change_id
+    note for game_commands "command_data 保留为 TEXT（高频中继缓冲，唯一例外）"

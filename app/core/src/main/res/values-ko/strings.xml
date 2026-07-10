@@ -71,11 +71,10 @@
     <string name="item_bomb">폭탄</string>
     <string name="item_joker">조커</string>
     <string name="item_double_points">더블 코인</string>
+    <string name="item_freeze">프리즈</string>
 
     <string name="shop_title">아이템 상점</string>
     <string name="shop_vault_locked">잠김</string>
-    <string name="shop_section_provinces">푸드 시리즈 스킨</string>
-    <string name="shop_section_animated">이펙트 스킨</string>
 
     <string name="task_play_3">게임 3회 플레이</string>
     <string name="task_play_5">게임 5회 플레이</string>
@@ -276,25 +275,14 @@
     <string name="slot_not_carried">없음</string>
     <string name="carried_magic_items">가져온 아이템</string>
 
-    <string name="item_skin_henan">허난 음식</string>
-    <string name="item_skin_henan_desc">허난성 맛집 테마의 스킨</string>
-    <string name="item_skin_sichuan">사천 음식</string>
-    <string name="item_skin_sichuan_desc">사천성 요리 테마의 스킨</string>
     <string name="item_skin_shuang">멍취징지</string>
     <string name="item_skin_shuang_desc">하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일</string>
 
-    <string name="item_skin_electronic">디지털 가젯</string>
-    <string name="item_skin_electronic_desc">네온 블루 테두리와 테크 실버 장식이 있는 12가지 전자 기기 타일</string>
-    <string name="item_skin_daily">일상의 순간</string>
-    <string name="item_skin_daily_desc">따뜻한 오렌지 테두리와 크림색 장식이 있는 12가지 일상 필수품 타일</string>
-    <string name="item_skin_vegetable">신선 채소</string>
-    <string name="item_skin_vegetable_desc">산뜻한 녹색 테두리와 새싹 장식이 있는 12가지 신선한 채소 타일</string>
-    <string name="item_skin_fruit">싱그러운 과일</string>
-    <string name="item_skin_fruit_desc">선명한 빨강 테두리와 과일 장식이 있는 12가지 즙이 많은 과일 타일</string>
 
     <string name="leaderboard_data_error">데이터 오류</string>
     <string name="leaderboard_load_error">로드 실패, 네트워크 확인</string>
     <string name="leaderboard_empty">랭킹 내역이 없습니다</string>
+    <string name="leaderboard_endless_disabled">무한 모드를 사용할 수 없습니다</string>
     <string name="leaderboard_title_format">스테이지 %1$d · 랭킹</string>
     <string name="leaderboard_tab_daily">일일</string>
     <string name="leaderboard_tab_weekly">주간</string>
@@ -310,6 +298,7 @@
     <string name="item_bomb_desc">슬롯 맨 끝에 있는 카드 2장을 폭파합니다</string>
     <string name="item_joker_desc">어떤 카드와도 맞춰지는 조커 역할을 합니다</string>
     <string name="item_double_points_desc">성공적으로 클리어 시 획득 코인이 2배가 됩니다</string>
+    <string name="item_freeze_desc">4초 동안 낙하를 정지하고 숨 돌릴 시간을 만듭니다</string>
     <string name="btn_go_to_play">도전</string>
     <string name="skin_apply_success">스킨이 변경되었습니다</string>
 
@@ -323,8 +312,6 @@
     <string name="btn_disagree_exit">동의하지 않음 및 종료</string>
     <string name="btn_agree_start">동의하고 시작</string>
     <string name="toast_offline_fallback">네트워크 오류가 발생하여 로컬 오프라인 데이터를 불러왔습니다</string>
-    <string name="province_skin_title">%1$s 미식</string>
-    <string name="province_skin_desc">%1$s의 특색 있는 맛 아이콘 스킨 해제</string>
     <string name="toast_login_failed">로그인 실패</string>
     <string name="toast_login_failed_retry">로그인에 실패했습니다. 나중에 다시 시도하십시오</string>
     <string name="toast_network_error_retry">네트워크 연결 상태가 불안정합니다. 나중에 다시 시도하십시오</string>

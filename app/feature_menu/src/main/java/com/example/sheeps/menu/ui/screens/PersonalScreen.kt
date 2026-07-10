@@ -108,6 +108,7 @@ fun PersonalScreen(
         item {
             BackpackCard(
                 state = state,
+                shopItems = state.shopItems,
                 onApplySkin = onApplySkin,
                 onGoToPlay = onGoToPlay
             )
