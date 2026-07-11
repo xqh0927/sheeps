@@ -56,6 +56,34 @@ import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.core.game.TileIconProvider
 import com.hjq.toast.Toaster
 
+/**
+ * 进入关卡前的准备对话框（自定义全屏遮罩 + [Card] 内容）。
+ *
+ * 展示关卡标题，并根据关卡规则提示特殊玩法（盲关/封印关/休息关）；
+ * 关卡未解锁时显示解锁费用与"解锁"按钮（消耗积分），已解锁时可选择携带道具
+ * （增减各种道具数量），最后点击"开始"进入游戏。
+ *
+ * 触发来源：首页/关卡选择（MenuScreen）点击某关卡进入。
+ * 确认后：
+ *  - 已解锁：由 [onConfirm] 回传 [levelId] 进入对局；
+ *  - 道具增减：由 [onUpdateItem] 实时回写 ViewModel 的 `selectedCarryItems`；
+ *  - 未解锁：由 [onUnlock] 回传 [levelId] 扣除积分并解锁（积分不足用 [Toaster] 提示）。
+ *
+ * 线程约束：所有 `state`（[MenuViewState]）读取与道具选择发生在主线程（UI 线程），
+ * [onConfirm]/[onUpdateItem]/[onUnlock] 由上层负责切到 IO/网络线程提交。
+ * [LocalContext] 仅用于 [Toaster] 提示，组合期间引用，Dialog 关闭后释放。
+ *
+ * ⚠️ 内存隐患：道具网格（8 种道具 × 多项状态）与图标列表在每次重组时由
+ * `listOf(...)`/`chunked(4)` 重新创建，数据量小可接受；[ItemIcon] 加载的网络图片
+ * 由图片加载库管理回收。本对话框无静态 Context 持有、无未取消协程，关闭即释放。
+ *
+ * @param levelId 目标关卡 ID（1 起）。
+ * @param state 菜单视图状态（[MenuViewState]），含 unlockedLevel、points、selectedCarryItems、backpackItems 等。
+ * @param onDismiss 关闭对话框的回调（返回/关闭按钮或点击遮罩触发）。
+ * @param onConfirm 点击"开始"的回调，参数为 [levelId]，用于进入对局。
+ * @param onUpdateItem 增减携带道具的回调，参数为 (道具类型, 变更数量 +1/-1)。
+ * @param onUnlock 点击"解锁"的回调，参数为 [levelId]，用于扣除积分并解锁关卡。
+ */
 @Composable
 fun PrepareGameDialog(
     levelId: Int,

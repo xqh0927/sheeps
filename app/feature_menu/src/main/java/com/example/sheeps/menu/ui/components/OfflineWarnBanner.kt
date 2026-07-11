@@ -19,6 +19,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
 
+/**
+ * 离线（无网络）警告横幅。
+ * 点击后跳转系统设置页（[android.provider.Settings.ACTION_SETTINGS]），引导用户恢复网络。
+ *
+ * 说明：
+ * - 无状态展示型组件，不依赖 ViewModel，运行于**主线程**。
+ * - ⚠️ 内存隐患提示：内部通过 [androidx.compose.ui.platform.LocalContext] 获取 Context，
+ *   并在 `clickable` 回调中 `startActivity`。该 Context 通常为 Activity，但回调生命周期随组合（Composition）
+ *   销毁而结束，不会长期持有引用，故**不会**造成 Activity 泄漏。注意不要在回调闭包中长期缓存 Context。
+ * - 跳转失败（部分深度定制系统无 Settings 模块）已被 try/catch 吞掉，仅静默忽略。
+ */
 @Composable
 fun OfflineWarnBanner() {
     val context = androidx.compose.ui.platform.LocalContext.current

@@ -12,6 +12,11 @@ import com.apkfuns.logutils.LogUtils
  */
 abstract class BaseActivity : ComponentActivity() {
 
+    /**
+     * 生命周期（Context 注入阶段）：在 [super.attachBaseContext] 之前完成 MMKV 初始化与动态语言切换。
+     * 必须最先初始化 MMKV，否则后续语言偏好读取会失败。
+     * ⚠️ 线程约束：@MainThread。
+     */
     override fun attachBaseContext(newBase: android.content.Context) {
         val mmkvContext = newBase.applicationContext ?: newBase
         try {
@@ -36,6 +41,14 @@ abstract class BaseActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * 生命周期：Activity 创建。
+     * 职责：按需设置主题、配置沉浸式状态栏、记录生命周期日志、开启 edge-to-edge，
+     * 最后调用 [initView] 与 [initData] 完成界面与数据初始化。
+     * ⚠️ 子类若在此前注册了 BroadcastReceiver / EventBus / Flow 收集 / 协程作用域，
+     *    必须在 [onDestroy] 中反注册或取消，否则泄漏。
+     * ⚠️ 线程约束：@MainThread。
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         // 配置主题，SplashActivity 使用其特定主题除外
         if (javaClass.simpleName != "SplashActivity") {
@@ -69,6 +82,12 @@ abstract class BaseActivity : ComponentActivity() {
      */
     abstract fun initData()
 
+    /**
+     * 生命周期：Activity 销毁。
+     * 职责：仅记录销毁日志。基类不持有需手动释放的全局资源；
+     * ⚠️ 子类必须在此反注册所有监听器 / 取消协程 / 停止 Flow 收集以释放引用。
+     * ⚠️ 线程约束：@MainThread。
+     */
     override fun onDestroy() {
         super.onDestroy()
         LogUtils.d("${javaClass.simpleName} onDestroy")

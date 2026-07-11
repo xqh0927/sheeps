@@ -15,19 +15,39 @@ import { Visibility, VisibilityOff, LockOutlined } from '@mui/icons-material';
 import { useAuth } from '../store/auth';
 import { extractError } from '../api/client';
 
+/**
+ * 登录页面组件。
+ *
+ * 路由：受路由守卫保护前的入口页（通常路径 `/login`）。
+ * 权限要求：无需登录即可访问；登录成功后由 `useAuth().login` 写入全局会话态并跳转。
+ * 关键 State：
+ * - `phone` / `password`：登录表单输入（手机号 + 密码）。
+ * - `showPwd`：密码明文/密文切换。
+ * - `error`：后端返回的登录错误文案（空字符串表示无错误）。
+ * - `loading`：提交中的加载态，用于禁用按钮、防止重复提交。
+ */
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  // 从全局 auth store 取出登录动作；该动作成功后会持久化会话态（token 等）
   const login = useAuth((s) => s.login);
 
+  // 表单受控输入：手机号
   const [phone, setPhone] = useState('');
+  // 表单受控输入：密码
   const [password, setPassword] = useState('');
+  // 密码可见性开关（仅本地 UI 状态，不影响数据流）
   const [showPwd, setShowPwd] = useState(false);
+  // 登录失败时的错误提示文案（由 extractError 从异常中归一化得到）
   const [error, setError] = useState('');
+  // 提交加载态：提交期间置 true，按钮禁用并阻止重复提交
   const [loading, setLoading] = useState(false);
 
+  // 登录后回跳地址：优先取路由守卫传入的 from，否则回退到数据概览页
   const from = (location.state as { from?: string } | null)?.from || '/dashboard';
 
+  // 表单提交：本地校验必填后调用 auth.login 发起登录
+  // 成功则跳转回目标页（replace 避免回退到登录页）；失败将异常归一化为文案并进入 error 态
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');

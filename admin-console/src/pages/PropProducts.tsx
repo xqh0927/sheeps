@@ -1,3 +1,5 @@
+// 页面 B 组：道具管理（实体 = ShopItem 的子集，item_type 非 SKIN_* 分区）
+// 复用 CrudPage，列表由 makeShopItemsFetcher 过滤出非皮肤道具
 import { useState, useMemo } from 'react';
 import CrudPage, { FieldDef, ColumnDef } from '../components/CrudPage';
 import { Button, Chip } from '@mui/material';
@@ -11,6 +13,7 @@ import ItemIconManager from '../components/ItemIconManager';
 import { makeShopItemsFetcher } from '../utils/filteredShopItemsFetcher';
 import { PROP_ITEM_TYPES } from '../constants/shopItemTypes';
 
+// 表格列定义：name/item_type/points_price/stock 可排序；image_url 渲染缩略图或「未设置」
 const columns: ColumnDef[] = [
   { key: 'name', label: '名称', sortable: true },
   {
@@ -37,6 +40,8 @@ const columns: ColumnDef[] = [
   },
 ];
 
+// 表单字段定义：name/description 为 multilingual → 由 CrudPage 渲染 MultilingualField；
+// image_url 为 image 类型（展示用，实际图标由 ItemIconManager 维护）
 const fields: FieldDef[] = [
   { name: 'name', label: '名称', required: true, multilingual: true },
   { name: 'description', label: '描述', type: 'textarea', multilingual: true },
@@ -46,6 +51,11 @@ const fields: FieldDef[] = [
   { name: 'image_url', label: '图标（由图标管理维护）', type: 'image' },
 ];
 
+/**
+ * 道具管理页。
+ * 复用 CrudPage 承载道具（非皮肤 ShopItem）列表与增删改查；
+ * 行内「图标管理」打开 ItemIconManager 上传图标，保存后通过 refreshKey 强制刷新列表。
+ */
 export default function PropProducts() {
   // fetcher 必须用 useMemo 固定引用，否则 CrudPage 会因依赖变化而无限重拉。
   // 道具 = 非 SKIN_* 分区。

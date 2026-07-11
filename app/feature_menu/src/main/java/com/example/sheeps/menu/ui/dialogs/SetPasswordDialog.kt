@@ -24,6 +24,11 @@ import androidx.compose.ui.platform.LocalContext
  * 不可关闭/不可跳过，设置密码后奖励 50 积分。
  *
  * @param onSetPassword 确认设置密码回调
+ *
+ * 线程约束：密码状态由 `remember { mutableStateOf }` 持有于组合作用域，
+ * Dialog 关闭后自动释放；[onSetPassword] 在主线程（UI 线程）回调，
+ * 网络提交由上层负责切到 IO 线程。本对话框内部通过 [androidx.compose.ui.platform.LocalContext]
+ * 读取错误文案字符串资源，不持有 Context 静态引用。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

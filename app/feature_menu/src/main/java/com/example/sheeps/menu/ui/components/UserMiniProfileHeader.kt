@@ -28,6 +28,17 @@ import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.AnimatedCounter
 import com.example.sheeps.ui.components.PrimaryButton
 
+/**
+ * 个人中心迷你资料头部（头像 + 昵称/积分）。
+ * 头像带呼吸光晕动画；未登录时显示游客名并提供登录入口。
+ *
+ * @param state 菜单界面状态 [com.example.sheeps.menu.state.MenuViewState]，由 ViewModel 持有并下发。
+ * @param onLoginClick 未登录时点击「登录」按钮的回调。
+ *
+ * 说明：
+ * - 展示型组件，状态来自 [state]（单向数据流）；事件通过 [onLoginClick] 上抛。
+ * - 光晕动画由 [androidx.compose.animation.core.rememberInfiniteTransition] 驱动，运行于**主线程**。
+ */
 @Composable
 fun UserMiniProfileHeader(
     state: MenuViewState,

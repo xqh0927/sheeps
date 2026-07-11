@@ -18,6 +18,23 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.ConflictInfo
 
+/**
+ * 存档冲突解决对话框（基于 Material [AlertDialog]）。
+ *
+ * 当检测到本地存档与云端存档不一致时弹出，提供"本地存档"与"云端存档"两张卡片，
+ * 用户必须二选一（[onChooseLocal] 或 [onChooseCloud]）以决定最终采用哪份存档。
+ *
+ * 触发来源：登录/数据同步流程检测到存档冲突时，由菜单 ViewModel 弹出。
+ * 确认后：调用方将依据所选来源覆盖写入存档状态（回写 ViewModel / 数据层）；
+ * 本对话框通过 [onChooseLocal]/[onChooseCloud] 回传用户选择，不自带提交逻辑。
+ *
+ * 线程约束：强制选择、禁止点外部或返回键关闭（见下方 onDismissRequest = {}）。
+ * [onChooseLocal]/[onChooseCloud] 在主线程（UI 线程）回调。
+ *
+ * @param info 冲突双方的存档信息（[ConflictInfo]），含 localLevel/localPoints 与 cloudLevel/cloudPoints。
+ * @param onChooseLocal 用户选择保留本地存档的回调。
+ * @param onChooseCloud 用户选择保留云端存档的回调。
+ */
 @Composable
 fun ConflictDialog(
     info: ConflictInfo,

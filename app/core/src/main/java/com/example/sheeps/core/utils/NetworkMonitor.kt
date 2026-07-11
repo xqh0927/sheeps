@@ -44,6 +44,9 @@ class NetworkMonitor @Inject constructor(
             val request = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
+            // 注：NetworkMonitor 为 @Singleton（进程级单例），生命周期等同应用进程，故此处注册的
+            //    NetworkCallback 无需反注册；若改为短生命周期组件持有，必须在 onDestroy 中调用
+            //    unregisterNetworkCallback 以防回调持续持有引用导致泄漏。
             connectivityManager.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     _status.value = NetworkStatus.ONLINE

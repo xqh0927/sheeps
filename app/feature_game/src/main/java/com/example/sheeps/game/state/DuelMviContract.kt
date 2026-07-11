@@ -68,6 +68,12 @@ data class DuelViewState(
 
 /**
  * 对决模式界面意图。
+ *
+ * 信令协议对齐：[Init] 触发 WebSocket 连接与同种子关卡加载；[ClickTile] 经
+ * [DuelActionDelegate] 消除后由 [DuelViewModel] 下发 ELIMINATE/ATTACK 指令；
+ * [CastSpell] 经 [DuelActionDelegate.handleCastSpell] 校验后下发 CAST_SPELL 指令；
+ * [Restart]/[Leave] 对应重开与断开连接。所有下行指令均封装为 [com.example.sheeps.core.multiplayer.model.GameCommand]，
+ * 类型与 `CommandType` 严格对应服务端对战信令，不改变既有协议。
  */
 sealed interface DuelViewIntent {
     /** 初始化对局，开始连接 WebSocket 并加载相同种子的关卡 */

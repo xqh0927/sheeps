@@ -21,6 +21,21 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import com.example.sheeps.data.model.DailyPopupResponse
 
+/**
+ * 每日天梯榜单弹窗（基于 Material [AlertDialog]）。
+ *
+ * 展示昨日天梯前三甲（[data.top3]）以及当前玩家自己的昨日最终排名（[data.yesterdayRank]）。
+ * 点击"知道了"关闭（经由 [onDismiss]）。
+ *
+ * 触发来源：App 启动或每日首次进入首页（MenuScreen）时由 ViewModel 拉取
+ * [DailyPopupResponse] 后自动弹出；本对话框只读展示，不回写 ViewModel。
+ *
+ * 线程约束：[data] 已在外部加载完成并整体传入，内部不发起网络/IO 请求；
+ * [onDismiss] 在主线程（UI 线程）回调。
+ *
+ * @param data 每日榜单数据（[DailyPopupResponse]），包含 top3 与玩家自身排名。
+ * @param onDismiss 关闭对话框的回调（确认按钮或点击外部触发）。
+ */
 @Composable
 fun DailyLeaderboardPopupDialog(
     data: DailyPopupResponse,

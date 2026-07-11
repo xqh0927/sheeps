@@ -35,6 +35,12 @@ import javax.inject.Inject
 /**
  * 全屏登录 Activity。
  * 支持验证码登录 / 密码登录双模式，登录成功后保存数据并自动关闭。
+ *
+ * 生命周期与内存说明：
+ * - 本 Activity 为独立认证页（非 MenuActivity 的 MVI 体系），自带轻量业务逻辑，登录成功后关闭并回退到菜单。
+ * - 注入的 apiService/prefs/localDao/syncRepository/json 均为 Hilt 提供的单例/无界面依赖，Activity 销毁即释放，不长期持有。
+ * - UI 协程使用 Compose 的 rememberCoroutineScope()，其生命周期绑定 Composition；
+ *   用户返回（finish）导致组合移除时该 scope 自动取消，进行中的网络请求随之取消，无泄漏。
  */
 @Route(path = "/auth/login")
 @AndroidEntryPoint
@@ -56,6 +62,8 @@ class LoginActivity : BaseActivity() {
             SheepsTheme {
                 BackHandler { finish() }
                 var isLoading by remember { mutableStateOf(false) }
+                // 线程边界：rememberCoroutineScope 提供的 scope 与当前 Composable 组合生命周期一致；
+                // 下面的 onSendCode/onLogin 等回调在用户手势（主线程）触发，内部 launch 的网络请求自动切到 IO。
                 val scope = rememberCoroutineScope()
 
                 LoginScreen(
@@ -228,6 +236,8 @@ class LoginActivity : BaseActivity() {
 
                 Toaster.show(getString(R.string.toast_login_success))
                 // 验证码登录后若未设密码，通知 MenuActivity 弹出强制设密
+                // ⚠️ 内存隐患（已规避）：MMKV 为进程级静态单例，仅写入布尔标记，不持有 Activity/Context 引用，无泄漏；
+                // MenuActivity 返回 onResume 时读取该标记并弹出对话框。
                 if (!response.hasPassword) {
                     com.tencent.mmkv.MMKV.defaultMMKV().encode("need_set_password", true)
                 }

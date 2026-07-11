@@ -81,6 +81,9 @@ fun ProfileScreen(
     var showChangePwdDialog by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
 
+    // ⚠️ 内存隐患提示：以下两个 ActivityResultLauncher 通过 rememberLauncherForActivityResult 注册，
+    // 其回调闭包捕获了 LocalContext.current（通常为 Activity）。该 Launcher 由 Compose 与 Activity 生命周期绑定管理，
+    // 组合销毁/配置变更时会自动清理注册，故不会造成 Activity 泄漏；注意不要在闭包中长期缓存 context 引用。
     // 图片选择器
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()

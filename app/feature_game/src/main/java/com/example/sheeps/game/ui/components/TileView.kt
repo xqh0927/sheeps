@@ -95,6 +95,8 @@ fun TileView(
         interactionSource, isBlocked
     )
 
+    // LaunchedEffect(isShaking) 在 isShaking 变 true 时启动，变 false 时自动取消该协程，
+    // 跟随组合生命周期，无独立泄漏风险。
     // 被阻止点击时的水平抖动动画：给玩家明确的“不可点击”视觉暗示
     val shakeOffset = remember { Animatable(0f) }
     LaunchedEffect(isShaking) {

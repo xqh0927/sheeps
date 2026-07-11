@@ -35,10 +35,16 @@ const TILE_COUNT = 12;
  */
 export default function SkinTilesManager({ open, skinType, skinItemType, initialTiles, onClose, onSaved }: Props) {
   const { show } = useFeedback();
+  // 12 张卡面 URL 数组（index 对应 tile_index-1），null 表示未上传
   const [tiles, setTiles] = useState<(string | null)[]>(new Array(TILE_COUNT).fill(null));
+  // 正在上传的卡面下标（null 表示无上传进行中），用于禁用其它上传并显示进度
   const [uploading, setUploading] = useState<number | null>(null);
+  // saving：保存提交中，防止重复提交并禁用关闭/保存按钮
   const [saving, setSaving] = useState(false);
 
+  // 打开弹窗时预填卡面：优先用 initialTiles，否则 getSkinTiles 拉后端；
+  // 依赖 [open, skinType, initialTiles]；通过 cancelled 标志避免异步回写竞态（组件卸载/重开时丢弃旧结果）
+  // 清理函数仅置 cancelled=true，无定时器/订阅泄漏
   // 打开时预填：优先 initialTiles，否则拉后端
   useEffect(() => {
     if (!open) return;
@@ -67,6 +73,8 @@ export default function SkinTilesManager({ open, skinType, skinItemType, initial
     };
   }, [open, skinType, initialTiles]);
 
+  // 上传单张卡面：拼 R2 key = images/skins/{skinType}/{index+1}.png → uploadImage → 回填对应 tile
+  // 失败经 e.response.data.error / message 提示
   const handleUpload = async (index: number, file: File) => {
     setUploading(index);
     try {
@@ -87,6 +95,8 @@ export default function SkinTilesManager({ open, skinType, skinItemType, initial
     }
   };
 
+  // 保存全部卡面：过滤掉未上传项，拼 [{tile_index, image_url}] → saveSkinTiles
+  // 后端自动将第 1 张同步为商店封面；成功回调 onSaved 刷新父列表并关闭
   const handleSave = async () => {
     setSaving(true);
     try {

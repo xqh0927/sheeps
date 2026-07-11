@@ -19,6 +19,9 @@ class DuelActionDelegate @Inject constructor() {
 
     /**
      * 处理卡牌点击逻辑
+     * （对决模式）线程边界：整个处理被包裹在 `scope.launch` 中（scope 来自 DuelViewModel 的 viewModelScope），
+     * 遮挡抖动、盲盒揭示、封印解封均在该协程内完成；VM 销毁时协程自动取消，无泄漏。
+     * 与闯关模式不同：对决中盲盒牌点击后才 `isBlind=false` 揭示图案；封印层数 >0 时点击仅 -1 层。
      */
     fun handleClickTile(
         scope: CoroutineScope,
@@ -80,6 +83,9 @@ class DuelActionDelegate @Inject constructor() {
 
     /**
      * 执行槽位匹配
+     * （对决模式核心，挂起函数）三同花消除时：分数 +100、连击 +1、能量 +1（上限 10），并回调 onMatchSuccess 下发 ELIMINATE/ATTACK；
+     * 仅新增牌未消除则连击归零。剩余 0 牌判 WIN（回调 onVictory），卡槽达 maxSlotSize 判 LOSE。
+     * 纯不可变状态更新，规避引用泄漏。
      */
     suspend fun processSlotMatch(
         state: DuelViewState,
@@ -167,6 +173,9 @@ class DuelActionDelegate @Inject constructor() {
 
     /**
      * 处理施放法术逻辑
+     * （对决恶搞/诅咒大招）校验：单局限次（DuelViewState.usedSpells）、禁魔（isSilenced）、能量是否充足（cost 见 FOG/SHRINK/...映射）。
+     * 通过后扣能量、标记已用，并回调 onCastSuccess（由 DuelViewModel 下发 CAST_SPELL 指令同步给对手）。
+     * 运行于主线程。
      */
     fun handleCastSpell(
         state: DuelViewState,

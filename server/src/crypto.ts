@@ -1,3 +1,20 @@
+/**
+ * crypto.ts — 加解密与令牌签名工具模块
+ *
+ * 职责：
+ *  - JWT 签发/校验：HMAC-SHA256，用于服务间及客户端的身份令牌（见 auth 流程）。
+ *  - AES-256-GCM 对称加密：用于请求体/响应体的「加密信封」（见 middleware.ts）。
+ *  - SHA-256 摘要：用于关卡 layout_data 摘要等幂等/去重场景。
+ *
+ * 安全约定：
+ *  - 生产环境密钥 JWT_SECRET / AES_KEY_HEX 由 Worker Secrets 经 configureSecrets 注入；
+ *    源码内 fallback 常量仅供本地 `wrangler dev` 使用，绝不可作为线上密钥。
+ *  - CryptoKey 在 Worker 实例级缓存（cachedKey / cachedAesKey），避免每次调用重复 importKey 的 CPU 开销。
+ *
+ * 加密信封格式（AES-GCM）：Base64( IV(12B) || ciphertext || authTag(16B) )
+ *
+ * @module crypto
+ */
 import { Env } from './types';
 
 /**

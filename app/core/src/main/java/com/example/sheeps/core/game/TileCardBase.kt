@@ -16,6 +16,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
+/**
+ * 卡牌视觉基座 Composable。
+ *
+ * 负责绘制统一风格的卡牌外框（圆角 + 阴影）与四角装饰折线，并按 [skin] 选择主题色
+ * （边框色 / 装饰色）。牌面具体图标由 [content] 插槽注入（通常为 [com.example.sheeps.core.game.TileIconProvider] 提供的 [RemoteImage]）。
+ *
+ * 线程约束：Composable 默认运行于主线程（@MainThread），仅做 Canvas 绘制，无耗时操作。
+ * 重组注意：每次 [skin] 变化会重新计算颜色三元组，开销极小；应避免在调用处高频改变 [skin]。
+ *
+ * @param skin    皮肤渲染键（如 "shuang"/"electronic"），内部做 `lowercase()` 不区分大小写
+ * @param modifier Compose 修饰符
+ * @param content 卡牌正面图标内容插槽（@Composable 作用域）
+ */
 @Composable
 fun TileCardBase(
     skin: String, // 皮肤名称

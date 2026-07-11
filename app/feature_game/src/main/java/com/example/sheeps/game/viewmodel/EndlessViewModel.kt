@@ -56,7 +56,6 @@ class EndlessViewModel @Inject constructor(
             is EndlessViewIntent.Init -> handleInit(intent.isDaily, intent.seed)
             is EndlessViewIntent.ClickColumn -> handleClickColumn(intent.col, intent.tileId)
             is EndlessViewIntent.UseFreeze -> handleUseFreeze()
-            is EndlessViewIntent.SwapColumns -> { /* v1.5 预留，暂不处理 */ }
             is EndlessViewIntent.Pause -> handlePause()
             is EndlessViewIntent.Resume -> handleResume()
             is EndlessViewIntent.Restart -> handleRestart()
@@ -67,6 +66,11 @@ class EndlessViewModel @Inject constructor(
 
     // ===== 生命周期 =====
 
+    /**
+     * 初始化无尽对局：重置生成器与计数器，构建初始 [EndlessViewState]，并启动下落循环。
+     * 普通模式使用 `System.currentTimeMillis()` 作为种子，每日挑战复用传入 `seed` 保证公平竞速。
+     * 运行于主线程（纯状态构建 + 启动协程）。
+     */
     private fun handleInit(isDaily: Boolean, seed: Long) {
         val actualSeed = if (isDaily) seed else System.currentTimeMillis()
         endlessGenerator.reset(actualSeed)
@@ -115,6 +119,11 @@ class EndlessViewModel @Inject constructor(
 
     // ===== 下落计时器 =====
 
+    /**
+     * 启动下落循环：取消旧 [spawnJob] 后在 [viewModelScope] 内 `while (PLAYING)` 循环。
+     * 冻结期间以 200ms 轮询跳过实际下落；正常按 `dropIntervalMs` 间隔触发 [doSpawn]。
+     * 旧 Job 先 cancel 防止并发计时器叠加（内存/逻辑隐患防护）。
+     */
     private fun startSpawnLoop() {
         spawnJob?.cancel()
         spawnJob = viewModelScope.launch {
@@ -130,6 +139,7 @@ class EndlessViewModel @Inject constructor(
         }
     }
 
+    /** 生成一行卡牌并压入棋盘（[EndlessEngine.pushRow]）。触顶则判定 death_line；否则累加存活时间并检测波次提速。运行于主线程。 */
     private fun doSpawn() {
         val row = endlessGenerator.nextRow(currentState.columns, currentState.activeSuitCount, COL_COUNT)
         val (newColumns, dead) = EndlessEngine.pushRow(currentState.columns, row, currentState.deathRow)
@@ -145,6 +155,10 @@ class EndlessViewModel @Inject constructor(
 
     // ===== 交互 =====
 
+    /**
+     * 处理点击某列卡牌：委托 [EndlessEngine.clickColumn] 取出卡牌飞入卡槽并即时三消。
+     * 连击累加/归零、得分计算与死亡判定（death_line / slot_overflow）均在此完成。运行于主线程。
+     */
     private fun handleClickColumn(col: Int, tileId: String) {
         if (currentState.status != EndlessStatus.PLAYING) return
 
@@ -195,6 +209,10 @@ class EndlessViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 使用冻结道具：暂停下落并启动倒计时协程（[viewModelScope] 内 100ms 轮询更新 `freezeRemainingMs`）。
+     * 倒计时结束自动解除冻结。运行于主线程。
+     */
     private fun handleUseFreeze() {
         if (currentState.freezeCount <= 0 || currentState.isFrozen) return
         if (currentState.status != EndlessStatus.PLAYING) return
@@ -227,6 +245,10 @@ class EndlessViewModel @Inject constructor(
         setEffect(EndlessViewEffect.ShowToast(banner))
     }
 
+    /**
+     * 死亡结算：取消下落 Job，更新最高分与结算弹窗，播放失败音效与振动，并提交云端成绩。
+     * @param reason 死因："death_line"（触顶）或 "slot_overflow"（卡槽溢出）
+     */
     private fun handleDeath(reason: String) {
         spawnJob?.cancel()
         val prevBest = currentState.bestScore

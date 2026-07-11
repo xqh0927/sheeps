@@ -338,10 +338,10 @@ CREATE TABLE IF NOT EXISTS item_icons (
 );
 
 -- 3) shop_items 增加分组列（主题系列；可空）。GROUP 为 SQL 保留字，建表已用双引号包裹。
---    已上线库若未含该列，由 Worker 启动时 migrateSchema() 自动 ALTER 补齐（见 index.ts）。
+--    已上线库若未含该列，需用 `wrangler d1 execute` 手动 ALTER 补齐（迁移逻辑已从 Worker 移除）。
 -- ===================== 生产迁移注释（DBA 执行，幂等） =====================
 -- ALTER TABLE shop_items ADD COLUMN "group" TEXT;
 -- 说明：分组维度默认为"主题系列"（地域系列/萌系系列/数码系列/生活系列），可空。
 -- 已上线库若无 item_icons / skin_tiles 表，按上方 CREATE TABLE IF NOT EXISTS 补齐即可
--- （Worker 启动 migrateSchema 也会自动建）。
+-- （迁移逻辑已从 Worker 移除，新表需手动执行上方 CREATE 语句）。
 

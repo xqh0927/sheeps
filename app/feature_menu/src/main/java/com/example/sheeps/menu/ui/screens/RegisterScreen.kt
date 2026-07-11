@@ -70,6 +70,7 @@ fun RegisterScreen(
     val pwdErrNotMatch = stringResource(id = R.string.pwd_err_not_match)
     val pwdErrCodeLength = stringResource(id = R.string.pwd_err_code_length)
 
+    // 验证码倒计时协程：绑定组合生命周期，组合销毁即取消；delay(1000) 为主线程挂起，不阻塞 UI 线程。
     LaunchedEffect(countdown) {
         if (countdown > 0) {
             delay(1000)

@@ -25,11 +25,12 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
      */
     if (path === '/api/shop/items' && request.method === 'GET') {
         const cacheKey = `shop_items_${lang}`;
-        // 读取 Cloudflare KV 缓存，减少频繁读库开销（缓存时间 10 分钟）
+        // DB/缓存：优先读 KV（SHEEPS_CACHE）热点缓存，TTL 10 分钟，命中直接返回，降低 D1 读压力
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: corsHeaders });
 
         // 方案 B：先取基列（zh 兜底），再用 i18n_strings 解析本地化文案
+        // DB：查询 shop_items 商品表，过滤掉非兑换类（CLASSIC 及各类 SKIN_* 皮肤），仅返回可消耗积分兑换的法宝道具
         const items = await env.DB.prepare(
             `SELECT id, name, description, image_url, item_type, points_price, stock, "group"
              FROM shop_items
@@ -97,24 +98,27 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const body: { shop_item_id: number; count: number } = await request.json();
+        // 参数校验：shop_item_id 必填且 count 必须为 ≥1 的正整数，否则返回 400
         if (body.shop_item_id === undefined || !body.count || body.count < 1) return new Response(JSON.stringify({ error: 'Invalid parameters' }), { status: 400, headers: corsHeaders });
 
-        // 批量读取商品信息和用户当前可用积分
+        // DB：单 batch 读取 shop_items 商品（名称/类型/单价/库存）与 users 当前积分，作为扣减前置校验
         const [shopItemResult, userResult] = await env.DB.batch([
             env.DB.prepare('SELECT name, item_type, points_price, stock FROM shop_items WHERE id = ?').bind(body.shop_item_id),
             env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
         ]);
 
         const shopItem = shopItemResult.results[0] as any;
+        // 参数校验（库存）：商品必须存在且库存 stock ≥ 兑换数量 count，否则返回 400（缺货）
         if (!shopItem || shopItem.stock < body.count) return new Response(JSON.stringify({ error: 'Item out of stock' }), { status: 400, headers: corsHeaders });
 
         const totalCost = shopItem.points_price * body.count;
         const userRow = userResult.results[0] as any;
+        // 参数校验（积分余额）：用户总积分需 ≥ 总花费（单价 × 数量），否则返回 400（积分不足）
         if (!userRow || userRow.points < totalCost) return new Response(JSON.stringify({ error: 'Insufficient points' }), { status: 400, headers: corsHeaders });
 
         const remainingPoints = userRow.points - totalCost;
 
-        // 执行原子扣积分、减库存、添加用户背包道具（ON CONFLICT 时叠加数量）、记录兑换及积分消费明细
+        // 事务边界：以下 6 条写入合并为单 D1 batch 原子提交（要么全成，要么不写），涵盖：扣 users.points、减 shop_items.stock、叠加 user_items 背包（ON CONFLICT 累加）、写 exchange_record 与 point_record 流水、回查新背包数量
         const writeResults = await env.DB.batch([
             env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),
             env.DB.prepare('UPDATE shop_items SET stock = stock - ? WHERE id = ?').bind(body.count, body.shop_item_id),

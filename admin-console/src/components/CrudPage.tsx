@@ -101,6 +101,21 @@ export interface CrudPageProps {
   rowActions?: (row: any) => ReactNode;
 }
 
+/**
+ * 通用 CRUD 页面外壳组件（表格 + 分页 + 新建/编辑弹窗 + 删除确认 + 可选搜索/排序）。
+ *
+ * 设计意图：各业务管理页（用户、皮肤、道具……）只需传入字段定义（fields）、
+ * 列定义（columns）与四个数据操作函数（fetcher/creator/updater/deleter）即可复用。
+ *
+ * 数据流向：
+ * - 列表数据来源于 `fetcher`（服务端分页），渲染到 Table；
+ * - 表单数据由本地 `form` state 承载，提交时经校验与字段契约转换后调用 creator/updater；
+ * - `useFeedback` 提供全局 Toast，所有成功/失败提示统一经 `show` 输出。
+ *
+ * 副作用与清理：组件挂载时加载首屏数据；卸载时清理搜索防抖定时器，避免内存泄漏。
+ *
+ * @param props 见 {@link CrudPageProps}
+ */
 export default function CrudPage({
   title,
   idField,
@@ -120,17 +135,23 @@ export default function CrudPage({
   initialSort,
   rowActions,
 }: CrudPageProps) {
+  // 写权限：来自 auth store 的 canWrite()，决定「新建/编辑/删除」按钮是否可用
   const canWrite = useAuth((s) => s.canWrite());
+  // 全局 Toast：show 触发提示，Feedback 为需渲染的 Snackbar 节点
   const { show, Feedback } = useFeedback();
 
+  // —— 列表与分页状态 ——
   const [rows, setRows] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
 
+  // —— 表单/弹窗状态 ——
+  // editing：null=弹窗关闭，{} = 新建态，object = 编辑态（携带行数据）
   const [editing, setEditing] = useState<any | null>(null); // null=关闭, {} = 新建, object = 编辑
   const [form, setForm] = useState<Record<string, any>>({});
+  // busy：提交/创建进行中，禁用表单与按钮
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false); // 删除期间禁用删除/取消按钮
@@ -146,6 +167,9 @@ export default function CrudPage({
     sortable && initialSort ? { field: initialSort.field, order: initialSort.order } : null
   );
 
+  // 拉取当前页数据：fetcher 为 1-based 页码（故 page+1）。
+  // 依赖 [fetcher, page, pageSize, keyword, show]：分页/搜索变化时自动重新拉取；
+  // 闭包稳定，避免每次渲染都重建函数触发无限刷新
   const load = useCallback(() => {
     setLoading(true);
     fetcher(page + 1, pageSize, keyword)
@@ -157,6 +181,7 @@ export default function CrudPage({
       .finally(() => setLoading(false));
   }, [fetcher, page, pageSize, keyword, show]);
 
+  // 首屏加载与分页/搜索变化时的自动重载（依赖 load，load 变化即重拉）
   useEffect(() => {
     load();
   }, [load]);

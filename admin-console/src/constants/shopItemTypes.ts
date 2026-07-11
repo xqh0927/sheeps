@@ -9,6 +9,7 @@
  * label 为管理后台展示用中文，value 为 DB/Android 端约定的 item_type 原始码。
  */
 
+/** 皮肤分区类型（7 项）：label 为后台展示中文，value 为 DB/Android 约定的 item_type 原始码。 */
 export const SKIN_ITEM_TYPES = [
   { label: '双倍', value: 'SKIN_SHUANG' },
   { label: '河南', value: 'SKIN_HENAN' },
@@ -19,6 +20,7 @@ export const SKIN_ITEM_TYPES = [
   { label: '水果', value: 'SKIN_FRUIT' },
 ];
 
+/** 道具分区类型（9 项）：非 SKIN_* 的常规道具，结构与 SKIN_ITEM_TYPES 对齐。 */
 export const PROP_ITEM_TYPES = [
   { label: '撤销', value: 'UNDO' },
   { label: '移出', value: 'MOVEOUT' },

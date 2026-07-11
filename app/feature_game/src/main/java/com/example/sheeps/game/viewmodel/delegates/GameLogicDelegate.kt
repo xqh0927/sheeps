@@ -25,6 +25,7 @@ class GameLogicDelegate @Inject constructor() {
 
     /**
      * 处理卡牌点击逻辑
+     * （闯关模式）线程边界：主流程在调用方主线程执行；被遮挡/封印时的「抖动反馈」通过 `scope.launch { delay(500) }` 在 [viewModelScope] 内延时复位 `shakingTileIds`，VM 销毁时该协程随 scope 取消，无泄漏风险。门控未解锁的封印牌在此拦截，避免产生无效 Undo 步骤。
      */
     fun handleClickTile(
         scope: CoroutineScope,
@@ -158,8 +159,10 @@ class GameLogicDelegate @Inject constructor() {
 
     /**
      * 执行槽位匹配及输赢判定
+     * （挂起函数，闯关模式核心）负责循环消除三同花、封印门控计数与跨阈值解锁（sealed-unlock-mechanism-design.md §6）、软锁兜底自动解锁，以及 WON/LOST/PLAYING 状态判定。纯不可变状态更新，规避引用泄漏。
      *
      * @return 本次所获得的得分增量值
+     * （非双倍 100 / 双倍 200 每张）
      */
     suspend fun processSlotMatchAndCheckEndGame(
         state: GameViewState,

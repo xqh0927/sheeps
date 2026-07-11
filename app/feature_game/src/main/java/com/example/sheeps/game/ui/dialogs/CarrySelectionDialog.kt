@@ -33,6 +33,28 @@ import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.core.game.TileIconProvider
 
+/**
+ * 重开携带道具选择弹窗（Compose `Dialog`）。
+ *
+ * 以全屏半透明遮罩 + 居中卡片呈现，列出 8 种道具（UNDO / SHUFFLE / MOVEOUT /
+ * REVIVE / HINT / BOMB / JOKER / DOUBLE_POINTS），每种显示图标、本地化名称、背包库存
+ * （[GameViewState.backpackItemStocks]）与已选数量（[GameViewState.tempCarryItems]），
+ * 通过 +/- 调用 [onUpdateItem] 调整临时携带数量，[onConfirm] 确认开始。
+ *
+ * 交互细节：
+ * - 遮罩层 `clickable` 触发 [onDismiss]；卡片层 `clickable` 通过空实现阻断点击冒泡，
+ *   避免误关弹窗。
+ * - `DialogProperties(usePlatformDefaultWidth = false)` 使弹窗可占满宽度（0.95f）。
+ *
+ * 线程约束：纯 Composable，运行于主线程；图标 URL 由 `TileIconProvider` 同步提供。
+ * ⚠️ 内存隐患：本弹窗随 `state.showCarrySelection` 组合/销毁，无静态引用；
+ * `MutableInteractionSource` 用 `remember` 创建，随重组复用、随销毁释放，无泄漏。
+ *
+ * @param state       当前游戏视图状态，提供背包库存与已选道具
+ * @param onDismiss   点击遮罩或“取消”时关闭弹窗
+ * @param onConfirm   点击“确认开始”时带当前选择提交
+ * @param onUpdateItem 调整某道具的临时携带数量（type, delta）
+ */
 @Composable
 fun CarrySelectionDialog(
     state: GameViewState,

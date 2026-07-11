@@ -30,9 +30,10 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
+        // 业务上下文：以 UTC+8（东八区）计算「今日」日期，作为 user_task 每日进度行的 task_date 维度，保证每日任务按天重置
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
-        // 批量查询系统全局任务模板和该用户当天的任务进度（方案 B：先取基列，再经 i18n 解析）
+        // DB：单 batch 查询 task 任务模板表 + user_task 当日进度表；方案 B 先取基列（zh 兜底），再经 i18n 解析多语言任务名/描述
         const [allTasks, userTasks] = await env.DB.batch([
             env.DB.prepare('SELECT id, name, description, target_count, points_reward FROM task'),
             env.DB.prepare('SELECT task_id, progress, is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_date = ?').bind(authUser.userId, chinaToday)
@@ -43,7 +44,7 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         const i18nMap = await getI18nBatch(env, 'task', lang);
         const inserts = [], list = [];
 
-        // 任务初始化对齐逻辑：遍历系统所有任务，如果用户今天未生成该任务进度条目，则进行懒加载插入
+        // 幂等初始化：遍历系统任务模板，若用户今日尚无对应 user_task 进度行则懒加载 INSERT（progress=0, is_completed=0, is_rewarded=0），保证每日任务自动就绪
         for (const task of taskList) {
             let ut = userTaskList.find(u => u.task_id === task.id);
             if (!ut) {
@@ -62,7 +63,7 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
             });
         }
 
-        // 批量将缺失的进度条目插入 D1 数据库
+        // 事务边界：将当日缺失的用户任务进度条目一次性批量写入 user_task 表，保证初始化原子性
         if (inserts.length > 0) await env.DB.batch(inserts);
 
         // 修复：如果用户今天已签到但 SIGN_IN_ONCE 任务状态未同步（如老用户已签到但任务数据未更新），自动修复
@@ -96,10 +97,11 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const body: { task_id: string } = await request.json();
+        // 参数校验：task_id 必填，缺失返回 400
         if (!body.task_id) return new Response(JSON.stringify({ error: 'Missing task ID' }), { status: 400, headers: corsHeaders });
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        // 批量查询当前任务进度、奖励积分数、以及用户当前的总积分数
+        // DB：单 batch 读取 user_task 进度（是否完成/已领）、task 奖励积分、users 当前积分，作为领取前置校验
         const [userTaskResult, taskResult, userResult] = await env.DB.batch([
             env.DB.prepare('SELECT is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
             env.DB.prepare('SELECT points_reward FROM task WHERE id = ?').bind(body.task_id),
@@ -107,13 +109,13 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         ]);
 
         const userTask = userTaskResult.results[0] as any;
-        // 校验：必须满足“已完成 (is_completed = 1)”且“未领取过 (is_rewarded = 0)”方可领取
+        // 参数校验（幂等防护）：任务必须「已完成且尚未领取」，否则返回 400；重复领取会被 is_rewarded 拦截，避免重复发奖
         if (!userTask || userTask.is_completed === 0 || userTask.is_rewarded === 1) return new Response(JSON.stringify({ error: 'Task not completed or already rewarded' }), { status: 400, headers: corsHeaders });
 
         const reward = (taskResult.results[0] as any)?.points_reward || 10;
         const remainingPoints = ((userResult.results[0] as any)?.points || 0) + reward;
 
-        // 执行原子事务：标记已领取、增加用户账户积分、写入积分明细流水
+        // 事务边界：标记 user_task.is_rewarded=1、累加 users.points、写 point_record 流水（source=DAILY_TASK_<id>），三写合并单 batch 原子提交，确保发奖与记账一致
         await env.DB.batch([
             env.DB.prepare('UPDATE user_task SET is_rewarded = 1 WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
             env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),

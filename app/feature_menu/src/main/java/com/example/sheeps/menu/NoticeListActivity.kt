@@ -13,7 +13,12 @@ import jakarta.inject.Inject
 import kotlinx.serialization.json.Json
 
 /**
- * 公告列表全屏界面
+ * 公告列表全屏界面。
+ *
+ * 生命周期与内存说明：
+ * - 数据通过 Intent 的 "noticesJson" 透传（由 MenuActivity 序列化后带入），本身不发起网络请求、无协程。
+ * - 反序列化得到的 [notices] 列表作为 Activity 属性持有，随 Activity 销毁而释放，不跨页长期引用，无泄漏。
+ * - 反序列化失败则降级为空列表，保证界面可渲染。
  */
 @Route(path = "/menu/notices")
 @AndroidEntryPoint
@@ -22,6 +27,7 @@ class NoticeListActivity : BaseActivity() {
     @Inject
     lateinit var json: Json
 
+    // 反序列化后的公告列表，仅在本 Activity 生命周期内有效；不参与持久化，无跨页引用风险。
     private lateinit var notices: List<Notice>
 
     override fun initView(savedInstanceState: Bundle?) {

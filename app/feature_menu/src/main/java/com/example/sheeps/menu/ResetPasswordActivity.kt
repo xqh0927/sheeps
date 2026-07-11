@@ -27,6 +27,11 @@ import javax.inject.Inject
 /**
  * 全屏找回密码 Activity。
  * 重置成功后 toast 提示并自动关闭，回到登录页。
+ *
+ * 生命周期与内存说明：
+ * - 注入的 apiService 为 Hilt 单例，Activity 销毁即释放，不长期持有界面。
+ * - 重置请求使用 [androidx.lifecycle.lifecycleScope]，保证 finish() 后请求仍可完成；
+ *   lifecycleScope 随 Activity 销毁自动取消，无泄漏。
  */
 @Route(path = "/auth/reset-password")
 @AndroidEntryPoint
@@ -88,6 +93,8 @@ class ResetPasswordActivity : BaseActivity() {
     ) {
         setLoading(true)
         // 使用 lifecycleScope 确保在 finish() 之后协程不会被立即取消
+        // ⚠️ 内存隐患（已规避）：lifecycleScope 绑定 Activity 生命周期，销毁即取消；
+        // 此处有意「先请求后 finish」，避免请求被提前打断。请勿改成 GlobalScope。
         lifecycleScope.launch {
             try {
                 val response = apiService.resetPassword(

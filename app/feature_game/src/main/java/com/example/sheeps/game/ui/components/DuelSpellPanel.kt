@@ -16,6 +16,7 @@ import com.example.sheeps.game.state.DuelViewState
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
 
+/** 将法术 key（FOG/SILENCE/SHUFFLE/SHRINK/SEAL_ALL）本地化为展示名称，复用 R.string 多语言资源。 */
 @Composable
 fun getLocalizedSpellName(spellKey: String): String {
     return when (spellKey.uppercase()) {
@@ -69,6 +70,7 @@ private data class SpellInfo(
     val color: Color
 )
 
+/** 单枚法术按钮：根据能量/已用/禁魔计算可用性与置灰透明度，点击触发 [onClick] 下发 CAST_SPELL。 */
 @Composable
 private fun SpellButton(
     info: SpellInfo,

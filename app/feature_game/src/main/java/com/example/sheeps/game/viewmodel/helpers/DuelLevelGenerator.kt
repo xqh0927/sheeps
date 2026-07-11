@@ -8,6 +8,14 @@ import javax.inject.Inject
  */
 class DuelLevelGenerator @Inject constructor() {
 
+    /**
+     * 生成本地对决关卡（离线/网络失败兜底）。
+     *
+     * 固定 levelId=2、6 种花色、4 层堆叠布局，保证卡牌总数为 3 的倍数以便可消。
+     * 与服务端生成的同种子关卡不同，仅用于弱网或断线时的本地可玩兜底，不保证双方完全一致。
+     *
+     * @return 卡牌列表（id 形如 `duel_tile_<index>`）
+     */
     fun generateDuelLevel(): List<Tile> {
         val levelId = 2
         val numTypes = 6

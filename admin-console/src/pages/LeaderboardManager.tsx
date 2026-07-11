@@ -38,6 +38,9 @@ import { useAuth } from '../store/auth';
 import { useFeedback } from '../components/feedback';
 import UserPicker from '../components/UserPicker';
 
+// 页面 B 组：排行榜管理（实体 = LeaderboardRow）
+// 列表 listLeaderboard / 新增 createLeaderboardRow / 更新 updateLeaderboardRow / 删除 deleteLeaderboardRow
+// 手动改分通过 UserPicker 选用户，按 game_mode（关卡榜/无尽生存榜）分 Tab 展示
 interface FormState {
   user_id: string;
   username: string;
@@ -48,31 +51,50 @@ interface FormState {
 
 const emptyForm: FormState = { user_id: '', username: '', level_id: '0', score: '0', clear_time_ms: '0' };
 
+/**
+ * 排行榜管理页。
+ * 按 game_mode（关卡榜/无尽生存榜）分 Tab 展示排行榜，支持关卡筛选与分页；
+ * 手动改分通过 UserPicker 选用户后新增/编辑分数，删除有二次确认。
+ * 数据流：listLeaderboard 分页拉取，create/update/delete 走对应 API，loading/error 经 useFeedback 提示。
+ */
 export default function LeaderboardManager() {
   const canWrite = useAuth((s) => s.canWrite());
   const { show, Feedback } = useFeedback();
 
+  // 当前 Tab：0=闯关榜 1=无尽生存榜（决定 listLeaderboard 的 game_mode 入参）
   const [tab, setTab] = useState(0); // 0=闯关榜 1=无尽生存榜
+  // 列表数据行与总数（来自服务端分页）
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [total, setTotal] = useState(0);
+  // 当前页（从 0 开始）与每页条数，对应服务端 page(1-based)/pageSize 分页参数
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+  // loading：列表请求中；disabled：当前模式未开启时禁用整页操作
   const [loading, setLoading] = useState(true);
   const [disabled, setDisabled] = useState(false);
+  // 游戏模式开关：endless 关闭时无尽榜 Tab 不可选且不发起请求
   const [modes, setModes] = useState<{ stage: boolean; endless: boolean }>({ stage: true, endless: false });
 
+  // 关卡筛选条件（按 level_id 精确匹配）
   const [levelFilter, setLevelFilter] = useState('');
+  // 新增/编辑弹窗状态：null 关闭；mode 区分新建与编辑，edit 时携带 row
   const [dialog, setDialog] = useState<null | { mode: 'create' | 'edit'; row?: LeaderboardRow }>(null);
+  // 受控表单状态（字符串存储，提交时再 Number 转换）
   const [form, setForm] = useState<FormState>(emptyForm);
+  // busy：保存/删除提交中，防止重复提交并禁用按钮
   const [busy, setBusy] = useState(false);
+  // 删除确认弹窗目标行
   const [deleteTarget, setDeleteTarget] = useState<LeaderboardRow | null>(null);
 
+  // 拉取游戏模式开关（stage/endless），仅在挂载时执行一次，失败静默回退默认
   const loadModes = useCallback(() => {
     getGameModes()
       .then((d) => setModes(d))
       .catch(() => { /* 忽略，使用默认 */ });
   }, []);
 
+  // 分页拉取当前 Tab 的排行榜列表；依赖变化（tab/分页/筛选/模式）时自动重拉
+  // 无尽榜且模式关闭时跳过请求，直接置空并标记 disabled 提示
   const load = useCallback(() => {
     const gameMode = tab;
     // 无尽榜且模式关闭：不查，展示禁用提示
@@ -100,10 +122,12 @@ export default function LeaderboardManager() {
       .finally(() => setLoading(false));
   }, [tab, modes.endless, page, pageSize, levelFilter, show]);
 
+  // 挂载时拉取游戏模式开关（仅一次）
   useEffect(() => {
     loadModes();
   }, [loadModes]);
 
+  // 列表加载副作用：load 引用随依赖变化，自动重新拉取；load 内部已处理 loading/finally，无定时器/订阅需清理
   useEffect(() => {
     load();
   }, [load]);
@@ -124,6 +148,8 @@ export default function LeaderboardManager() {
     setDialog({ mode: 'edit', row });
   };
 
+  // 保存逻辑：校验用户必选 → 组装 body（表单字符串转 Number）→ 编辑走 update，新建走 create
+  // busy 防重复提交；成功关闭弹窗并重拉列表，失败以 extractError 反馈
   const handleSave = async () => {
     if (!form.user_id) {
       show('请选择用户', 'warning');
@@ -158,6 +184,8 @@ export default function LeaderboardManager() {
     }
   };
 
+  // 删除逻辑：校验目标存在 → 调 deleteLeaderboardRow → 成功关闭弹窗并重拉列表
+  // busy 防重复提交，finally 释放
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setBusy(true);
@@ -173,6 +201,7 @@ export default function LeaderboardManager() {
     }
   };
 
+  // 表格列定义（与 LeaderboardRow 字段对应）
   const columns = [
     { key: 'id', label: 'ID' },
     { key: 'username', label: '用户' },

@@ -36,6 +36,27 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.core.R
 import kotlinx.coroutines.delay
 
+/**
+ * 修改密码对话框（基于 Material [AlertDialog]）。
+ *
+ * 通过短信验证码 + 新密码完成密码修改：用户输入验证码、新密码与确认密码，
+ * 点击"获取验证码"触发 [onSendCode]，点击"确认"经本地校验后触发 [onChangePassword]。
+ *
+ * 触发来源：个人中心（ProfileScreen）点击"修改密码"弹出。
+ * 确认后：由 [onChangePassword] 回传 (验证码, 新密码)，由上层调用 ViewModel 提交修改。
+ *
+ * 线程约束：本对话框所有状态变更发生在主线程（UI 线程）；[onSendCode]/[onChangePassword]
+ * 由上层负责切到 IO 线程发起网络请求。
+ *
+ * ⚠️ 内存隐患：下方的 [LaunchedEffect] 倒计时协程由组合作用域（Composition）持有，
+ * 随 Dialog 关闭自动取消，不会泄漏；但若后续改为 `rememberCoroutineScope().launch { ... }`
+ * 的全局作用域，则需在 onDispose 中手动取消，否则 Dialog 关闭后延迟任务仍会执行。
+ *
+ * @param currentPhone 当前登录手机号，仅用于展示账号前缀，不可编辑。
+ * @param onDismiss 关闭对话框的回调（取消按钮或点击外部触发）。
+ * @param onSendCode 点击"获取验证码"的回调，参数为当前手机号 [currentPhone]。
+ * @param onChangePassword 点击"确认"且本地校验通过后的回调，参数为 (验证码, 新密码)。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangePasswordDialog(

@@ -87,23 +87,48 @@ function resolveActionInput(input: string): string {
   return trimmed;
 }
 
+/**
+ * 操作审计日志（AuditLogs）页面组件。
+ *
+ * 路由：通常路径 `/audit`。
+ * 权限要求：仅超级管理员 `isSuper()` 可访问；非超管直接渲染无权限提示并短路返回。
+ * 关键 State：
+ * - `rows` / `total`：服务端分页的审计记录及总数。
+ * - `page` / `pageSize` / `action` / `adminId` / `fromDate` / `toDate`：筛选与分页条件。
+ * - `detail`：当前展开查看的审计详情弹窗目标。
+ *
+ * 数据来源：依赖 listAuditLogs；action 输入支持中文，经 resolveActionInput 反向映射为英文枚举传给后端。
+ */
 export default function AuditLogs() {
+  // 超级管理员信号：控制整页可访问性与数据加载
   const isSuper = useAuth((s) => s.isSuper());
+  // 全局反馈组件
   const { show, Feedback } = useFeedback();
 
+  // 当前页审计记录
   const [rows, setRows] = useState<AuditRow[]>([]);
+  // 服务端返回的总记录数（驱动分页器）
   const [total, setTotal] = useState(0);
+  // 当前页码（0 基），传给后端 page = page + 1
   const [page, setPage] = useState(0);
+  // 每页条数
   const [pageSize, setPageSize] = useState(20);
+  // 列表加载态
   const [loading, setLoading] = useState(true);
 
+  // 操作类型输入（支持中文，加载前经 resolveActionInput 映射为英文枚举）
   const [action, setAction] = useState('');
+  // 管理员 ID 筛选
   const [adminId, setAdminId] = useState('');
+  // 起始日期（YYYY-MM-DD），加载时转毫秒并作为区间下界
   const [fromDate, setFromDate] = useState('');
+  // 结束日期（YYYY-MM-DD），加载时转毫秒 + 一天以含当天，作为区间上界
   const [toDate, setToDate] = useState('');
 
+  // 审计详情弹窗目标记录
   const [detail, setDetail] = useState<AuditRow | null>(null);
 
+  // 拉取审计日志（服务端分页）：合并各筛选条件；from/to 为时间区间（含当天），action 经中文→英文映射
   const load = useCallback(() => {
     setLoading(true);
     const from = fromDate ? new Date(fromDate).getTime() : undefined;
@@ -118,6 +143,7 @@ export default function AuditLogs() {
       .finally(() => setLoading(false));
   }, [page, pageSize, action, adminId, fromDate, toDate, show]);
 
+  // 仅超管加载数据；依赖 load / isSuper
   useEffect(() => {
     if (isSuper) load();
   }, [load, isSuper]);
@@ -132,10 +158,12 @@ export default function AuditLogs() {
     load();
   };
 
+  // 输入框回车触发筛选
   const handleEnter = (e: any) => {
     if (e.key === 'Enter') handleSearch();
   };
 
+  // 非超级管理员：短路返回无权限提示，不渲染数据区域
   if (!isSuper) {
     return (
       <Box>
@@ -238,6 +266,7 @@ export default function AuditLogs() {
   );
 }
 
+// 安全解析审计快照字符串：成功返回对象，失败或非空时回退原始字符串
 function safeParse(s: string | null): any {
   if (!s) return null;
   try {

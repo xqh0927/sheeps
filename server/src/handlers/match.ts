@@ -14,6 +14,7 @@ import { getCorsHeaders } from '../helpers';
 export async function handleMatchRoutes(request: Request, env: Env, path: string, url: URL): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
 
+    // 业务上下文：实时对决采用「客户端轮询 + D1 匹配队列（matchmaking_queue 表）」方案，无长连接；join 入队、status 轮询配对、leave 退队、30s 超时清理
     /**
      * POST /api/match/join — 加入匹配队列（自动配对或等待对手）
      *

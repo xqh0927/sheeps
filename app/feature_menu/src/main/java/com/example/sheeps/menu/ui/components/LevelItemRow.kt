@@ -30,6 +30,22 @@ import com.example.sheeps.theme.ShapeMedium
 import com.example.sheeps.theme.ShapeSmall
 import com.example.sheeps.theme.Text_Disabled_Dark
 
+/**
+ * 单个关卡条目（关卡列表行）。
+ * 展示关卡编号、类型描述（普通/盲阵/封印/休息/地狱）、解锁/锁定状态，
+ * 并提供「开始」与「排行榜」入口。
+ *
+ * @param levelId 关卡编号（从 1 开始）。
+ * @param isUnlocked 是否已解锁；锁定态降低透明度并显示锁图标，点击不触发 [onStart]。
+ * @param onStart 点击卡片（已解锁时）开始该关卡的回调。
+ * @param onShowLeaderboard 点击排行榜图标的回调。
+ *
+ * 说明：
+ * - 无状态（Stateless）组件：所有展示数据来自参数，按压缩放动画由
+ *   [androidx.compose.animation.core.animateFloatAsState] + [androidx.compose.foundation.interaction.MutableInteractionSource]
+ *   驱动，运行于**主线程**。
+ * - 关卡类型描述通过 `remember(levelId)` 记忆化派生，避免每次重组重复计算。
+ */
 @Composable
 fun LevelItemRow(
     levelId: Int,

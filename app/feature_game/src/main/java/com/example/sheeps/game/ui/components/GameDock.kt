@@ -162,6 +162,9 @@ private fun MatchingSlot(
             }
         }
 
+        // 线程边界：animateDpAsState 的动画帧由 Compose 在主线程驱动；
+        // 下方 onGloballyPositioned 为布局期回调（主线程），将各槽位绝对坐标写入外部 MutableMap slotGlobalPositions，
+        // 供卡牌飞入动画读取（⚠️ 该 Map 由父级持有，需保证其生命周期不超本组件，避免卡牌坐标引用滞留）。
         // 2. 绘制卡槽中的实体卡牌，并添加位置滑动动画
         if (containerWidthPx > 0 && state.slotTiles.isNotEmpty()) {
             val containerWidthDp = with(density) { containerWidthPx.toDp() }

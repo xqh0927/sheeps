@@ -92,6 +92,8 @@ fun EndlessWellBoard(
                             )
 
                             LaunchedEffect(Unit) {
+                                // 首帧后将 isInitial 置 false，使后续重组合（如重力下坠）从正确目标位滑动。
+                                // 该一次性协程随组合生命周期自动结束，无泄漏。
                                 isInitial = false
                             }
 

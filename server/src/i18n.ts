@@ -11,8 +11,7 @@ import { Env } from './types';
  *  - 命中缺失时自动回退「基列 / 宽列」原值（resolveI18n 的 fallback），保证零空白；
  *  - 返回给客户端的 JSON 字段名完全不变（name/description/title/content/update_log），
  *    Android 客户端零改动；
- *  - 结果按 `i18n_${module}_${locale}` 缓存到 KV（TTL 300s）；
- *  - ensureI18nSeeded 作为 ETL 二次兜底（migrateSchema 首次部署自动调用）。
+ *  - 结果按 `i18n_${module}_${locale}` 缓存到 KV（TTL 300s）。
  */
 
 /** 系统支持的全部 locale（固定顺序：zh → en → tw → ja → ko） */
@@ -127,20 +126,6 @@ export function resolveI18n(
   return fallback;
 }
 
-// ============ ETL 兜底（ensureI18nSeeded）============
-
-/** 模块级缓存：避免每次冷启动重复扫描 */
-let i18nSeeded = false;
-
-/**
- * 幂等 ETL 兜底（no-op）：宽列已 DROP，不再执行 ETL 播种。
- * 保留函数签名与模块级标志，保持 migrateSchema 调用兼容。
- */
-export async function ensureI18nSeeded(env: Env): Promise<void> {
-  if (i18nSeeded) return;
-  i18nSeeded = true;
-}
-
 // ============ i18n 自动播种（创建实体时自动补全多语言行）============
 
 /**
@@ -186,6 +171,7 @@ export async function seedI18nForEntity(
 
   if (statements.length > 0) {
     try {
+      // DB.batch 在单个事务中原子执行全部 INSERT OR IGNORE，失败整体回滚（不影响主流程）
       await env.DB.batch(statements);
     } catch (e) {
       console.error(`seedI18nForEntity failed for ${module}.${entityId}:`, e);

@@ -24,6 +24,22 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 公告详情对话框（基于 Material [AlertDialog]）。
+ *
+ * 展示单条公告的标题、发布时间（由 [Notice.created_at] 格式化）与正文内容。
+ * 点击"关闭"按钮关闭（经由 [onDismiss]）。
+ *
+ * 触发来源：首页/菜单（MenuScreen）公告列表点击某条公告时弹出。
+ * 本对话框为纯只读展示，不回写 ViewModel。
+ *
+ * 线程约束：[notice] 已在外部加载完成并整体传入，内部不发起网络/IO 请求；
+ * 时间格式化使用 [SimpleDateFormat] 在主线程（UI 线程）即时完成（数据量极小，无性能风险）；
+ * [onDismiss] 在主线程回调。
+ *
+ * @param notice 待展示的公告数据（[Notice]），含 title、created_at、content。
+ * @param onDismiss 关闭对话框的回调（关闭按钮或点击外部/返回键触发）。
+ */
 @Composable
 fun NoticeDetailDialog(
     notice: Notice,

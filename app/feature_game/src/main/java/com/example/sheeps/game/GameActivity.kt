@@ -20,8 +20,20 @@ import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 
 /**
- * 单机游戏模式 Activity。
- * 负责接收外部参数（如关卡ID、携带道具），初始化游戏界面，并处理与 UI 相关的副作用（如振动、音效、弹窗）。
+ * 单机游戏模式 Activity（路由路径 `/game/play`）。
+ *
+ * 负责接收外部参数（如关卡 ID、携带道具 JSON），初始化 Compose 游戏界面，
+ * 并将 GameScreen 的用户操作转发为 [com.example.sheeps.game.state.GameViewIntent]
+ * 交给 [GameViewModel]；同时处理与 UI 相关的副作用（Toast、音效预留、振动、路由跳转）。
+ *
+ * 生命周期职责：
+ * - [initView]：在 `onCreate` 之后由 [BaseActivity] 调用，仅做界面组合构建，
+ *   无需要手动释放的资源。
+ * - [initData]：加载初始关卡并收集 [com.example.sheeps.game.state.GameViewEffect]；
+ *   协程与状态收集均由 Compose / `lifecycleScope` 在销毁时自动取消。
+ *
+ * 线程约束：UI 构建与回调转发均运行于主线程；振动通过
+ * `Context.getSystemService(VIBRATOR_SERVICE)` 局部获取，不持有静态引用。
  */
 @Route(path = "/game/play")
 @dagger.hilt.android.AndroidEntryPoint
@@ -30,12 +42,21 @@ class GameActivity : BaseActivity() {
     private val viewModel: GameViewModel by viewModels()
     private var levelId: Int = 1
 
+    /**
+     * 初始化界面（由 [BaseActivity] 在 onCreate 之后调用）。
+     * 职责：读取 intent 中的关卡参数并构建 Compose 内容；将 GameScreen 的
+     * 各类回调转发为 [com.example.sheeps.game.state.GameViewIntent] 交给 [viewModel]。
+     * ⚠️ 资源释放：本方法仅做组合构建，无需手动释放的资源；
+     * 协程与状态收集由 Compose / lifecycleScope 在销毁时自动取消。
+     */
     override fun initView(savedInstanceState: Bundle?) {
         // 从 intent 中获取关卡 ID，默认为第 1 关
         levelId = intent.getIntExtra("levelId", 1)
 
         setContent {
             SheepsTheme {
+                // 在 Compose 中收集 UI 状态；collectAsState 自动绑定组合生命周期，
+                // 离开界面即停止收集，无泄漏风险
                 val state by viewModel.viewState.collectAsState()
 
                 Surface(
@@ -79,12 +100,22 @@ class GameActivity : BaseActivity() {
         }
     }
 
+    /**
+     * 初始化数据（由 [BaseActivity] 在 initView 之后调用）。
+     * 职责：读取携带道具 JSON 并发送 LoadLevel 意图加载关卡；
+     * 在生命周期范围内收集 [com.example.sheeps.game.state.GameViewEffect]
+     * 副作用（Toast / 音效 / 振动）。
+     * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，onDestroy 时自动取消；
+     * 振动通过 getSystemService 局部获取 Vibrator，不持有静态引用，无泄漏。
+     */
     override fun initData() {
         val carryJson = intent.getStringExtra("carryItemsJson")
         // 发送初始加载关卡意图
         viewModel.sendIntent(GameViewIntent.LoadLevel(levelId, carryJson))
 
         // 在生命周期范围内收集 ViewModel 发出的副作用
+        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消；
+        // viewEffect 为一次性/SharedFlow 副作用流，此处 collect 不会造成泄漏。
         lifecycleScope.launchWhenStarted {
             viewModel.viewEffect.collect { effect ->
                 when (effect) {

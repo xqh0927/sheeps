@@ -57,18 +57,28 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/audit-logs', label: '审计日志', icon: <HistoryIcon />, superOnly: true },
 ];
 
+// 角色 code -> 中文展示名，用于顶栏头像处的角色标签
 const ROLE_LABEL: Record<string, string> = {
   super: '超级管理员',
   operator: '运营',
   readonly: '只读',
 };
 
+/**
+ * 应用骨架布局组件（登录后渲染，由 ProtectedRoute 包裹）。
+ * 职责：顶栏（标题/当前用户/登出）+ 永久左侧抽屉导航 + 业务内容区（<Outlet/>）。
+ *
+ * 数据流向：从 useAuth 读取当前用户与鉴权方法（user / logout / isSuper），
+ * 经 useNavigate / useLocation 完成路由跳转与高亮；会话过期回调由 setSessionExpiredHandler 注入。
+ */
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isSuper } = useAuth();
 
-  // 注册会话过期回调：refresh 失败 -> 清态跳登录
+  // 注册会话过期回调：当 api 层 refresh 失败判定会话过期时调用，
+  // 执行登出并跳登录。依赖 [logout, navigate] 稳定，仅挂载时注册一次；
+  // 注意此处为全局单例回调，无需在 cleanup 中清除（后续注册会覆盖旧 handler）
   useEffect(() => {
     setSessionExpiredHandler(() => {
       logout();
@@ -76,6 +86,7 @@ export default function Layout() {
     });
   }, [logout, navigate]);
 
+  // 顶栏「退出登录」点击：清空登录态并跳转到登录页
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
@@ -115,6 +126,7 @@ export default function Layout() {
         <Toolbar />
         <Box sx={{ overflow: 'auto' }}>
           <List>
+            {/* 按权限过滤：superOnly 项仅超级管理员可见；其余全部角色可见 */}
             {NAV_ITEMS.filter((item) => !item.superOnly || isSuper()).map((item) => (
               <ListItemButton
                 key={item.to}

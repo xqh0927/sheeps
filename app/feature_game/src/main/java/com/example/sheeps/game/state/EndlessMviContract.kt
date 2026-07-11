@@ -66,8 +66,6 @@ sealed interface EndlessViewIntent {
     data class ClickColumn(val col: Int, val tileId: String) : EndlessViewIntent
     /** 使用冻结道具 */
     object UseFreeze : EndlessViewIntent
-    /** 列顶交换（v1.5 预留） */
-    data class SwapColumns(val a: Int, val b: Int) : EndlessViewIntent
     /** 暂停 / 继续（切换） */
     object Pause : EndlessViewIntent
     /** 继续（显式） */

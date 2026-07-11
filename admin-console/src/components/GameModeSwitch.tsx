@@ -13,11 +13,16 @@ export default function GameModeSwitch() {
   const canWrite = useAuth((s) => s.canWrite());
   const { show, Feedback } = useFeedback();
 
+  // 无尽生存模式开关状态（来自服务端配置）
   const [endless, setEndless] = useState(false);
+  // 对战模式开关状态（来自服务端配置）
   const [battle, setBattle] = useState(false);
+  // loading：初始化拉取配置中
   const [loading, setLoading] = useState(true);
+  // saving：开关保存中，防止重复提交并禁用 Switch
   const [saving, setSaving] = useState(false);
 
+  // 拉取游戏模式配置：getGameModes → 回填 endless/battle；失败经 useFeedback 提示
   const load = () => {
     setLoading(true);
     getGameModes()
@@ -29,10 +34,13 @@ export default function GameModeSwitch() {
       .finally(() => setLoading(false));
   };
 
+  // 挂载时拉取一次游戏模式配置；无依赖、无定时器/订阅，无需清理
   useEffect(() => {
     load();
   }, []); // eslint-disable-line
 
+  // 切换开关：校验写权限 → updateConfig(key, 'on'|'off') 写服务端 → 本地乐观更新对应状态；
+  // 失败经 useFeedback 提示，finally 释放 saving
   const toggle = async (key: 'gamemode_endless' | 'gamemode_battle', next: boolean) => {
     if (!canWrite) return;
     setSaving(true);

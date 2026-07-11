@@ -24,11 +24,12 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/send-code' && request.method === 'POST') {
         const body: { phone: string } = await request.json();
+        // 参数校验：手机号必填，缺失返回 400 Bad Request
         if (!body.phone) return new Response(JSON.stringify({ error: '请填写手机号' }), { status: 400, headers: corsHeaders });
 
         // 生成 6 位随机数字验证码
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        // 将验证码写入 login_token 表，并记录当前毫秒级时间戳以实现过期校验
+        // DB：对 login_token 表执行 upsert（INSERT OR REPLACE），以最新验证码与时间戳覆盖该手机号旧记录，供后续登录做 5 分钟过期校验
         await env.DB.prepare('INSERT OR REPLACE INTO login_token (phone, code, created_at) VALUES (?, ?, ?)').bind(body.phone, code, Date.now()).run();
         return new Response(JSON.stringify({ success: true, code }), { headers: corsHeaders });
     }
@@ -45,11 +46,14 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/login' && request.method === 'POST') {
         const body: { phone: string; code: string; device_uuid?: string } = await request.json();
+        // 参数校验：手机号与验证码必须同时存在，缺失返回 400
         if (!body.phone || !body.code) return new Response(JSON.stringify({ error: '请填写手机号和验证码' }), { status: 400, headers: corsHeaders });
 
+        // 业务上下文：以 UTC+8（东八区）计算「今日」日期，用于判断当日是否已签到 / 连续签到天数
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
         // ─── 合并查询：一次 D1 batch 完成所有读操作 ───
+        // 事务/并发：6 条 SELECT 合并为单次 batch 读取，减少往返；读快照用于后续「验证码校验 / 用户资料 / 关卡 / 道具 / 今日签到 / 历史连续天数」判断
         const [codeRecord, userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
             env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone),
             env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
@@ -59,13 +63,14 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) ORDER BY sign_date DESC LIMIT 1').bind(body.phone)
         ]);
 
+        // 参数校验：验证码需「存在且与用户输入一致」且「签发后 5 分钟内」，否则分别返回 400（验证码错误 / 已过期）
         const tokenRecord = codeRecord.results[0] as { code: string; created_at: number } | undefined;
         if (!tokenRecord || tokenRecord.code !== body.code)
             return new Response(JSON.stringify({ error: '验证码错误' }), { status: 400, headers: corsHeaders });
         if (Date.now() - tokenRecord.created_at > 5 * 60 * 1000)
             return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
 
-        // 清除验证码（异步，不阻塞响应）
+        // 清除已用验证码：fire-and-forget 异步删除 login_token 记录，失败静默忽略（.catch 避免未处理异常），不阻塞主流程
         env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
 
         let user = userRow.results[0] as any;
@@ -79,6 +84,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (!user) {
             const uuid = crypto.randomUUID();
             const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
+            // 事务边界：新用户自动注册跨 users / level_unlock / user_items 三表写入，全部放入单 D1 batch 原子提交（要么全成，要么不写）
             const insertQueries = [
                 // 插入用户主表
                 env.DB.prepare('INSERT INTO users (id, phone, username, role, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(uuid, body.phone, defaultUsername, 'user', 0, Date.now()),
@@ -137,7 +143,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             }
         }
 
-        // 生成 Access Token (过期时间 2 小时) 与 Refresh Token (过期时间 30 天)
+        // 签发双 Token：Access Token（2h，常规鉴权用）+ Refresh Token（30d，/refresh 静默续期用）；均经签名，payload 含 userId/phone/type/exp
         const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
         const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
 
@@ -164,7 +170,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const body: { refreshToken: string } = await request.json();
         if (!body.refreshToken) return new Response(JSON.stringify({ error: '缺少刷新令牌' }), { status: 400, headers: corsHeaders });
 
-        // 验证 Refresh Token 合法性与过期时间
+        // 校验 Refresh Token：先 verifyJWT 验签并确认未过期（exp），再校验 type==='refresh'，否则返回 401（凭证失效需重新登录）
         const payload = await verifyJWT(body.refreshToken);
         if (!payload || payload.type !== 'refresh') return new Response(JSON.stringify({ error: '登录凭证已过期，请重新登录' }), { status: 401, headers: corsHeaders });
 
@@ -187,6 +193,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/register' && request.method === 'POST') {
         const body: { phone: string; password: string; code: string } = await request.json();
+        // 参数校验：手机号、密码、验证码三者必填，缺失返回 400
         if (!body.phone || !body.password || !body.code)
             return new Response(JSON.stringify({ error: '请填写完整注册信息' }), { status: 400, headers: corsHeaders });
 
@@ -207,13 +214,14 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         // 清除验证码
         env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
 
-        // 哈希密码
+        // 密码安全：单向加盐哈希（hashPassword）后落库 password_hash，明文密码绝不在 DB 中持久化
         const pwHash = await hashPassword(body.password);
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         const uuid = crypto.randomUUID();
         const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
 
+        // 事务边界：密码注册写入 users（含 password_hash）/ level_unlock / user_items 三表，统一单 batch 原子提交
         const insertQueries = [
             env.DB.prepare('INSERT INTO users (id, phone, username, role, points, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
                 .bind(uuid, body.phone, defaultUsername, 'user', 0, pwHash, Date.now()),
@@ -247,6 +255,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/login-password' && request.method === 'POST') {
         const body: { phone: string; password: string } = await request.json();
+        // 参数校验：手机号与密码必填，缺失返回 400
         if (!body.phone || !body.password)
             return new Response(JSON.stringify({ error: '请填写手机号和密码' }), { status: 400, headers: corsHeaders });
 
@@ -264,7 +273,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (!user)
             return new Response(JSON.stringify({ error: '用户不存在' }), { status: 400, headers: corsHeaders });
 
-        // 验证密码
+        // 验证密码：verifyPassword 用同一盐值重算哈希并与存储值比对（恒定时间比较，防时序攻击）
         if (!user.password_hash)
             return new Response(JSON.stringify({ error: '尚未设置密码，请使用验证码登录' }), { status: 400, headers: corsHeaders });
 
@@ -297,6 +306,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      */
     if (path === '/api/auth/reset-password' && request.method === 'POST') {
         const body: { phone: string; code: string; newPassword: string } = await request.json();
+        // 参数校验：手机号、验证码、新密码三者必填，缺失返回 400
         if (!body.phone || !body.code || !body.newPassword)
             return new Response(JSON.stringify({ error: '请填写完整信息' }), { status: 400, headers: corsHeaders });
 
@@ -311,6 +321,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         // 清除验证码
         env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
 
+        // 密码安全：单向加盐哈希后更新 users.password_hash（按手机号定位），明文密码不入 DB
         const pwHash = await hashPassword(body.newPassword);
         await env.DB.prepare('UPDATE users SET password_hash = ? WHERE phone = ?').bind(pwHash, body.phone).run();
 
@@ -326,6 +337,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      * 响应: { hasPassword: boolean }
      */
     if (path === '/api/auth/check-password' && request.method === 'GET') {
+        // 鉴权：校验 Authorization: Bearer <accessToken>，缺失或非法返回 401；随后 verifyJWT 验签并确认 type==='access'
         const authHeader = request.headers.get('Authorization');
         if (!authHeader || !authHeader.startsWith('Bearer '))
             return new Response(JSON.stringify({ error: '未授权，请登录' }), { status: 401, headers: corsHeaders });
@@ -375,6 +387,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         const pwHash = await hashPassword(body.password);
         const newPoints = (user?.points || 0) + 50;
 
+        // 事务边界：设置密码 + 赠送 50 积分 + 写积分流水（source=SET_PASSWORD）合并单 batch 原子提交
         await env.DB.batch([
             env.DB.prepare('UPDATE users SET password_hash = ?, points = ? WHERE id = ?').bind(pwHash, newPoints, payload.userId),
             env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)')

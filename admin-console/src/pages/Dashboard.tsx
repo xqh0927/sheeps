@@ -70,12 +70,31 @@ const GROUPS: StatGroupDef[] = [
   },
 ];
 
+/**
+ * 数据概览（Dashboard）页面组件。
+ *
+ * 路由：通常路径 `/dashboard`，登录后默认落地页。
+ * 权限要求：任意已登录管理员均可访问（只读展示，无写入操作）。
+ * 关键 State：
+ * - `stats`：服务端聚合统计（Stats），初始 null 表示尚未加载。
+ * - `loading`：首屏加载态（控制整体骨架/loading）。
+ * - `refreshing`：手动刷新态（不影响已展示数据的占位，仅控制刷新按钮 loading）。
+ *
+ * 数据来源：依赖 `api/admin.getStats()` 拉取全站聚合指标，前端按 GROUPS 配置分组渲染。
+ */
 export default function Dashboard() {
+  // 服务端聚合统计结果；null 表示首屏尚未返回
   const [stats, setStats] = useState<Stats | null>(null);
+  // 首屏加载态（loading 且尚无数据时显示整页 loading）
   const [loading, setLoading] = useState(true);
+  // 手动刷新态（用于在右上角按钮展示刷新进度，区别于首屏 loading）
   const [refreshing, setRefreshing] = useState(false);
+  // 全局反馈组件：show() 用于错误提示，Feedback 为挂载节点
   const { show, Feedback } = useFeedback();
 
+  // 首屏加载：组件挂载即拉取统计
+  // 依赖 [show]：仅 feedback 实例变化时重新执行；使用 alive 标志避免组件卸载后的 setState（防止内存泄漏）
+  // 清理函数将 alive 置 false，确保异步回调在卸载后不再更新已卸载组件
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -94,6 +113,7 @@ export default function Dashboard() {
     };
   }, [show]);
 
+  // 手动刷新：复用 getStats 拉取最新数据并替换 stats；刷新期间刷新按钮显示进度
   const handleRefresh = () => {
     setRefreshing(true);
     getStats()

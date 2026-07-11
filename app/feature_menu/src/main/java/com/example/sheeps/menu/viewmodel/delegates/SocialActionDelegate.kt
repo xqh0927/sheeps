@@ -23,7 +23,13 @@ import kotlin.math.max
 
 /**
  * 社交与任务操作逻辑委派类
- * 处理签到、商店兑换、任务领奖、关卡解锁
+ * 处理签到、商店兑换、任务领奖、关卡解锁。
+ *
+ * 持有关系：由 [com.example.sheeps.menu.viewmodel.MenuViewModel] 注入并持有，
+ * 负责社交/任务相关子状态（积分、签到、兑换、任务、关卡解锁）。
+ * 线程边界：公开方法均接收调用方 [CoroutineScope]（MenuViewModel.viewModelScope），
+ * 网络与 DB 操作在挂起函数内自动切 IO；协程随 ViewModel 销毁取消。
+ * 一致性：多处采用「乐观更新 + 失败回滚」策略（见 handleSignIn），保证本地积分与服务端最终一致。
  */
 class SocialActionDelegate @Inject constructor(
     private val apiService: ApiService,
@@ -31,7 +37,12 @@ class SocialActionDelegate @Inject constructor(
     private val localDao: LocalDao
 ) {
     /**
-     * 处理每日签到
+     * 处理每日签到（乐观更新 + 失败回滚）。
+     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
+     * @param onComplete 服务端确认成功后刷新页面的回调。
+     * @param setEffect 派发签到成功/失败 Toast。
+     * 线程边界：本地预扣在主线程（prefs）；[apiService.signIn] 在 IO；
+     * 关键持久化用 [NonCancellable] 包裹以防协程取消导致积分丢失，finally 中未确认则回滚。
      */
     fun handleSignIn(
         scope: CoroutineScope,
@@ -96,7 +107,14 @@ class SocialActionDelegate @Inject constructor(
     }
 
     /**
-     * 处理道具兑换
+     * 处理道具兑换（本地先扣积分与入库，再同步云端）。
+     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
+     * @param shopItemId 商城道具 ID。
+     * @param count 兑换数量。
+     * @param shopItems 当前商城列表（用于按 ID 查找单价与 item_type）。
+     * @param onComplete 云端失败时刷新页面的回调。
+     * @param setEffect 派发兑换成功/失败/积分不足 Toast。
+     * 线程边界：积分校验/扣减与 DB 写入在主线程（prefs）与 IO（Room）；[apiService.exchangeItem] 在 IO。
      */
     fun handleExchangeShopItem(
         scope: CoroutineScope,
@@ -153,7 +171,13 @@ class SocialActionDelegate @Inject constructor(
     }
 
     /**
-     * 处理任务领奖
+     * 处理任务领奖（本地先加分，再同步云端）。
+     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
+     * @param taskId 任务 ID。
+     * @param dailyTasks 当前任务列表（用于定位任务并校验已完成/未领奖）。
+     * @param onComplete 完成后的刷新回调。
+     * @param setEffect 派发领奖成功/失败 Toast。
+     * 线程边界：积分入账与 DB 标记在主线程（prefs）与 IO（Room）；[apiService.claimTaskReward] 在 IO。
      */
     fun handleClaimTask(
         scope: CoroutineScope,
@@ -190,7 +214,12 @@ class SocialActionDelegate @Inject constructor(
     }
 
     /**
-     * 使用积分手动解锁关卡
+     * 使用积分手动解锁关卡（本地先扣积分并解锁，再同步云端）。
+     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
+     * @param levelId 目标关卡 ID，费用按 ID 阶梯计算（2→50，3→100，其余→200）。
+     * @param onComplete 云端失败时刷新回调。
+     * @param setEffect 派发解锁成功/失败/积分不足 Toast。
+     * 线程边界：积分与进度写入在主线程（prefs）与 IO（Room）；[apiService.unlockLevel] 在 IO。
      */
     fun handleUnlockLevelWithPoints(
         scope: CoroutineScope,

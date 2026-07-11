@@ -31,10 +31,15 @@ interface Props {
  */
 export default function ItemIconManager({ open, itemType, initialUrl, onClose, onSaved }: Props) {
   const { show } = useFeedback();
+  // 当前图标 URL（受控），空串表示未上传
   const [url, setUrl] = useState<string>('');
+  // uploading：上传中，禁用操作并展示进度
   const [uploading, setUploading] = useState(false);
+  // saving：保存提交中，防止重复提交并禁用关闭/保存按钮
   const [saving, setSaving] = useState(false);
 
+  // 打开弹窗时预填图标：优先 initialUrl，否则 getItemIcon 拉后端；
+  // 依赖 [open, itemType, initialUrl]；cancelled 标志避免异步回写竞态，清理函数仅置 cancelled=true
   useEffect(() => {
     if (!open) return;
     if (initialUrl) {
@@ -54,6 +59,7 @@ export default function ItemIconManager({ open, itemType, initialUrl, onClose, o
     };
   }, [open, itemType, initialUrl]);
 
+  // 上传图标：拼 R2 key = images/items/{itemType}.png → uploadImage → 回填 url
   const handleUpload = async (file: File) => {
     setUploading(true);
     try {
@@ -70,6 +76,8 @@ export default function ItemIconManager({ open, itemType, initialUrl, onClose, o
     }
   };
 
+  // 保存图标：校验已上传 → saveItemIcon 写入 item_icons 并镜像到商店封面；
+  // 成功回调 onSaved 刷新父列表并关闭
   const handleSave = async () => {
     if (!url) {
       show('请先上传图标', 'warning');

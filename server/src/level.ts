@@ -1,11 +1,28 @@
+/**
+ * 关卡生成模块（服务端）
+ * ======================
+ * 业务位置：当用户请求 `/api/level` 获取关卡布局时，本模块基于 (userId, levelId, seed)
+ * 确定性地生成一份「保证有解」的三维卡牌布局（坐标 + 花色 + 盲盒/封印属性），供客户端渲染与玩法使用。
+ *
+ * 算法对齐（关键）：
+ *  - 全部随机性来自 {@link lcg}（线性同余发生器）。相同 (seed, levelId) 在 Android 客户端与服务端
+ *    生成完全同源、确定性的随机序列，确保客户端预生成与服务端校验一致（防作弊的基石）。
+ *  - 封印解锁阈值 {@link SEAL_UNLOCK_THRESHOLD}、封印层分布、坐标质心归一化策略均与 Android 端
+ *    `GameViewState` 及渲染层逐项对齐（详见 sealed-unlock-mechanism-design.md）。
+ *  - 注意：本文件的 `getDifficultyForLevel` 为「简化档位映射」（L1→1 / L2→2 / 其余→3），
+ *    仅用于决定封印层数等少数阈值；完整 1~100 难度曲线由 `difficulty.ts` 的
+ *    `getDifficultyForLevel` 计算，二者同名但职责不同，调用时勿混淆。
+ */
 import { Point3D, TileData } from './types';
 import { calculateCardCount, isRestLevel } from './difficulty';
 
 /**
- * 根据关卡 ID 获取关卡的基础难度系数
- * 
+ * 关卡基础档位映射（简化版，仅本模块内部用于封印层数等阈值）。
+ * 注意：返回值仅为 1/2/3，与 `difficulty.ts` 中返回 1~100 完整难度系数的
+ * `getDifficultyForLevel` 同名但职责不同，调用时请勿混淆。
+ *
  * @param levelId 关卡 ID
- * @return 难度系数 (1-3)
+ * @return 档位系数 (1-3)
  */
 export function getDifficultyForLevel(levelId: number): number {
   if (levelId === 1) return 1;

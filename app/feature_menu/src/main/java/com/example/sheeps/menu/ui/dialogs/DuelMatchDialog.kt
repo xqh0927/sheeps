@@ -24,6 +24,30 @@ import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 
+/**
+ * 天命对决匹配对话框（基于 Material [AlertDialog]）。
+ *
+ * 进入即自动加入匹配队列，展示旋转的太极动画与匹配状态文案（搜索中/成功/失败/排队）。
+ * 匹配成功显示对手 ID 与对局 ID；失败时提供"重新匹配"按钮；关闭时自动离开队列。
+ *
+ * 触发来源：首页（MenuScreen）点击"天命对决"弹出。
+ * 确认后：匹配状态由 [state]（[MenuViewState]）驱动，匹配成功后的对局进入
+ * 由上层依据 [state.matchedGameId] 跳转，本对话框仅负责匹配生命周期展示与回传。
+ *
+ * 线程约束：状态展示与动画在主线程（UI 线程）。下方的 [LaunchedEffect]、`delay` 等
+ * 均在组合作用域的协程中运行，随 Dialog 关闭自动取消，不泄漏。
+ *
+ * ⚠️ 内存隐患：下方的匹配省略号动画使用 `LaunchedEffect(state.matchStatus)` 内
+ * `while (state.matchStatus == "searching") { delay(500); ... }` 轮询，该协程由组合作用域
+ * 持有，Dialog 关闭即取消；**切勿**改为 `rememberCoroutineScope().launch` 的全局作用域，
+ * 否则需手动在 onDispose 中取消，否则 Dialog 销毁后仍会持续轮询。同时 `onJoin`/`onLeave`
+ * 由上层负责切到 IO/网络线程。
+ *
+ * @param state 菜单视图状态（[MenuViewState]），含 matchStatus、matchedOpponentId、matchedGameId、phone 等。
+ * @param onJoin 进入时自动加入匹配队列的回调。
+ * @param onLeave 对话框销毁时自动离开匹配队列的回调（防止空置对手）。
+ * @param onDismiss 关闭对话框的回调（退出按钮或点击外部触发）。
+ */
 @Composable
 fun DuelMatchDialog(
     state: MenuViewState,

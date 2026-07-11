@@ -39,11 +39,18 @@ enum class UpdateStatus {
  *   val manager = UpdateDownloadManager()
  *   manager.downloadAndInstall(context, apkUrl) { state -> /* 更新 UI */ }
  */
+
+// ⚠️ 内存隐患：本类不持有 Lifecycle，自定义 CoroutineScope 不会自动取消；
+//    调用方必须在界面销毁（onDestroy）时调用 cancel()/cleanup() 以避免泄漏。
 class UpdateDownloadManager {
 
     private val _state = MutableStateFlow(UpdateDownloadState())
     val state: StateFlow<UpdateDownloadState> = _state.asStateFlow()
 
+    // ⚠️ 内存隐患：downloadJob 运行于自定义 CoroutineScope(Dispatchers.IO)，本类不绑定任何生命周期；
+    //    若调用方（Activity/Fragment）未在 onDestroy/onPause 中调用 cancel()/cleanup()，
+    //    协程将持续持有 context 引用并在后台继续下载，造成内存泄漏与无效流量。
+    //    调用方务必在界面销毁时显式取消。
     private var downloadJob: Job? = null
     private var apkFile: File? = null
 
@@ -71,6 +78,8 @@ class UpdateDownloadManager {
         apkFile = File(dir, fileName)
         apkFile?.delete()
 
+        // 线程切换点：以下代码块运行于 Dispatchers.IO 工作线程，负责网络读取与 APK 文件写入；
+        //    进度通过 _state.value 直接赋值（StateFlow 对发射线程无限制）。
         downloadJob = CoroutineScope(Dispatchers.IO).launch {
             var connection: HttpURLConnection? = null
             var output: FileOutputStream? = null
@@ -111,6 +120,7 @@ class UpdateDownloadManager {
                 _state.value = UpdateDownloadState(status = UpdateStatus.Completed, progress = 100)
 
                 // 下载完成后，先检查权限再安装
+                // 线程切换点：下载完成后切回 Dispatchers.Main 主线程，触发 APK 安装流程（需主线程上下文）。
                 withContext(Dispatchers.Main) {
                     tryInstallApk(context)
                 }

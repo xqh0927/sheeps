@@ -1,0 +1,495 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Sheeps API",
+    "version": "1.0.0",
+    "description": "Sheeps 手游后端 API 文档。\n\n**约定**：除明确标注的 GET 接口外，大部分接口的请求体为「加密信封」，结构形如 `{ \"encrypted\": \"<base64>\" }`，由服务端 `decryptRequest` 中间件解密为真实 JSON 后再分发。Swagger 中 requestBody 给出的均为「解密后的真实 JSON 示例」。\n\n**鉴权**：带 `/api/admin/*`、`/api/match/*` 等接口的访问令牌通过 `Authorization: Bearer <token>` 头传递（具体见各接口说明）。"
+  },
+  "tags": [
+    { "name": "auth", "description": "账号与认证" },
+    { "name": "match", "description": "实时匹配队列" },
+    { "name": "user", "description": "用户资料 / 数据同步 / 积分" },
+    { "name": "shop", "description": "商城与积分兑换" },
+    { "name": "task", "description": "每日任务" },
+    { "name": "game", "description": "关卡 / 成绩 / 签到 / 排行榜" },
+    { "name": "system", "description": "公告 / 版本更新检测" },
+    { "name": "admin", "description": "管理后台（需管理员令牌）" }
+  ],
+  "paths": {
+    "/api/auth/send-code": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "发送短信/邮箱验证码",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "phone": "13800000000", "type": "login" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": { "application/json": { "example": { "success": true } } }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "验证码登录/注册（自动注册新用户）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "phone": "13800000000", "code": "123456" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功，返回访问令牌与用户信息",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "token": "<jwt>",
+                  "user": { "id": "uuid", "phone": "13800000000", "nickname": "玩家1234", "points": 0 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login-password": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "密码登录",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "phone": "13800000000", "password": "yourPassword" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": { "application/json": { "example": { "success": true, "token": "<jwt>", "user": {} } } }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "注册账号",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "phone": "13800000000", "code": "123456", "password": "yourPassword" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "重置密码",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "phone": "13800000000", "code": "123456", "password": "newPassword" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/auth/check-password": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "检查当前用户是否已设置密码",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "hasPassword": true } } } }
+        }
+      }
+    },
+    "/api/auth/set-password": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "设置/修改密码",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "password": "newPassword", "oldPassword": "oldPassword(可选)" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "刷新访问令牌",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "token": "<jwt>" } } } }
+        }
+      }
+    },
+    "/api/match/join": {
+      "post": {
+        "tags": ["match"],
+        "summary": "加入实时匹配队列",
+        "requestBody": {
+          "content": { "application/json": { "example": { "mode": "battle" } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "ticket": "queue-id" } } } }
+        }
+      }
+    },
+    "/api/match/status": {
+      "get": {
+        "tags": ["match"],
+        "summary": "轮询匹配状态",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": { "application/json": { "example": { "success": true, "status": "matched", "gameId": "g-123", "wsUrl": "wss://..." } } }
+          }
+        }
+      }
+    },
+    "/api/match/leave": {
+      "post": {
+        "tags": ["match"],
+        "summary": "离开匹配队列",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/user/sync": {
+      "post": {
+        "tags": ["user"],
+        "summary": "端云数据同步（上传本地存档/拉取云端）",
+        "requestBody": {
+          "content": { "application/json": { "example": { "localData": {}, "lastSyncAt": 0 } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "serverData": {} } } } }
+        }
+      }
+    },
+    "/api/user/profile": {
+      "get": {
+        "tags": ["user"],
+        "summary": "获取用户 Profile（积分、昵称、头像等）",
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "user": { "id": "uuid", "nickname": "玩家1234", "points": 120, "avatar_url": null } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/points-history": {
+      "get": {
+        "tags": ["user"],
+        "summary": "积分流水查询",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [], "total": 0 } } } }
+        }
+      }
+    },
+    "/api/user/exchange-history": {
+      "get": {
+        "tags": ["user"],
+        "summary": "兑换记录查询",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      }
+    },
+    "/api/user/rename": {
+      "post": {
+        "tags": ["user"],
+        "summary": "修改昵称",
+        "requestBody": {
+          "content": { "application/json": { "example": { "nickname": "新昵称" } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/user/avatar": {
+      "post": {
+        "tags": ["user"],
+        "summary": "上传头像（multipart/form-data，写入 R2）",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "avatar_url": "https://..." } } } }
+        }
+      }
+    },
+    "/api/avatar/{userId}": {
+      "get": {
+        "tags": ["user"],
+        "summary": "代理读取用户头像（从 R2 返回图片流）",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "图片", "content": { "image/*": { "schema": { "type": "string", "format": "binary" } } } }
+        }
+      }
+    },
+    "/api/shop/items": {
+      "get": {
+        "tags": ["shop"],
+        "summary": "商品列表（分页）",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "keyword", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "list": [], "total": 0, "page": 1, "pageSize": 20 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/shop/exchange": {
+      "post": {
+        "tags": ["shop"],
+        "summary": "积分兑换道具/皮肤",
+        "requestBody": {
+          "content": { "application/json": { "example": { "itemId": "SKIN_xxx", "count": 1 } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "points": 80 } } } }
+        }
+      }
+    },
+    "/api/task/daily": {
+      "get": {
+        "tags": ["task"],
+        "summary": "每日任务列表",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      }
+    },
+    "/api/task/claim": {
+      "post": {
+        "tags": ["task"],
+        "summary": "领取任务奖励",
+        "requestBody": {
+          "content": { "application/json": { "example": { "taskId": "task-1" } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "points": 10 } } } }
+        }
+      }
+    },
+    "/api/level": {
+      "get": {
+        "tags": ["game"],
+        "summary": "获取关卡布局",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "tiles": [] } } } }
+        }
+      }
+    },
+    "/api/level/unlock": {
+      "post": {
+        "tags": ["game"],
+        "summary": "积分解锁关卡",
+        "requestBody": {
+          "content": { "application/json": { "example": { "levelId": 3 } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/score/submit": {
+      "post": {
+        "tags": ["game"],
+        "summary": "提交通关成绩",
+        "requestBody": {
+          "content": { "application/json": { "example": { "levelId": 3, "score": 1200, "stars": 3 } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "bestScore": 1200 } } } }
+        }
+      }
+    },
+    "/api/sign/today": {
+      "post": {
+        "tags": ["game"],
+        "summary": "每日签到",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "points": 5, "streak": 2 } } } }
+        }
+      }
+    },
+    "/api/leaderboard": {
+      "get": {
+        "tags": ["game"],
+        "summary": "排行榜查询",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      }
+    },
+    "/api/leaderboard/daily-popup": {
+      "get": {
+        "tags": ["game"],
+        "summary": "每日弹窗排行榜",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      }
+    },
+    "/api/notice/list": {
+      "get": {
+        "tags": ["system"],
+        "summary": "公告列表",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      }
+    },
+    "/api/app/check-update": {
+      "get": {
+        "tags": ["system"],
+        "summary": "App 版本更新检测",
+        "parameters": [
+          { "name": "versionCode", "in": "query", "schema": { "type": "integer" } },
+          { "name": "platform", "in": "query", "schema": { "type": "string", "enum": ["android", "ios"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "update": { "hasUpdate": false, "forceUpdate": false, "download_url": "", "release_notes": "" },
+                  "game_modes": { "battle": true, "endless": true }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/login": {
+      "post": {
+        "tags": ["admin"],
+        "summary": "管理员登录（无前置鉴权）",
+        "requestBody": {
+          "content": { "application/json": { "example": { "phone": "admin", "password": "****" } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "token": "<admin-jwt>" } } } }
+        }
+      }
+    },
+    "/api/admin/refresh": {
+      "post": {
+        "tags": ["admin"],
+        "summary": "刷新管理员访问令牌",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "token": "<admin-jwt>" } } } }
+        }
+      }
+    },
+    "/api/admin/app-versions": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "应用版本列表（后台）",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "新增/更新应用版本（status=1 即发布）",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "example": { "version_code": 12, "version_name": "1.1.2", "download_url": "https://...", "status": 1, "force_update": 0 }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/admin/app-versions/{code}": {
+      "delete": {
+        "tags": ["admin"],
+        "summary": "撤回指定版本",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    },
+    "/api/admin/notices": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "公告列表（后台）",
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "list": [] } } } }
+        }
+      },
+      "post": {
+        "tags": ["admin"],
+        "summary": "新建公告",
+        "requestBody": {
+          "content": { "application/json": { "example": { "title": "维护通知", "content": "...", "platform": "all" } } }
+        },
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      },
+      "delete": {
+        "tags": ["admin"],
+        "summary": "删除公告（路径带 ?id=）",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+        }
+      }
+    }
+  }
+}

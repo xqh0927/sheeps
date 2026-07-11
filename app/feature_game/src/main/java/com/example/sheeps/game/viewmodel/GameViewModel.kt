@@ -147,6 +147,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 初始化用户信息：读取隐私协议状态、昵称与已解锁关卡，并进入 MENU 或 INIT 状态。运行于主线程。 */
     private fun handleInitUser() {
         val accepted = prefs.isPrivacyAccepted()
         updateState {
@@ -165,6 +166,11 @@ class GameViewModel @Inject constructor(
         handleInitUser()
     }
 
+    /**
+     * 修改昵称并同步至服务端。
+     * 线程边界：本地写入主线程完成，昵称上报网络请求运行在 [viewModelScope] 默认调度器（主线程 IO 挂起）。
+     * 失败仅提示本地已修改，不阻塞流程。
+     */
     private fun handleChangeUsername(newName: String) {
         if (newName.isBlank()) return
         prefs.setUsername(newName)
@@ -199,12 +205,24 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 加载指定关卡数据并初始化本局状态（MVI Intent: [GameViewIntent.LoadLevel]）。
+     *
+     * 线程边界：
+     * - 计时器协程运行在 [viewModelScope]（主线程），每秒更新 `elapsedMs`；
+     * - 道具库存扣减与关卡网络请求运行在 [Dispatchers.IO]（`apiService.getLevel` / `localDao`）；
+     * - 离线回退时改由本地生成器生成可解关卡，避免阻塞 UI。
+     *
+     * @param levelId 目标关卡 ID
+     * @param carryItemsJson 进入关卡前选择的携带道具 JSON（可空）
+     */
     private fun handleLoadLevel(levelId: Int, carryItemsJson: String?) {
         updateState { copy(isLoading = true, currentLevelId = levelId) }
         historyStack.clear()
         levelStartTime = System.currentTimeMillis()
         itemsUsedCount = 0
         carryItemsJsonStr = carryItemsJson
+        // 计时器在 viewModelScope 内启动，VM 销毁时由框架自动取消；先 cancel 旧 Job 防止并发计时器叠加。
         // 启动计时器协程
         tickJob?.cancel()
         tickJob = viewModelScope.launch {
@@ -257,6 +275,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 将加载得到的卡牌写入 State：计算棋盘边界 [BoardBounds]、封印解锁顺序，并切换至 PLAYING 状态。运行于主线程。 */
     private fun updateBoardState(
         tiles: List<Tile>,
         carryMap: Map<String, Int>,
@@ -315,6 +334,12 @@ class GameViewModel @Inject constructor(
         )
     }
 
+    /**
+     * 处理卡槽三消匹配与胜负判定（挂起函数）。
+     * 委托 [GameLogicDelegate.processSlotMatchAndCheckEndGame] 计算消除与门控解锁；
+     * 胜利时计算通关结算积分（含双倍倍率与难度系数）并触发 [ScoreDelegate] 云端提交。
+     * 游戏结束（WON/LOST）时取消计时器 Job。
+     */
     private suspend fun processSlotMatchAndCheckEndGame() {
         val state = currentState
         logicDelegate.processSlotMatchAndCheckEndGame(
@@ -338,6 +363,10 @@ class GameViewModel @Inject constructor(
             updateState { copy(finalScore = computedFinalScore, elapsedMs = elapsedMs) }
 
             scoreDelegate.submitScoreOnline(
+                // ⚠️ 内存隐患：此处每次通关都新建一个「未绑定 viewModelScope」的 CoroutineScope(Dispatchers.IO)。
+                // 该 Scope 没有持有者引用、也从未调用 cancel()，理论上需依赖 submitScoreOnline 内部
+                // scope.launch 自行结束；若后续误在此处长期持有该 Scope，会造成协程泄漏。
+                // 安全建议：改为复用 viewModelScope（VM 销毁时由框架统一取消），避免匿名 Scope 逃逸。
                 CoroutineScope(Dispatchers.IO),
                 currentState.currentLevelId,
                 computedFinalScore,
@@ -352,6 +381,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 复活逻辑：将卡槽前 3 张移入置物架并恢复 PLAYING；仅在 LOST 且仍有复活次数时生效。运行于主线程。 */
     private fun handleRevive() {
         val state = currentState
         if (state.gameStatus != GameStatus.LOST || state.reviveCount <= 0) return
@@ -384,6 +414,7 @@ class GameViewModel @Inject constructor(
         )
     }
 
+    /** 加载关卡排行榜：拉取本地/云端排行榜数据；失败降级为空列表并 Toast 提示。运行于 [viewModelScope]。 */
     private fun handleLoadLeaderboard(levelId: Int) {
         updateState { copy(isLoading = true) }
         viewModelScope.launch {
@@ -407,6 +438,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 将当前棋盘/卡槽/置物架与封印进度快照压入撤销栈（[historyStack]），供 Undo 回退。深拷贝避免引用泄漏。 */
     private fun saveHistoryState() {
         historyStack.add(
             GameHistoryState(
@@ -431,6 +463,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 触发重开流程：在 [Dispatchers.IO] 读取背包库存并打开携带道具选择弹窗。运行于 [viewModelScope]。 */
     private fun handleTriggerRestartFlow() {
         viewModelScope.launch(Dispatchers.IO) {
             val list = localDao.getAllItems()
@@ -445,6 +478,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 调整临时携带道具数量（受库存上限与 0 下限约束）。运行于主线程。 */
     private fun handleUpdateTempCarryItem(itemType: String, change: Int) {
         val currentSelected = currentState.tempCarryItems[itemType] ?: 0
         val stock = currentState.backpackItemStocks[itemType] ?: 0
@@ -461,6 +495,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    /** 确认重开：将临时携带道具序列化为 JSON 并重新 [handleLoadLevel]。运行于主线程。 */
     private fun handleConfirmRestartWithCarry() {
         val carryJson = json.encodeToString<Map<String, Int>>(currentState.tempCarryItems)
         updateState {

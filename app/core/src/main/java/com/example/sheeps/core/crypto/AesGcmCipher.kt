@@ -14,6 +14,8 @@ import javax.crypto.spec.SecretKeySpec
  */
 object AesGcmCipher {
 
+    // 安全提示：AES 密钥以明文硬编码于客户端源码中，逆向可被提取；该方案仅用于“传输层混淆”而非真正的机密保护，
+    // 切勿依赖其保护高敏感数据。如需更强保护应改为服务端下发或基于 Android Keystore 的密钥。
     /** AES-256 共享密钥（HEX 编码，与服务端 crypto.ts 一致） */
     private const val AES_KEY_HEX =
         "a1b2c3d4e5f6a7b8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2"

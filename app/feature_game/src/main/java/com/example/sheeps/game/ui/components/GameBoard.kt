@@ -87,6 +87,8 @@ fun GameBoard(
     ) {
         // 当 boardTiles 引用或 flyingTileIds 变化时重算 visibleTiles
         // flyingTileIds 加入 key 确保动画结束后 flyingTileIds 清空时正确重算
+        // 线程边界：remember 在主线程组合期求值；下方 onGloballyPositioned 为布局期回调（主线程），
+        // 直接写入外部传入的可变 Map tileGlobalPositions，供飞行动画读取屏幕绝对坐标。
         val visibleTiles = remember(state.boardTiles, flyingTileIds) {
             state.boardTiles.filter { tile ->
                 (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) &&
@@ -121,6 +123,9 @@ fun GameBoard(
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .onGloballyPositioned { coords ->
+                                    // ⚠️ 内存隐患提示：tileGlobalPositions 为外部持有的 MutableMap，
+                                    // 此处持续写入卡牌全局坐标。该 Map 由调用方（Screen/父 Composable）拥有并随重组复用，
+                                    // 只要其生命周期不超过棋盘组件即可，避免在长生命周期对象中持有导致卡牌引用滞留。
                                     val pos = coords.positionInRoot()
                                     val prev = tileGlobalPositions[tile.id]
                                     if (prev == null || prev != pos) {

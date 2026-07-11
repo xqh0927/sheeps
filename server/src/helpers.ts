@@ -1,3 +1,18 @@
+/**
+ * @module helpers
+ * @fileoverview 服务端公共工具与鉴权辅助模块。
+ *
+ * 本模块聚合两类能力：
+ * 1. **鉴权与权限守卫**：玩家端 JWT 解析(`getAuthenticatedUser`)、
+ *    管理员三级鉴权(`requireAdmin`)以及写操作/超级操作守卫
+ *    (`assertCanWrite`/`assertSuper`)，是后台所有写接口的共用前置校验。
+ * 2. **通用基础设施**：CORS 头构造、统一错误响应、多语言(i18n)错误映射、
+ *    系统配置 KV 缓存读取、游戏模式开关查询。
+ *
+ * 约定：鉴权类函数返回 `Response` 即表示校验失败，调用方应以
+ * `instanceof Response` 判定并直接透传该响应；返回业务对象则表示鉴权通过。
+ */
+
 import { Env } from './types';
 import { verifyJWT } from './crypto';
 
@@ -116,7 +131,13 @@ export function assertSuper(payload: AdminPayload): Response | null {
 }
 
 /**
- * 国际化辅助：根据请求头的 Accept-Language 决定返回的内容语言后缀
+ * 国际化辅助：根据请求头的 `Accept-Language` 决定返回的内容语言后缀。
+ *
+ * 用于 `translateErrorMessage` 选择错误消息的目标语言。匹配优先级为：
+ * en(英语) > TW/rTW/tw/Hant(繁体中文) > ja(日语) > ko(韩语) > 其它(简体中文)。
+ *
+ * @param request 客户端 HTTP 请求，从中读取 Accept-Language 头
+ * @returns 语言后缀：'en' | 'tw' | 'ja' | 'ko'；默认简体中文返回空串 ''
  */
 export function getLangSuffix(request: Request): string {
   const acceptLang = request.headers.get('Accept-Language') || 'zh';
@@ -128,7 +149,10 @@ export function getLangSuffix(request: Request): string {
 }
 
 /**
- * 错误信息国际化映射翻译表
+ * 错误信息国际化映射翻译表（i18n 数据源）。
+ *
+ * 以简体中文业务文案为 key，映射到 en/tw/ja/ko 四种语言译本；
+ * 由 `translateErrorMessage` 在响应返回前按需查表翻译。
  */
 const ERROR_TRANSLATIONS: Record<string, Record<string, string>> = {
   '请填写手机号': {
@@ -349,6 +373,16 @@ const ERROR_TRANSLATIONS: Record<string, Record<string, string>> = {
   }
 };
 
+/**
+ * 将业务错误消息翻译为指定语言（i18n）。
+ *
+ * 查找 {@link ERROR_TRANSLATIONS} 映射表；若 `lang` 为空（简体中文）或
+ * 未命中目标语言，则原样返回原始错误文案，保证客户端始终能拿到可读信息。
+ *
+ * @param error 原始错误消息（简体中文 key）
+ * @param lang 目标语言后缀，由 `getLangSuffix` 产出（'en'/'tw'/'ja'/'ko' 或 ''）
+ * @returns 翻译后的错误消息；未命中时退回原始 `error`
+ */
 export function translateErrorMessage(error: string, lang: string): string {
   if (!lang) return error; // 默认简体中文，直接返回原信息
   const translations = ERROR_TRANSLATIONS[error];

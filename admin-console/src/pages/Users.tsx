@@ -53,38 +53,84 @@ const ROLES = [
 const ROLE_LABEL: Record<string, string> = Object.fromEntries(ROLES.map((r) => [r.value, r.label]));
 const ADMIN_ROLES = ROLES.filter((r) => r.value !== 'user');
 
+/**
+ * 用户管理（Users）页面组件。
+ *
+ * 路由：通常路径 `/users`。
+ * 权限要求：
+ * - 基础查看：已登录管理员即可。
+ * - 用户写操作（积分/昵称/封禁/移除/资产）：需 `canWrite()`。
+ * - 角色切换、新增管理员：仅超级管理员 `isSuper()` 可操作。
+ *
+ * 关键 State：
+ * - `rows` / `total`：分页用户列表及总数（服务端分页）。
+ * - `page` / `pageSize` / `keyword` / `roleFilter`：检索与分页条件。
+ * - 各 `*Target`：当前操作的用户弹窗目标（积分/改名/资产/移除）。
+ * - `newAdmin*`：新增管理员弹窗表单。
+ * - `skinDefs`：从商城拉取的皮肤定义，用于资产弹窗渲染。
+ *
+ * 数据来源：依赖 listUsers（分页检索）、listShopItems（皮肤定义）、adjustPoints / banUser /
+ * renameUser / deleteUser / updateUserItems / setAccountRole / createAccount 等写接口。
+ */
 export default function Users() {
+  // 写入权限信号
   const canWrite = useAuth((s) => s.canWrite());
+  // 超级管理员信号：控制角色切换与新增管理员入口
   const isSuper = useAuth((s) => s.isSuper());
+  // 全局反馈组件
   const { show, Feedback } = useFeedback();
 
+  // 当前页用户行
   const [rows, setRows] = useState<AdminUserRow[]>([]);
+  // 服务端返回的总用户数（驱动分页器）
   const [total, setTotal] = useState(0);
+  // 当前页码（0 基），传给后端的 page = page + 1
   const [page, setPage] = useState(0);
+  // 每页条数
   const [pageSize, setPageSize] = useState(20);
+  // 已确认的检索关键词（手机号/昵称），变更后触发 reload
   const [keyword, setKeyword] = useState('');
+  // 角色筛选条件（'' 表示全部）
   const [roleFilter, setRoleFilter] = useState('');
+  // 列表加载态
   const [loading, setLoading] = useState(true);
 
+  // 资产（道具/皮肤）弹窗目标用户
   const [assetTarget, setAssetTarget] = useState<AdminUserRow | null>(null);
+  // 资产表单：item_type -> 数量/拥有状态映射
   const [assetForm, setAssetForm] = useState<Record<string, number>>({});
 
+  // 积分调整弹窗目标用户
   const [pointsTarget, setPointsTarget] = useState<AdminUserRow | null>(null);
+  // 积分调整量（正加负减）
   const [pointsAmount, setPointsAmount] = useState('');
+  // 积分调整原因（可选）
   const [pointsReason, setPointsReason] = useState('');
+  // 改名弹窗目标用户
   const [renameTarget, setRenameTarget] = useState<AdminUserRow | null>(null);
+  // 改名表单值
   const [renameValue, setRenameValue] = useState('');
+  // 移除用户二次确认弹窗目标
   const [removeTarget, setRemoveTarget] = useState<AdminUserRow | null>(null);
+  // 提交中态：统一禁用所有写操作按钮，防止重复提交
   const [busy, setBusy] = useState(false);
 
+  // 新增管理员弹窗开关
   const [newAdminOpen, setNewAdminOpen] = useState(false);
+  // 新增管理员表单：手机号
   const [newAdminPhone, setNewAdminPhone] = useState('');
+  // 新增管理员表单：角色（默认运营）
   const [newAdminRole, setNewAdminRole] = useState('operator');
+  // 新增管理员表单：初始密码（空则后端随机生成）
   const [newAdminPwd, setNewAdminPwd] = useState('');
 
+  // 可配置皮肤定义列表（来自商城），驱动资产弹窗皮肤开关
   const [skinDefs, setSkinDefs] = useState<{ type: string; label: string }[]>([]);
+  // 皮肤定义加载态
   const [skinsLoading, setSkinsLoading] = useState(true);
 
+  // 拉取用户列表（服务端分页）：依赖页码/页大小/关键词/角色筛选，任一变化即重新检索
+  // useCallback 缓存，供 useEffect 与主检索动作复用，避免无效重建
   const load = useCallback(() => {
     setLoading(true);
     listUsers(page + 1, pageSize, keyword.trim(), roleFilter)
@@ -96,10 +142,13 @@ export default function Users() {
       .finally(() => setLoading(false));
   }, [page, pageSize, keyword, roleFilter, show]);
 
+  // 页面挂载及依赖变化时重新加载列表
   useEffect(() => {
     load();
   }, [load]);
 
+  // 拉取皮肤定义：组件挂载即请求一次（仅取 SKIN_ 前缀商品并清洗名称）
+  // alive 标志防止卸载后 setState；清理函数将其置 false 以避免内存泄漏
   useEffect(() => {
     let alive = true;
     setSkinsLoading(true);
@@ -119,6 +168,7 @@ export default function Users() {
     return () => { alive = false; };
   }, []);
 
+  // 积分调整：校验非零数值后调用 adjustPoints（reason 可选），成功刷新列表
   const handleAdjust = async () => {
     if (!pointsTarget) return;
     const amount = Number(pointsAmount);
@@ -141,6 +191,7 @@ export default function Users() {
     }
   };
 
+  // 封禁/解封：调用 banUser 并在成功后刷新列表（无 busy 锁，操作轻量且幂等）
   const handleBan = async (row: AdminUserRow, banned: boolean) => {
     try {
       await banUser(row.id, banned);
@@ -151,6 +202,7 @@ export default function Users() {
     }
   };
 
+  // 移除用户：二次确认后调用 deleteUser（硬删除，不可恢复），成功后刷新
   const handleRemove = async () => {
     if (!removeTarget) return;
     setBusy(true);
@@ -166,6 +218,7 @@ export default function Users() {
     }
   };
 
+  // 改名：校验非空后调用 renameUser，成功后刷新
   const handleRename = async () => {
     if (!renameTarget || !renameValue.trim()) return;
     setBusy(true);
@@ -182,6 +235,7 @@ export default function Users() {
     }
   };
 
+  // 打开资产弹窗：拉取用户当前背包，并以 PROPS_DEFINITIONS + skinDefs 为骨架初始化表单（默认 0）
   const handleOpenAssets = async (user: AdminUserRow) => {
     setAssetTarget(user);
     try {
@@ -199,6 +253,7 @@ export default function Users() {
     }
   };
 
+  // 保存资产：将表单转为 item_type/count 列表调用 updateUserItems（全量覆盖背包），成功后刷新
   const handleSaveAssets = async () => {
     if (!assetTarget) return;
     setBusy(true);
@@ -218,6 +273,7 @@ export default function Users() {
     }
   };
 
+  // 新增管理员：仅超管可见入口；调用 createAccount，密码留空则后端随机生成
   const handleCreateAdmin = async () => {
     if (!newAdminPhone.trim()) return;
     setBusy(true);
@@ -309,6 +365,7 @@ export default function Users() {
                     <TableCell>{r.username}</TableCell>
                     <TableCell>{r.points}</TableCell>
                     <TableCell>
+                      {/* 角色单元格：超管可下拉切换（调用 setAccountRole），其余用户仅以只读 Chip 展示 */}
                       {isSuper ? (
                         <TextField
                           select

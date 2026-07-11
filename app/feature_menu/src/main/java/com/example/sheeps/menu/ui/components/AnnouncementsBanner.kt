@@ -44,6 +44,19 @@ import com.example.sheeps.theme.ShapeMedium
 import com.example.sheeps.theme.ShapeSmall
 import kotlinx.coroutines.delay
 
+/**
+ * 系统公告轮播横幅（Ticker）。
+ * 取最新两条公告，每 4 秒自动切换一次并带滑入/淡出转场；点击跳转公告列表页。
+ *
+ * @param notices 公告列表（[com.example.sheeps.data.model.Notice]），由调用方（Screen/ViewModel）提供。
+ * @param onClick 点击横幅跳转到公告列表页的回调。
+ *
+ * 说明：
+ * - 无状态（Stateless）组件，展示数据来自 [notices]，交互通过 [onClick] 上抛。
+ * - 自动轮播由 `LaunchedEffect(latestTwo)` 内的 `while(true) { delay(4000) }` 协程驱动。
+ *   ⚠️ 该协程**绑定于组合生命周期**：离开组合（Composable 退出屏幕/页面关闭）时会被自动取消，
+ *   不会泄漏；`delay` 为主线程挂起操作，不阻塞 UI 线程。
+ */
 @Composable
 fun AnnouncementsBanner(
     notices: List<Notice>,
@@ -52,6 +65,8 @@ fun AnnouncementsBanner(
     val latestTwo = remember(notices) { notices.take(2) }
     var currentIndex by remember { mutableIntStateOf(0) }
 
+    // ⚠️ 协程生命周期：该 LaunchedEffect 在 latestTwo 变化时重启；其内部 while(true) 无限循环随组合销毁自动取消，
+    // 不会泄漏。delay(4000) 为主线程挂起，不阻塞 UI。
     LaunchedEffect(latestTwo) {
         if (latestTwo.size > 1) {
             while (true) {

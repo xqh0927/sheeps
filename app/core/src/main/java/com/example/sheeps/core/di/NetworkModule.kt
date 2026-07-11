@@ -88,6 +88,8 @@ object NetworkModule {
         // 4. 双 Token 静默刷新拦截器（带线程同步锁）：
         // 监听 HTTP 401 错误。如果 AccessToken 过期，会在同步锁内挂起并发请求，并使用 RefreshToken 发起静默刷新；
         // 刷新成功后自动保存新 Token，并静默重试原始请求。若刷新失败则强行执行本地 Logout。
+        // 注意：下方 synchronized(this) 锁定的是 NetworkModule 单例对象（进程级全局静态锁），
+        // 并发 401 刷新会在此串行化；仅在 401 时触发且频率低，可接受，但锁内不应执行额外耗时阻塞。
         val tokenRefreshInterceptor = Interceptor { chain ->
             val request = chain.request()
             var response = chain.proceed(request)
@@ -188,6 +190,8 @@ object NetworkModule {
 
                 if (attempt < 3) {
                     try {
+                        // 线程切换点：此代码运行于 OkHttp 拦截器所在的工作线程（Dispatcher 线程池），
+                        // Thread.sleep 会阻塞该工作线程；因重试次数 ≤3 且为后端故障场景，阻塞可接受。
                         Thread.sleep(attempt * 1000L) // 分别等待 1秒、2秒 再次重试
                     } catch (e: InterruptedException) {
                         Thread.currentThread().interrupt()

@@ -24,6 +24,18 @@ import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 /**
  * 对决模式 ViewModel
  * 处理 WebSocket 实时对战逻辑。核心业务分发至 ActionDelegate 和 CommandHandler 实现。
+ *
+ * 生命周期与资源释放：
+ * - [init] 中在 [viewModelScope] 内 `collectLatest`/`collect` 监听 [WebSocketManager.connectionState]
+ *   与 `messageFlow`，这些 Flow 收集随 VM 销毁（`viewModelScope` 取消）自动停止，无独立泄漏风险。
+ * - ⚠️ 内存隐患：[WebSocketManager] 为单例/应用级连接管理，本类未覆写 `onCleared()`，
+ *   WebSocket 仅在用户主动触发 [DuelViewIntent.Leave]（[handleLeave] 内 `wsManager.disconnect()`）时关闭。
+ *   若用户直接返回而不走 Leave 流程，连接可能残留。安全建议：在 `onCleared()` 中补 `wsManager.disconnect()`
+ *   作为兜底，确保 VM 销毁时必然断连。
+ *
+ * 信令协议对齐：本类通过 [sendEliminateCommand]/[sendAttackCommand]/[sendCastSpellCommand]/[sendSystemEvent]
+ * 构造 [GameCommand] 下发，类型与 `CommandType`（ELIMINATE/ATTACK/CAST_SPELL/SYSTEM_EVENT）严格对应服务端对战信令，
+ * 不改变既有协议字段。
  */
 @HiltViewModel
 class DuelViewModel @Inject constructor(
@@ -71,10 +83,24 @@ class DuelViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 初始化对局：写入房间/玩家信息，建立 WebSocket 连接并加载相同种子的关卡。
+     *
+     * 线程边界：
+     * - `wsManager.connect` 在主线程调用，底层 WebSocket 收发在 SDK 自有线程；
+     * - 关卡数据请求运行在 [Dispatchers.IO]，成功/失败均切回主线程更新 State。
+     *
+     * @param gameId 房间 ID
+     * @param playerId 本地玩家 ID
+     * @param levelId 关卡 ID
+     * @param seed 关卡随机种子（双方一致以保证公平）
+     */
     private fun handleInit(gameId: String, playerId: String, levelId: Int, seed: Int) {
         currentLevelId = levelId
         currentGameSeed = seed
         updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, totalTileCount = 0, opponentEliminatedCount = 0) }
+        // ⚠️ 内存隐患：建立 WebSocket 连接；若后续未通过 handleLeave → wsManager.disconnect() 关闭，
+        // 连接会残留（见类文档 onCleared 兜底建议）。
         wsManager.connect(gameId, playerId)
         
         viewModelScope.launch(Dispatchers.IO) {
@@ -108,6 +134,10 @@ class DuelViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 卡槽三消匹配（委托 [DuelActionDelegate.processSlotMatch]）。
+     * 匹配成功后向服务端下发 ELIMINATE 指令并据连击触发 ATTACK；胜利时下发 SYSTEM_EVENT(WIN)。
+     */
     private suspend fun processSlotMatch(board: List<Tile>, slot: List<Tile>, movedOut: List<Tile>) {
         actionDelegate.processSlotMatch(currentState, board, slot, movedOut, ::updateState, ::setEffect,
             onMatchSuccess = { eliminatedIds ->
@@ -118,27 +148,37 @@ class DuelViewModel @Inject constructor(
         )
     }
 
+    // 指令发送：以下方法构造 GameCommand 下发，类型与 server 对战信令协议严格对齐，字段不可随意增删。
     // --- WebSocket 指令发送 ---
 
+    /** 向服务端下发 ELIMINATE 指令：上报本次消除的卡牌 id 与当前连击数（seqId 自增保证消息有序）。 */
     private fun sendEliminateCommand(ids: List<String>) {
         wsManager.sendCommand(GameCommand(currentState.gameId, ++seqId, System.currentTimeMillis(), currentState.playerId, CommandType.ELIMINATE, CommandPayload(tilesEliminated = ids, comboCount = currentState.combo)))
     }
 
+    /** 向服务端下发 ATTACK 指令：对对手施加封印干扰（SEALED）。连击每满 3 次由 [processSlotMatch] 触发。 */
     private fun sendAttackCommand() {
         wsManager.sendCommand(GameCommand(currentState.gameId, ++seqId, System.currentTimeMillis(), currentState.playerId, CommandType.ATTACK, CommandPayload(obstacleType = "SEALED")))
         setEffect(DuelViewEffect.ShowToast(getLocalizedString("发动攻击！", "Attacking!", "發動攻擊！", "攻撃！", "공격!")))
     }
 
+    /** 向服务端下发 CAST_SPELL 指令：广播本玩家的恶搞/诅咒大招类型。 */
     private fun sendCastSpellCommand(spellType: String) {
         wsManager.sendCommand(GameCommand(currentState.gameId, ++seqId, System.currentTimeMillis(), currentState.playerId, CommandType.CAST_SPELL, CommandPayload(spellType = spellType)))
     }
 
+    /** 向服务端下发 SYSTEM_EVENT 指令（如 WIN / OPPONENT_QUIT 等状态同步）。 */
     private fun sendSystemEvent(msg: String) {
         wsManager.sendCommand(GameCommand(currentState.gameId, ++seqId, System.currentTimeMillis(), currentState.playerId, CommandType.SYSTEM_EVENT, CommandPayload(systemMessage = msg)))
     }
 
+    /** 重开对局：复用当前房间与种子重新 [handleInit]。 */
     private fun handleRestart() = handleInit(currentState.gameId, currentState.playerId, currentLevelId, currentGameSeed)
 
+    /**
+     * 离开房间：先下发 OPPONENT_QUIT 系统事件，短暂延迟后 [WebSocketManager.disconnect] 断开连接并退出界面。
+     * 这是当前唯一的 WebSocket 主动关闭点（见类文档内存隐患说明）。
+     */
     private fun handleLeave() {
         viewModelScope.launch {
             sendSystemEvent("OPPONENT_QUIT")

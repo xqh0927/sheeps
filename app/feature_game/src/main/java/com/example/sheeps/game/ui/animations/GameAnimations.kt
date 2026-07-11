@@ -11,6 +11,12 @@ import androidx.compose.ui.unit.dp
 /**
  * 羊了个羊 游戏动画工具类 (GameAnimations)
  * 统一管理和复用游戏中棋盘震动、卡牌飞行、卡牌被锁抖动、高亮呼吸、点击按压反馈等所有动效。
+ *
+ * 线程边界：
+ * - 挂起式一阶执行器（run*Animation）必须在协程中调用，通常位于 Composable 的 `LaunchedEffect`
+ *   （组合作用域）内，因此其动画帧回调运行在组合所属的主线程调度器上，VM 销毁/组件离屏时自动取消；
+ * - `@Composable` 状态动画辅助函数（remember*）直接返回由 Compose 主线程驱动的 `State<Float>`，
+ *   无独立线程切换。
  */
 object GameAnimations {
 

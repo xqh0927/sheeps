@@ -21,11 +21,22 @@ import com.example.sheeps.ui.components.SheepsTopAppBar
 
 /**
  * 无尽生存模式主界面。
- * 组装 HUD + 6 列棋盘 + 卡槽；showResult 时弹出结算。
+ * 组装 HUD（[com.example.sheeps.game.ui.components.EndlessHud]）+ 6 列棋盘
+ * （[com.example.sheeps.game.ui.components.EndlessWellBoard]）+ 卡槽
+ * （[com.example.sheeps.game.ui.components.EndlessDock]）；当 [EndlessViewState.showResult]
+ * 为 true 时弹出结算对话框（[com.example.sheeps.game.ui.components.EndlessResultDialog]）。
  *
  * effect（toast / sound / vibrate / exit）由 Activity 处理，Screen 不处理。
  *
- * @param state 当前状态
+ * 重组注意点：[state] 变化即触发重组；`Scaffold` 的 `paddingValues` 由
+ * Compose 在状态栏/导航栏测量后提供，无需手动处理。
+ *
+ * 线程约束：Composable 运行于主线程；所有点击通过 [onIntent] 即时转发给
+ * ViewModel，不在 Screen 内做耗时/IO 操作。
+ * ⚠️ 内存隐患：回调 [onIntent] 由 Activity 持有，本 Screen 不捕获额外
+ * Activity/Context 引用；结算弹窗仅在 `showResult` 时组合，关闭后随之销毁。
+ *
+ * @param state 当前无尽模式视图状态
  * @param onIntent 意图分发（直接转给 ViewModel.sendIntent）
  */
 @Composable

@@ -43,6 +43,16 @@ import javax.inject.Inject
  * 菜单主界面 ViewModel
  * 负责状态流转、核心业务调度。具体业务逻辑已委派至各 Delegate 实现，保持此类简洁。
  */
+
+/**
+ * MVI 架构与持有关系说明：
+ * - State：[MenuViewState] 为单一不可变状态源，所有变更均通过 [updateState]（复制式 copy）完成；
+ * - Intent：[MenuViewIntent]，UI 事件统一在 [handleIntent] 中按密封类型分发；
+ * - Effect：[MenuViewEffect]，一次性副作用（弹窗 / 导航）通过 [setEffect] 派发，不进入状态树。
+ * 认证 / 社交 / 匹配等子状态逻辑分别委派给 AuthDelegate / SocialActionDelegate / MatchmakingDelegate，
+ * 三者由 Hilt 注入并由本 ViewModel 持有，复用同一 viewModelScope。
+ * 注意：注入的 context 标注 @ApplicationContext，为 Application 级 Context，不持有 Activity/View 引用，无内存泄漏风险。
+ */
 @HiltViewModel
 class MenuViewModel @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext
@@ -60,8 +70,12 @@ class MenuViewModel @Inject constructor(
     private val matchmakingDelegate: MatchmakingDelegate
 ) : BaseMviViewModel<MenuViewState, MenuViewIntent, MenuViewEffect>(MenuViewState()) {
 
+    // 暂存登录响应，供存档冲突对话框「解决冲突」时回放；为 ViewModel 级字段且仅持有数据对象，不引用 Activity/View，无泄漏风险。
     private var pendingLoginResponse: LoginResponse? = null
 
+    // ⚠️ 内存隐患：ProcessLifecycleOwner 为进程级生命周期（贯穿整个 App 而非单个 Activity）。
+    // 若忘记在 onCleared 中 removeObserver，该匿名 DefaultLifecycleObserver 会长期持有本 ViewModel 导致泄漏。
+    // 安全：本对象为 ViewModel 内部匿名类，不引用 Activity；且已在 onCleared() 反注册（见下方）。
     /** 切回前台 / 定时静默刷新的进程级生命周期观察者，onCleared 时移除，避免泄漏。 */
     private val shopRefreshObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -84,17 +98,22 @@ class MenuViewModel @Inject constructor(
         setupObservers()
         initData()
         // 切回前台 / 定时（约 30min）静默刷新商城（多语言动态下发 + 本地缓存变更检测）
+        // 线程边界：addObserver / startPeriodicShopRefresh 在主线程调用，内部刷新逻辑经 viewModelScope 切到 IO（Retrofit 挂起函数主安全）。
         ProcessLifecycleOwner.get().lifecycle.addObserver(shopRefreshObserver)
         startPeriodicShopRefresh()
     }
 
     override fun onCleared() {
         super.onCleared()
+        // 资源释放：反注册进程级生命周期观察者 + 取消定时刷新 Job，避免 ViewModel 销毁后仍被引用或空跑协程。
         ProcessLifecycleOwner.get().lifecycle.removeObserver(shopRefreshObserver)
         periodicRefreshJob?.cancel()
     }
 
     private fun setupObservers() {
+        // ⚠️ 内存隐患（已规避）：以下 4 处均通过 viewModelScope.launch { flow.collectLatest { } } 收集本地数据库 / 网络状态流。
+        // viewModelScope 由 ViewModel 生命周期托管，ViewModel 被清除（onCleared）时作用域自动取消，
+        // collectLatest 随之解除收集，不会因匿名收集器持有引用而泄漏；切勿改用 GlobalScope 或自行创建的 CoroutineScope。
         // 观察数据库用户信息变化
         viewModelScope.launch {
             localDao.observeProfile().collectLatest { profile ->
@@ -136,6 +155,12 @@ class MenuViewModel @Inject constructor(
         checkAppUpdateOnce()
     }
 
+    /**
+     * MVI 的 Intent 分发中枢。
+     * 接收 UI 发来的 [MenuViewIntent]，按密封类型路由到对应的私有处理函数或委派给各 Delegate；
+     * 调用线程：与主线程（UI 调用方）一致，内部耗时操作一律通过 viewModelScope.launch 切到后台。
+     * 注意：本方法应保持「只分发、不写业务」，具体状态/副作用变更交给被调用方处理。
+     */
     override fun handleIntent(intent: MenuViewIntent) {
         when (intent) {
             is MenuViewIntent.LoadData -> handleLoadData()
@@ -195,6 +220,12 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    /**
+     * 拉取并聚合首屏 / 刷新所需数据（商城、公告、用户资料、任务、积分/兑换历史）。
+     * 线程边界：外层 viewModelScope.launch 运行于主线程（Dispatchers.Main.immediate），
+     * 内部 apiService.* 与 syncRepository.* 均为 Retrofit/Room 挂起函数（主安全，自动切 IO），无需手动切线程。
+     * 并行策略：通过 coroutineScope + async 并发独立请求，统一 await 后一次性合并写入 State。
+     */
     private fun handleLoadData() {
         if (currentState.shopItems.isEmpty()) updateState { copy(isLoading = true) }
         val isLoggedIn = prefs.isLoggedIn()

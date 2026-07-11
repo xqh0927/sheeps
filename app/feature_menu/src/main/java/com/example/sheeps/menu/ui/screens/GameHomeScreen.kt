@@ -41,6 +41,9 @@ import com.therouter.TheRouter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// ⚠️ 状态隐患：文件级顶层可变变量（相当于静态全局状态），跨 Composable 实例与配置变更（如旋转屏幕）
+// 持续保留，用于「冷启动仅自动滚动一次」的全局标记。它不是 Context/View 引用，故不构成内存泄漏，
+// 但属于隐式共享可变状态，存在多实例/测试环境相互干扰风险；若需更严谨应改为 ViewModel 或 rememberSaveable 状态。
 private var isColdStartAutoScrolled = false
 
 @Composable
@@ -140,6 +143,7 @@ fun GameHomeScreen(
         }
 
         // 匹配成功后自动倒计时并跳转到对决战场
+        // 协程绑定组合生命周期，退出组合即取消；delay 为主线程挂起不阻塞 UI。
         LaunchedEffect(state.matchStatus) {
             if (state.matchStatus == "matched") {
                 delay(1500)
@@ -270,6 +274,7 @@ fun GameHomeScreen(
         val listState = rememberLazyListState()
         var hasAutoScrolled by remember { mutableStateOf(isColdStartAutoScrolled) }
 
+        // 解锁关卡变化时的自动定位滚动：协程随组合生命周期自动取消；内部 launch{} 为子协程同样受作用域约束。
         LaunchedEffect(state.unlockedLevel) {
             val targetIndex = maxOf(0, state.unlockedLevel - 1)
             if (targetIndex < levels.size) {
@@ -352,6 +357,7 @@ fun GameHomeScreen(
             }
 
             // 定位按钮 (仅在当前有已解锁关卡且列表未在动画滚动时响应)
+            // 通过 rememberCoroutineScope 获取与组合生命周期绑定的作用域，FAB 点击触发的一次性滚动在组合销毁时自动取消。
             val coroutineScope = rememberCoroutineScope()
             SmallFloatingActionButton(
                 onClick = {

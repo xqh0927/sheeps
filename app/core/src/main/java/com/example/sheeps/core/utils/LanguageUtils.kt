@@ -17,6 +17,14 @@ import com.example.sheeps.data.model.ShopItem
  * - 游戏内对局（准备对话框 / 道具栏 / 带出选择等）传 null，走本地 R.string 兜底。
  */
 
+/**
+ * 获取商品展示名称（本地化）。
+ * 优先使用后台多语言 [itemI18n]，回退本地 R.string 资源。
+ * @param itemType 商品类型标识（如 "UNDO"）
+ * @param itemI18n 后台接口多语言 Map（key 为大写类型），可空
+ * @return 本地化后的商品名称
+ * ⚠️ 线程约束：@MainThread（@Composable，在组合阶段调用，内部使用 stringResource）
+ */
 @Composable
 fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null): String {
     // 优先：后台接口多语言
@@ -37,6 +45,14 @@ fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null
     }
 }
 
+/**
+ * 获取商品展示描述（本地化）。
+ * 优先使用后台多语言 [itemI18n]，回退本地 R.string 资源；[defaultDesc] 作为最终兜底。
+ * @param itemType 商品类型标识
+ * @param defaultDesc 后台未提供描述时的兜底文本，可空
+ * @param itemI18n 后台接口多语言 Map，可空
+ * ⚠️ 线程约束：@MainThread（@Composable）
+ */
 @Composable
 fun getLocalizedItemDesc(itemType: String, defaultDesc: String?, itemI18n: Map<String, String>? = null): String {
     // 优先：后台接口多语言
@@ -85,6 +101,12 @@ fun getShopItemDesc(item: ShopItem): String {
     return item.description ?: ""
 }
 
+/**
+ * 积分来源描述本地化。按前缀（UNLOCK_LEVEL_/SHOP_REDEEM_/DAILY_TASK_）或固定枚举映射为可读文本。
+ * @param source 积分来源原始标识
+ * @param itemI18n 后台接口多语言 Map（用于 SHOP_REDEEM_ 场景的商品名），可空
+ * ⚠️ 线程约束：@MainThread（@Composable）
+ */
 @Composable
 fun getLocalizedSource(source: String, itemI18n: Map<String, String>? = null): String {
     if (source.startsWith("UNLOCK_LEVEL_")) {
@@ -114,6 +136,11 @@ fun getLocalizedSource(source: String, itemI18n: Map<String, String>? = null): S
     }
 }
 
+/**
+ * 每日任务名本地化。将后台任务标识映射为本地 R.string 文本。
+ * @param taskName 任务标识（如 "PLAY_3_GAMES"）
+ * ⚠️ 线程约束：@MainThread（@Composable）
+ */
 @Composable
 fun getLocalizedTaskName(taskName: String): String {
     return when (taskName.uppercase()) {

@@ -1,3 +1,5 @@
+// 页面 B 组：卡片皮肤管理（实体 = ShopItem 的子集，item_type 以 SKIN_ 开头）
+// 复用 CrudPage，列表由 makeShopItemsFetcher 过滤出皮肤道具
 import { useState, useMemo } from 'react';
 import CrudPage, { FieldDef, ColumnDef } from '../components/CrudPage';
 import { Button, Chip } from '@mui/material';
@@ -14,6 +16,7 @@ import { SKIN_ITEM_TYPES } from '../constants/shopItemTypes';
 
 const GROUP_OPTIONS = SHOP_GROUPS.map((g) => ({ label: g, value: g }));
 
+// 表格列定义：name/item_type/points_price/stock 可排序；image_url 渲染封面，group 渲染系列分组
 const columns: ColumnDef[] = [
   { key: 'name', label: '名称', sortable: true },
   {
@@ -46,6 +49,8 @@ const columns: ColumnDef[] = [
   },
 ];
 
+// 表单字段定义：name/description 为 multilingual → 由 CrudPage 渲染 MultilingualField；
+// image_url 为 image 类型（展示用，实际卡面由 SkinTilesManager 维护），group 为系列分组下拉
 const fields: FieldDef[] = [
   { name: 'name', label: '名称', required: true, multilingual: true },
   { name: 'description', label: '描述', type: 'textarea', multilingual: true },
@@ -56,6 +61,11 @@ const fields: FieldDef[] = [
   { name: 'group', label: '系列分组', type: 'select', options: GROUP_OPTIONS, nullable: true },
 ];
 
+/**
+ * 卡片皮肤管理页。
+ * 复用 CrudPage 承载皮肤（SKIN_* ShopItem）列表与增删改查；
+ * 行内「卡面管理」打开 SkinTilesManager 批量上传 12 张卡面，保存后通过 refreshKey 强制刷新列表。
+ */
 export default function SkinProducts() {
   // fetcher 必须用 useMemo 固定引用，否则 CrudPage 会因依赖变化而无限重拉。
   const fetcher = useMemo(

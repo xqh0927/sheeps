@@ -10,12 +10,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import com.example.sheeps.core.game.SkinConstants
 
+/**
+ * 用户偏好与敏感凭据存储（进程级单例）。
+ *
+ * - 普通偏好使用 MMKV（线程安全，可任意线程读写）；
+ * - 敏感凭据（Token/手机号）懒加载使用 EncryptedSharedPreferences（AndroidX Security，基于 MasterKey 加密存储）。
+ * 由于涉及磁盘 I/O，建议避免在 UI 动画等高频路径同步读取大量数据。
+ */
 @Singleton
 class UserPreferences @Inject constructor(
     private val kv: MMKV,
     @ApplicationContext private val context: Context
 ) {
 
+    // ⚠️ 线程提示：securePrefs 通过 lazy 首次访问时创建，EncryptedSharedPreferences.create 涉及磁盘 I/O，
+    //    若首次访问发生在主线程可能掉帧；建议在后台或冷启动阶段预先触发一次访问。其后续读写为内存映射，开销较低。
     private val securePrefs by lazy {
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         EncryptedSharedPreferences.create(

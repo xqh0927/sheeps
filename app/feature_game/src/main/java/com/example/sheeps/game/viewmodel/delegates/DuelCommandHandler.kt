@@ -24,10 +24,15 @@ import javax.inject.Inject
  */
 class DuelCommandHandler @Inject constructor() {
 
+    /** 法术倒计时协程句柄。每次施法前先 `countdownJob?.cancel()` 防止多法术倒计时叠加；
+     *  该 Job 在传入的 `scope`（[viewModelScope]）中启动，VM 销毁时随 scope 取消。⚠️ 若外部传入匿名未绑定 Scope 则可能泄漏。 */
     private var countdownJob: Job? = null
 
     /**
      * 处理远程指令
+     * （来自对手/服务端，经 DuelViewModel.init 的 messageFlow 收集后转发）按 CommandType 分发：ELIMINATE→对手进度、ATTACK→干扰封印、CAST_SPELL→各类诅咒、
+     * SYSTEM_EVENT→胜负/断线/重连/超时。仅处理非自身 sender 的指令。
+     * 线程边界：回调在主线程执行；涉及延时的清理（如 ATTACK 3s 后清提示）通过 scope.launch { delay } 在 viewModelScope 内完成。
      */
     fun handleRemoteCommand(
         scope: CoroutineScope,

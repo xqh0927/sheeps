@@ -29,6 +29,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * 公告列表页（全屏）。
+ * 以列表形式展示系统公告（标题/类型/时间），点击条目弹出详情对话框。
+ *
+ * @param notices 公告列表 [com.example.sheeps.data.model.Notice]，由调用方（Screen/ViewModel）提供。
+ * @param onBack 返回上一页回调。
+ *
+ * 说明：
+ * - 无状态（Stateless）屏幕组件：数据来自 [notices]，交互（返回、查看详情）通过回调上抛，
+ *   符合单向数据流；列表通过 `LazyColumn` 惰性布局，仅在**主线程**组合与滚动。
+ * - 详情弹窗 [com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog] 由本地 `remember` 状态控制显隐。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoticeListScreen(

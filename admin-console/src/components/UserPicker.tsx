@@ -26,12 +26,19 @@ interface UserHit {
  */
 export default function UserPicker({ value, onChange, initialLabel, label = '用户（手机号/昵称搜索）' }: UserPickerProps) {
   const { show, Feedback } = useFeedback();
+  // 输入框文本（受控），初始回填 initialLabel
   const [query, setQuery] = useState(initialLabel || '');
+  // 搜索结果列表
   const [results, setResults] = useState<UserHit[]>([]);
+  // 下拉面板是否展开
   const [open, setOpen] = useState(false);
+  // loading：搜索请求中
   const [loading, setLoading] = useState(false);
+  // 防抖定时器引用，避免输入过程中频繁请求
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 编辑回填：initialLabel 变化时若当前无输入则补回填显；
+  // 清理函数在卸载时清除未触发的 debounce 定时器，避免内存泄漏
   useEffect(() => {
     if (initialLabel && !query) setQuery(initialLabel);
     return () => {
@@ -39,6 +46,8 @@ export default function UserPicker({ value, onChange, initialLabel, label = '用
     };
   }, [initialLabel]); // eslint-disable-line
 
+  // 执行搜索：空查询直接关闭；否则调 searchUsers（GET /api/admin/users/search）反查用户，
+  // loading 态经 useFeedback 提示错误
   const doSearch = (q: string) => {
     if (!q.trim()) {
       setResults([]);
@@ -55,6 +64,7 @@ export default function UserPicker({ value, onChange, initialLabel, label = '用
       .finally(() => setLoading(false));
   };
 
+  // 输入变化：更新 query、展开面板，并以 300ms 防抖触发 doSearch，避免每次按键都请求
   const handleChange = (e: any) => {
     const v = e.target.value;
     setQuery(v);
@@ -63,6 +73,7 @@ export default function UserPicker({ value, onChange, initialLabel, label = '用
     debounceRef.current = setTimeout(() => doSearch(v), 300);
   };
 
+  // 选中用户：回填展示文本并回调 onChange(user_id, username) 给父组件
   const select = (u: UserHit) => {
     setQuery(`${u.username}（${u.phone}）`);
     setOpen(false);

@@ -12,6 +12,8 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
   const user = useAuth((s) => s.user);
   const location = useLocation();
 
+  // 登录态判定：token 与 user 任一缺失即视为未登录，重定向到登录页，
+  // 并通过 state.from 记录来源路径，便于登录成功后回跳
   if (!token || !user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }

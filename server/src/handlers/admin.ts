@@ -24,6 +24,10 @@ import {
 const PAGE_SIZE_DEFAULT = 20;
 const PAGE_SIZE_MAX = 100;
 
+/**
+ * 解析分页参数：从 query 读取 page / pageSize，约束范围 [1, PAGE_SIZE_MAX]，计算 SQL OFFSET。
+ * 默认值：page=1，pageSize=PAGE_SIZE_DEFAULT(20)。用于在多条列表接口中统一分页。
+ */
 function parsePaging(url: URL): { page: number; pageSize: number; offset: number } {
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
   const pageSize = Math.min(
@@ -33,6 +37,10 @@ function parsePaging(url: URL): { page: number; pageSize: number; offset: number
   return { page, pageSize, offset: (page - 1) * pageSize };
 }
 
+/**
+ * 提取客户端真实 IP：优先 CF-Connecting-IP，其次 x-forwarded-for 首个，缺省 unknown。
+ * 用于审计日志 source_ip 字段落库。
+ */
 function getClientIp(request: Request): string {
   return (
     request.headers.get('CF-Connecting-IP') ||
@@ -137,6 +145,12 @@ async function adminRefresh(request: Request, env: Env): Promise<Response> {
 
 // ============ 用户管理 ============
 
+/**
+ * 列出用户（读操作）。鉴权：requireAdmin。
+ * 业务：动态拼接 WHERE（keyword 模糊匹配 phone/username、role 精确），
+ * 先 COUNT(*) 取 total，再 SELECT 分页（ORDER BY created_at DESC）。
+ * 涉及表：users。响应结构见路由注释。
+ */
 async function listUsers(request: Request, env: Env, admin: AdminPayload, url: URL): Promise<Response> {
   const { page, pageSize, offset } = parsePaging(url);
   const keyword = (url.searchParams.get('keyword') || '').trim();
@@ -164,6 +178,12 @@ async function listUsers(request: Request, env: Env, admin: AdminPayload, url: U
   );
 }
 
+/**
+ * 调整用户积分（写操作，需 assertCanWrite）。
+ * 参数校验：amount 必须为非零 number，否则 400。
+ * 业务：先读取旧 points 作为审计 before，计算 after=before+amount，UPDATE users.points；
+ * 仅 DB 变更成功后落审计 ADJUST_POINTS（含 reason）。涉及表：users。非原子：单条 UPDATE，失败无回滚需求。
+ */
 async function adjustPoints(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -179,6 +199,11 @@ async function adjustPoints(request: Request, env: Env, admin: AdminPayload, id:
   return new Response(JSON.stringify({ success: true, points: after }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 封禁/解封用户（写操作，需 assertCanWrite）。
+ * 参数校验：body.banned 缺省视为封禁(true)。先查旧 is_banned 用于审计 before。
+ * 业务：UPDATE users.is_banned；DB 成功后落 BAN_USER/UNBAN_USER 审计。涉及表：users。
+ */
 async function banUser(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -191,6 +216,11 @@ async function banUser(request: Request, env: Env, admin: AdminPayload, id: stri
   return new Response(JSON.stringify({ success: true, is_banned: banned }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 修改用户昵称（写操作，需 assertCanWrite）。
+ * 参数校验：username 非空否则 400；用户不存在 404。
+ * 业务：读取旧 username 作为审计 before，UPDATE users.username；成功后落 RENAME_USER 审计。涉及表：users。
+ */
 async function renameUser(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -203,6 +233,14 @@ async function renameUser(request: Request, env: Env, admin: AdminPayload, id: s
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 删除用户（高危写操作，super 专属，assertSuper）。
+ * 参数校验：用户不存在 404；双护栏——禁止删管理员账户(403，避免后台锁死)、禁止删当前登录账户(403)。
+ * 事务边界：env.DB.batch 一次性提交 12 条 DELETE，级联清理该用户在
+ * level_unlock/user_items/exchange_record/point_record/sign_record/user_task/leaderboard/
+ * backup_save_*（含子查询）/users/login_token 的全部数据，保证原子性。
+ * 仅 batch 成功后落 DELETE_USER 审计。涉及表：上述多张。
+ */
 async function deleteUser(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertSuper(admin);
   if (guard) return guard;
@@ -250,6 +288,12 @@ interface CrudConfig {
   onCreated?: (entityId: string, body: Record<string, any>) => Promise<void>;
 }
 
+/**
+ * 通用列表（读操作，requireAdmin 已在路由层通过）。
+ * 业务：按 cfg.searchCols 动态拼接关键字 LIKE 的 WHERE（OR 组合），COUNT(*) 取 total，
+ * 再 SELECT * 分页（ORDER BY rowid DESC）。涉及表：cfg.table。
+ * 注意：SELECT * 会带出全列，仅用于后台内部，前端按需取字段。
+ */
 async function genericList(request: Request, env: Env, cfg: CrudConfig, url: URL): Promise<Response> {
   const { page, pageSize, offset } = parsePaging(url);
   const keyword = (url.searchParams.get('keyword') || '').trim();
@@ -268,6 +312,12 @@ async function genericList(request: Request, env: Env, cfg: CrudConfig, url: URL
   return new Response(JSON.stringify({ success: true, list: rows.results, total: totalRow?.c || 0, page, pageSize }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 通用创建（写操作，需 assertCanWrite）。
+ * 业务：剔除 locale 后缀键 → 动态拼 INSERT（双引号包裹列名兼容关键字列）→ 取 lastRowId 作为新 ID；
+ * DB 写入成功后落 CREATE_${action} 审计，再异步回调 cfg.onCreated（如 i18n 播种，失败不阻塞响应）。
+ * 涉及表：cfg.table。非批量：单条 INSERT，成功后审计。
+ */
 async function genericCreate(request: Request, env: Env, admin: AdminPayload, cfg: CrudConfig): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -295,6 +345,11 @@ async function genericCreate(request: Request, env: Env, admin: AdminPayload, cf
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 通用更新（写操作，需 assertCanWrite）。
+ * 业务：先读旧记录作审计 before；剔除 locale 后缀键与 id 列 → 动态拼 UPDATE SET；
+ * 写后重读 after，落 UPDATE_${action} 审计（仅快照 cfg.snapshotCols 字段）。涉及表：cfg.table。
+ */
 async function genericUpdate(request: Request, env: Env, admin: AdminPayload, cfg: CrudConfig, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -316,6 +371,11 @@ async function genericUpdate(request: Request, env: Env, admin: AdminPayload, cf
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 通用删除（写操作，需 assertCanWrite）。
+ * 业务：先读旧记录作审计 before；DELETE BY idCol；成功后落 DELETE_${action} 审计（含 before 快照）。
+ * 涉及表：cfg.table。非级联：仅删本表记录，子表依赖由业务层另行处理。
+ */
 async function genericDelete(request: Request, env: Env, admin: AdminPayload, cfg: CrudConfig, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -327,6 +387,10 @@ async function genericDelete(request: Request, env: Env, admin: AdminPayload, cf
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 字段选择器：从对象中挑选指定列组成新对象，用于审计快照裁剪（仅记录关心的字段）。
+ * cols 为空或 obj 为空时原样返回。
+ */
 function pick(obj: any, cols?: string[]): any {
   if (!obj) return obj;
   if (!cols || cols.length === 0) return obj;
@@ -337,11 +401,21 @@ function pick(obj: any, cols?: string[]): any {
 
 // ============ 配置 ============
 
+/**
+ * 读取全部配置（读操作，requireAdmin）。
+ * 业务：SELECT key,value FROM config。涉及表：config。响应：{ success, list:[{key,value}] }。
+ */
 async function getConfig(request: Request, env: Env): Promise<Response> {
   const rows = await env.DB.prepare('SELECT key, value FROM config').all();
   return new Response(JSON.stringify({ success: true, list: rows.results }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 新增/更新配置（写操作，super 专属，assertSuper）。
+ * 参数校验：key 必填否则 400。
+ * 业务：INSERT ... ON CONFLICT(key) DO UPDATE 实现 upsert；同时删除 SHEEPS_CACHE 中 config_${key}，
+ * 使 getCachedConfig 立即生效（避免脏缓存）；成功后落 UPDATE_CONFIG 审计。涉及表：config + KV。
+ */
 async function updateConfig(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
   const guard = assertSuper(admin);
   if (guard) return guard;
@@ -357,6 +431,12 @@ async function updateConfig(request: Request, env: Env, admin: AdminPayload): Pr
 
 // ============ 统计 ============
 
+/**
+ * 全局运营统计（读操作，requireAdmin）。
+ * 业务：Promise.all 并行聚合 users（总数/今日注册）、exchange_record、point_record(IN 累计)、
+ * notice、banned、shop_items、task、levels 计数；再单独查 leaderboard 中 game_mode=1
+ * （无尽生存）的今日挑战次数与历史最高分。涉及多表，纯读。响应见路由注释。
+ */
 async function getStats(request: Request, env: Env): Promise<Response> {
   const [users, today, exchange, points, notice, banned, shop, task, level] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) as c FROM users').bind().first<{ c: number }>(),
@@ -397,6 +477,9 @@ async function getStats(request: Request, env: Env): Promise<Response> {
   );
 }
 
+/**
+ * 返回今天 00:00:00 的时间戳（毫秒），用于统计/查询中「今日」区间下界。
+ */
 function startOfToday(): number {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -405,11 +488,21 @@ function startOfToday(): number {
 
 // ============ 超级管理员专属：账户管理 ============
 
+/**
+ * 管理员账户列表（读操作，super 专属，assertSuper 已在路由层）。
+ * 业务：SELECT 后台角色账户（role IN super/operator/readonly），按创建时间倒序。涉及表：users。
+ */
 async function listAccounts(request: Request, env: Env): Promise<Response> {
   const rows = await env.DB.prepare("SELECT id, phone, username, role, is_banned, created_at FROM users WHERE role IN ('super','operator','readonly') ORDER BY created_at DESC").all();
   return new Response(JSON.stringify({ success: true, list: rows.results }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 新建管理员账户（写操作，super 专属，assertSuper）。
+ * 参数校验：phone/role 必填(400)；role 须为后台角色(400)；手机号已注册 409。
+ * 业务：密码缺省生成随机强密码（12 位，含大小写+数字+符号）；hashPassword 后 INSERT users(role, points=0)；
+ * 成功后落 CREATE_ADMIN 审计，仅系统生成密码时回传 initialPassword。涉及表：users。
+ */
 async function createAccount(request: Request, env: Env, admin: AdminPayload): Promise<Response> {
   const guard = assertSuper(admin);
   if (guard) return guard;
@@ -428,6 +521,12 @@ async function createAccount(request: Request, env: Env, admin: AdminPayload): P
   return new Response(JSON.stringify({ success: true, id: newId, initialPassword: body.password ? undefined : pwd }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 修改管理员角色（写操作，super 专属，assertSuper）。
+ * 参数校验：role 须为 user/super/operator/readonly(400)；用户不存在 404。
+ * 业务：UPDATE users.role；若把唯一 super 降级，仅审计预警不阻断（防锁死由前端/流程控制）。
+ * 成功后落 UPDATE_ADMIN_ROLE 审计（before/after role）。涉及表：users。
+ */
 async function setAccountRole(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertSuper(admin);
   if (guard) return guard;
@@ -443,6 +542,11 @@ async function setAccountRole(request: Request, env: Env, admin: AdminPayload, i
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 封禁/解封管理员账户（写操作，super 专属，assertSuper）。
+ * 参数校验：body.disabled 缺省视为封禁；仅匹配后台角色账户(404)。
+ * 业务：UPDATE users.is_banned；成功后落 DISABLE_ADMIN 审计。涉及表：users。
+ */
 async function disableAccount(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertSuper(admin);
   if (guard) return guard;
@@ -457,6 +561,12 @@ async function disableAccount(request: Request, env: Env, admin: AdminPayload, i
 
 // ============ 审计日志查看（super 只读） ============
 
+/**
+ * 审计日志查询（只读，super 专属，assertSuper 已在路由层）。
+ * 业务：按 admin_id/action/created_at 范围动态拼 WHERE；分页读 admin_audit_log，
+ * 再用 reassembleAuditSnapshots 按 change_id 重组 before/after 快照（兼容迁移前旧列）。
+ * 涉及表：admin_audit_log + admin_audit_changes。响应见路由注释。
+ */
 async function listAuditLogs(request: Request, env: Env, url: URL): Promise<Response> {
   const { page, pageSize, offset } = parsePaging(url);
   const adminId = url.searchParams.get('admin_id');
@@ -492,11 +602,22 @@ async function listAuditLogs(request: Request, env: Env, url: URL): Promise<Resp
 
 // ============ 用户资产背包管理 ============
 
+/**
+ * 查看用户背包（读操作，requireAdmin）。
+ * 业务：SELECT item_type,count FROM user_items WHERE user_id。涉及表：user_items。
+ */
 async function listUserItems(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const rows = await env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(id).all();
   return new Response(JSON.stringify({ success: true, list: rows.results }), { headers: getCorsHeaders(env) });
 }
 
+/**
+ * 批量设置用户背包（写操作，需 assertCanWrite）。
+ * 参数校验：body.items 须为数组(400)。
+ * 业务：先读旧库存作审计 before；用 items 映射为 INSERT OR REPLACE 语句，
+ * 经 env.DB.batch 原子覆盖 user_items；成功后落 UPDATE_USER_ITEMS 审计（before=旧快照, after=新列表）。
+ * 涉及表：user_items。
+ */
 async function updateUserItems(request: Request, env: Env, admin: AdminPayload, id: string): Promise<Response> {
   const guard = assertCanWrite(admin);
   if (guard) return guard;
@@ -1152,114 +1273,381 @@ async function clearAllCache(request: Request, env: Env): Promise<Response> {
 export async function handleAdminRoutes(request: Request, env: Env, path: string, url: URL): Promise<Response | null> {
   const method = request.method;
 
-  // 无鉴权接口
+  // ============ 无鉴权接口（登录 / 刷新令牌）============
+  /**
+   * POST /api/admin/login （无鉴权）
+   * 用途：管理员账号密码登录，签发 access + refresh 双令牌。
+   * 鉴权：无（公开）。请求参数(body)：phone, password。
+   * 响应：{ success, token(access), refreshToken, user }；失败 400/401。
+   */
   if (path === '/api/admin/login' && method === 'POST') return adminLogin(request, env);
+  /**
+   * POST /api/admin/refresh （无鉴权，使用 refresh token）
+   * 用途：用有效 refresh token 换取新的 access + refresh 令牌对。
+   * 鉴权：校验 refresh token 合法性 + 账号未被封禁 + 角色一致。
+   * 请求参数(body)：refreshToken。响应：{ success, token, refreshToken }；失败 401。
+   */
   if (path === '/api/admin/refresh' && method === 'POST') return adminRefresh(request, env);
 
   // 以下均需要管理员鉴权
   const admin = await requireAdmin(request, env);
   if (admin instanceof Response) return admin;
 
-  // 用户管理
+  // ============ 用户管理 ============
+  /**
+   * GET /api/admin/users
+   * 用途：分页列出前台用户，支持 keyword（手机号/昵称模糊）、role 过滤。
+   * 鉴权：requireAdmin。请求参数(query)：page, pageSize, keyword, role。
+   * 响应：{ success, list:[id,phone,username,points,role,is_banned,avatar_url,created_at], total, page, pageSize }。
+   */
   if (path === '/api/admin/users' && method === 'GET') return listUsers(request, env, admin, url);
+  // 调整用户积分（写操作，需 assertCanWrite）
+  /**
+   * POST /api/admin/users/:id/points
+   * 用途：手动调整某用户积分（正加负减，不能为零）。
+   * 鉴权：requireAdmin + assertCanWrite（readonly→403）。
+   * 请求参数(body)：amount(number, 非零), reason。响应：{ success, points }。
+   * 失败时审计不落库（DB 变更未成功）。
+   */
   let m = path.match(/^\/api\/admin\/users\/([^/]+)\/points$/);
   if (m && method === 'POST') return adjustPoints(request, env, admin, m[1]);
+  // 封禁 / 解封用户（写操作，需 assertCanWrite）
+  /**
+   * POST /api/admin/users/:id/ban
+   * 用途：封禁(banned=true)或解封(banned=false)某用户。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(body)：banned(boolean)。
+   * 响应：{ success, is_banned }。
+   */
   m = path.match(/^\/api\/admin\/users\/([^/]+)\/ban$/);
   if (m && method === 'POST') return banUser(request, env, admin, m[1]);
+  // 重命名（改昵称）/ 删除用户
+  /**
+   * PUT /api/admin/users/:id  —— 修改昵称
+   * 用途：修改用户 username。鉴权：requireAdmin + assertCanWrite。
+   * 请求参数(body)：username(非空)。响应：{ success }。
+   */
   m = path.match(/^\/api\/admin\/users\/([^/]+)$/);
   if (m && method === 'PUT') return renameUser(request, env, admin, m[1]);
+  /**
+   * DELETE /api/admin/users/:id —— 删除用户（高危，super 专属）
+   * 用途：级联删除该用户在多张业务表中的全部数据。
+   * 鉴权：requireAdmin + assertSuper；内含双护栏（禁止删管理员/当前登录账户）。
+   * 事务：env.DB.batch 内一次性提交所有 DELETE，保证级联删除原子性。
+   * 响应：{ success }。
+   */
   if (m && method === 'DELETE') return deleteUser(request, env, admin, m[1]);
+  // 用户背包（道具）查看 / 批量更新
+  /**
+   * GET /api/admin/users/:id/items —— 查看用户背包
+   * 用途：列出 user_items 中该用户的所有道具及数量。鉴权：requireAdmin。
+   * 响应：{ success, list:[item_type, count] }。
+   */
   m = path.match(/^\/api\/admin\/users\/([^/]+)\/items$/);
   if (m && method === 'GET') return listUserItems(request, env, admin, m[1]);
+  /**
+   * POST /api/admin/users/:id/items —— 批量设置背包
+   * 用途：用 items 列表整体覆盖该用户背包（INSERT OR REPLACE）。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(body)：items:[{item_type,count}]。
+   * 事务：env.DB.batch 批量写入；写后落审计（before=旧库存快照）。
+   * 响应：{ success }。
+   */
   if (m && method === 'POST') return updateUserItems(request, env, admin, m[1]);
 
-  // 配置
+  // ============ 配置 ============
+  /**
+   * GET /api/admin/config —— 读取全部配置
+   * 用途：拉取 config 表所有 key/value。鉴权：requireAdmin。
+   * 响应：{ success, list:[{key,value}] }。
+   */
   if (path === '/api/admin/config' && method === 'GET') return getConfig(request, env);
+  /**
+   * POST /api/admin/config —— 新增/更新配置（upsert，super 专属）
+   * 用途：键不存在则插入，存在则覆盖 value；同时删除对应 KV 缓存使其立即生效。
+   * 鉴权：requireAdmin + assertSuper。请求参数(body)：key(必填), value。
+   * 响应：{ success }。
+   */
   if (path === '/api/admin/config' && method === 'POST') return updateConfig(request, env, admin);
 
-  // 统计
+  // ============ 统计 ============
+  /**
+   * GET /api/admin/stats —— 全局运营指标
+   * 用途：并行聚合用户数、今日注册、兑换/积分/公告/封禁/商品/任务/关卡数，
+   * 及无尽生存模式今日挑战次数与历史最高分。鉴权：requireAdmin。
+   * 响应：{ success, users_total, today_signup, exchange_total, points_total, ... }。
+   */
   if (path === '/api/admin/stats' && method === 'GET') return getStats(request, env);
 
-  // 商品
+  // ============ 商品 ============
+  /**
+   * GET /api/admin/shop-items —— 商品列表（分页+关键字）
+   * 用途：genericList 读取 shop_items，支持 name/item_type 关键字搜索。
+   * 鉴权：requireAdmin。响应：{ success, list, total, page, pageSize }。
+   */
   if (path === '/api/admin/shop-items' && method === 'GET') return genericList(request, env, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], searchCols: ['name', 'item_type'] }, url);
+  /**
+   * POST /api/admin/shop-items —— 新建商品
+   * 用途：genericCreate 写 shop_items；创建后回调 seedI18nForEntity 播种 name/description 多语言。
+   * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
+   */
   if (path === '/api/admin/shop-items' && method === 'POST') return genericCreate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], onCreated: (id, body) => seedI18nForEntity(env, 'shop_items', id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
   m = path.match(/^\/api\/admin\/shop-items\/([^/]+)$/);
+  /**
+   * PUT /api/admin/shop-items/:id —— 编辑商品
+   * 用途：genericUpdate 改 shop_items 后额外 purgeShopCache，使 image_url/group 变更生效。
+   * 鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return updateShopItemRoute(request, env, admin, m[1]);
+  /**
+   * DELETE /api/admin/shop-items/:id —— 删除商品
+   * 用途：genericDelete 删除 shop_items 记录并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', idColumn: 'id', snapshotCols: ['item_type', 'points_price', 'stock'] }, m[1]);
 
-  // 图片上传（通用）
+  // ============ 图片上传（通用）============
+  /**
+   * POST /api/admin/upload-image —— 通用图片上传至 R2
+   * 用途：multipart 上传，校验后写 R2 返回公开 URL；key 须以 images/ 开头防越权。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(formData)：file + key/folder。
+   * 响应：{ success, url }。
+   */
   if (path === '/api/admin/upload-image' && method === 'POST') return uploadImage(request, env, admin);
 
-  // 皮肤 12 张卡面
+  // ============ 皮肤 12 张卡面 ============
+  /**
+   * GET /api/admin/skin-tiles/:skinType —— 获取皮肤卡面
+   * 用途：读取 skin_tiles 中该皮肤 12 张卡面（供后台预填）。鉴权：requireAdmin。
+   * 响应：{ success, skin_type, tiles:[{tile_index,image_url}] }。
+   */
   m = path.match(/^\/api\/admin\/skin-tiles\/([^/]+)$/);
   if (m && method === 'GET') return getSkinTiles(request, env, m[1]);
+  /**
+   * PUT /api/admin/skin-tiles/:skinType —— 保存皮肤卡面
+   * 用途：Upsert skin_tiles；tile_index=1 镜像写 shop_items.image_url；purgeShopCache 后落审计。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(body)：tiles:[{tile_index,image_url}]。
+   * 响应：{ success }。
+   */
   if (m && method === 'PUT') return saveSkinTiles(request, env, admin, m[1]);
 
-  // 道具图标（item_icons 真身 + 镜像 image_url）
+  // ============ 道具图标（item_icons 真身 + 镜像 image_url）============
+  /**
+   * GET /api/admin/item-icons/:itemType —— 获取道具图标
+   * 用途：读取 item_icons 中该道具当前图标 URL（供后台预填）。鉴权：requireAdmin。
+   * 响应：{ success, item_type, icon }。
+   */
   m = path.match(/^\/api\/admin\/item-icons\/([^/]+)$/);
   if (m && method === 'GET') return getItemIcon(request, env, m[1]);
+  /**
+   * PUT /api/admin/item-icons/:itemType —— 保存道具图标
+   * 用途：写 item_icons 真身 + 镜像 shop_items.image_url + 刷缓存；URL 须来自本站点 R2。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(body)：image_url。响应：{ success }。
+   */
   if (m && method === 'PUT') return saveItemIcon(request, env, admin, m[1]);
 
-  // 公告
+  // ============ 公告 ============
+  /**
+   * GET /api/admin/notices —— 公告列表（分页+关键字）
+   * 用途：genericList 读 notice，支持 title/content 搜索。鉴权：requireAdmin。
+   * 响应：{ success, list, total, page, pageSize }。
+   */
   if (path === '/api/admin/notices' && method === 'GET') return genericList(request, env, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], searchCols: ['title', 'content'] }, url);
+  /**
+   * POST /api/admin/notices —— 新建公告
+   * 用途：genericCreate 写 notice；回调播种 title/content 多语言。
+   * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
+   */
   if (path === '/api/admin/notices' && method === 'POST') return genericCreate(request, env, admin, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], onCreated: (id, body) => seedI18nForEntity(env, 'notice', id, { title: localeValuesFromBody(body, 'title'), content: localeValuesFromBody(body, 'content') }) });
   m = path.match(/^\/api\/admin\/notices\/([^/]+)$/);
+  /**
+   * PUT /api/admin/notices/:id —— 编辑公告
+   * 用途：genericUpdate 改 notice。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return genericUpdate(request, env, admin, { table: 'notice', action: 'NOTICE', idColumn: 'id', snapshotCols: ['title', 'content', 'type'] }, m[1]);
+  /**
+   * DELETE /api/admin/notices/:id —— 删除公告
+   * 用途：genericDelete 删除 notice 并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'notice', action: 'NOTICE', idColumn: 'id', snapshotCols: ['title', 'content', 'type'] }, m[1]);
 
-  // 任务
+  // ============ 任务 ============
+  /**
+   * GET /api/admin/tasks —— 任务列表（分页+关键字）
+   * 用途：genericList 读 task，支持 name/id 搜索。鉴权：requireAdmin。
+   * 响应：{ success, list, total, page, pageSize }。
+   */
   if (path === '/api/admin/tasks' && method === 'GET') return genericList(request, env, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], searchCols: ['name', 'id'] }, url);
+  /**
+   * POST /api/admin/tasks —— 新建任务
+   * 用途：genericCreate 写 task；回调播种 name/description 多语言（key=body.id）。
+   * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
+   */
   if (path === '/api/admin/tasks' && method === 'POST') return genericCreate(request, env, admin, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], onCreated: (_rowid, body) => seedI18nForEntity(env, 'task', body.id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
   m = path.match(/^\/api\/admin\/tasks\/([^/]+)$/);
+  /**
+   * PUT /api/admin/tasks/:id —— 编辑任务
+   * 用途：genericUpdate 改 task。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return genericUpdate(request, env, admin, { table: 'task', action: 'TASK', idColumn: 'id', snapshotCols: ['target_count', 'points_reward'] }, m[1]);
+  /**
+   * DELETE /api/admin/tasks/:id —— 删除任务
+   * 用途：genericDelete 删除 task 并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'task', action: 'TASK', idColumn: 'id', snapshotCols: ['target_count', 'points_reward'] }, m[1]);
 
-  // 关卡（layout_data 拆表：主表 + level_tiles 子表，读取重组 layout_data 字符串）
+  // ============ 关卡（layout_data 拆表：主表 + level_tiles 子表）============
+  /**
+   * GET /api/admin/levels —— 关卡列表
+   * 用途：分页读 levels，按本页 level_id 批量读 level_tiles 重组 layout_data（存量回退旧列）。
+   * 鉴权：requireAdmin。响应：{ success, list:[level_id,difficulty,created_at,layout_data], total, page, pageSize }。
+   */
   if (path === '/api/admin/levels' && method === 'GET') return listLevels(request, env, url);
+  /**
+   * POST /api/admin/levels —— 新建关卡
+   * 用途：主表写 level_id/difficulty；layout_data 解析后写 level_tiles 子表（旧库 NOT NULL 时回退旧列）。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(body)：level_id, difficulty, layout_data(JSON)。
+   * 响应：{ success, id }。
+   */
   if (path === '/api/admin/levels' && method === 'POST') return createLevel(request, env, admin);
   m = path.match(/^\/api\/admin\/levels\/([^/]+)$/);
+  /**
+   * PUT /api/admin/levels/:levelId —— 更新关卡
+   * 用途：difficulty 改主表；layout_data 变更则先删后插 level_tiles 重写。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return updateLevel(request, env, admin, m[1]);
+  /**
+   * DELETE /api/admin/levels/:levelId —— 删除关卡
+   * 用途：先删 level_tiles 子表再删主表（保持引用一致）。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return deleteLevel(request, env, admin, m[1]);
 
-  // 超级管理员专属
+  // ============ 超级管理员专属：账户管理 ============
+  /**
+   * GET /api/admin/accounts —— 管理员账户列表（super 专属）
+   * 用途：列出 role IN(super,operator,readonly) 的账户。鉴权：requireAdmin + assertSuper。
+   * 响应：{ success, list:[id,phone,username,role,is_banned,created_at] }。
+   */
   if (path === '/api/admin/accounts' && method === 'GET') { const g = assertSuper(admin); if (g) return g; return listAccounts(request, env); }
+  /**
+   * POST /api/admin/accounts —— 新建管理员账户（super 专属）
+   * 用途：为指定手机号/角色创建后台账户；未提供密码则生成随机强密码返回。
+   * 鉴权：requireAdmin + assertSuper。请求参数(body)：phone, role, password?(可选)。
+   * 响应：{ success, id, initialPassword?(仅系统生成时返回) }。
+   */
   if (path === '/api/admin/accounts' && method === 'POST') return createAccount(request, env, admin);
   m = path.match(/^\/api\/admin\/accounts\/([^/]+)\/role$/);
+  /**
+   * PUT /api/admin/accounts/:id/role —— 修改账户角色（super 专属）
+   * 用途：变更 users.role；降级最后一个 super 仅审计不阻止。鉴权：requireAdmin + assertSuper。
+   * 请求参数(body)：role(user|super|operator|readonly)。
+   */
   if (m && method === 'PUT') return setAccountRole(request, env, admin, m[1]);
   m = path.match(/^\/api\/admin\/accounts\/([^/]+)\/disable$/);
+  /**
+   * POST /api/admin/accounts/:id/disable —— 封禁/解封管理员（super 专属）
+   * 用途：设置管理员 is_banned。鉴权：requireAdmin + assertSuper。请求参数(body)：disabled(boolean)。
+   */
   if (m && method === 'POST') return disableAccount(request, env, admin, m[1]);
 
+  /**
+   * GET /api/admin/audit-logs —— 审计日志查看（super 专属，只读）
+   * 用途：分页按 admin_id/action/time 过滤 admin_audit_log；子表快照重组为 before/after。
+   * 鉴权：requireAdmin + assertSuper。响应：{ success, list, total, page, pageSize }。
+   */
   if (path === '/api/admin/audit-logs' && method === 'GET') { const g = assertSuper(admin); if (g) return g; return listAuditLogs(request, env, url); }
 
   // ============ App 版本管理 ============
+  /**
+   * GET /api/admin/app-versions —— 版本列表（分页+关键字，主键 version_code）
+   * 用途：genericList 读 app_version。鉴权：requireAdmin。响应：{ success, list, total, page, pageSize }。
+   */
   if (path === '/api/admin/app-versions' && method === 'GET')
     return genericList(request, env, { table: 'app_version', action: 'APP_VERSION', idColumn: 'version_code', snapshotCols: ['version_name', 'status'], searchCols: ['version_name'] }, url);
+  /**
+   * POST /api/admin/app-versions —— 新建版本（自动播种 update_log 多语言）
+   * 用途：写 app_version；status=1 且无 release_time 时补写；回调播种 update_log。鉴权：requireAdmin + assertCanWrite。
+   */
   if (path === '/api/admin/app-versions' && method === 'POST') return createAppVersion(request, env, admin);
   m = path.match(/^\/api\/admin\/app-versions\/([^/]+)$/);
+  /**
+   * PUT /api/admin/app-versions/:code —— 编辑版本
+   * 用途：改 app_version；status 变 1 且 release_time 空时补写发布时间。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return updateAppVersion(request, env, admin, parseInt(m[1], 10));
+  /**
+   * DELETE /api/admin/app-versions/:code —— 删除版本
+   * 用途：genericDelete 删除 app_version 并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'app_version', action: 'APP_VERSION', idColumn: 'version_code', snapshotCols: ['version_name', 'status'] }, m[1]);
 
   // ============ APK 上传（R2）============
+  /**
+   * POST /api/admin/upload-apk —— 上传 APK 安装包（R2）
+   * 用途：校验 .apk 后写 apks/ 前缀，返回 url 供回填 app_version.download_url。
+   * 鉴权：requireAdmin + assertCanWrite。请求参数(formData)：file。响应：{ success, url }。
+   */
   if (path === '/api/admin/upload-apk' && method === 'POST') return uploadApk(request, env, admin);
 
   // ============ 多语言统一管（i18n_strings）============
+  /**
+   * GET /api/admin/i18n —— 多语言列表（不分页，前端聚合）
+   * 用途：按 module/locale/keyword 过滤 i18n_strings，业务模块 enrich entity_label。鉴权：requireAdmin。
+   * 响应：{ success, list, total }。
+   */
   if (path === '/api/admin/i18n' && method === 'GET') return listI18n(request, env, url);
+  /**
+   * POST /api/admin/i18n —— 新增 i18n 键（自动写 updated_at）
+   * 用途：写 i18n_strings。鉴权：requireAdmin + assertCanWrite。请求参数(body)：str_key, locale, module, value。
+   */
   if (path === '/api/admin/i18n' && method === 'POST') return createI18n(request, env, admin);
   m = path.match(/^\/api\/admin\/i18n\/([^/]+)$/);
+  /**
+   * PUT /api/admin/i18n/:id —— 编辑 i18n 值
+   * 用途：写 value + updated_at。鉴权：requireAdmin + assertCanWrite。请求参数(body)：value。
+   */
   if (m && method === 'PUT') return updateI18n(request, env, admin, m[1]);
+  /**
+   * DELETE /api/admin/i18n/:id —— 删除 i18n 键
+   * 用途：genericDelete 删除 i18n_strings 并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'i18n_strings', action: 'I18N', idColumn: 'id', snapshotCols: ['str_key', 'locale', 'module'] }, m[1]);
 
   // ============ 排行榜手动管理 ============
+  /**
+   * GET /api/admin/leaderboard —— 排行榜列表（JOIN users）
+   * 用途：JOIN 取 username，按 score 降序；无尽模式未开启且 game_mode=1 时返回 disabled 空列表。
+   * 鉴权：requireAdmin。响应：{ success, list, total, page, pageSize }（或 disabled 标记）。
+   */
   if (path === '/api/admin/leaderboard' && method === 'GET') return listLeaderboard(request, env, url);
+  /**
+   * POST /api/admin/leaderboard —— 新增排行榜行（手动补录）
+   * 用途：校验 user 存在后写 leaderboard 并补 achieved_at。鉴权：requireAdmin + assertCanWrite。
+   * 请求参数(body)：user_id, level_id, score, clear_time_ms, game_mode。
+   */
   if (path === '/api/admin/leaderboard' && method === 'POST') return createLeaderboardRow(request, env, admin);
   m = path.match(/^\/api\/admin\/leaderboard\/([^/]+)$/);
+  /**
+   * PUT /api/admin/leaderboard/:id —— 改分（仅 score/clear_time_ms/level_id/game_mode）
+   * 用途：手动校分，白名单字段更新。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'PUT') return updateLeaderboardRow(request, env, admin, m[1]);
+  /**
+   * DELETE /api/admin/leaderboard/:id —— 删除排行榜行
+   * 用途：genericDelete 删除 leaderboard 并落审计。鉴权：requireAdmin + assertCanWrite。
+   */
   if (m && method === 'DELETE') return genericDelete(request, env, admin, { table: 'leaderboard', action: 'LEADERBOARD', idColumn: 'id', snapshotCols: ['user_id', 'score'] }, m[1]);
 
   // ============ 用户搜索（反查 id）============
+  /**
+   * GET /api/admin/users/search —— 用户搜索（供 UserPicker 反查 id）
+   * 用途：按手机号/昵称 LIKE 取前 20 条。鉴权：requireAdmin。响应：{ success, list:[id,username,phone] }。
+   */
   if (path === '/api/admin/users/search' && method === 'GET') return searchUsers(request, env, url);
 
   // ============ 清空 KV 缓存 ============
+  /**
+   * POST /api/admin/cache/clear —— 清空 SHEEPS_CACHE KV（super 专属，高危）
+   * 用途：游标遍历删除 KV 全部键，返回删除数量。鉴权：requireAdmin + assertSuper。
+   * 响应：{ success, deleted }。
+   */
   if (path === '/api/admin/cache/clear' && method === 'POST') {
     const g = assertSuper(admin);
     if (g) return g;

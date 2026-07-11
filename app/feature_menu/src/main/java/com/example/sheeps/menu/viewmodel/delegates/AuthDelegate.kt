@@ -19,7 +19,12 @@ import javax.inject.Inject
 
 /**
  * 用户认证逻辑委派类
- * 处理登录、登出、验证码发送、存档冲突解决
+ * 处理登录、登出、验证码发送、存档冲突解决。
+ *
+ * 持有关系：由 [com.example.sheeps.menu.viewmodel.MenuViewModel] 通过 Hilt 注入并持有，
+ * 专门负责认证相关的子状态（登录态、登出、验证码、本地/云端存档冲突）。
+ * 线程边界：所有公开方法均接收调用方传入的 [CoroutineScope]（实为 MenuViewModel.viewModelScope），
+ * 网络请求在挂起函数内自动切到 IO；作用域随 ViewModel 销毁而取消，委派类本身不创建独立协程作用域。
  */
 class AuthDelegate @Inject constructor(
     private val apiService: ApiService,
@@ -28,7 +33,11 @@ class AuthDelegate @Inject constructor(
     private val syncRepository: SyncRepository
 ) {
     /**
-     * 发送短信验证码
+     * 发送短信验证码。
+     * @param scope 调用方协程作用域（MenuViewModel.viewModelScope），退出登录/页面切换时自动取消。
+     * @param phone 手机号，长度非 11 位直接在 UI 线程拦截并回调错误 Effect，不发起请求。
+     * @param setEffect 向 UI 派发一次性副作用（成功 / 失败 Toast）的回调。
+     * 线程边界：参数校验在主线程；[apiService.sendCode] 挂起函数在 IO 线程执行。
      */
     fun handleSendSmsCode(
         scope: CoroutineScope,
@@ -55,7 +64,15 @@ class AuthDelegate @Inject constructor(
     }
 
     /**
-     * 处理登录逻辑
+     * 验证码登录，并检测本地存档与云端的积分/关卡冲突。
+     * @param scope 调用方协程作用域（MenuViewModel.viewModelScope）。
+     * @param phone 手机号（须 11 位）。
+     * @param code 短信验证码（须 6 位）。
+     * @param onSuccess 登录成功且无冲突时的回调，携带 [LoginResponse]。
+     * @param onConflict 本地与云端数据不一致时的回调，参数依次为 (响应, 本地积分, 本地关卡, 云端积分, 云端关卡)。
+     * @param setLoading 控制 UI 加载态的回调。
+     * @param setEffect 派发一次性副作用（校验失败 / 验证码错误 Toast）。
+     * 线程边界：UI 线程做参数校验与 setLoading(true)；[apiService.login] 在 IO 线程。
      */
     fun handleLoginWithCode(
         scope: CoroutineScope,
@@ -97,7 +114,14 @@ class AuthDelegate @Inject constructor(
     }
 
     /**
-     * 解决存档冲突
+     * 解决本地/云端存档冲突。
+     * @param scope 调用方协程作用域（MenuViewModel.viewModelScope）。
+     * @param pendingResponse 之前登录时暂存的 [LoginResponse]，为空则直接返回（无操作）。
+     * @param useLocal true=以本地存档为准并标记 dirty 待同步；false=以云端覆盖本地。
+     * @param onComplete 处理完成（含成功/失败）后的回调，通常用于重新拉取数据。
+     * @param setLoading 控制 UI 加载态。
+     * @param setEffect 派发「本地/云端解决成功」或「解决失败」Toast。
+     * 线程边界：本地 DB 写入与 [syncRepository.syncDirtyData] 在挂起函数内切 IO；finally 中恢复加载态。
      */
     fun handleResolveConflict(
         scope: CoroutineScope,
@@ -183,7 +207,11 @@ class AuthDelegate @Inject constructor(
     }
 
     /**
-     * 处理登出
+     * 处理登出：清空本地数据库与用户偏好，并重置默认关卡进度。
+     * @param scope 调用方协程作用域（MenuViewModel.viewModelScope）。
+     * @param onComplete 登出完成后的回调（通常由 ViewModel 重新拉取数据刷新 UI）。
+     * @param setEffect 派发登出成功 Toast。
+     * 线程边界：DB 删除/插入在挂起函数内切 IO；末尾 [kotlinx.coroutines.delay] 仅为了让加载指示器有足够渲染时间。
      */
     fun handleLogout(scope: CoroutineScope, onComplete: () -> Unit, setEffect: (MenuViewEffect) -> Unit) {
         scope.launch {

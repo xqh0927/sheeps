@@ -226,6 +226,8 @@ class GameToolDelegate @Inject constructor() {
 
     /**
      * 处理万能牌（太极牌）操作
+     * 线程边界：主流程在主线程；最终通过 scope.launch { processSlotMatch() } 在 viewModelScope 内触发成绩提交与胜负同步，VM 销毁时协程自动取消。
+     * 玩法：优先从置物架/棋盘凑齐与卡槽 2 张同型牌组成消除，再补入卡槽触发匹配。
      */
     fun handleUseJoker(
         scope: CoroutineScope,

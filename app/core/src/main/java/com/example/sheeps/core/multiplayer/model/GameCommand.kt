@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 /**
  * 核心对局同步指令包
  */
+// 该数据类为不可变 @Serializable 模型，可在 WebSocket 工作线程与 UI 主线程之间安全跨线程传递。
 @Serializable
 data class GameCommand(
     val gameId: String,          // 对局唯一 ID

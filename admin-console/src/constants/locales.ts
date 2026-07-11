@@ -7,10 +7,10 @@
  *  - 语言顺序固定 ['zh','en','tw','ja','ko']。
  */
 
-/** 支持的全部 locale（固定顺序） */
+/** 支持的全部 locale（联合类型，固定顺序）。 */
 export type LocaleCode = 'zh' | 'en' | 'tw' | 'ja' | 'ko';
 
-/** 支持的全部 locale（数组形式，用于遍历渲染） */
+/** 支持的全部 locale（数组形式，用于遍历渲染，顺序与后端一致）。 */
 export const I18N_LOCALES: LocaleCode[] = ['zh', 'en', 'tw', 'ja', 'ko'];
 
 /**
@@ -25,7 +25,7 @@ export const LOCALE_SUFFIX: Record<LocaleCode, string> = {
   ko: '_ko',
 };
 
-/** 各 locale 的 UI 展示标签 */
+/** 各 locale 在管理后台 UI 上的展示标签（用于下拉/标签页）。 */
 export const LOCALE_LABELS: Record<LocaleCode, string> = {
   zh: '中文',
   en: 'English',

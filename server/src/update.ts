@@ -1,3 +1,17 @@
+/**
+ * update.ts — App 版本更新检测模块
+ *
+ * 业务上下文：客户端启动时携带 version_code 调用 `/api/app/check-update`
+ * （路由见 handlers/system.ts），服务端据此判定是否需要升级并下发 APK 直链与更新日志。
+ *
+ * 数据源：
+ *  - 优先 GitHub Release（mapGitHubReleaseToUpdate 等纯函数负责映射，由调用方组合）；
+ *  - 兜底「方案 B」：GitHub 不可用时回退 D1 `app_version` 表（getDatabaseAppUpdate），并经 i18n 本地化。
+ *
+ * 性能：GitHub Release 响应与 APK 存在性结果均做内存/KV 缓存，降低外网请求频率与限流风险。
+ *
+ * @module update
+ */
 import { Env, GitHubRelease, GitHubReleaseAsset, AppUpdatePayload, ApkStatus } from './types';
 import { getI18nBatch, resolveI18n } from './i18n';
 
@@ -69,6 +83,15 @@ export async function getDatabaseAppUpdate(env: Env, currentCode: number, lang: 
   return { has_update: false };
 }
 
+/**
+ * 将 GitHub Release 标签（如 `v1.2.3`）解析为数值版本号。
+ *
+ * 编码规则：取 major/minor/patch 三段，映射为 `major*10000 + minor*100 + patch`，
+ * 以便与客户端 version_code 直接做大小比较。
+ *
+ * @param tagName Release 标签名（可带或不带 `v` 前缀）
+ * @returns 数值版本号；格式非法或缺失时返回 null
+ */
 export function parseReleaseVersionCode(tagName?: string): number | null {
   if (!tagName) return null;
 
@@ -86,17 +109,41 @@ export function parseReleaseVersionCode(tagName?: string): number | null {
   return major * 10000 + minor * 100 + patch;
 }
 
+/**
+ * 从 GitHub Release 资源列表中筛选 APK 安装包附件。
+ *
+ * @param assets Release 的 assets 数组（可能为空或 undefined）
+ * @returns 第一个以 `.apk` 结尾且含下载地址的资源；无匹配时返回 null
+ */
 export function findApkAsset(assets?: GitHubReleaseAsset[]): GitHubReleaseAsset | null {
   return assets?.find(asset =>
     Boolean(asset.browser_download_url) && Boolean(asset.name?.toLowerCase().endsWith('.apk'))
   ) ?? null;
 }
 
+/**
+ * 依据 Release 说明文本判定是否为「强制更新」。
+ *
+ * 匹配规则（不区分大小写）：包含 `[force]` / `[force_update]` / `[强制更新]` 标签，
+ * 或 `force_update: true` / `force_update = true` 写法。
+ *
+ * @param body Release 的 body 说明文本
+ * @returns 是否强制更新
+ */
 export function isForceUpdateRelease(body?: string): boolean {
   if (!body) return false;
   return /\[(force|force_update|强制更新|強制更新)\]|force_update\s*[:=]\s*true/i.test(body);
 }
 
+/**
+ * 将单个 GitHub Release 映射为客户端更新负载。
+ *
+ * 过滤规则：跳过 draft 版本；versionCode 必须存在且严格大于 currentCode；且必须存在 APK 资源。
+ *
+ * @param release GitHub Release 对象
+ * @param currentCode 客户端当前数值版本号
+ * @returns 需要更新时返回 has_update=true 的 AppUpdatePayload；否则 has_update=false
+ */
 export function mapGitHubReleaseToUpdate(release: GitHubRelease, currentCode: number): AppUpdatePayload | null {
   if (release.draft) return null;
 
@@ -115,6 +162,10 @@ export function mapGitHubReleaseToUpdate(release: GitHubRelease, currentCode: nu
   };
 }
 
+/**
+ * 清空 APK 存在性的内存缓存。
+ * 当 Release 信息或 APK 直链发生变更时调用，强制下次请求重新探测链接存活状态。
+ */
 export function clearApkCache() {
   apkExistenceCache.clear();
 }

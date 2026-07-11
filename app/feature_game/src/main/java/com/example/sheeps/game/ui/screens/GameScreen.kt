@@ -46,8 +46,41 @@ private data class GameFlyingTile(
 )
 
 /**
- * 游戏主界面
- * 负责游戏逻辑控制、动画管理以及各功能组件的组合
+ * 单机游戏主界面（关卡模式）。
+ *
+ * 负责组合顶部状态栏、封印门控进度条、核心棋盘、底部槽位区、道具交互区，
+ * 并管理卡牌飞行动画层、结算覆盖层、携带道具选择弹窗与全屏加载遮罩。
+ * 所有用户操作通过回调上抛给 [GameActivity] / [com.example.sheeps.game.viewmodel.GameViewModel]。
+ *
+ * 重组注意点：
+ * - [state] 变化即触发重组；[tileGlobalPositions]/[slotGlobalPositions] 用
+ *   `remember { mutableStateMapOf(...) }` 跨重组保留，[flyingTiles]/[flyingTileIds]
+ *   用 `remember { mutableStateOf(...) }` 持有，仅用于视觉过渡。
+ * - 震屏效果由 [androidx.compose.animation.core.Animatable]（[boardShakeOffset]）
+ *   驱动，[prevBombCount] 用于对比炸弹数变化以触发一次动画。
+ *
+ * 线程约束：Composable 运行于主线程。飞行动画通过 `rememberCoroutineScope()`
+ * 启动，组合销毁时自动取消。
+ * ⚠️ 内存隐患：务必使用组合作用域协程（非全局 `CoroutineScope`/`GlobalScope`），
+ * 否则卡牌/震屏动画协程会脱离界面生命周期而泄漏。当前实现为安全用法。
+ *
+ * @param state                     当前游戏视图状态
+ * @param onTileClick              点击可用卡牌的回调（被遮挡/封印牌已拦截）
+ * @param onUseUndo               使用撤销道具
+ * @param onUseMoveOut            使用移出道具
+ * @param onUseShuffle            使用洗牌道具
+ * @param onUseHint               使用提示道具
+ * @param onUseBomb              使用炸弹道具（触发震屏）
+ * @param onUseJoker             使用百搭道具
+ * @param onUseDouble            使用双倍得分道具
+ * @param onRevive               复活
+ * @param onRestart              重新开始本关
+ * @param onBack                 返回首页
+ * @param onNextLevel            进入下一关
+ * @param onShowLeaderboard      打开排行榜
+ * @param onUpdateTempCarryItem  更新临时携带道具数量（默认空实现）
+ * @param onConfirmRestartWithCarry 确认携带道具重开（默认空实现）
+ * @param onDismissCarrySelection  关闭携带选择弹窗（默认空实现）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,6 +120,8 @@ fun GameScreen(
     var prevBombCount by remember { mutableStateOf(state.bombCount) }
     val boardShakeOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
 
+    // ⚠️ 内存/生命周期：下方 LaunchedEffect 仅在 state.bombCount 变化时触发一次，
+    // 内部运行短动画 runBoardShakeAnimation，Compose 会在作用域结束时自动取消，无泄漏风险。
     LaunchedEffect(state.bombCount) {
         if (state.bombCount < prevBombCount) {
             com.example.sheeps.game.ui.animations.GameAnimations.runBoardShakeAnimation(boardShakeOffset)
@@ -168,7 +203,8 @@ fun GameScreen(
                              flyingTileIds = flyingTileIds + tile.id
                              
                              onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
-                             
+
+                             // 启动飞行动画；rememberCoroutineScope 作用域，组合销毁时自动取消，无泄漏风险
                              coroutineScope.launch {
                                  com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
                                  flyingTiles = flyingTiles.filter { it.tileId != tile.id }
@@ -241,7 +277,15 @@ fun GameScreen(
 }
 
 /**
- * 封印门控进度条：显示已消除正常牌数 / 阈值，以及已解锁封印牌数
+ * 封印门控进度条：显示已消除正常牌数 / 阈值，以及已解锁封印牌数。
+ *
+ * 仅当 [GameViewState.sealedOrder] 非空（封印关卡）时由调用方渲染。以
+ * `LinearProgressIndicator` 展示已解锁封印牌占比
+ * （[GameViewState.sealedUnlockedIds].size / [GameViewState.sealedOrder].size）。
+ *
+ * 线程约束：纯 Composable，运行于主线程；读取 state 直接驱动 UI，无需额外线程切换。
+ *
+ * @param state 当前游戏视图状态，提供封印门控相关数据
  */
 @Composable
 private fun SealedGateProgress(state: GameViewState) {
@@ -279,7 +323,20 @@ private fun SealedGateProgress(state: GameViewState) {
 }
 
 /**
- * 飞行卡片动画层组件
+ * 飞行卡片动画层组件。
+ *
+ * 遍历 [flyingTiles]，在 `graphicsLayer` 中根据 [GameFlyingTile.progress]（0→1）
+ * 对 [GameFlyingTile.start]→[GameFlyingTile.end] 做线性插值位移，并以
+ * [screenRootOffset] 折算回屏幕根坐标系；卡牌皮肤由 [currentSkin] 决定。
+ *
+ * 重组注意点：动画由 `Animatable` 驱动，进度变化以高帧率触发本层重组；
+ * 渲染的 `Tile(id="fly_view")` 为占位卡片，不参与游戏逻辑。
+ *
+ * 线程约束：纯 Composable，运行于主线程；位移计算在每一动画帧的主线程完成。
+ *
+ * @param flyingTiles      当前正在飞行的卡牌状态集合
+ * @param currentSkin     当前卡牌皮肤标识
+ * @param screenRootOffset 屏幕根布局的全局偏移，用于坐标折算
  */
 @Composable
 private fun FlyingTilesLayer(
@@ -314,7 +371,11 @@ private fun FlyingTilesLayer(
 }
 
 /**
- * 游戏背景装饰（微光效果）
+ * 游戏背景装饰（微光效果）。
+ *
+ * 在顶部绘制一个以主题主色径向渐变形成的柔光圆，纯静态装饰，不依赖动画或状态。
+ *
+ * 线程约束：纯 Composable，运行于主线程；`Canvas` 绘制在布局/绘制阶段的主线程完成。
  */
 @Composable
 private fun GameBackgroundDecoration() {
@@ -333,7 +394,24 @@ private fun GameBackgroundDecoration() {
 }
 
 /**
- * 游戏结果处理区
+ * 游戏结果处理区。
+ *
+ * 依据 [state.gameStatus] 以 `AnimatedVisibility` 分别呈现胜利覆盖层
+ * （[GameStatus.WON]，提供下一关/排行榜）与失败覆盖层（[GameStatus.LOST]，
+ * 提供复活/重开/返回）。两个覆盖层互斥，仅其一可见。
+ *
+ * ⚠️ 内存/生命周期：`AnimatedVisibility` 的进出场动画由 Compose 内部协程驱动，
+ * 随组件销毁自动取消，无泄漏风险。注意回调（[onBack]/[onRestart]/[onRevive] 等）
+ * 由上层 Activity 提供，切勿在此捕获 Activity/Context 引用。
+ *
+ * 线程约束：纯 Composable，运行于主线程。
+ *
+ * @param state             当前游戏视图状态，决定胜/负覆盖层显隐
+ * @param onBack           返回首页
+ * @param onRestart        重新开始本关
+ * @param onRevive         复活
+ * @param onNextLevel      进入下一关
+ * @param onShowLeaderboard 打开排行榜
  */
 @Composable
 private fun GameResultSection(

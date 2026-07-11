@@ -1,18 +1,24 @@
+// 页面 B 组：App 版本管理（实体 = AppVersion，整数主键 version_code）
+// 列表/创建/更新/删除分别映射 listAppVersions / createAppVersion / updateAppVersion / deleteAppVersion
+// uploadApk 用于上传 APK 文件到 R2，返回 URL 回填 download_url
 import CrudPage, { ColumnDef, FieldDef } from '../components/CrudPage';
 import { uploadApk, listAppVersions, createAppVersion, updateAppVersion, deleteAppVersion } from '../api/admin';
 import { Chip } from '@mui/material';
 
+// 状态下拉选项：0=草稿 / 1=已发布 / 2=已下线（与后端枚举对应）
 const STATUS_OPTIONS = [
   { label: '草稿', value: '0' },
   { label: '已发布', value: '1' },
   { label: '已下线', value: '2' },
 ];
 
+// 是否强制更新下拉选项：0=否 / 1=是
 const FORCE_OPTIONS = [
   { label: '否', value: '0' },
   { label: '是', value: '1' },
 ];
 
+// 状态展示映射：数字 → Chip 颜色与中文文案
 const STATUS_CHIP: Record<number, 'default' | 'success' | 'error'> = {
   0: 'default',
   1: 'success',
@@ -28,6 +34,7 @@ const uploadApkFile = async (file: File): Promise<string> => {
   return r.url;
 };
 
+// 状态展示映射：数字 → Chip 颜色与中文文案
 const columns: ColumnDef[] = [
   { key: 'version_code', label: '版本号', sortable: true },
   { key: 'version_name', label: '版本名称' },
@@ -74,6 +81,11 @@ const fields: FieldDef[] = [
   { name: 'created_at', label: '创建时间(ms)', type: 'number', hideOnCreate: true, nullable: true },
 ];
 
+/**
+ * App 版本管理页。
+ * 通过 CrudPage 承载版本列表、搜索、增删改查；
+ * download_url 字段支持上传 APK（uploadApkFile）回填 R2 URL，update_log 为 multilingual 字段。
+ */
 export default function AppVersions() {
   return (
     <CrudPage

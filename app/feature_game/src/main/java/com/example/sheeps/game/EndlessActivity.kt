@@ -20,15 +20,37 @@ import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import dagger.hilt.android.AndroidEntryPoint
 
+/**
+ * 无尽生存模式 Activity（路由路径 `/endless/play`）。
+ *
+ * 负责构建 Compose 无尽界面，并将 EndlessScreen 的用户意图转发为
+ * [com.example.sheeps.game.state.EndlessViewIntent] 交给 [EndlessViewModel]；
+ * 同时收集 [com.example.sheeps.game.state.EndlessViewEffect] 副作用
+ * （Toast / 音效 / 振动预留 / 退出）。
+ *
+ * 生命周期职责：
+ * - [initView]：在 `onCreate` 之后由 [BaseActivity] 调用，构建界面并发送
+ *   Init 意图（非每日、seed=0）；无需要手动释放的资源。
+ * - [initData]：收集副作用流；协程绑定 `lifecycleScope`，onDestroy 自动取消。
+ *
+ * 线程约束：UI 构建与意图转发均运行于主线程。
+ */
 @Route(path = "/endless/play")
 @AndroidEntryPoint
 class EndlessActivity : BaseActivity() {
 
     private val viewModel: EndlessViewModel by viewModels()
 
+    /**
+     * 初始化界面（由 [BaseActivity] 在 onCreate 之后调用）。
+     * 职责：构建 Compose 内容，并发送 [com.example.sheeps.game.state.EndlessViewIntent.Init]
+     * （非每日模式、seed=0）启动无尽对局。
+     * ⚠️ 资源释放：仅做组合构建，无需手动释放；状态收集由 Compose 自动管理。
+     */
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
             SheepsTheme {
+                // 在 Compose 中收集 UI 状态；collectAsState 自动绑定组合生命周期，无泄漏风险
                 val state by viewModel.viewState.collectAsState()
 
                 Surface(
@@ -46,7 +68,15 @@ class EndlessActivity : BaseActivity() {
         viewModel.sendIntent(EndlessViewIntent.Init(isDaily = false, seed = 0))
     }
 
+    /**
+     * 初始化数据（由 [BaseActivity] 在 initView 之后调用）。
+     * 职责：在生命周期范围内收集 [com.example.sheeps.game.state.EndlessViewEffect]
+     * 副作用（Toast / 音效 / 振动 / 退出游戏）。
+     * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消，无泄漏。
+     */
     override fun initData() {
+        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消；
+        // viewEffect 为副作用流，此处 collect 不会造成泄漏。
         lifecycleScope.launchWhenStarted {
             viewModel.viewEffect.collect { effect ->
                 when (effect) {

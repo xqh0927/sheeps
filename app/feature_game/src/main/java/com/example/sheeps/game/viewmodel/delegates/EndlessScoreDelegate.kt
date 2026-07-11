@@ -93,6 +93,7 @@ class EndlessScoreDelegate @Inject constructor(
         }
     }
 
+    /** 计算 SHA-256 十六进制签名串，用于成绩提交防作弊（与服务端 `folklore` 盐值约定一致）。 */
     private fun sha256(input: String): String {
         val bytes = input.toByteArray(Charsets.UTF_8)
         val md = MessageDigest.getInstance("SHA-256")

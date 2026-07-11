@@ -22,6 +22,13 @@ import javax.inject.Inject
 /**
  * 全屏设置 Activity。
  * 包含语言切换、主题切换、玩法说明等功能。
+ *
+ * 生命周期与内存说明：
+ * - 注入的 prefs 为 Hilt 单例，Activity 销毁即释放。
+ * - 语言/主题变更通过 MMKV 静态标记（"language_changed_in_settings"/"theme_changed_in_settings"）通知 MenuActivity，
+ *   MMKV 为进程级单例、仅写布尔标记，不持有 Activity/Context，无泄漏；
+ *   ThemeManager 为全局 StateFlow，SheepsTheme 自动响应，无需 recreate。
+ * - 仅构建精简版 [MenuViewState] 供 SettingsScreen 使用，不持有完整菜单状态。
  */
 @Route(path = "/menu/settings")
 @AndroidEntryPoint
@@ -36,6 +43,7 @@ class SettingsActivity : BaseActivity() {
                 var showGameGuide by remember { mutableStateOf(false) }
 
                 // 构建简化版 MenuViewState（仅提供 SettingsScreen 所需字段）
+                // 线程边界：remember 在组合内创建，随组合重建/销毁；不跨 Configuration 长期持有。
                 val settingsState = remember {
                     MenuViewState(language = prefs.getLanguage())
                 }

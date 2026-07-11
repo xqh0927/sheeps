@@ -76,6 +76,21 @@ import javax.inject.Inject
 import kotlin.math.PI
 import kotlin.math.sin
 
+/**
+ * 启动页（Splash）Activity，路由路径 `/splash/entry`。
+ *
+ * 启动流程：
+ * 1. [initView] 构建 Compose 内容（[showSplashContent]）。
+ * 2. 若用户尚未同意隐私政策，先弹 [PrivacyComposeDialog]；同意后进入主流程。
+ * 3. 已同意则通过 `LaunchedEffect` 申请通知权限（[requestPermissionsAndProceed]），
+ *    无论授权与否最终都 [navigateToMenu]：延迟 2s 后路由至 `/menu/main` 并 `finish()`。
+ *
+ * 线程安排：UI 构建与动画均运行于主线程；权限申请、路由跳转在主线程发起，
+ * 延迟由 `lifecycleScope` 协程 `delay(2000)` 实现，协程绑定生命周期、销毁即取消。
+ *
+ * ⚠️ 内存隐患：[userPrefs] 由 Hilt 字段注入（Application 级依赖），
+ * 不持有 Activity 引用；所有协程均经 `lifecycleScope` / Compose 作用域，无静态泄漏。
+ */
 @Route(path = "/splash/entry")
 @AndroidEntryPoint
 class SplashActivity : BaseActivity() {
@@ -83,13 +98,31 @@ class SplashActivity : BaseActivity() {
     @Inject
     lateinit var userPrefs: UserPreferences
 
+    /**
+     * 初始化界面（由 [BaseActivity] 在 onCreate 之后调用）。
+     * 职责：记录日志并调用 [showSplashContent] 构建 Compose 启动页内容。
+     * ⚠️ 资源释放：仅做组合构建，无需要手动释放的资源；
+     * 协程与动画由 Compose / lifecycleScope 在销毁时自动取消。
+     */
     override fun initView(savedInstanceState: Bundle?) {
         LogUtils.d("SplashActivity initialized via Compose.")
         showSplashContent()
     }
 
+    /**
+     * 初始化数据（由 [BaseActivity] 在 initView 之后调用）。
+     * 本启动页无需额外数据加载，故为空实现；耗时初始化已在 [showSplashContent]
+     * 的 Compose 组合与权限回调中完成。
+     */
     override fun initData() {}
 
+    /**
+     * 构建启动页 Compose 内容。
+     * 组合粒子背景（[ParticleBackground]）、主体视觉（[SplashVisuals]），
+     * 并按 [com.example.sheeps.core.preference.UserPreferences.isPrivacyAccepted]
+     * 决定展示隐私协议弹窗（[PrivacyComposeDialog]）或发起权限申请。
+     * 纯 UI 组合，无副作用挂起；权限与跳转交由下方方法处理。
+     */
     private fun showSplashContent() {
         setContent {
             SheepsTheme {
@@ -127,6 +160,7 @@ class SplashActivity : BaseActivity() {
                             }
                         )
                     } else {
+                        // 已同意隐私政策：进入主流程前先申请通知权限（协程仅执行一次）
                         LaunchedEffect(Unit) {
                             requestPermissionsAndProceed()
                         }
@@ -136,6 +170,12 @@ class SplashActivity : BaseActivity() {
         }
     }
 
+    /**
+     * 申请通知权限并继续启动流程。
+     * 使用 XXPermissions 请求 [Permission.POST_NOTIFICATIONS]；无论用户授权或拒绝
+     * （含“不再询问”），回调中均调用 [navigateToMenu] 进入主菜单，保证流程不卡死。
+     * ⚠️ 内存/生命周期：权限回调为一次性匿名对象，授权结束后即无引用，无泄漏。
+     */
     private fun requestPermissionsAndProceed() {
         XXPermissions.with(this)
             .permission(Permission.POST_NOTIFICATIONS)
@@ -150,7 +190,15 @@ class SplashActivity : BaseActivity() {
             })
     }
 
+    /**
+     * 跳转至主菜单并完成启动页。
+     * 在 [lifecycleScope] 协程中 `delay(2000)` 后通过 TheRouter 路由到 `/menu/main`
+     * 并 `finish()` 关闭启动页。
+     * ⚠️ 内存/生命周期：协程绑定于 lifecycleScope，若 Activity 在 2s 内被销毁，
+     * 协程自动取消，不会泄漏也不会触发重复 `finish()`。
+     */
     private fun navigateToMenu() {
+        // ⚠️ 协程绑定 lifecycleScope：delay 期间销毁即取消，无泄漏
         lifecycleScope.launch {
             delay(2000)
             TheRouter.build("/menu/main").navigation()
@@ -160,6 +208,13 @@ class SplashActivity : BaseActivity() {
 }
 
 // --- 粒子背景（随机浮动金色光点）---
+/**
+ * 启动页粒子背景。
+ * 借助 `rememberInfiniteTransition` 驱动 10 个金色光点的浮动与明暗呼吸，
+ * 并在底部叠加主题主色光晕；`Canvas` 纯绘制，不依赖外部状态。
+ * ⚠️ 内存/生命周期：无限动画绑定组合生命周期，组件销毁时自动停止，无泄漏。
+ * 线程约束：Composable 运行于主线程；绘制在每帧主线程完成。
+ */
 @Composable
 fun ParticleBackground() {
     val themePrimary = MaterialTheme.colorScheme.primary
@@ -223,6 +278,14 @@ fun ParticleBackground() {
 }
 
 // --- Splash 主体视觉 ---
+/**
+ * 启动页主体视觉。
+ * 展示 Logo（多层叠放卡牌旋转动画 + 金色光晕）、游戏标题/副标题、
+ * 分隔线与 `SheepsLoading` 加载指示；底部呈现适龄提示与防沉迷健康提示。
+ * ⚠️ 内存/生命周期：Logo 缩放/光晕/旋转均由 `rememberInfiniteTransition`
+ * 驱动，绑定组合生命周期，销毁即停止，无泄漏。
+ * 线程约束：Composable 运行于主线程；动画在每帧主线程计算。
+ */
 @Composable
 fun SplashVisuals() {
     val themePrimary = MaterialTheme.colorScheme.primary
@@ -471,6 +534,18 @@ fun SplashVisuals() {
 }
 
 // --- 隐私协议 Dialog（使用新设计语言）---
+/**
+ * 隐私协议弹窗（Compose `Dialog`，不可通过返回/外部点击关闭）。
+ * 以富文本展示隐私政策，并将正文中的《用户协议》《隐私政策》关键词标注为
+ * 可点击链接（[androidx.compose.foundation.text.ClickableText] +
+ * [androidx.compose.ui.platform.LocalUriHandler] 打开对应网页）。
+ * 同意则写入隐私标记并关闭弹窗；拒绝则提示并 `finish()` 退出应用。
+ * ⚠️ 内存隐患：弹窗仅在未同意隐私时组合，同意后即从组合树移除并释放；
+ * 不持有 Activity/Context 或静态引用。`LocalUriHandler` 由 Compose 提供，随组件销毁释放。
+ *
+ * @param onConfirm 用户点击“同意并开始”的回调
+ * @param onDismiss  用户点击“不同意并退出”的回调
+ */
 @Composable
 fun PrivacyComposeDialog(
     onConfirm: () -> Unit,

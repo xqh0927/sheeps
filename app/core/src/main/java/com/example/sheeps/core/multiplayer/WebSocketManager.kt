@@ -23,6 +23,11 @@ class WebSocketManager @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val json: Json
 ) {
+    // ⚠️ 内存隐患：scope 为自定义 CoroutineScope 且作为单例属性存在，本类未提供任何 cancel()/release() 方法，
+    //    该作用域及其中的所有协程（消息解码、指数退避重连等）将伴随进程终生，永远不会被自动取消。
+    //    若调用方（Activity/Fragment/ViewModel）在生命周期结束时未主动调用 disconnect()，
+    //    WebSocket 连接与协程会持续持有引用，造成连接泄漏与内存泄漏；
+    //    建议在注销登录 / 退出房间时调用 disconnect()，并在需要时补充 scope.cancel()。
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var webSocket: WebSocket? = null
     private var isManualClose = false
@@ -43,6 +48,9 @@ class WebSocketManager @Inject constructor(
      * 暴露给 UI 订阅的实时对局指令数据流。
      */
     private val _messageFlow = MutableSharedFlow<GameCommand>(extraBufferCapacity = 64)
+    // ⚠️ 内存隐患：以下公开 Flow 由单例持有，订阅方若在 lifecycleScope/repeatOnLifecycle 之外收集且未取消，
+    //    回调会持续强引用订阅者（常包含 Activity/Fragment），导致内存泄漏；
+    //    务必在 UI 层使用 lifecycleScope 或 repeatOnLifecycle 收集，并在界面销毁时停止。
     val messageFlow: SharedFlow<GameCommand> = _messageFlow
 
     // 退避重连延迟计算器
@@ -127,6 +135,7 @@ class WebSocketManager @Inject constructor(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            // 线程切换点：WebSocket 回调位于 OkHttp 工作线程，此处通过 scope.launch 切到 Dispatchers.IO 协程上下文解码并 emit。
             scope.launch {
                 try {
                     val command = json.decodeFromString(GameCommand.serializer(), text)

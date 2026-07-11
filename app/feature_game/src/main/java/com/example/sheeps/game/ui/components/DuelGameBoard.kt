@@ -108,6 +108,9 @@ fun DuelGameBoard(
         }
 
         // 迷雾障眼特效（诅咒效果）
+        // 线程边界：FogEffectOverlay 的 pointerInput 手势处理运行在主线程 UI 协程上下文中，
+        // 仅更新 Compose 状态 touchOffset，不阻塞渲染；下方 onGloballyPositioned 同样为主线程布局回调，
+        // 写入外部 MutableMap tileGlobalPositions 供飞行动画使用。
         if (state.isFogActive) {
             FogEffectOverlay()
         }

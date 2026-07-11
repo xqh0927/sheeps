@@ -37,6 +37,8 @@ class ScoreDelegate @Inject constructor(
             prefs.setUnlockedLevel(levelId + 1)
         }
 
+        // 线程边界：外部传入的 scope 通常为 viewModelScope；launch(Dispatchers.IO) 将网络/本地写入切到 IO 线程，
+        // 回调 setEffect 切换回主线程驱动 UI。⚠️ 若该 scope 为匿名未绑定 VM 的 CoroutineScope，存在泄漏风险。
         // 使用独立的 IO 作用域提交，防止页面关闭导致提交中断
         scope.launch(Dispatchers.IO) {
             try {

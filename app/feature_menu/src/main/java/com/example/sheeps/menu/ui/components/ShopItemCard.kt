@@ -48,6 +48,23 @@ import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.ui.components.RemoteImage
 
+/**
+ * 商城商品卡片（道具 / 皮肤）。
+ * 展示封面、名称、描述、价格/库存，并提供「兑换」或「应用皮肤」操作；兑换时弹出数量确认弹窗。
+ *
+ * @param item 商品数据 [com.example.sheeps.data.model.ShopItem]。
+ * @param backpackCount 背包中该商品已拥有数量（用于判断是否已解锁皮肤）。
+ * @param currentSkin 当前已应用的皮肤 key。
+ * @param userPoints 用户当前积分（用于计算可兑换上限）。
+ * @param onExchange 确认兑换回调，参数为兑换数量。
+ * @param onApplySkin 应用/切换皮肤回调，参数为皮肤 key。
+ *
+ * 说明：
+ * - 无状态（Stateless）组件，所有数据来自参数；本地 UI 状态（兑换弹窗显隐、数量）通过
+ *   `remember { mutableStateOf(...) }` 持有，随组合销毁而释放。
+ * - 弹窗（AlertDialog）内嵌于本 Composable，确认后通过 [onExchange]/[onApplySkin] 将意图上抛给 ViewModel。
+ * - 封面图片通过 Coil 异步加载（RemoteImage），图片请求在 IO 线程执行，结果切回**主线程**提交组合。
+ */
 @Composable
 fun ShopItemCard(
     item: ShopItem,

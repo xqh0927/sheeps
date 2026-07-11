@@ -54,6 +54,28 @@ import com.example.sheeps.core.update.UpdateDownloadManager
 import com.example.sheeps.core.update.UpdateStatus
 import com.example.sheeps.data.model.AppUpdateResponse
 
+/**
+ * 应用更新对话框（自定义 [Card] 内容，非标准 AlertDialog）。
+ *
+ * 展示版本更新日志与下载进度，支持下载/安装/重试流程。非强制更新可关闭，
+ * 强制更新（[AppUpdateResponse.force_update]）禁止关闭。
+ *
+ * 触发来源：启动检查更新或菜单手动"检查更新"后，由上层依据 [AppUpdateResponse] 弹出。
+ * 本对话框自身不直接回写 ViewModel；下载/安装状态由 [UpdateDownloadManager] 驱动，
+ * 其 Flow 状态经 `collectAsState()` 在组合作用域内收集。
+ *
+ * 线程约束：下载与安装由 [UpdateDownloadManager] 在内部管理（其内部切到 IO/主线程）；
+ * `collectAsState()` 在主线程收集下载进度并触发重组。[context] 取自 [LocalContext]。
+ *
+ * ⚠️ 内存隐患：`downloadManager` 通过 `remember { UpdateDownloadManager() }` 持有，
+ * 下载的 APK 文件位于应用缓存/外部存储，需在 Dialog 关闭时按状态清理（见下方
+ * `DisposableEffect(Unit).onDispose`）：已完成/已授权则不删（已交由安装器），
+ * 其余清理。未清理的 APK 会持续占用磁盘空间，但不会造成内存泄漏。
+ * 注意 [LocalContext] 仅为组合期间引用，Dialog 关闭后随之释放，无静态持有风险。
+ *
+ * @param updateInfo 更新信息（[AppUpdateResponse]），含版本号、更新日志、APK 地址与是否强制更新。
+ * @param onDismiss 关闭对话框的回调（仅非强制更新且非下载中时可触发）。
+ */
 @Composable
 fun AppUpdateDialog(
     updateInfo: AppUpdateResponse,

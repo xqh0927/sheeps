@@ -68,6 +68,7 @@ export default function MultilingualField({
             disabled={disabled}
             error={isMissing}
             helperText={isMissing ? `请填写${LOCALE_LABELS[loc]}` : undefined}
+            // 受控写入：将本语言键 key(=base 或 base_后缀) 写入共享 form 并整体回传父组件（序列化由各语言键平铺存储）
             onChange={(e: any) => onChange({ ...form, [key]: e.target.value })}
           />
         );

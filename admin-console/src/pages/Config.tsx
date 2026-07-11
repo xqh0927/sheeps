@@ -44,18 +44,41 @@ const CONFIG_LABELS: Record<string, string> = {
   'i18n_dual_write': 'i18n双写开关（已废弃）',
 };
 
+/**
+ * 系统配置（Config）页面组件。
+ *
+ * 路由：通常路径 `/config`。
+ * 权限要求：仅 `canWrite()` 为 true 的管理员可执行新增/编辑/清空缓存；只读用户仅可查看。
+ * 关键 State：
+ * - `rows`：配置键值对列表（来自 getConfig）。
+ * - `editing` / `creating`：当前编辑/新增弹窗的目标行（null 表示关闭）。
+ * - `formKey` / `formValue`：弹窗表单字段。
+ * - `busy`：提交中态，禁用表单与按钮防止重复提交。
+ *
+ * 数据来源：依赖 `api/admin.getConfig`、`updateConfig`、`clearCache`，数据变更后调用 load() 重新拉取。
+ */
 export default function Config() {
+  // 写入权限信号：来自 auth store 的 canWrite()，控制按钮禁用与表单可编辑性
   const canWrite = useAuth((s) => s.canWrite());
+  // 全局反馈组件
   const { show, Feedback } = useFeedback();
 
+  // 配置行列表（key/value 对）
   const [rows, setRows] = useState<ConfigRow[]>([]);
+  // 首屏/重载加载态
   const [loading, setLoading] = useState(true);
+  // 当前正在编辑的配置行；非空即打开编辑弹窗
   const [editing, setEditing] = useState<ConfigRow | null>(null);
+  // 新增模式开关
   const [creating, setCreating] = useState(false);
+  // 表单：配置 key（编辑时锁定，仅新增可填）
   const [formKey, setFormKey] = useState('');
+  // 表单：配置 value
   const [formValue, setFormValue] = useState('');
+  // 提交中态：保存期间禁用所有操作，防止重复提交
   const [busy, setBusy] = useState(false);
 
+  // 拉取配置列表：调用 getConfig 并用 loading 包裹，异常归一化为错误提示
   const load = () => {
     setLoading(true);
     getConfig()
@@ -64,22 +87,26 @@ export default function Config() {
       .finally(() => setLoading(false));
   };
 
+  // 首屏加载：组件挂载时拉取一次配置（空依赖，仅执行一次）
   useEffect(() => {
     load();
   }, []); // eslint-disable-line
 
+  // 打开编辑：把目标行的 key/value 灌入表单
   const openEdit = (row: ConfigRow) => {
     setFormKey(row.key);
     setFormValue(row.value);
     setEditing(row);
   };
 
+  // 打开新增：清空表单并进入新增模式
   const openCreate = () => {
     setFormKey('');
     setFormValue('');
     setCreating(true);
   };
 
+  // 保存：校验 key 非空后调用 updateConfig 提交；成功后关闭弹窗并重新拉取
   const handleSave = async () => {
     if (!formKey.trim()) {
       show('请填写配置 key', 'warning');
@@ -106,6 +133,7 @@ export default function Config() {
           系统配置
         </Typography>
         <Stack direction="row" spacing={1}>
+          {/* 清空缓存：仅 canWrite 可操作；调用 clearCache 并反馈清空键数量 */}
           <Button
             variant="outlined"
             color="warning"

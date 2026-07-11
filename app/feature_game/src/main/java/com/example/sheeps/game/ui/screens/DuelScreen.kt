@@ -50,7 +50,29 @@ private data class DuelFlyingTile(
 )
 
 /**
- * 对决模式主界面
+ * 对决模式（Duel）主界面。
+ *
+ * 负责组合对决头部、施法提示条、含迷雾特效的棋盘、移出置物架、消除槽、
+ * 技能释放面板，以及飞行卡牌动画层与结算弹窗。通过回调将用户操作上抛给
+ * Activity / ViewModel 处理。
+ *
+ * 重组注意点：
+ * - [state] 每次变化都会触发本函数重组；位置映射 [tileGlobalPositions] /
+ *   [slotGlobalPositions] 使用 `remember { mutableStateMapOf(...) }` 跨重组保留，
+ *   避免重复测量。
+ * - 飞行卡牌列表 [flyingTiles] 由 `remember { mutableStateOf(...) }` 持有，
+ *   仅作纯视觉过渡，不参与游戏数据状态。
+ *
+ * 线程约束：Composable 运行于主线程。飞行动画通过 `rememberCoroutineScope()`
+ * 启动，该作用域在组合销毁时自动取消。
+ * ⚠️ 内存隐患：必须使用组合作用域协程（而非全局 `CoroutineScope` / `GlobalScope`），
+ * 否则卡牌动画协程会脱离界面生命周期而泄漏。当前实现为安全用法。
+ *
+ * @param state       当前对决视图状态（含棋盘、卡槽、技能、对手分数等）
+ * @param onTileClick 点击可用卡牌的回调（被遮挡/封印牌已在此拦截）
+ * @param onLeave     主动离开对决的回调
+ * @param onRestart   重新开始对决的回调
+ * @param onCastSpell 释放技能 Spell 的回调，参数为技能类型字符串
  */
 @Composable
 fun DuelScreen(
@@ -129,7 +151,8 @@ fun DuelScreen(
                         flyingTileIds = flyingTileIds + tile.id
                         
                         onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
-                        
+
+                        // 启动飞行动画；使用 rememberCoroutineScope 作用域，组合销毁时自动取消，无泄漏风险
                         coroutineScope.launch {
                             com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
                             flyingTiles = flyingTiles.filter { it.tileId != tile.id }
@@ -172,7 +195,15 @@ fun DuelScreen(
 }
 
 /**
- * 施法/受击消息提示条
+ * 施法/受击消息提示条。
+ *
+ * 监听 [state.activeSpellMessage]（己方施法）与 [state.incomingAttackMessage]（对手攻击），
+ * 有提示文案时借助 `AnimatedVisibility` 以淡入 + 展开动画呈现于棋盘上方。
+ *
+ * 线程约束：纯 Composable，运行于主线程；`AnimatedVisibility` 的进出场动画由
+ * Compose 动画框架在内部协程中驱动，随组件销毁自动取消，无泄漏风险。
+ *
+ * @param state 当前对决视图状态，提供主动施法提示与来自对手的受击提示
  */
 @Composable
 private fun SpellMessageBar(state: DuelViewState) {
@@ -199,7 +230,15 @@ private fun SpellMessageBar(state: DuelViewState) {
 }
 
 /**
- * 对决模式移出置物架
+ * 对决模式移出置物架。
+ *
+ * 当 [state.movedOutTiles] 非空时，横向排列展示被移出棋盘的卡牌，点击可触发
+ * [onTileClick] 将其放回卡槽。空列表时直接 `return` 不渲染，避免无意义重组。
+ *
+ * 线程约束：纯 Composable，运行于主线程；`key(tile.id)` 保证列表项稳定复用。
+ *
+ * @param state       当前对决视图状态，提供移出卡牌集合
+ * @param onTileClick 点击移出卡牌的回调
  */
 @Composable
 private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) {
@@ -220,7 +259,21 @@ private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) 
 }
 
 /**
- * 对决模式消除槽位（支持缩减槽位诅咒）
+ * 对决模式消除槽位（支持缩减槽位诅咒）。
+ *
+ * 渲染 7 个插槽背景（当 [DuelViewState.maxSlotSize] == 6 时第 7 个插槽锁定并显示 🔒），
+ * 并以 `animateDpAsState` + spring 动画驱动已放置卡牌的横向滑动定位。
+ * 通过 [slotGlobalPositions] 将每个插槽的全局坐标回填，供飞行卡牌计算落点。
+ *
+ * ⚠️ 内存/生命周期提示：[slotGlobalPositions] 为外部传入的可变 Map，由
+ * `onGloballyPositioned` 在布局阶段写入；该回调绑定于布局测量，随组件销毁
+ * 释放，不会长期持有引用。注意不要在回调中捕获 Activity/Context，否则会造成泄漏。
+ *
+ * 线程约束：纯 Composable，运行于主线程；坐标换算 `toDp()` 借助 `LocalDensity`。
+ *
+ * @param state              当前对决视图状态，提供卡槽卡牌与最大槽位数
+ * @param flyingTileIds      正在飞行中的卡牌 id 集合（飞行时隐藏原槽位卡牌）
+ * @param slotGlobalPositions 插槽全局坐标映射（会被本函数回填写入）
  */
 @Composable
 private fun DuelMatchingSlot(
@@ -299,7 +352,13 @@ private fun DuelMatchingSlot(
 }
 
 /**
- * 加载全屏遮罩
+ * 加载全屏遮罩。
+ *
+ * 以半透明黑色覆盖全屏并居中显示 `SheepsLoading`，并通过 `pointerInput` 吞掉
+ * 所有指针事件、配合 `clickable(enabled = false)` 阻断底层交互，防止加载期间误触。
+ *
+ * 线程约束：纯 Composable，运行于主线程；`awaitEachGesture` 在内部挂起协程中
+ * 消费指针事件，随组件销毁自动取消。
  */
 @Composable
 private fun FullScreenLoadingOverlay() {
@@ -314,7 +373,19 @@ private fun FullScreenLoadingOverlay() {
 }
 
 /**
- * 飞行卡片渲染层 (对决模式)
+ * 飞行卡片渲染层（对决模式）。
+ *
+ * 遍历 [flyingTiles]，为每张飞行卡牌在 `graphicsLayer` 中根据 [DuelFlyingTile.progress]
+ * （0→1）对 [DuelFlyingTile.start]→[DuelFlyingTile.end] 做线性插值位移，并以
+ * [screenRootOffset] 将坐标折算回屏幕根坐标系。
+ *
+ * 重组注意点：动画通过 `Animatable` 驱动，进度变化会以高帧率触发本层重组；
+ * 仅绘制飞行卡牌（占位 `Tile(id="fly_view")`），不参与游戏逻辑。
+ *
+ * 线程约束：纯 Composable，运行于主线程；位移计算在每一动画帧的主线程完成。
+ *
+ * @param flyingTiles      当前正在飞行的卡牌状态集合
+ * @param screenRootOffset 屏幕根布局的全局偏移，用于坐标折算
  */
 @Composable
 private fun DuelFlyingTilesLayer(

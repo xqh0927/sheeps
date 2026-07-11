@@ -31,7 +31,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const body: any = await request.json();
-        // 第一步：备份用户的旧数据，避免同步过程中由于异常导致数据彻底丢失
+        // 第一步：备份用户的旧数据，避免同步过程中由于异常导致数据彻底丢失；读取 users / level_unlock / user_items 三表当前值作为回滚基线
         const backupQueries = [
             env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
@@ -50,6 +50,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
                 .bind(authUser.userId, oldUser.points, Date.now())
                 .run();
             const backupId = insertInfo.meta.last_row_id;
+            // 事务边界：写入本次备份（backup_save_log + 子表 backup_unlocked_levels / backup_save_items）与 7 天过期清理统一单 batch 原子提交
             const backupStatements = [];
             for (const r of oldLevelsResult.results as any[]) {
                 backupStatements.push(
@@ -72,11 +73,12 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
 
         const mutationStatements = [];
 
-        // 第二步：合并客户端传上来的积分数据（取本地和云端极大值），合并关卡解锁进度，以及叠加或更新背包道具
+        // 第二步：合并客户端传上来的积分数据（取本地和云端极大值，body.points>0 才合并），合并关卡解锁进度，以及叠加或更新背包道具
         if (body.points !== undefined && body.points > 0) mutationStatements.push(env.DB.prepare('UPDATE users SET points = MAX(points, ?) WHERE id = ?').bind(body.points, authUser.userId));
         if (body.unlocked_levels) for (const lvl of body.unlocked_levels) mutationStatements.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, lvl, Date.now()));
         if (body.items) for (const item of body.items) mutationStatements.push(env.DB.prepare('INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, COALESCE((SELECT MAX(count) FROM user_items WHERE user_id = ? AND item_type = ?), ?))').bind(authUser.userId, item.item_type, authUser.userId, item.item_type, item.count));
 
+        // 事务边界：将合并后的积分 / 关卡 / 道具变更一次性原子写入 D1（UPDATE users + INSERT OR IGNORE level_unlock + INSERT OR REPLACE user_items）
         if (mutationStatements.length > 0) await env.DB.batch(mutationStatements);
 
         // 第三步：返回用户最新同步完的最终权威云端数据，供端侧刷新本地 Room 状态
@@ -102,6 +104,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
+        // DB：单 batch 聚合查询用户资料、关卡解锁、道具背包、今日签到、历史连续天数、最高通关关卡（leaderboard 表），供前端渲染个人中心
         const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
             env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, avatar_url FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
@@ -131,6 +134,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
     if (path === '/api/user/points-history' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        // DB：查询 point_record 积分流水表，按时间倒序取最近 50 条（type=IN/OUT、来源、变动额、变动后余额）
         const records = await env.DB.prepare('SELECT type, amount, source, remaining_points, created_at FROM point_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
@@ -146,6 +150,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
     if (path === '/api/user/exchange-history' && request.method === 'GET') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        // DB：查询 exchange_record 兑换记录表，按时间倒序取最近 50 条（商品/道具/数量/积分消耗），展示用户兑换历史
         const records = await env.DB.prepare('SELECT id, shop_item_id, item_type, count, points_cost, created_at FROM exchange_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
@@ -163,6 +168,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         const body: { new_username: string } = await request.json();
+        // 参数校验：new_username 必填，缺失返回 400
         if (!body.new_username) return new Response(JSON.stringify({ error: 'Missing new_username' }), { status: 400, headers: corsHeaders });
         await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(body.new_username, authUser.userId).run();
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
@@ -196,12 +202,12 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
             return new Response(JSON.stringify({ error: 'Missing avatar file' }), { status: 400, headers: corsHeaders });
         }
 
-        // 校验文件大小（≤ 512KB）
+        // 参数校验：限制头像文件 ≤ 512KB，超出返回 400，防止 R2 存储被大文件打爆
         if (file.size > 512 * 1024) {
             return new Response(JSON.stringify({ error: 'Avatar image too large (max 512KB)' }), { status: 400, headers: corsHeaders });
         }
 
-        // 校验文件类型
+        // 参数校验：仅允许 png/jpeg/webp 三种图片 MIME，否则返回 400，规避非法文件上传风险
         const validTypes = ['image/png', 'image/jpeg', 'image/webp'];
         if (!validTypes.includes(file.type)) {
             return new Response(JSON.stringify({ error: 'Invalid image type (allowed: png, jpeg, webp)' }), { status: 400, headers: corsHeaders });
@@ -224,6 +230,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         // 存储 R2 公网直链到 D1（供 profile 等领域直接查询，跳过 Worker 代理）
         const r2PublicUrl = env.R2_PUBLIC_URL || new URL(request.url).origin;
         const avatarUrl = `${r2PublicUrl}/${key}`;
+        // DB：将 R2 公网直链写入 users.avatar_url 列，profile 等接口直接读取，省去经 Worker 代理取图
         await env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?')
             .bind(avatarUrl, authUser.userId).run();
 

@@ -21,6 +21,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * 底部导航栏（Bottom Navigation）。
+ * 展示「对局 / 商城 / 我的」三个 Tab，选中态带轻微放大动画与指示圆点。
+ *
+ * @param currentTab 当前选中的 Tab 标识（"game" / "shop" / "me"），由调用方（通常为 Screen/ViewModel）持有并提升。
+ * @param onTabSelected 用户点击 Tab 时的回调，将新标识上抛给调用方处理导航切换。
+ *
+ * 说明：
+ * - 无状态（Stateless）组件：选中态来自 [currentTab] 参数，点击事件通过 [onTabSelected] 单向上抛，
+ *   自身不保存任何可变状态，符合单向数据流（UDF）。
+ * - 图标缩放动画由 [androidx.compose.animation.core.animateFloatAsState] 驱动，运行于**主线程**。
+ */
 @Composable
 fun MenuBottomNavigation(
     currentTab: String,

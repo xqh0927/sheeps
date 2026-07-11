@@ -72,6 +72,9 @@ class EndlessLeaderboardActivity : BaseActivity() {
 
     override fun initData() {}
 
+
+
+
     @Composable
     private fun EndlessLeaderboardContent() {
         var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }

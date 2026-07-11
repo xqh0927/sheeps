@@ -63,6 +63,9 @@ class MyApplication : Application(), Configuration.Provider {
      * 当应用进入前台或切往后台时，均会触发一次离线脏数据的静默同步。
      */
     private fun setupForegroundBackgroundListener() {
+        // 匿名 DefaultLifecycleObserver 注册到 ProcessLifecycleOwner（进程级生命周期，与 App 同寿，
+        // 无需反注册，不会泄漏）。onStart/onStop 内各启动一个短生存的 CoroutineScope(Dispatchers.IO)
+        // 执行一次性同步，协程会自然结束；如需可取消，可改用 lifecycleScope。
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 logcat("AppLifecycle") { "App moved to FOREGROUND" }
@@ -87,6 +90,12 @@ class MyApplication : Application(), Configuration.Provider {
      * 当检测到网络恢复在线时，立即触发同步任务。
      */
     private fun setupNetworkObserver() {
+        // ⚠️ 协程/内存隐患：此处使用独立的顶层 `CoroutineScope(Dispatchers.IO)` 启动并永久 `collectLatest`
+        // 网络状态流，该 CoroutineScope 全程没有任何地方调用 `cancel()`，会随进程一直存活，
+        // 并持续持有 `syncRepository`（间接持有 Application 上下文）的引用。
+        // 因 Application 本身与进程同生命周期，这不会造成传统泄漏，但属于「永不取消的全局协程」，
+        // 会在后台持续触发同步、驻留引用。
+        // 建议：改用 `ProcessLifecycleOwner.get().lifecycleScope` 启动收集，使流随进程生命周期自动取消。
         CoroutineScope(Dispatchers.IO).launch {
             networkMonitor.status.collectLatest { status ->
                 if (status == NetworkStatus.ONLINE) {

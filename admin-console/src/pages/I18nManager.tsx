@@ -108,18 +108,42 @@ function filterRowsByField(rows: I18nRow[], selectedField: string): I18nRow[] {
   });
 }
 
+/**
+ * 多语言管理（I18nManager）页面组件。
+ *
+ * 路由：通常路径 `/i18n`。
+ * 权限要求：查看任意已登录管理员可访问；新增/编辑/删除需 `canWrite()`。
+ * 关键 State：
+ * - `rows` / `total`：服务端分页返回的原始多语言行（按条，非聚合）。
+ * - `page` / `pageSize` / `module` / `keyword` / `field`：分页与筛选条件。
+ * - `groups` / `paginatedGroups`：基于 rows 经 str_key 聚合 + 字段过滤后的前端分组与切片。
+ * - 各弹窗态：`creating`/`editGroup`/`deleteGroup` 控制新增/编辑/删除交互。
+ *
+ * 核心逻辑：后端按条（str_key × locale）存储；前端在 `groups` 中按 str_key 聚合，
+ * 每个分组聚合该 key 下所有语言（values 以 locale 为键），便于整行编辑/删除。
+ */
 export default function I18nManager() {
+  // 写入权限信号
   const canWrite = useAuth((s) => s.canWrite());
+  // 全局反馈组件
   const { show, Feedback } = useFeedback();
 
+  // 服务端返回的原始多语言行（按条存储，未聚合）
   const [rows, setRows] = useState<I18nRow[]>([]);
+  // 服务端分页总数（按条计数；前端聚合后实际分页基于 groups 长度）
   const [total, setTotal] = useState(0);
+  // 当前页码（0 基）
   const [page, setPage] = useState(0);
+  // 每页分组数
   const [pageSize, setPageSize] = useState(20);
+  // 列表加载态
   const [loading, setLoading] = useState(true);
 
+  // 模块筛选条件（'' 表示全部）
   const [module, setModule] = useState('');
+  // 搜索输入框原始值（未 trim，受控于输入框）
   const [keywordInput, setKeywordInput] = useState('');
+  // 已确认的检索关键词（回车后生效），用于触发 load
   const [keyword, setKeyword] = useState('');
   // 字段筛选器：'' 表示全部，'name' / 'description' 仅显示对应字段的行（默认只显示 name）
   const [field, setField] = useState('name');
@@ -149,9 +173,12 @@ export default function I18nManager() {
     [groups, page, pageSize]
   );
 
+  // 拉取多语言行（服务端按条分页）：依赖 module/keyword/show
+  // 注意：total 为按条计数，前端聚合后真正分页基于 groups 长度（见 paginatedGroups）
   const load = useCallback(() => {
     setLoading(true);
     // 后端不再分页，返回全部匹配行；前端按 str_key 聚合后做客户端分页。
+    // 补充说明：listI18n 走服务端分页（PageResult），这里取回当前页行后，前端再按 str_key 聚合、对聚合后的分组做客户端切片分页。
     listI18n({ module: module || undefined, keyword: keyword || undefined })
       .then((d) => {
         setRows(d.list);
@@ -161,21 +188,25 @@ export default function I18nManager() {
       .finally(() => setLoading(false));
   }, [module, keyword, show]);
 
+  // 页面挂载及依赖变化时重新加载
   useEffect(() => {
     load();
   }, [load]);
 
+  // 应用关键词检索：trim 后写入 keyword 状态并重置到第 0 页
   const applyKeyword = (raw: string) => {
     setKeyword(raw.trim() || '');
     setPage(0);
   };
 
   // ============ 新增 ============
+  // 新增（单条记录：str_key + 一个 locale）
   const openCreate = () => {
     setCreateForm({ str_key: '', module: 'system', locale: 'zh', value: '' });
     setCreating(true);
   };
 
+  // 创建：校验 str_key/locale/module 非空后调用 createI18n（仅写入单个语言条目）
   const handleCreate = async () => {
     if (!createForm.str_key.trim() || !createForm.locale.trim() || !createForm.module.trim()) {
       show('请填写 str_key / locale / module', 'warning');
@@ -200,6 +231,7 @@ export default function I18nManager() {
   };
 
   // ============ 编辑（整行） ============
+  // 编辑（整行：所有语言并列）；打开编辑：把该 str_key 下各语言的现有 value 灌入 editValues（缺失语言填空串）
   const openEdit = (g: I18nGroup) => {
     const vals: Record<string, string> = {};
     LOCALES.forEach((l) => {
@@ -209,6 +241,7 @@ export default function I18nManager() {
     setEditGroup(g);
   };
 
+  // 保存编辑：仅对"已存在且 value 有变更"的语言调用 updateI18n（缺失语言不新增），批量并发提交
   const handleSaveEdit = async () => {
     if (!editGroup) return;
     setBusy(true);
@@ -234,6 +267,7 @@ export default function I18nManager() {
   };
 
   // ============ 删除（整行：组内所有语言） ============
+  // 删除：收集该 str_key 下所有语言记录 id，并发调用 deleteI18n 整行删除
   const handleDeleteGroup = async () => {
     if (!deleteGroup) return;
     setBusy(true);

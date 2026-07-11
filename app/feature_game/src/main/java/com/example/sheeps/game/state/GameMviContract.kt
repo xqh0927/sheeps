@@ -50,6 +50,17 @@ data class BoardBounds(
     val maxY: Float = 0f
 )
 
+/**
+ * 闯关模式（单人）界面状态模型（MVI 中的 State）。
+ *
+ * 聚合了一局闯关对局所需的全部不可变 UI 数据：关卡与用户元数据、棋盘/卡槽/置物架卡牌、
+ * 各类道具剩余次数、封印门控解锁进度、计时与结算分数、排行榜等。
+ * 所有字段均为不可变 `val`，状态更新统一通过 ViewModel 的 `updateState { copy(...) }` 完成，
+ * 从而确保 Compose 仅按引用变化触发重组。
+ *
+ * 线程约束：State 对象本身不持有线程；其创建/合并发生在 ViewModel 的
+ * `viewModelScope`（主线程）或 `Dispatchers.IO` 协程中，但一旦进入 `StateFlow` 即只在主线程被消费。
+ */
 data class GameViewState(
     /** 是否正在加载关卡数据 */
     val isLoading: Boolean = false,

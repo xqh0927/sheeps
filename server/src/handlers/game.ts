@@ -1,8 +1,27 @@
+/**
+ * @module handlers/game
+ * @fileoverview 游戏业务路由处理模块。
+ *
+ * 由 `handleGameRoutes` 统一分发，承载核心游戏闭环：
+ * - 关卡布局获取与解锁（积分消耗）
+ * - 通关成绩安全提交（含防作弊签名校验、自动补全游客用户、任务进度推进）
+ * - 每日签到（连续签到奖励 + 签到任务自动领取）
+ * - 多维度排行榜查询（历史/日/周，按人去重或全量）与每日弹窗
+ *
+ * 业务流转位置：位于玩家端鉴权之后，所有写操作均通过 `getAuthenticatedUser`
+ * 解析 Bearer Token；涉及多步 DB 变更时使用 `env.DB.batch` 保证原子性。
+ */
+
 import { Env } from '../types';
 import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus } from '../helpers';
 import { generateSolvableLevel } from '../level';
 import { sha256 } from '../crypto';
 
+/**
+ * 关卡布局内存缓存（进程级，Worker 重启即失效）。
+ * key 形如 `v4_{levelId}_{seed}`，仅缓存确定性种子生成的布局；
+ * 作为 KV 之前的快速命中层，未命中时从 KV 回填。
+ */
 const CACHE_STAGE_CONFIG = new Map<number | string, string>();
 
 /**
@@ -103,7 +122,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const costStr = await getCachedConfig(env, configKey, body.level_id === 2 ? '50' : '200');
         const cost = parseInt(costStr, 10);
         
-        // 批量执行数据库事务：查询是否已解锁、读取用户当前积分
+        // 批量执行数据库事务（D1 batch 保证同批语句原子提交/回滚）：
+        // 并行查询「是否已解锁」与「用户当前积分」，避免读-改-写竞态下重复扣分
         const [unlockCheckResult, userResult] = await env.DB.batch([
             env.DB.prepare('SELECT 1 FROM level_unlock WHERE user_id = ? AND level_id = ?').bind(authUser.userId, body.level_id),
             env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
@@ -145,13 +165,16 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 无尽生存模式标记：0=闯关/PvP, 1=无尽；旧客户端不含该字段时默认 0（兼容）
         const gameMode = Number(body.game_mode) || 0;
 
-        // 防作弊校验：使用加盐 SHA256 算法校验签名合法性
+        // 防作弊校验：使用加盐 SHA256 算法校验签名合法性。
+        // 注意：`folklore` 是服务端/客户端约定的硬编码盐值（共享密钥），
+        // 客户端须以相同拼接方式与盐值生成签名，缺失或不符即视为作弊请求(403)。
         const expectedSign = await sha256(`${body.user_id}_${body.level_id}_${body.clear_time_ms}_folklore`);
         if (body.sign !== expectedSign) return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 403, headers: corsHeaders });
 
         const authUser = await getAuthenticatedUser(request, env);
         const resolvedUserId = authUser ? authUser.userId : body.user_id;
 
+        // 以北京时间(UTC+8)日期作为"今日"基准，用于每日任务/签到归属，避免跨时区跨日问题
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         // 批量查询：用户信息、此前该关卡的通关次数、当天的每日任务进度
         const [userResult, clearsResult, tasksResult] = await env.DB.batch([
@@ -233,7 +256,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         const newPoints = ((userResult.results[0] as { points: number } | undefined)?.points || 0) + rewardPoints;
 
-        // 签到事务原子入库
+        // 签到事务原子入库：积分更新、签到记录、积分流水、签到任务标记全部在同一次 D1 batch 提交，
+        // 任一失败整体回滚，保证「积分增加」与「签到记录」不会只成功一半
         // P0-1 修复：签到成功后自动领取 SIGN_IN_ONCE 的 10 积分
         const signInOnceReward = 10;
         const totalNewPoints = newPoints + signInOnceReward;
