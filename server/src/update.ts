@@ -34,8 +34,12 @@ export async function checkApkExists(url: string): Promise<boolean> {
   }
 
   try {
-    // 仅请求 Header，不下载文件主体
-    const response = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': 'sheeps-update-checker' } });
+    // 仅请求 Header，不下载文件主体；signal 设 3 秒超时，超时/网络错误在下方 catch 中降级为"不存在"
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'sheeps-update-checker' },
+      signal: AbortSignal.timeout(3000)
+    });
     const exists = response.status === 200;
     apkExistenceCache.set(url, { exists, checkedAt: now });
     return exists;
@@ -63,20 +67,28 @@ export async function getDatabaseAppUpdate(env: Env, currentCode: number, lang: 
   ).bind(currentCode).all<any>();
 
   if (versions.results && versions.results.length > 0) {
-    for (const release of versions.results) {
-      const downloadUrl = release.download_url || release.apk_url;
-      if (downloadUrl) {
-        const exists = await checkApkExists(downloadUrl); // 确保链接有效
-        if (exists) {
-          const updateLog = resolveI18n(i18nMap, `app_version.${release.version_code}.update_log`, release.update_log);
-          return {
-            has_update: true,
-            version_name: release.version_name,
-            apk_url: downloadUrl,
-            update_log: updateLog ?? '',
-            force_update: release.is_force_update === 1
-          };
-        }
+    // 并行探测所有候选版本的 APK 直链存活性（最多 5 个，结果顺序与 candidates 对齐，显著缩短探测耗时）
+    const candidates = versions.results;
+    const existence = await Promise.all(
+      candidates.map((release) => {
+        const downloadUrl = release.download_url || release.apk_url;
+        if (!downloadUrl) return Promise.resolve(false);
+        return checkApkExists(downloadUrl); // 内部已含 3s 超时与内存缓存
+      })
+    );
+    // candidates 已按 version_code DESC 排序，取第一个存活版本（最高版本优先）
+    for (let i = 0; i < candidates.length; i++) {
+      if (existence[i]) {
+        const release = candidates[i];
+        const downloadUrl = release.download_url || release.apk_url;
+        const updateLog = resolveI18n(i18nMap, `app_version.${release.version_code}.update_log`, release.update_log);
+        return {
+          has_update: true,
+          version_name: release.version_name,
+          apk_url: downloadUrl,
+          update_log: updateLog ?? '',
+          force_update: release.is_force_update === 1
+        };
       }
     }
   }

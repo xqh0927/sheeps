@@ -1,5 +1,5 @@
 import { Env } from '../types';
-import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
+import { getCorsHeaders, getAuthenticatedUser, cacheControl } from '../helpers';
 import { getI18nBatch, resolveI18n } from '../i18n';
 
 /**
@@ -24,10 +24,11 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
      * 响应: [{ id, name, description, image_url, item_type, points_price, stock }]
      */
     if (path === '/api/shop/items' && request.method === 'GET') {
+        const cacheHeaders = cacheControl(300);
         const cacheKey = `shop_items_${lang}`;
         // DB/缓存：优先读 KV（SHEEPS_CACHE）热点缓存，TTL 10 分钟，命中直接返回，降低 D1 读压力
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached) return new Response(cached, { headers: corsHeaders });
+        if (cached) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
 
         // 方案 B：先取基列（zh 兜底），再用 i18n_strings 解析本地化文案
         // DB：查询 shop_items 商品表，过滤掉非兑换类（CLASSIC 及各类 SKIN_* 皮肤），仅返回可消耗积分兑换的法宝道具
@@ -78,7 +79,7 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
 
         const jsonStr = JSON.stringify(result);
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 600 });
-        return new Response(jsonStr, { headers: corsHeaders });
+        return new Response(jsonStr, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
     /**

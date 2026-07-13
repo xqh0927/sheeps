@@ -13,7 +13,7 @@
  */
 
 import { Env } from '../types';
-import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus } from '../helpers';
+import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus, cacheControl } from '../helpers';
 import { generateSolvableLevel } from '../level';
 import { sha256 } from '../crypto';
 
@@ -56,20 +56,23 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const seedStr = url.searchParams.get('seed');
         // 若客户端未传种子，则在后端随机生成一个，保证离线与在线的关卡同源随机性
         const seed = seedStr ? parseInt(seedStr, 10) : Math.floor(Math.random() * 1000000) + 1;
+        // 仅对带确定性 seed 的请求启用 public CDN 缓存（所有用户结果一致，正确）；
+        // 无 seed 的随机布局返回 no-store，避免 CDN 把同一随机布局推给所有玩家，破坏游戏正确性
+        const cacheHeaders = seedStr ? cacheControl(300) : { 'Cache-Control': 'no-store' };
         const cacheKey = `v4_${levelId}_${seed}`;
 
         // 仅在传了确定性种子时读缓存，随机种子每次都不一样无需缓存
         if (seedStr) {
             // 优先查内存缓存（最快）
             if (CACHE_STAGE_CONFIG.has(cacheKey))
-                return new Response(CACHE_STAGE_CONFIG.get(cacheKey)!, { headers: corsHeaders });
+                return new Response(CACHE_STAGE_CONFIG.get(cacheKey)!, { headers: { ...corsHeaders, ...cacheHeaders } });
 
             // 其次查 KV 持久化缓存（跨 Worker 实例共享，冷启动也能命中）
             const kvCached = await env.SHEEPS_CACHE.get(cacheKey);
             if (kvCached) {
                 // 回填内存缓存
                 CACHE_STAGE_CONFIG.set(cacheKey, kvCached);
-                return new Response(kvCached, { headers: corsHeaders });
+                return new Response(kvCached, { headers: { ...corsHeaders, ...cacheHeaders } });
             }
         }
 
@@ -97,7 +100,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
             env.SHEEPS_CACHE.put(cacheKey, layoutJson, { expirationTtl: 86400 }).catch(() => {});
         }
 
-        return new Response(layoutJson, { headers: corsHeaders });
+        return new Response(layoutJson, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
     /**
@@ -287,6 +290,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
      * 响应: { success, rankings: [{ username, avatar, clear_time_ms, score, achieved_at }] }
      */
     if (path === '/api/leaderboard' && request.method === 'GET') {
+        const cacheHeaders = cacheControl(60);
         const levelIdStr = url.searchParams.get('level_id');
         if (!levelIdStr) return new Response(JSON.stringify({ error: 'Missing level_id' }), { status: 400, headers: corsHeaders });
 
@@ -301,7 +305,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         if (gameMode === 1) {
             const { endless } = await getGameModeStatus(env);
             if (!endless) {
-                return new Response(JSON.stringify({ success: true, rankings: [], total: 0, disabled: true }), { headers: corsHeaders });
+                return new Response(JSON.stringify({ success: true, rankings: [], total: 0, disabled: true }), { headers: { ...corsHeaders, ...cacheHeaders } });
             }
         }
 
@@ -311,7 +315,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         const cacheKey = `leaderboard_${levelId}_${gameMode}_${type}_${perUser}_${page}_${limit}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached) return new Response(cached, { headers: corsHeaders });
+        if (cached) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
 
         const offset = (page - 1) * limit;
         let timeFilter = 0;
@@ -352,7 +356,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // KV 缓存 60 秒（排行榜数据无需秒级实时性，per_user=all 缓存更短）
         const ttl = showAll ? 60 : 300;
         await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: ttl });
-        return new Response(responseData, { headers: corsHeaders });
+        return new Response(responseData, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
     /**

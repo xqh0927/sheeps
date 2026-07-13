@@ -163,6 +163,11 @@ CREATE TABLE leaderboard (
 -- 按模式 + 关卡 + 分数建索引，加速分榜查询（无尽模式 game_mode=1 查询）
 CREATE INDEX idx_leaderboard_mode ON leaderboard(game_mode, level_id, score DESC);
 
+-- 按 user_id 建索引，加速以用户为维度的查询/统计（积分流水、兑换记录、个人榜等）
+CREATE INDEX IF NOT EXISTS idx_leaderboard_user ON leaderboard(user_id);
+CREATE INDEX IF NOT EXISTS idx_point_record_user ON point_record(user_id);
+CREATE INDEX IF NOT EXISTS idx_exchange_record_user ON exchange_record(user_id);
+
 -- ===== 迁移脚本（适用于已存在的库；DBA 执行，幂等）=====
 -- ALTER TABLE leaderboard ADD COLUMN game_mode INTEGER NOT NULL DEFAULT 0;
 -- 说明：0 = 闯关/PvP, 1 = 无尽生存；DEFAULT 0 兼容历史数据。

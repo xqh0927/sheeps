@@ -1,5 +1,5 @@
 import { Env } from '../types';
-import { getCorsHeaders, getGameModeStatus } from '../helpers';
+import { getCorsHeaders, getGameModeStatus, cacheControl } from '../helpers';
 import { getDatabaseAppUpdate } from '../update';
 import { getI18nBatch, resolveI18n } from '../i18n';
 
@@ -29,10 +29,11 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
      * 响应: [{ id, title, content, type, created_at }]
      */
     if (path === '/api/notice/list' && request.method === 'GET') {
+        const cacheHeaders = cacheControl(3600);
         const cacheKey = lang ? `notices_${lang}_v2` : 'notices_v2';
         // 读取公告 KV 缓存，默认缓存 1 小时以降低 D1 读负荷
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached && cached.startsWith('[{')) return new Response(cached, { headers: corsHeaders });
+        if (cached && cached.startsWith('[{')) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
 
         // 方案 B：先取基列（zh 兜底），再用 i18n_strings 解析本地化文案
         const notices = await env.DB.prepare(`SELECT id, title, content, type, created_at FROM notice ORDER BY created_at DESC`).all();
@@ -47,7 +48,7 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
 
         const jsonStr = JSON.stringify(localized);
         await env.SHEEPS_CACHE.put(cacheKey, jsonStr, { expirationTtl: 3600 });
-        return new Response(jsonStr, { headers: corsHeaders });
+        return new Response(jsonStr, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
     /**
@@ -59,13 +60,14 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
      * 响应: { has_update, latest_version, download_url, update_info }
      */
     if (path === '/api/app/check-update' && request.method === 'GET') {
+        const cacheHeaders = cacheControl(300);
         const currentCodeStr = url.searchParams.get('version_code');
         const currentCode = currentCodeStr ? parseInt(currentCodeStr, 10) : 1;
 
         // KV 缓存避免频繁 D1 + HEAD 探测
         const cacheKey = `update_check_${currentCode}_${lang}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached) return new Response(cached, { headers: corsHeaders });
+        if (cached) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
 
         // 调用 update 模块进行 APK 的 HEAD 轻量级可用性探针检测与延迟缓存判定
         const databaseUpdate = await getDatabaseAppUpdate(env, currentCode, lang);
@@ -73,7 +75,7 @@ export async function handleSystemRoutes(request: Request, env: Env, path: strin
         const responseData = JSON.stringify({ ...databaseUpdate, game_modes: gameModes });
         // 更新检测结果缓存 5 分钟（与 GitHub API 缓存对齐）
         await env.SHEEPS_CACHE.put(cacheKey, responseData, { expirationTtl: 300 });
-        return new Response(responseData, { headers: corsHeaders });
+        return new Response(responseData, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
     return null;

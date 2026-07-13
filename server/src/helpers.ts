@@ -49,6 +49,20 @@ export function getCorsHeaders(env?: Env) {
 }
 
 /**
+ * 构造边缘缓存响应头（Cloudflare CDN Cache-Control）。
+ * 用于无需鉴权的 public GET 接口，让 Cloudflare 边缘按 max-age 缓存 JSON 响应，降低回源。
+ *
+ * @param seconds 缓存时长（秒）
+ * @param privateCache 为 true 时设为 private（仅客户端缓存，边缘不共享）；默认 false（public 边缘共享）
+ * @returns 可展开合并进 Response headers 的对象，如 `{ 'Cache-Control': 'public, max-age=300' }`
+ */
+export function cacheControl(seconds: number, privateCache = false): Record<string, string> {
+  return privateCache
+    ? { 'Cache-Control': `private, max-age=${seconds}` }
+    : { 'Cache-Control': `public, max-age=${seconds}` };
+}
+
+/**
  * 统一构造错误响应（带 CORS 头）
  * @param message 错误描述
  * @param status HTTP 状态码
