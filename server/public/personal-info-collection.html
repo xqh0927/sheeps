@@ -5,66 +5,181 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>个人信息收集清单</title>
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;padding:16px;max-width:600px;margin:0 auto;color:#333;line-height:1.8;font-size:15px;background:#fff}
-h1{text-align:center;color:#1976D2;font-size:20px;margin-bottom:24px}
-h2{color:#1565C0;font-size:17px;margin-top:28px;border-left:4px solid #1976D2;padding-left:12px}
-table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
-th,td{border:1px solid #e0e0e0;padding:10px;text-align:left}
-th{background:#f5f5f5;font-weight:600}
-.section{background:#fafafa;border-radius:8px;padding:16px;margin:16px 0}
-.tag{display:inline-block;background:#E3F2FD;color:#1565C0;padding:2px 10px;border-radius:12px;font-size:12px;margin:2px}
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.7;
+        color: #334155;
+        background-color: #ffffff;
+        margin: 0;
+        padding: 24px 16px;
+    }
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 32px 24px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+    h1 {
+        font-size: 26px;
+        color: #0f172a;
+        border-bottom: 2px solid #f1f5f9;
+        padding-bottom: 16px;
+        margin-top: 0;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+    h2 {
+        font-size: 18px;
+        color: #1e3a8a;
+        border-left: 4px solid #2563eb;
+        padding-left: 12px;
+        margin-top: 32px;
+        margin-bottom: 16px;
+    }
+    p {
+        margin: 14px 0;
+    }
+    ul {
+        padding-left: 20px;
+        margin: 12px 0;
+    }
+    li {
+        margin: 8px 0;
+    }
+    strong {
+        color: #0f172a;
+    }
+    .section {
+        background-color: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 24px 0;
+    }
+    /* 现代扁平表格设计 */
+    .table-wrapper {
+        overflow-x: auto;
+        margin: 20px 0;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        text-align: left;
+    }
+    th, td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    th {
+        background-color: #f1f5f9;
+        color: #1e293b;
+        font-weight: 600;
+    }
+    tr:last-child td {
+        border-bottom: none;
+    }
+    tr:hover {
+        background-color: #f1f5f9;
+    }
+    /* 状态高亮与标签 */
+    .status-ok {
+        color: #059669;
+        font-weight: 600;
+    }
+    .status-part {
+        color: #d97706;
+        font-weight: 600;
+    }
+    .tag {
+        display: inline-block;
+        background: #eff6ff;
+        color: #2563eb;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        margin: 2px;
+        font-weight: 500;
+    }
+    .footer {
+        text-align: center;
+        color: #64748b;
+        font-size: 13px;
+        margin-top: 40px;
+        line-height: 1.8;
+    }
+    /* 针对移动端优化 padding */
+    @media (max-width: 600px) {
+        body {
+            padding: 12px 8px;
+        }
+        .container {
+            padding: 24px 16px;
+            border-radius: 12px;
+        }
+        th, td {
+            padding: 10px 12px;
+        }
+    }
 </style>
 </head>
 <body>
-<h1>个人信息收集清单</h1>
-<p>本清单旨在向您清晰展示「金色体育」App 收集的个人信息类型、目的、方式及存储期限。</p>
+<div class="container">
+    <h1>个人信息收集清单</h1>
+    <p>本清单旨在向您清晰展示「金色体育」App 收集的个人信息类型、目的、方式及存储期限。</p>
 
-<div class="section">
-<h2>一、我们收集的信息</h2>
-<table>
-<tr><th>信息类型</th><th>具体内容</th><th>收集目的</th></tr>
-<tr><td>设备信息</td><td>设备型号、操作系统版本、唯一设备标识符</td><td>保障服务安全运行、防范恶意行为</td></tr>
-<tr><td>网络信息</td><td>IP 地址、网络类型、运营商信息</td><td>提供网络连接服务、优化数据传输</td></tr>
-<tr><td>账号信息</td><td>手机号码（用于注册/登录）</td><td>创建账号、身份验证</td></tr>
-<tr><td>游戏数据</td><td>关卡进度、积分记录、对局结果</td><td>保存游戏进度、展示排行榜</td></tr>
-<tr><td>日志信息</td><td>操作日志、崩溃报告</td><td>排查故障、优化产品体验</td></tr>
-</table>
-</div>
+    <div class="section">
+        <h2>一、我们收集的信息</h2>
+        <div class="table-wrapper">
+            <table>
+            <tr><th>信息类型</th><th>具体内容</th><th>收集目的</th></tr>
+            <tr><td>设备信息</td><td>设备型号、操作系统版本、唯一设备标识符</td><td>保障服务安全运行、防范恶意行为</td></tr>
+            <tr><td>网络信息</td><td>IP 地址、网络类型、运营商信息</td><td>提供网络连接服务、优化数据传输</td></tr>
+            <tr><td>账号信息</td><td>手机号码（用于注册/登录）</td><td>创建账号、身份验证</td></tr>
+            <tr><td>游戏数据</td><td>关卡进度、积分记录、对局结果</td><td>保存游戏进度、展示排行榜</td></tr>
+            <tr><td>日志信息</td><td>操作日志、崩溃报告</td><td>排查故障、优化产品体验</td></tr>
+            </table>
+        </div>
+    </div>
 
-<div class="section">
-<h2>二、信息的收集方式</h2>
-<p>我们会在以下场景中收集上述信息：</p>
-<ul>
-<li><strong>注册/登录时</strong>：收集手机号码以完成账号创建和身份验证</li>
-<li><strong>使用功能时</strong>：自动收集设备信息和网络信息以保障服务正常运行</li>
-<li><strong>进行游戏时</strong>：记录游戏数据和操作日志以保存进度和分析体验</li>
-<li><strong>发生异常时</strong>：自动采集崩溃日志以定位问题</li>
-</ul>
-</div>
+    <div class="section">
+        <h2>二、信息的收集方式</h2>
+        <p>我们会在以下场景中收集上述信息：</p>
+        <ul>
+            <li><strong>注册/登录时</strong>：收集手机号码以完成账号创建和身份验证</li>
+            <li><strong>使用功能时</strong>：自动收集设备信息和网络信息以保障服务正常运行</li>
+            <li><strong>进行游戏时</strong>：记录游戏数据和操作日志以保存进度和分析体验</li>
+            <li><strong>发生异常时</strong>：自动采集崩溃日志以定位问题</li>
+        </ul>
+    </div>
 
-<div class="section">
-<h2>三、存储与保护</h2>
-<ul>
-<li>所有信息均经过加密传输（HTTPS）和安全存储</li>
-<li>个人信息存储于中华人民共和国境内的服务器上</li>
-<li>我们采取行业标准的加密、去标识化等技术措施保护您的信息安全</li>
-<li>存储期限：在账号存续期间及法律要求的最低期限内保留；注销账号后 30 天内删除或匿名化</li>
-</ul>
-</div>
+    <div class="section">
+        <h2>三、存储与保护</h2>
+        <ul>
+            <li>所有信息均经过加密传输（HTTPS）和安全存储</li>
+            <li>个人信息存储于中华人民共和国境内的服务器上</li>
+            <li>我们采取行业标准的加密、去标识化等技术措施保护您的信息安全</li>
+            <li>存储期限：在账号存续期间及法律要求的最低期限内保留；注销账号后 30 天内删除或匿名化</li>
+        </ul>
+    </div>
 
-<div class="section">
-<h2>四、您的权利</h2>
-<ul>
-<li>有权访问、更正、删除您的个人信息</li>
-<li>有权撤回授权同意</li>
-<li>有权注销账号（注销后将清除所有个人信息）</li>
-<li>如有疑问，可通过 App 内反馈渠道联系我们</li>
-</ul>
-</div>
+    <div class="section">
+        <h2>四、您的权利</h2>
+        <ul>
+            <li>有权访问、更正、删除您的个人信息</li>
+            <li>有权撤回授权同意</li>
+            <li>有权注销账号（注销后将清除所有个人信息）</li>
+            <li>如有疑问，可通过 App 内反馈渠道联系我们</li>
+        </ul>
+    </div>
 
-<div style="text-align:center;color:#999;font-size:12px;margin-top:32px">
-<p>更新时间：2026 年 7 月</p>
-<p>生效时间：2026 年 7 月</p>
+    <div class="footer">
+        <p>更新时间：2026 年 7 月</p>
+        <p>生效时间：2026 年 7 月</p>
+    </div>
 </div>
 </body>
 </html>

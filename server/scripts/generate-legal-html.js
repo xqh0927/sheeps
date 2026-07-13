@@ -99,66 +99,139 @@ function wrapHtml(title, htmlContent) {
     <title>${title}</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f7f9fa;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.7;
+            color: #334155;
+            background-color: #ffffff;
             margin: 0;
             padding: 24px 16px;
         }
         .container {
             max-width: 800px;
             margin: 0 auto;
-            background: #fff;
-            padding: 40px 32px;
+            background: #ffffff;
+            padding: 32px 24px;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
         }
         h1 {
-            font-size: 28px;
-            color: #111;
-            border-bottom: 2px solid #eaeaea;
-            padding-bottom: 12px;
+            font-size: 26px;
+            color: #0f172a;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 16px;
             margin-top: 0;
+            margin-bottom: 24px;
+            text-align: center;
         }
         h2 {
-            font-size: 20px;
-            color: #222;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 8px;
+            font-size: 18px;
+            color: #1e3a8a;
+            border-left: 4px solid #2563eb;
+            padding-left: 12px;
             margin-top: 32px;
+            margin-bottom: 16px;
         }
         h3 {
-            font-size: 16px;
-            color: #333;
+            font-size: 15px;
+            color: #1e293b;
             margin-top: 24px;
+            margin-bottom: 12px;
         }
         p {
-            margin: 16px 0;
+            margin: 14px 0;
         }
         ul, ol {
-            padding-left: 24px;
+            padding-left: 20px;
+            margin: 12px 0;
         }
         li {
             margin: 8px 0;
         }
+        strong {
+            color: #0f172a;
+        }
         blockquote {
-            background-color: #f0f4f8;
-            border-left: 4px solid #1976d2;
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
             margin: 20px 0;
-            padding: 12px 20px;
-            border-radius: 4px;
+            padding: 14px 20px;
+            border-radius: 8px;
+            color: #1e40af;
         }
         blockquote p {
             margin: 0;
         }
-        strong {
-            color: #000;
-        }
         hr {
             border: 0;
-            border-top: 1px solid #eee;
+            border-top: 1px solid #e2e8f0;
             margin: 32px 0;
+        }
+        /* 现代扁平表格设计 */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background-color: #f8fafc;
+            color: #1e293b;
+            font-weight: 600;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover {
+            background-color: #f8fafc;
+        }
+        /* 状态高亮与标签 */
+        .status-ok {
+            color: #059669;
+            font-weight: 600;
+        }
+        .status-part {
+            color: #d97706;
+            font-weight: 600;
+        }
+        .tag {
+            display: inline-block;
+            background: #eff6ff;
+            color: #2563eb;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+            font-weight: 500;
+        }
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+            margin-top: 40px;
+            line-height: 1.8;
+        }
+        /* 针对移动端优化 padding */
+        @media (max-width: 600px) {
+            body {
+                padding: 12px 8px;
+            }
+            .container {
+                padding: 24px 16px;
+                border-radius: 12px;
+            }
+            th, td {
+                padding: 10px 12px;
+            }
         }
     </style>
 </head>

@@ -1,0 +1,100 @@
+[
+  {
+    "path": "/splash/entry",
+    "className": "com.example.sheeps.splash.SplashActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/web/h5",
+    "className": "com.example.sheeps.menu.ui.h5.H5Activity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/userinfo",
+    "className": "com.example.sheeps.menu.UserInfoActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/settings",
+    "className": "com.example.sheeps.menu.SettingsActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/reset-password",
+    "className": "com.example.sheeps.menu.ResetPasswordActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/register",
+    "className": "com.example.sheeps.menu.RegisterActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/notices",
+    "className": "com.example.sheeps.menu.NoticeListActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/menu/main",
+    "className": "com.example.sheeps.menu.MenuActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/auth/login",
+    "className": "com.example.sheeps.menu.LoginActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/leaderboard/show",
+    "className": "com.example.sheeps.leaderboard.LeaderboardActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/endless/leaderboard",
+    "className": "com.example.sheeps.leaderboard.EndlessLeaderboardActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/game/play",
+    "className": "com.example.sheeps.game.GameActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/endless/play",
+    "className": "com.example.sheeps.game.EndlessActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  },
+  {
+    "path": "/game/duel",
+    "className": "com.example.sheeps.game.DuelActivity",
+    "action": "",
+    "description": "",
+    "params": {}
+  }
+]
