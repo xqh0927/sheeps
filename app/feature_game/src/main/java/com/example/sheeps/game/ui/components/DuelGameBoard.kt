@@ -40,22 +40,34 @@ fun DuelGameBoard(
     onTileClick: (Tile) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 边界优先用 ViewModel 计算好的 boardBounds，再用当前 boardTiles 兜底，防止旧缓存导致偏移
-    val actualMinX = state.boardTiles.minOfOrNull { it.x } ?: 0f
-    val actualMaxX = state.boardTiles.maxOfOrNull { it.x } ?: 0f
-    val actualMinY = state.boardTiles.minOfOrNull { it.y } ?: 0f
-    val actualMaxY = state.boardTiles.maxOfOrNull { it.y } ?: 0f
+    // 使用 remember 缓存棋盘的边界和宽高计算，防止每次重绘都要遍历 state.boardTiles
+    val dimensions = remember(state.boardTiles, state.boardBounds) {
+        val actualMinX = state.boardTiles.minOfOrNull { it.x } ?: 0f
+        val actualMaxX = state.boardTiles.maxOfOrNull { it.x } ?: 0f
+        val actualMinY = state.boardTiles.minOfOrNull { it.y } ?: 0f
+        val actualMaxY = state.boardTiles.maxOfOrNull { it.y } ?: 0f
 
-    val minX = minOf(state.boardBounds.minX, actualMinX)
-    val maxX = maxOf(state.boardBounds.maxX, actualMaxX)
-    val minY = minOf(state.boardBounds.minY, actualMinY)
-    val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
+        val minX = minOf(state.boardBounds.minX, actualMinX)
+        val maxX = maxOf(state.boardBounds.maxX, actualMaxX)
+        val minY = minOf(state.boardBounds.minY, actualMinY)
+        val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
 
-    val tileSize = 46
-    val spacing = 46
-    // 计算卡片内容边界尺寸
-    val contentWidth = (maxX - minX) * spacing + tileSize
-    val contentHeight = (maxY - minY) * spacing + tileSize
+        val tileSize = 46
+        val spacing = 46
+        // 计算卡片内容边界尺寸
+        val contentWidth = (maxX - minX) * spacing + tileSize
+        val contentHeight = (maxY - minY) * spacing + tileSize
+        val scale = 1f
+
+        BoardDimensions(
+            minX = minX,
+            minY = minY,
+            spacing = spacing,
+            scale = scale,
+            displayedWidth = (contentWidth * scale).dp,
+            displayedHeight = (contentHeight * scale).dp
+        )
+    }
 
     // 棋盘自适应宽度：保证左右比屏幕边缘少 16dp
     val configuration = LocalConfiguration.current
@@ -63,8 +75,6 @@ fun DuelGameBoard(
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 420.dp
 
-    val displayedWidth = contentWidth.dp
-    val displayedHeight = contentHeight.dp
     Box(
         modifier = modifier
             .size(width = boardWidth, height = boardHeight)
@@ -79,24 +89,21 @@ fun DuelGameBoard(
         }
 
         if (visibleTiles.isNotEmpty()) {
-            // 关键修复：用"缩放后实际尺寸"作为 Box size
-            // 棋盘内容区根容器：仅在此测量一次，捕获全局坐标（px）后按公式推导每张牌全局坐标，
-            // 取代逐牌 onGloballyPositioned。飞行动画点击瞬间读取 tileGlobalPositions[tile.id] 作为起点。
             val boardRootPos = remember { mutableStateOf(Offset.Zero) }
             val density = LocalDensity.current.density
 
             Box(
                 modifier = Modifier
-                    .size(width = displayedWidth, height = displayedHeight)
+                    .size(width = dimensions.displayedWidth, height = dimensions.displayedHeight)
                     .onGloballyPositioned { coords ->
                         boardRootPos.value = coords.positionInRoot()
                         computeTileGlobalPositions(
                             boardRootPos = boardRootPos.value,
                             density = density,
-                            minX = minX,
-                            minY = minY,
-                            spacing = spacing,
-                            scale = 1f,
+                            minX = dimensions.minX,
+                            minY = dimensions.minY,
+                            spacing = dimensions.spacing,
+                            scale = dimensions.scale,
                             visibleTiles = visibleTiles,
                             tileGlobalPositions = tileGlobalPositions
                         )
@@ -109,12 +116,12 @@ fun DuelGameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = "shuang",
-                            tileSize = 46.dp,
+                            tileSize = (46 * dimensions.scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             modifier = Modifier
                                 .offset(
-                                    x = ((tile.x - minX) * spacing).dp,
-                                    y = ((tile.y - minY) * spacing).dp
+                                    x = ((tile.x - dimensions.minX) * dimensions.spacing * dimensions.scale).dp,
+                                    y = ((tile.y - dimensions.minY) * dimensions.spacing * dimensions.scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .alpha(if (isFlying) 0f else 1f)
@@ -129,10 +136,10 @@ fun DuelGameBoard(
                     computeTileGlobalPositions(
                         boardRootPos = boardRootPos.value,
                         density = density,
-                        minX = minX,
-                        minY = minY,
-                        spacing = spacing,
-                        scale = 1f,
+                        minX = dimensions.minX,
+                        minY = dimensions.minY,
+                        spacing = dimensions.spacing,
+                        scale = dimensions.scale,
                         visibleTiles = visibleTiles,
                         tileGlobalPositions = tileGlobalPositions
                     )
@@ -228,3 +235,5 @@ private fun computeTileGlobalPositions(
         tileGlobalPositions[tile.id] = Offset(x, y)
     }
 }
+
+

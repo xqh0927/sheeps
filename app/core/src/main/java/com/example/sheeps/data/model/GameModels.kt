@@ -1,5 +1,6 @@
 package com.example.sheeps.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /** 瓦片（麻将牌）的运行时状态，参与游戏引擎遮挡判定与消除流程。 */
@@ -27,6 +28,7 @@ enum class TileState {
  * @param isBlind 是否为盲牌（隐藏图案）
  * @param sealedCount 封印计数（被符纸封印的层数）
  */
+@Immutable
 @Serializable
 data class Tile(
     val id: String,

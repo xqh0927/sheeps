@@ -11,6 +11,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.launch
 import com.therouter.router.Route
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.game.state.DuelViewEffect
@@ -89,15 +92,17 @@ class DuelActivity : BaseActivity() {
      * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消，无泄漏。
      */
     override fun initData() {
-        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消；
-        // viewEffect 为副作用流，此处 collect 不会造成泄漏。
-        lifecycleScope.launchWhenStarted {
-            viewModel.viewEffect.collect { effect ->
-                when (effect) {
-                    is DuelViewEffect.ShowToast -> Toaster.show(effect.message)
-                    is DuelViewEffect.PlaySound -> { /* Play sound */ }
-                    is DuelViewEffect.Vibrate -> { /* Vibrate */ }
-                    is DuelViewEffect.ExitGame -> finish()
+        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，并使用 repeatOnLifecycle 确保应用在后台时
+        // 自动取消收集，释放硬件资源，防止后台内存泄漏与不必要的 CPU 开销。
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.viewEffect.collect { effect ->
+                    when (effect) {
+                        is DuelViewEffect.ShowToast -> Toaster.show(effect.message)
+                        is DuelViewEffect.PlaySound -> { /* Play sound */ }
+                        is DuelViewEffect.Vibrate -> { /* Vibrate */ }
+                        is DuelViewEffect.ExitGame -> finish()
+                    }
                 }
             }
         }

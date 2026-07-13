@@ -9,11 +9,13 @@ import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,7 +57,8 @@ class H5Activity : BaseActivity() {
     override fun initData() {}
 
     /**
-     * H5 内容可组合项：顶栏（标题 + 返回 + 刷新）+ 内部 WebView + 加载转圈。
+     * H5 内容可组合项：基于 Scaffold 承载顶栏（标题 + 返回 + 刷新）与内部 WebView，
+     * 自动处理状态栏与底部物理导航栏的间距（PaddingValues），保证全屏体验样式统一。
      *
      * @param url 要加载的地址
      * @param title 顶部标题
@@ -71,19 +74,24 @@ class H5Activity : BaseActivity() {
             webView?.goBack()
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            SheepsTopAppBar(
-                title = title,
-                onBack = { finish() },
-                showAction = true,
-                actionIcon = Icons.Default.Refresh,
-                onActionClick = { webView?.reload() }
-            )
-
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                SheepsTopAppBar(
+                    title = title,
+                    onBack = { finish() },
+                    showAction = true,
+                    actionIcon = Icons.Default.Refresh,
+                    onActionClick = { webView?.reload() }
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { paddingValues ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .weight(1f)
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
             ) {
                 AndroidView(
                     factory = { ctx ->
@@ -129,7 +137,9 @@ class H5Activity : BaseActivity() {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator()
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }

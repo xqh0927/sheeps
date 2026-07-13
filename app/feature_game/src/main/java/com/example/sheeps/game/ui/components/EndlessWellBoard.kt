@@ -50,9 +50,17 @@ fun EndlessWellBoard(
 
     val tileSize = 48.dp // 单张牌尺寸（固定）
     val verticalStep = tileSize + gap // 纵向步进 = 牌高 + 间隙（上下间隙 = gap）
-    val stackHeight = deathRow * tileSize + (deathRow - 1) * gap // 满 deathRow 张的堆叠高度
-    val columnHeight = topReserve + stackHeight + bottomReserve // 列内可用高度
-    val rowHeight = columnHeight + pad * 2 // 含 padding 的 Row 总高
+
+    // 缓存无尽模式的列高和总高计算，防止重绘时频繁重新计算 Dp
+    val sizes = remember(deathRow) {
+        val stackHeight = deathRow * tileSize + (deathRow - 1) * gap
+        val columnHeight = topReserve + stackHeight + bottomReserve
+        val rowHeight = columnHeight + pad * 2
+        WellBoardSizes(
+            columnHeight = columnHeight,
+            rowHeight = rowHeight
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -60,7 +68,7 @@ fun EndlessWellBoard(
     ) {
         Row(
             modifier = Modifier
-                .height(rowHeight)
+                .height(sizes.rowHeight)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .border(
@@ -84,10 +92,10 @@ fun EndlessWellBoard(
                         key(tile.id) {
                             // isInitial：首帧从列底滑入，之后以目标位做重力动画
                             var isInitial by remember { mutableStateOf(true) }
-                            // p = 距底第几张（0 为最底）。目标顶部 y = columnHeight - bottomReserve - tileSize - p*verticalStep
+                            // p = 距底第几张（0 为最底）。目标顶部 y = sizes.columnHeight - bottomReserve - tileSize - p*verticalStep
                             val p = column.size - 1 - i
-                            val targetY = columnHeight - bottomReserve - tileSize - p * verticalStep
-                            val finalTargetY = if (isInitial) columnHeight else targetY
+                            val targetY = sizes.columnHeight - bottomReserve - tileSize - p * verticalStep
+                            val finalTargetY = if (isInitial) sizes.columnHeight else targetY
 
                             val animatedY by animateDpAsState(
                                 targetValue = finalTargetY,
@@ -120,3 +128,9 @@ fun EndlessWellBoard(
         }
     }
 }
+
+/** 封装生存模式棋盘列高和总高的局部实体类 */
+private data class WellBoardSizes(
+    val columnHeight: androidx.compose.ui.unit.Dp,
+    val rowHeight: androidx.compose.ui.unit.Dp
+)

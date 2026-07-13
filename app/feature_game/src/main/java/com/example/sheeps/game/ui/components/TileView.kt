@@ -95,6 +95,18 @@ fun TileView(
         interactionSource, isBlocked
     )
 
+    // 缓存边框 Shape，免除重绘期重复实例化
+    val borderShape = remember { RoundedCornerShape(8.dp) }
+
+    // 缓存图片 URL 和 fallback 资源 ID，避免高频重构触发 Map 查询与资源解析
+    val context = LocalContext.current
+    val tileUrl = remember(currentSkin, tile.type) {
+        TileIconProvider.getTileUrl(currentSkin, tile.type)
+    }
+    val fallbackResId = remember(tile.type) {
+        TileIconProvider.getFallbackResId(context, tile.type)
+    }
+
     // LaunchedEffect(isShaking) 在 isShaking 变 true 时启动，变 false 时自动取消该协程，
     // 跟随组合生命周期，无独立泄漏风险。
     // 被阻止点击时的水平抖动动画：给玩家明确的“不可点击”视觉暗示
@@ -126,15 +138,13 @@ fun TileView(
                 color = if (isShaking) Color.Red else if (isHighlighted) MaterialTheme.colorScheme.secondary.copy(
                     alpha = borderAlpha
                 ) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+                shape = borderShape
             )
             .clickable(
                 interactionSource = interactionSource, indication = null, // 移除系统默认水波纹，以自定义缩放为主
                 enabled = true, onClick = onClick
             )
     ) {
-        val context = LocalContext.current
-
         Box(
             modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
         ) {
@@ -148,8 +158,6 @@ fun TileView(
             } else {
                 // 情况 2：显示正面图标，若被压制则降低透明度
                 // v2：URL 优先（Coil），缺失/失败回退默认皮肤本地 drawable，再无则显示类型编号
-                val tileUrl = TileIconProvider.getTileUrl(currentSkin, tile.type)
-                val fallbackResId = TileIconProvider.getFallbackResId(context, tile.type)
                 val iconAlpha = if (isBlocked) mask else 1f
                 when {
                     tileUrl != null -> RemoteImage(

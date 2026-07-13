@@ -4,6 +4,9 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.Lifecycle
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
@@ -114,28 +117,30 @@ class GameActivity : BaseActivity() {
         viewModel.sendIntent(GameViewIntent.LoadLevel(levelId, carryJson))
 
         // 在生命周期范围内收集 ViewModel 发出的副作用
-        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消；
-        // viewEffect 为一次性/SharedFlow 副作用流，此处 collect 不会造成泄漏。
-        lifecycleScope.launchWhenStarted {
-            viewModel.viewEffect.collect { effect ->
-                when (effect) {
-                    is com.example.sheeps.game.state.GameViewEffect.ShowToast -> {
-                        Toaster.show(effect.message)
-                    }
-                    is com.example.sheeps.game.state.GameViewEffect.PlaySound -> {
-                        // 预留：此处触发全局音效播放
-                    }
-                    is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
-                        try {
-                            val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                            } else {
-                                @Suppress("DEPRECATION")
-                                vibrator.vibrate(100)
+        // ⚠️ 内存/生命周期：收集协程绑定于 lifecycleScope，并使用 repeatOnLifecycle 确保应用在后台时
+        // 自动取消收集，释放硬件资源，防止后台内存泄漏与不必要的 CPU 开销。
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.viewEffect.collect { effect ->
+                    when (effect) {
+                        is com.example.sheeps.game.state.GameViewEffect.ShowToast -> {
+                            Toaster.show(effect.message)
+                        }
+                        is com.example.sheeps.game.state.GameViewEffect.PlaySound -> {
+                            // 预留：此处触发全局音效播放
+                        }
+                        is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
+                            try {
+                                val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    vibrator.vibrate(100)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
                         }
                     }
                 }

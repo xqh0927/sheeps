@@ -2,7 +2,7 @@ package com.example.sheeps.core.preference
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 import com.tencent.mmkv.MMKV
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -26,11 +26,13 @@ class UserPreferences @Inject constructor(
     // ⚠️ 线程提示：securePrefs 通过 lazy 首次访问时创建，EncryptedSharedPreferences.create 涉及磁盘 I/O，
     //    若首次访问发生在主线程可能掉帧；建议在后台或冷启动阶段预先触发一次访问。其后续读写为内存映射，开销较低。
     private val securePrefs by lazy {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
         EncryptedSharedPreferences.create(
-            "secure_user_prefs",
-            masterKeyAlias,
             context,
+            "secure_user_prefs",
+            masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )

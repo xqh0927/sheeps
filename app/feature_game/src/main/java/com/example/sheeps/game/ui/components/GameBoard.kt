@@ -39,34 +39,40 @@ fun GameBoard(
     onTileClick: (Tile) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 边界优先用 ViewModel 计算好的 boardBounds，再用当前 boardTiles 兜底，防止旧缓存导致偏移
-    val actualMinX = state.boardTiles.minOfOrNull { it.x } ?: 0f
-    val actualMaxX = state.boardTiles.maxOfOrNull { it.x } ?: 0f
-    val actualMinY = state.boardTiles.minOfOrNull { it.y } ?: 0f
-    val actualMaxY = state.boardTiles.maxOfOrNull { it.y } ?: 0f
+    // 使用 remember 缓存棋盘的边界和宽高计算，防止每次微小的重绘都要去遍历 state.boardTiles
+    val dimensions = remember(state.boardTiles, state.boardBounds) {
+        val actualMinX = state.boardTiles.minOfOrNull { it.x } ?: 0f
+        val actualMaxX = state.boardTiles.maxOfOrNull { it.x } ?: 0f
+        val actualMinY = state.boardTiles.minOfOrNull { it.y } ?: 0f
+        val actualMaxY = state.boardTiles.maxOfOrNull { it.y } ?: 0f
 
-    val minX = minOf(state.boardBounds.minX, actualMinX)
-    val maxX = maxOf(state.boardBounds.maxX, actualMaxX)
-    val minY = minOf(state.boardBounds.minY, actualMinY)
-    val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
+        val minX = minOf(state.boardBounds.minX, actualMinX)
+        val maxX = maxOf(state.boardBounds.maxX, actualMaxX)
+        val minY = minOf(state.boardBounds.minY, actualMinY)
+        val maxY = maxOf(state.boardBounds.maxY, actualMaxY)
 
-    val tileSize = 46
-    val spacing = 46
-    // 计算卡片内容边界尺寸（未缩放）
-    val contentWidth = (maxX - minX) * spacing + tileSize
-    val contentHeight = (maxY - minY) * spacing + tileSize
+        val tileSize = 46
+        val spacing = 46
+        // 计算卡片内容边界尺寸（未缩放）
+        val contentWidth = (maxX - minX) * spacing + tileSize
+        val contentHeight = (maxY - minY) * spacing + tileSize
+        val scale = 1f
+
+        BoardDimensions(
+            minX = minX,
+            minY = minY,
+            spacing = spacing,
+            scale = scale,
+            displayedWidth = (contentWidth * scale).dp,
+            displayedHeight = (contentHeight * scale).dp
+        )
+    }
 
     // 棋盘自适应宽度：保证左右比屏幕边缘少 16dp
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val boardWidth = screenWidth - 32.dp
     val boardHeight = 420.dp
-
-    // 采用方案二：服务端限制生成网格在 6x7 内，客户端固定卡牌尺寸不缩放
-    val scale = 1f
-
-    val displayedWidth = (contentWidth * scale).dp
-    val displayedHeight = (contentHeight * scale).dp
 
     Box(
         modifier = modifier
@@ -88,8 +94,6 @@ fun GameBoard(
     ) {
         // 当 boardTiles 引用或 flyingTileIds 变化时重算 visibleTiles
         // flyingTileIds 加入 key 确保动画结束后 flyingTileIds 清空时正确重算
-        // 线程边界：remember 在主线程组合期求值；下方 onGloballyPositioned 为布局期回调（主线程），
-        // 直接写入外部传入的可变 Map tileGlobalPositions，供飞行动画读取屏幕绝对坐标。
         val visibleTiles = remember(state.boardTiles, flyingTileIds) {
             state.boardTiles.filter { tile ->
                 (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) &&
@@ -98,28 +102,21 @@ fun GameBoard(
         }
 
         if (visibleTiles.isNotEmpty()) {
-            // 关键修复：用"缩放后实际尺寸"作为 Box size（不是原始 contentWidth）
-            // 然后把每个 tile 的 offset 同步乘以 scale
-            // 这样 Alignment.Center 会按真实可见大小居中，不再有偏移/裁切
-            // 棋盘内容区根容器：仅在根容器测量一次，捕获其全局坐标（px），
-            // 再按布局公式推导每张可见牌的全局坐标写入 tileGlobalPositions，
-            // 取代此前给每张 TileView 挂 onGloballyPositioned（300 次回调/帧）。
-            // 飞行动画点击瞬间读取 tileGlobalPositions[tile.id] 作为起点，保证首帧布局后即写入。
             val boardRootPos = remember { mutableStateOf(Offset.Zero) }
             val density = LocalDensity.current.density
 
             Box(
                 modifier = Modifier
-                    .size(width = displayedWidth, height = displayedHeight)
+                    .size(width = dimensions.displayedWidth, height = dimensions.displayedHeight)
                     .onGloballyPositioned { coords ->
                         boardRootPos.value = coords.positionInRoot()
                         computeTileGlobalPositions(
                             boardRootPos = boardRootPos.value,
                             density = density,
-                            minX = minX,
-                            minY = minY,
-                            spacing = spacing,
-                            scale = scale,
+                            minX = dimensions.minX,
+                            minY = dimensions.minY,
+                            spacing = dimensions.spacing,
+                            scale = dimensions.scale,
                             visibleTiles = visibleTiles,
                             tileGlobalPositions = tileGlobalPositions
                         )
@@ -134,14 +131,14 @@ fun GameBoard(
                             tile = tile,
                             onClick = { if (!isFlying) onTileClick(tile) },
                             currentSkin = state.currentSkin,
-                            tileSize = (46 * scale).dp,
+                            tileSize = (46 * dimensions.scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
                             isHighlighted = isHighlighted,
                             gateLocked = tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds,
                             modifier = Modifier
                                 .offset(
-                                    x = ((tile.x - minX) * spacing * scale).dp,
-                                    y = ((tile.y - minY) * spacing * scale).dp
+                                    x = ((tile.x - dimensions.minX) * dimensions.spacing * dimensions.scale).dp,
+                                    y = ((tile.y - dimensions.minY) * dimensions.spacing * dimensions.scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
                         )
@@ -149,17 +146,16 @@ fun GameBoard(
                 }
             }
 
-            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标，
-            // 确保飞行动画在点击瞬间能读到正确起点（首帧布局已写入，此处为兜底）。
+            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标
             LaunchedEffect(visibleTiles) {
                 if (boardRootPos.value != Offset.Zero) {
                     computeTileGlobalPositions(
                         boardRootPos = boardRootPos.value,
                         density = density,
-                        minX = minX,
-                        minY = minY,
-                        spacing = spacing,
-                        scale = scale,
+                        minX = dimensions.minX,
+                        minY = dimensions.minY,
+                        spacing = dimensions.spacing,
+                        scale = dimensions.scale,
                         visibleTiles = visibleTiles,
                         tileGlobalPositions = tileGlobalPositions
                     )
@@ -168,6 +164,16 @@ fun GameBoard(
         }
     }
 }
+
+/** 封装棋盘宽高边界与缩放比例的局部实体类 */
+internal data class BoardDimensions(
+    val minX: Float,
+    val minY: Float,
+    val spacing: Int,
+    val scale: Float,
+    val displayedWidth: androidx.compose.ui.unit.Dp,
+    val displayedHeight: androidx.compose.ui.unit.Dp
+)
 
 /**
  * 依据棋盘内容区根容器全局坐标（px）与布局参数，推导每张可见牌的屏幕全局坐标（px）。
