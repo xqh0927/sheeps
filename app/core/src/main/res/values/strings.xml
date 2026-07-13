@@ -74,7 +74,6 @@
     <string name="item_bomb">炸弹</string>
     <string name="item_joker">万能牌</string>
     <string name="item_double_points">双倍金币</string>
-    <string name="item_freeze">冻结符</string>
 
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解锁</string>
@@ -339,7 +338,6 @@
     <string name="item_bomb_desc">炸毁槽位最末尾的2张卡牌</string>
     <string name="item_joker_desc">作为万能牌与前两张卡牌自动消除</string>
     <string name="item_double_points_desc">本局结算时金币奖励翻倍</string>
-    <string name="item_freeze_desc">暂停下落4秒，获得喘息窗口</string>
     <string name="btn_go_to_play">去闯关</string>
     <string name="skin_apply_success">皮肤更换成功</string>
 

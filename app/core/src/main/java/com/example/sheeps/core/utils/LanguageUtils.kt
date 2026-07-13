@@ -37,7 +37,6 @@ fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null
         "REVIVE" -> stringResource(id = R.string.item_revive)
         "HINT" -> stringResource(id = R.string.item_hint)
         "BOMB" -> stringResource(id = R.string.item_bomb)
-        "FREEZE" -> stringResource(id = R.string.item_freeze)
         "JOKER" -> stringResource(id = R.string.item_joker)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang)
@@ -54,7 +53,11 @@ fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null
  * ⚠️ 线程约束：@MainThread（@Composable）
  */
 @Composable
-fun getLocalizedItemDesc(itemType: String, defaultDesc: String?, itemI18n: Map<String, String>? = null): String {
+fun getLocalizedItemDesc(
+    itemType: String,
+    defaultDesc: String?,
+    itemI18n: Map<String, String>? = null
+): String {
     // 优先：后台接口多语言
     itemI18n?.get(itemType.uppercase())?.let { return it }
     // 回退：本地 R.string
@@ -65,7 +68,6 @@ fun getLocalizedItemDesc(itemType: String, defaultDesc: String?, itemI18n: Map<S
         "REVIVE" -> stringResource(id = R.string.item_revive_desc)
         "HINT" -> stringResource(id = R.string.item_hint_desc)
         "BOMB" -> stringResource(id = R.string.item_bomb_desc)
-        "FREEZE" -> stringResource(id = R.string.item_freeze_desc)
         "JOKER" -> stringResource(id = R.string.item_joker_desc)
         "DOUBLE_POINTS" -> stringResource(id = R.string.item_double_points_desc)
         "SKIN_SHUANG" -> stringResource(id = R.string.item_skin_shuang_desc)

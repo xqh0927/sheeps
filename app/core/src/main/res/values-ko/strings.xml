@@ -71,7 +71,6 @@
     <string name="item_bomb">폭탄</string>
     <string name="item_joker">조커</string>
     <string name="item_double_points">더블 코인</string>
-    <string name="item_freeze">프리즈</string>
 
     <string name="shop_title">아이템 상점</string>
     <string name="shop_vault_locked">잠김</string>
@@ -298,7 +297,6 @@
     <string name="item_bomb_desc">슬롯 맨 끝에 있는 카드 2장을 폭파합니다</string>
     <string name="item_joker_desc">어떤 카드와도 맞춰지는 조커 역할을 합니다</string>
     <string name="item_double_points_desc">성공적으로 클리어 시 획득 코인이 2배가 됩니다</string>
-    <string name="item_freeze_desc">4초 동안 낙하를 정지하고 숨 돌릴 시간을 만듭니다</string>
     <string name="btn_go_to_play">도전</string>
     <string name="skin_apply_success">스킨이 변경되었습니다</string>
 

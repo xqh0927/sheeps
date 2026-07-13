@@ -71,7 +71,6 @@
     <string name="item_bomb">爆弾</string>
     <string name="item_joker">ジョーカー</string>
     <string name="item_double_points">ダブルコイン</string>
-    <string name="item_freeze">フリーズ</string>
 
     <string name="shop_title">ショップ</string>
     <string name="shop_vault_locked">未開放</string>
@@ -294,7 +293,6 @@
     <string name="item_bomb_desc">スロットの末尾2枚を消去します</string>
     <string name="item_joker_desc">万能カードとして自動消去に使用されます</string>
     <string name="item_double_points_desc">獲得するコインを2倍にします</string>
-    <string name="item_freeze_desc">4秒間落下を停止し、一息つく時間を作ります</string>
     <string name="btn_go_to_play">挑戦</string>
     <string name="skin_apply_success">スキンを変更しました</string>
 

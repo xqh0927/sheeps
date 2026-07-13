@@ -1,6 +1,10 @@
 package com.example.sheeps
 
 import android.app.Application
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.disk.DiskCache
+import coil.memory.MemoryCache
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -23,7 +27,7 @@ import javax.inject.Inject
  * 初始化核心组件、第三方库，并负责监控全局生命周期与网络变化以触发数据同步。
  */
 @HiltAndroidApp
-class MyApplication : Application(), Configuration.Provider {
+class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
@@ -42,9 +46,37 @@ class MyApplication : Application(), Configuration.Provider {
             .setWorkerFactory(workerFactory)
             .build()
 
+    /**
+     * 配置 Coil 全局 [ImageLoader]（实现 [ImageLoaderFactory]）。
+     * 统一开启磁盘/内存/网络三级缓存与 crossfade 过渡，供 [TileIconProvider] 远程卡面
+     * 与 [com.example.sheeps.ui.components.RemoteImage] 使用。
+     *
+     * 注意：Coil 2.x 的 [ImageLoaderFactory.newImageLoader] 方法签名为无参；Application 自身即
+     * [android.content.Context]，故以 `this`（捕获为 [appContext]）作为各 Builder 的上下文，
+     * 避免 lambda 内 `this` 指代 [ImageLoader.Builder] 而导致上下文类型错误。
+     */
+    override fun newImageLoader(): ImageLoader {
+        val appContext: Application = this
+        return ImageLoader.Builder(appContext)
+            .crossfade(true)
+            .memoryCache {
+                MemoryCache.Builder(appContext)
+                    .maxSizePercent(0.25)
+                    .weakReferencesEnabled(true)
+                    .build()
+            }
+            .diskCache {
+                DiskCache.Builder()
+                    .directory(appContext.cacheDir.resolve("image_cache"))
+                    .maxSizePercent(0.05)
+                    .build()
+            }
+            .build()
+    }
+
     override fun onCreate() {
         super.onCreate()
-        
+
         // --- 核心初始化 ---
         // 注意：MMKV, Toaster, Logcat, TheRouter 已通过 App Startup 库自动初始化。
 

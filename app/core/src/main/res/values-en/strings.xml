@@ -71,7 +71,6 @@
     <string name="item_bomb">Bomb</string>
     <string name="item_joker">Joker</string>
     <string name="item_double_points">Double Coins</string>
-    <string name="item_freeze">Freeze</string>
 
     <string name="shop_title">Item Shop</string>
     <string name="shop_vault_locked">Locked</string>
@@ -324,7 +323,6 @@
     <string name="item_bomb_desc">Remove last 2 tiles from slots</string>
     <string name="item_joker_desc">Acts as a joker card to clear matches</string>
     <string name="item_double_points_desc">Double the coins earned on win</string>
-    <string name="item_freeze_desc">Pause falling for 4 seconds to catch a breath</string>
     <string name="btn_go_to_play">Play</string>
     <string name="skin_apply_success">Skin applied successfully</string>
 

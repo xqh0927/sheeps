@@ -319,7 +319,7 @@ class DuelCommandHandler @Inject constructor() {
             "PLAYER_RECONNECTED" -> if (command.payload.targetPlayerId != state.playerId) {
                 handleOpponentReconnected(updateState, getLocalizedString)
             }
-            "GAME_OVER_DISCONNECT_WIN" -> handleOpponentTimeout(state, updateState, setEffect, getLocalizedString)
+            "GAME_OVER_DISCONNECT_WIN" -> if (command.payload.targetPlayerId != state.playerId) handleOpponentTimeout(state, updateState, setEffect, getLocalizedString)
         }
     }
 

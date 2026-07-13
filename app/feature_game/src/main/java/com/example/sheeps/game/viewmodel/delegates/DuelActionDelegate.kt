@@ -52,30 +52,35 @@ class DuelActionDelegate @Inject constructor() {
 
         scope.launch {
             if (tile.state == TileState.MOVED_OUT) {
-                // 从置物架点击
-                val updatedBoard = state.boardTiles
+                // 从置物架点击：不可变更新并【立即乐观提交】到卡槽，
+                // 避免本地落槽更新被后续远端消息 / 重渲染以旧快照覆盖而“回档”。
                 val updatedMovedOut = state.movedOutTiles.filter { it.id != tile.id }
-                val newSlot = state.slotTiles + tile.copy(state = TileState.IN_SLOT, isBlind = false)
-
+                val clickedTile = tile.copy(state = TileState.IN_SLOT, isBlind = false)
+                val newSlot = state.slotTiles + clickedTile
+                val newBoard = state.boardTiles.map { t -> if (t.id == tile.id) clickedTile else t.copy() }
                 setEffect(DuelViewEffect.PlaySound(SoundType.CLICK))
-                processSlotMatch(updatedBoard, newSlot, updatedMovedOut)
+                updateState { copy(boardTiles = newBoard, slotTiles = newSlot, movedOutTiles = updatedMovedOut) }
+                processSlotMatch(newBoard, newSlot, updatedMovedOut)
             } else {
                 // 从棋盘点击
                 if (tile.sealedCount > 0) {
-                    // 解锁封印
-                    tile.sealedCount--
+                    // 解锁封印：不可变更新，构造新的棋盘副本，避免共享对象被远端消息覆盖
+                    val newSealedCount = tile.sealedCount - 1
+                    val newBoard = state.boardTiles.map { t ->
+                        if (t.id == tile.id) t.copy(sealedCount = newSealedCount) else t.copy()
+                    }
                     setEffect(DuelViewEffect.PlaySound(SoundType.UNSEAL))
                     setEffect(DuelViewEffect.Vibrate)
-                    updateState { copy(boardTiles = calculateBlockedStates(state.boardTiles)) }
+                    updateState { copy(boardTiles = calculateBlockedStates(newBoard)) }
                 } else {
-                    // 盲盒牌进入卡槽后立刻揭示图案
-                    tile.isBlind = false
-                    tile.state = TileState.IN_SLOT
-                    val updatedBoard = state.boardTiles
-                    val newSlot = state.slotTiles + tile
-
+                    // 普通棋盘牌落槽（不可变状态更新，【立即乐观提交】；与闯关模式保持一致，
+                    // 彻底规避引用泄漏、卡牌重复显示与“回档”）。
+                    val clickedTile = tile.copy(isBlind = false, state = TileState.IN_SLOT)
+                    val newSlot = state.slotTiles + clickedTile
+                    val newBoard = state.boardTiles.map { t -> if (t.id == tile.id) clickedTile else t.copy() }
                     setEffect(DuelViewEffect.PlaySound(SoundType.CLICK))
-                    processSlotMatch(updatedBoard, newSlot, state.movedOutTiles)
+                    updateState { copy(boardTiles = newBoard, slotTiles = newSlot) }
+                    processSlotMatch(newBoard, newSlot, state.movedOutTiles)
                 }
             }
         }
@@ -130,8 +135,10 @@ class DuelActionDelegate @Inject constructor() {
         if (matched) {
             setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
             onMatchSuccess(eliminatedIds)
-        } else if (slot.size > state.slotTiles.size) {
-            // 新增了牌但未消除，重置连击
+        } else {
+            // 新增了牌但未消除，重置连击。
+            // 注：点击落槽已在 handleClickTile 中即时提交，此处不再依赖 slot 大小比较，
+            // 只要本次未触发消除即归零，符合“仅新增牌未消除则连击归零”的语义。
             updateState { copy(combo = 0) }
         }
 

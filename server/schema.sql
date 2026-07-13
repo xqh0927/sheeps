@@ -240,8 +240,7 @@ INSERT INTO task (id, name, description, target_count, points_reward) VALUES
 ('SIGN_IN_ONCE', '每日晨曦', '完成一次签到', 1, 10);
 
 INSERT INTO notice (title, content, type, created_at) VALUES 
-('国风消消乐2.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000),
-('版本优化公告', '优化了层叠卡牌飞入和重叠状态计算性能', 'UPDATE', 1720000000100);
+('消了个爽1.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000),
 
 INSERT INTO shop_items (name, description, item_type, points_price, stock) VALUES 
 ('乾坤符 (Undo)', '撤销上一步操作', 'UNDO', 20, 100),
@@ -251,8 +250,7 @@ INSERT INTO shop_items (name, description, item_type, points_price, stock) VALUE
 ('天眼符 (Hint)', '自动高亮出一组可消卡牌', 'HINT', 15, 150),
 ('雷震子 (Bomb)', '直接炸毁卡槽中最后2张卡牌', 'BOMB', 40, 30),
 ('太极牌 (Joker)', '作为任意图案卡牌与前两张直接凑对消除', 'JOKER', 60, 10),
-('双倍符 (Double)', '结算时获得双倍积分卡', 'DOUBLE_POINTS', 25, 50),
-('冻结符 (Freeze)', '暂停下落4秒，获得操作窗口', 'FREEZE', 35, 30);
+('双倍符 (Double)', '结算时获得双倍积分卡', 'DOUBLE_POINTS', 25, 50);
 
 INSERT INTO config (key, value) VALUES 
 ('level_2_unlock_points', '50'),
@@ -260,6 +258,7 @@ INSERT INTO config (key, value) VALUES
 ('level_4_unlock_points', '200'),
 ('sign_rewards', '20,20,30,30,40,50,100'),
 ('gamemode_stage', 'on'),               -- 方案 B：闯关模式（默认开）
+('gamemode_battle', 'on'),               -- 方案 B：对战模式（默认开）
 ('gamemode_endless', 'off');            -- 方案 B：无尽生存模式（默认关）
 
 CREATE TABLE IF NOT EXISTS app_version (

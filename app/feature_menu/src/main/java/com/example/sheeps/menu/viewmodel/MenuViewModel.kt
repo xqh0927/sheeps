@@ -1,6 +1,10 @@
 package com.example.sheeps.menu.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.viewModelScope
+import coil.Coil
+import coil.request.ImageRequest
+ import coil.size.Scale
 import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseMviViewModel
 import com.example.sheeps.core.cache.ShopCache
@@ -31,6 +35,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import coil.size.Size
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -311,6 +316,9 @@ class MenuViewModel @Inject constructor(
             val remoteItems = apiService.getShopItems()
             // 注入 URL 注册表：建立 skin_tiles / item_icons 映射与分组数据（v2 图片下发核心）
             TileIconProvider.setShopItems(remoteItems)
+            // 保底预热：首次商城数据就绪后，预载当前皮肤与默认皮肤（解决进对局首张慢）
+            preloadSkin(prefs.getCurrentSkin())
+            preloadSkin("shuang")
             // 本地缓存 + 变更检测：仅内容变化时写盘（返回是否有变化，调用方据此决定是否刷新）
             shopCache.saveIfChanged(remoteItems)
             remoteItems
@@ -545,6 +553,26 @@ class MenuViewModel @Inject constructor(
     private fun handleChangeSkin(skin: String) {
         prefs.setCurrentSkin(skin)
         updateState { copy(currentSkin = skin) }
+        preloadSkin(skin)
+    }
+
+    /**
+     * 换肤后后台预加载新皮肤的 12 张卡面图片（Coil 内存/磁盘缓存），
+     * 避免进入对局后首张牌面加载缓慢。enqueue 为非阻塞调用，使用 viewModelScope 默认调度。
+     */
+    private fun preloadSkin(skinKey: String) {
+        viewModelScope.launch {
+            val px = (48f * context.resources.displayMetrics.density).toInt()
+            TileIconProvider.getSkinTileUrls(skinKey).forEach { url ->
+                Coil.imageLoader(context).enqueue(
+                    ImageRequest.Builder(context)
+                        .data(url)
+                        .size(Size(px, px))
+                        .scale(Scale.FIT)
+                        .build()
+                )
+            }
+        }
     }
 
     /**

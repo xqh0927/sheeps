@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import coil.compose.AsyncImage
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 
 /**
  * 远程图片封装（Coil AsyncImage + 本地兜底 painter）。
@@ -40,8 +42,15 @@ fun RemoteImage(
             contentScale = ContentScale.Fit
         )
     } else {
+        val context = LocalContext.current
         AsyncImage(
-            model = url,
+            model = ImageRequest.Builder(context)
+                .data(url)
+                .crossfade(true)
+                .diskCachePolicy(CachePolicy.ENABLED)
+                .memoryCachePolicy(CachePolicy.ENABLED)
+                .networkCachePolicy(CachePolicy.ENABLED)
+                .build(),
             contentDescription = contentDescription,
             modifier = resolved,
             contentScale = ContentScale.Fit,

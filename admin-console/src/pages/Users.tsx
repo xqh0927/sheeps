@@ -40,8 +40,7 @@ const PROPS_DEFINITIONS = [
   { type: 'HINT', label: '天眼符 (Hint)' },
   { type: 'BOMB', label: '雷震子 (Bomb)' },
   { type: 'JOKER', label: '太极牌 (Joker)' },
-  { type: 'DOUBLE_POINTS', label: '双倍符 (Double)' },
-  { type: 'FREEZE', label: '冻结符 (Freeze)' }
+  { type: 'DOUBLE_POINTS', label: '双倍符 (Double)' }
 ];
 
 const ROLES = [

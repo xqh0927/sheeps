@@ -64,6 +64,14 @@ object TileIconProvider {
     }
 
     /**
+     * 批量获取某皮肤全部 12 张卡面的远程 URL（用于切换皮肤后预加载，解决进对局首张加载慢）。
+     * 内部按 1..12 顺序取 [getTileUrl]，过滤掉取不到的（null）。
+     * @param skinKey 皮肤渲染键（任意大小写，内部统一小写）
+     * @return 该皮肤全部有效卡面 URL 列表
+     */
+    fun getSkinTileUrls(skinKey: String): List<String> = (1..12).mapNotNull { getTileUrl(skinKey, it) }
+
+    /**
      * 获取某道具图标的远程 URL。
      * @return URL 字符串；无远程数据返回 null（调用方应回退静态占位 drawable）。
      */
@@ -76,11 +84,40 @@ object TileIconProvider {
     fun getAllItems(): List<ShopItem> = allItems
 
     /**
+     * 默认皮肤（[SkinConstants.DEFAULT_SKIN]，即 shuang）本地兜底图的静态映射表。
+     *
+     * 由 `app/core/src/main/res/drawable/tile_shuang_1..12.webp` 这些真实资源在编译期直接引用生成，
+     * 彻底替代原先运行时 `Resources.getIdentifier(...)` 反射查找（反射有性能损耗且在新 Android 上易被
+     * 资源混淆/裁剪影响）。[getFallbackResId] 仅做一次 Map 查表，O(1) 且无反射。
+     *
+     * 键为 tileIndex（1..12，与 [SkinConstants.MAX_TILE_TYPES] 对齐），值为对应的
+     * `R.drawable.tile_shuang_{index}` 资源 ID。
+     */
+    private val fallbackMap: Map<Int, Int> = mapOf(
+        1 to R.drawable.tile_shuang_1,
+        2 to R.drawable.tile_shuang_2,
+        3 to R.drawable.tile_shuang_3,
+        4 to R.drawable.tile_shuang_4,
+        5 to R.drawable.tile_shuang_5,
+        6 to R.drawable.tile_shuang_6,
+        7 to R.drawable.tile_shuang_7,
+        8 to R.drawable.tile_shuang_8,
+        9 to R.drawable.tile_shuang_9,
+        10 to R.drawable.tile_shuang_10,
+        11 to R.drawable.tile_shuang_11,
+        12 to R.drawable.tile_shuang_12
+    )
+
+    /**
      * 回退到默认皮肤（[SkinConstants.DEFAULT_SKIN]，即 shuang）的本地 drawable。
      * 当远程 URL 缺失或加载失败时作为兜底，保证离线/弱网可用。
+     *
+     * 通过静态 [fallbackMap] 直接查表返回资源 ID，移除运行时反射。
+     * 若 [tileIndex] 超出 [fallbackMap]（理论上不会，类型恒为 1..12），则回退到默认兜底图
+     * [R.drawable.tile_shuang_1]，保证始终返回一个有效 drawable 而非 0（避免调用方
+     * `painterResource(0)` 崩溃）。
      */
     fun getFallbackResId(context: Context, tileIndex: Int): Int {
-        val resName = "tile_${SkinConstants.DEFAULT_SKIN}_$tileIndex"
-        return context.resources.getIdentifier(resName, "drawable", context.packageName)
+        return fallbackMap[tileIndex] ?: R.drawable.tile_shuang_1
     }
 }
