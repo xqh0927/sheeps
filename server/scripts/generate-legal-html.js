@@ -177,11 +177,8 @@ const agreementMd = fs.readFileSync(path.join(legalDir, '用户协议.md'), 'utf
 const privacyHtml = wrapHtml('秘境消消乐 隐私政策', markdownToHtml(privacyMd));
 const agreementHtml = wrapHtml('秘境消境乐 用户协议', markdownToHtml(agreementMd));
 
-const outputTsPath = path.join(__dirname, '..', 'src', 'legal-docs.ts');
-const fileContent = `// Automatically generated from legal markdown files. Do not edit manually.
-export const privacyHtml = ${JSON.stringify(privacyHtml)};
-export const agreementHtml = ${JSON.stringify(agreementHtml)};
-`;
-
-fs.writeFileSync(outputTsPath, fileContent, 'utf8');
-console.log('Successfully generated legal-docs.ts');
+const publicDir = path.join(__dirname, '..', 'public');
+fs.mkdirSync(publicDir, { recursive: true });
+fs.writeFileSync(path.join(publicDir, 'privacy.html'), privacyHtml, 'utf8');
+fs.writeFileSync(path.join(publicDir, 'agreement.html'), agreementHtml, 'utf8');
+console.log('Successfully generated server/public/privacy.html & agreement.html');
