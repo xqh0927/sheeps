@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.ksp)
     }
 
+
 android {
     namespace = "com.example.sheeps.menu"
     compileSdk = 37

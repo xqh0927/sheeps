@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseActivity
@@ -41,6 +40,8 @@ import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import javax.inject.Inject
 
 /**
@@ -85,26 +86,42 @@ class EndlessLeaderboardActivity : BaseActivity() {
 
         // 加载总榜单（无分页 / 无 Tab；levelId=0 表示无尽模式无关卡概念，game_mode=1 区分无尽榜）
         LaunchedEffect(Unit) {
+            LogUtils.d("EndlessLeaderboard: 开始加载")
             isLoading = true
-            lifecycleScope.launch {
-                try {
+            try {
+                withTimeout(15_000) {
                     val resp = apiService.getLeaderboard(0, 100, 1)
+                    LogUtils.d("EndlessLeaderboard: 收到响应 success=${resp.success} 条数=${resp.rankings.size}")
                     if (resp.success) {
                         rankings = resp.rankings
                         isDisabled = resp.disabled
-                        // 自动定位到当前用户
-                        val myIndex = rankings.indexOfFirst { it.username == userPrefs.getUsername() }
-                        if (myIndex >= 0) {
-                            listState.scrollToItem(myIndex)
-                        }
+                        LogUtils.d("EndlessLeaderboard: 数据已设置")
                     } else {
                         Toaster.show(context.getString(R.string.leaderboard_data_error))
                     }
-                } catch (e: Exception) {
-                    LogUtils.e(e)
-                    Toaster.show(context.getString(R.string.leaderboard_load_error))
-                } finally {
-                    isLoading = false
+                }
+            } catch (e: TimeoutCancellationException) {
+                LogUtils.e("EndlessLeaderboard: 加载超时", e)
+                Toaster.show(context.getString(R.string.leaderboard_load_error))
+            } catch (e: Exception) {
+                LogUtils.e("EndlessLeaderboard: 加载异常", e)
+                Toaster.show(context.getString(R.string.leaderboard_load_error))
+            } finally {
+                isLoading = false
+                LogUtils.d("EndlessLeaderboard: isLoading=false")
+            }
+        }
+
+        // 列表数据就绪后再滚动定位（避免 scrollToItem 在 LazyColumn 未组合时挂起导致永久转圈）
+        LaunchedEffect(rankings) {
+            if (rankings.isNotEmpty()) {
+                val myIndex = rankings.indexOfFirst { it.username == userPrefs.getUsername() }
+                if (myIndex >= 0) {
+                    try {
+                        listState.scrollToItem(myIndex)
+                    } catch (e: Exception) {
+                        LogUtils.e(e)
+                    }
                 }
             }
         }

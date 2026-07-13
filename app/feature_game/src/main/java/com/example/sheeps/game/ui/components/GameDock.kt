@@ -125,6 +125,7 @@ private fun MatchingSlot(
 
     val density = LocalDensity.current
     var containerWidthPx by remember { mutableStateOf(0) }
+    val containerRoot = remember { mutableStateOf(Offset.Zero) }
 
     Box(
         modifier = Modifier
@@ -138,10 +139,21 @@ private fun MatchingSlot(
             )
             .padding(8.dp)
             .onGloballyPositioned { coords ->
+                // 仅在此根容器测量一次，捕获容器全局坐标与宽度（px），
+                // 再按固定布局（padding 8dp + 7 等分槽位 + 4dp 间隔）推导 7 个槽位的全局坐标，
+                // 取代此前给每个槽位挂 onGloballyPositioned（7 次回调）。
+                containerRoot.value = coords.positionInRoot()
                 containerWidthPx = coords.size.width
+                computeSlotGlobalPositions(
+                    containerRoot = containerRoot.value,
+                    density = density.density,
+                    containerWidthPx = containerWidthPx,
+                    slotCount = 7,
+                    slotGlobalPositions = slotGlobalPositions
+                )
             }
     ) {
-        // 1. 绘制 7 个空插槽背景
+        // 1. 绘制 7 个空插槽背景（不再挂 onGloballyPositioned）
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -153,10 +165,7 @@ private fun MatchingSlot(
                         .weight(1f)
                         .aspectRatio(1f)
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .onGloballyPositioned { coords ->
-                            slotGlobalPositions[i] = coords.positionInRoot()
-                        },
+                        .border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {}
             }
@@ -196,5 +205,31 @@ private fun MatchingSlot(
                 }
             }
         }
+    }
+}
+
+/**
+ * 依据消除槽容器根坐标与宽度（px）推导各槽位全局坐标（px）。
+ *
+ * 布局：容器 padding 8dp，内部 Row 为 7 等分（weight(1f)）加 4dp 间隔（共 6 个间隔）。
+ * 与原始逐槽 [androidx.compose.ui.layout.onGloballyPositioned] 写入的槽位左上角坐标一致，飞行动画落点不变。
+ * `density` 用于把 dp 间距换算为 px，与 [androidx.compose.ui.layout.positionInRoot] 的 px 坐标系对齐。
+ */
+private fun computeSlotGlobalPositions(
+    containerRoot: Offset,
+    density: Float,
+    containerWidthPx: Int,
+    slotCount: Int,
+    slotGlobalPositions: MutableMap<Int, Offset>
+) {
+    if (containerWidthPx <= 0) return
+    val padPx = 8f * density
+    val gapPx = 4f * density
+    val rowWidthPx = containerWidthPx - 2f * padPx
+    val slotW = (rowWidthPx - (slotCount - 1) * gapPx) / slotCount
+    for (i in 0 until slotCount) {
+        val x = containerRoot.x + padPx + i * (slotW + gapPx)
+        val y = containerRoot.y + padPx
+        slotGlobalPositions[i] = Offset(x, y)
     }
 }

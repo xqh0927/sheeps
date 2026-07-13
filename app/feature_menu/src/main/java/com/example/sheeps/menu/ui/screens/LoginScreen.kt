@@ -1,5 +1,6 @@
 package com.example.sheeps.menu.ui.screens
 
+// 协议勾选（Checkbox + 可点击链接）相关依赖
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,13 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -28,7 +27,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,11 +38,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.R
 import com.example.sheeps.ui.components.SheepsLoading
 import com.example.sheeps.ui.components.SheepsTopAppBar
@@ -88,6 +92,9 @@ fun LoginScreen(
     // ----- 密码登录状态 -----
     var pwPhone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    // ----- 协议勾选状态（默认未勾选）-----
+    var agreed by remember { mutableStateOf(false) }
 
     // 验证码倒计时协程：绑定组合生命周期，组合销毁即取消；delay(1000) 为主线程挂起，不阻塞 UI 线程。
     LaunchedEffect(countdown) {
@@ -199,7 +206,7 @@ fun LoginScreen(
 
                                     Button(
                                         onClick = { onLogin(phone, code) },
-                                        enabled = !isLoading,
+                                        enabled = agreed && !isLoading,
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.fillMaxWidth()
@@ -246,7 +253,7 @@ fun LoginScreen(
 
                                     Button(
                                         onClick = { onPasswordLogin(pwPhone, password) },
-                                        enabled = !isLoading,
+                                        enabled = agreed && !isLoading,
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                         shape = RoundedCornerShape(8.dp),
                                         modifier = Modifier.fillMaxWidth()
@@ -274,6 +281,79 @@ fun LoginScreen(
                             }
                         }
                     }
+                    // 协议勾选行（两个 Tab 共用，放在登录按钮下方）
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Checkbox(
+                            checked = agreed,
+                            onCheckedChange = { agreed = it },
+                            modifier = Modifier.size(18.dp)
+                        )
+
+                        val uriHandler = LocalUriHandler.current
+                        val agreeText = buildAnnotatedString {
+                            append("我已阅读并同意")
+                            append(" ")
+
+                            // 《用户协议》
+                            val uaStart = length
+                            append("《用户协议》")
+                            val uaEnd = length
+                            addStyle(
+                                SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline
+                                ), start = uaStart, end = uaEnd
+                            )
+                            addStringAnnotation(
+                                tag = "URL",
+                                annotation = AppConfig.BASE_URL + "agreement.html",
+                                start = uaStart,
+                                end = uaEnd
+                            )
+
+                            append("和")
+                            append(" ")
+
+                            // 《隐私政策》
+                            val ppStart = length
+                            append("《隐私政策》")
+                            val ppEnd = length
+                            addStyle(
+                                SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline
+                                ), start = ppStart, end = ppEnd
+                            )
+                            addStringAnnotation(
+                                tag = "URL",
+                                annotation = AppConfig.BASE_URL + "privacy.html",
+                                start = ppStart,
+                                end = ppEnd
+                            )
+                        }
+
+                        ClickableText(
+                            text = agreeText,
+                            style = TextStyle(
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            ),
+                            onClick = { offset ->
+                                agreeText.getStringAnnotations(
+                                    tag = "URL",
+                                    start = offset,
+                                    end = offset
+                                )
+                                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                            }
+                        )
+                    }
                 }
             }
 
@@ -299,3 +379,4 @@ fun LoginScreen(
         }
     }
 }
+

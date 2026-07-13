@@ -7,14 +7,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.GameGuideDialog
 import com.example.sheeps.menu.ui.screens.SettingsScreen
 import com.example.sheeps.theme.SheepsTheme
-import com.example.sheeps.theme.ThemeManager
 import com.tencent.mmkv.MMKV
+import com.therouter.TheRouter
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -34,7 +35,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class SettingsActivity : BaseActivity() {
 
-    @Inject lateinit var prefs: UserPreferences
+    @Inject
+    lateinit var prefs: UserPreferences
 
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
@@ -67,10 +69,43 @@ class SettingsActivity : BaseActivity() {
                         // ThemeManager 是全局 StateFlow，SheepsTheme 自动响应，无需 recreate
                         MMKV.defaultMMKV().encode("theme_changed_in_settings", true)
                     },
-                    onShowGameGuide = { showGameGuide = true }
+                    onShowGameGuide = { showGameGuide = true },
+                    onOpenAgreement = { openH5(AppConfig.BASE_URL + "agreement.html", "用户协议") },
+                    onOpenPrivacyPolicy = {
+                        openH5(
+                            AppConfig.BASE_URL + "privacy.html",
+                            "隐私政策"
+                        )
+                    },
+                    onOpenPersonalInfoCollection = {
+                        openH5(
+                            AppConfig.BASE_URL + "personal-info-collection.html",
+                            "个人信息收集清单"
+                        )
+                    },
+                    onOpenThirdPartySharing = {
+                        openH5(
+                            AppConfig.BASE_URL + "third-party-sharing.html",
+                            "第三方信息共享清单"
+                        )
+                    }
                 )
             }
         }
+    }
+
+    /**
+     * 统一通过独立 H5 Activity 内部加载目标页面，
+     * 避免外部浏览器跳转与 Compose Dialog 弹窗。
+     *
+     * @param url 目标地址（远程 H5，由 H5Activity 内部 WebView 加载）
+     * @param title 顶部标题
+     */
+    private fun openH5(url: String, title: String) {
+        TheRouter.build("/web/h5")
+            .withString("url", url)
+            .withString("title", title)
+            .navigation(this)
     }
 
     override fun initData() {}

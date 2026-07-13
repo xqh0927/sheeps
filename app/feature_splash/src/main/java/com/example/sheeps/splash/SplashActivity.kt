@@ -2,6 +2,7 @@ package com.example.sheeps.splash
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -9,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,24 +28,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -62,7 +70,6 @@ import com.example.sheeps.theme.ShapeLarge
 import com.example.sheeps.theme.SheepsTheme
 import com.example.sheeps.ui.components.GhostButton
 import com.example.sheeps.ui.components.PrimaryButton
-import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
@@ -74,6 +81,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 /**
@@ -132,16 +140,18 @@ class SplashActivity : BaseActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
+                            // 四色纵向渐变：深色 → 中间偏亮 → 主色微光 → 深色，营造空间纵深
                             Brush.verticalGradient(
                                 colors = listOf(
                                     MaterialTheme.colorScheme.background,
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
                                     MaterialTheme.colorScheme.background
                                 )
                             )
                         )
                 ) {
-                    // 粒子背景动画
+                    // 粒子背景动画（含四角光晕装饰）
                     ParticleBackground()
 
                     // 主体内容
@@ -207,11 +217,12 @@ class SplashActivity : BaseActivity() {
     }
 }
 
-// --- 粒子背景（随机浮动金色光点）---
+// --- 粒子背景（随机浮动金色光点 + 星芒 + 四角光晕）---
 /**
  * 启动页粒子背景。
- * 借助 `rememberInfiniteTransition` 驱动 10 个金色光点的浮动与明暗呼吸，
- * 并在底部叠加主题主色光晕；`Canvas` 纯绘制，不依赖外部状态。
+ * 借助 `rememberInfiniteTransition` 驱动 24 个金色光点的二维漂浮与明暗呼吸，
+ * 并叠加少量十字星芒与四角微弱光晕、底部脉冲光晕；`Canvas` 纯绘制，不依赖外部状态。
+ * 光点分三级尺寸层次（小/中/大光晕），横向 + 纵向正弦漂移形成自然漂浮感。
  * ⚠️ 内存/生命周期：无限动画绑定组合生命周期，组件销毁时自动停止，无泄漏。
  * 线程约束：Composable 运行于主线程；绘制在每帧主线程完成。
  */
@@ -229,45 +240,82 @@ fun ParticleBackground() {
         ),
         label = "particlePhase"
     )
+    val phase2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 2 * PI.toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(11000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "particlePhase2"
+    )
 
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = this.size.width
         val h = this.size.height
 
-        // 绘制 20 个随机浮动光点
         val particles = listOf(
-            Triple(0.1f, 0.3f, 1.0f),
-            Triple(0.8f, 0.2f, 0.7f),
-            Triple(0.3f, 0.7f, 1.3f),
-            Triple(0.6f, 0.5f, 0.9f),
-            Triple(0.15f, 0.8f, 1.1f),
-            Triple(0.9f, 0.65f, 0.8f),
-            Triple(0.45f, 0.15f, 1.4f),
-            Triple(0.7f, 0.85f, 0.6f),
-            Triple(0.25f, 0.45f, 1.2f),
-            Triple(0.85f, 0.4f, 0.95f)
+            Particle(0.10f, 0.20f, 1.0f, 3f),
+            Particle(0.80f, 0.15f, 0.7f, 5f),
+            Particle(0.30f, 0.60f, 1.3f, 2f),
+            Particle(0.60f, 0.45f, 0.9f, 4f),
+            Particle(0.15f, 0.75f, 1.1f, 6f),
+            Particle(0.90f, 0.65f, 0.8f, 3f),
+            Particle(0.45f, 0.10f, 1.4f, 2f),
+            Particle(0.70f, 0.85f, 0.6f, 5f),
+            Particle(0.25f, 0.40f, 1.2f, 4f),
+            Particle(0.85f, 0.35f, 0.95f, 3f),
+            Particle(0.05f, 0.50f, 1.15f, 2f),
+            Particle(0.55f, 0.80f, 0.75f, 6f),
+            Particle(0.35f, 0.30f, 1.25f, 3f),
+            Particle(0.65f, 0.20f, 0.85f, 4f),
+            Particle(0.20f, 0.90f, 1.05f, 2f),
+            Particle(0.75f, 0.55f, 0.65f, 5f),
+            Particle(0.40f, 0.70f, 1.35f, 3f),
+            Particle(0.95f, 0.45f, 0.9f, 4f),
+            Particle(0.50f, 0.05f, 1.1f, 2f),
+            Particle(0.12f, 0.62f, 0.8f, 5f),
+            Particle(0.82f, 0.78f, 1.2f, 3f),
+            Particle(0.28f, 0.18f, 0.7f, 4f),
+            Particle(0.68f, 0.38f, 1.3f, 2f),
+            Particle(0.48f, 0.92f, 0.95f, 6f)
         )
 
-        particles.forEach { (xR, yR, speed) ->
-            val offsetY = sin(phase * speed) * h * 0.04f
-            val alpha = (sin(phase * speed * 0.7f + 1f) * 0.25f + 0.15f).coerceIn(0f, 0.4f)
-            val radius = sin(phase * speed * 0.5f + 2f) * 4f + 6f
-
+        particles.forEach { p ->
+            val offsetY = sin(phase * p.speed) * h * 0.04f
+            val offsetX = cos(phase2 * p.speed * 0.8f) * w * 0.02f
+            val alpha = (sin(phase * p.speed * 0.7f + 1f) * 0.25f + 0.15f).coerceIn(0f, 0.4f)
+            val radius = sin(phase * p.speed * 0.5f + 2f) * 2f + p.baseRadius
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(themeSecondary.copy(alpha = alpha), Color.Transparent),
-                    center = Offset(xR * w, yR * h + offsetY),
+                    center = Offset(p.xR * w + offsetX, p.yR * h + offsetY),
                     radius = radius * 2.5f
                 ),
                 radius = radius * 2.5f,
-                center = Offset(xR * w, yR * h + offsetY)
+                center = Offset(p.xR * w + offsetX, p.yR * h + offsetY)
             )
         }
 
-        // 底部主题主色调光晕
+        val sparkles = listOf(
+            Sparkle(0.18f, 0.28f, 1.6f),
+            Sparkle(0.78f, 0.52f, 1.2f),
+            Sparkle(0.42f, 0.82f, 1.4f),
+            Sparkle(0.88f, 0.22f, 1.0f)
+        )
+        sparkles.forEach { s ->
+            val sa = (sin(phase * s.speed + 0.5f) * 0.4f + 0.4f).coerceIn(0f, 0.8f)
+            val cx = s.xR * w
+            val cy = s.yR * h
+            val len = 8f * sa + 3f
+            drawLine(color = themeSecondary.copy(alpha = sa), start = Offset(cx - len, cy), end = Offset(cx + len, cy), strokeWidth = 1.2f)
+            drawLine(color = themeSecondary.copy(alpha = sa), start = Offset(cx, cy - len), end = Offset(cx, cy + len), strokeWidth = 1.2f)
+        }
+
+        val pulse = (sin(phase * 0.5f) * 0.05f + 0.15f).coerceIn(0f, 0.25f)
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(themePrimary.copy(alpha = 0.15f), Color.Transparent),
+                colors = listOf(themePrimary.copy(alpha = pulse), Color.Transparent),
                 center = Offset(w * 0.5f, h * 0.75f),
                 radius = w * 0.6f
             ),
@@ -277,13 +325,17 @@ fun ParticleBackground() {
     }
 }
 
+private data class Particle(val xR: Float, val yR: Float, val speed: Float, val baseRadius: Float)
+private data class Sparkle(val xR: Float, val yR: Float, val speed: Float)
+
 // --- Splash 主体视觉 ---
 /**
  * 启动页主体视觉。
- * 展示 Logo（多层叠放卡牌旋转动画 + 金色光晕）、游戏标题/副标题、
- * 分隔线与 `SheepsLoading` 加载指示；底部呈现适龄提示与防沉迷健康提示。
- * ⚠️ 内存/生命周期：Logo 缩放/光晕/旋转均由 `rememberInfiniteTransition`
- * 驱动，绑定组合生命周期，销毁即停止，无泄漏。
+ * 展示 Logo（双层反向旋转虚线环 + 三层叠放卡牌旋转动画 + 金色光晕）、
+ * 渐变色游戏标题、副标题、分隔线、自定义雷达脉冲加载指示，以及底部 2s 假进度条；
+ * 底部呈现适龄提示与防沉迷健康提示。
+ * ⚠️ 内存/生命周期：Logo 缩放/光晕/旋转、雷达脉冲、进度条均由
+ * `rememberInfiniteTransition` / `Animatable` 驱动，绑定组合生命周期，销毁即停止，无泄漏。
  * 线程约束：Composable 运行于主线程；动画在每帧主线程计算。
  */
 @Composable
@@ -310,6 +362,11 @@ fun SplashVisuals() {
         label = "glowAlpha"
     )
 
+    var progress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        animate(0f, 1f, animationSpec = tween(2000)) { value, _ -> progress = value }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -319,26 +376,20 @@ fun SplashVisuals() {
     ) {
         Spacer(Modifier.height(0.dp))
 
-        // 中心Logo区域
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier.scale(logoScale)
         ) {
-            // 金色光晕（Logo背后发光）
             Canvas(modifier = Modifier.size(240.dp)) {
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(
-                            themeSecondary.copy(alpha = glowAlpha * 0.3f),
-                            Color.Transparent
-                        )
+                        colors = listOf(themeSecondary.copy(alpha = glowAlpha * 0.3f), Color.Transparent)
                     ),
                     radius = this.size.width * 0.5f
                 )
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // 现代叠放卡牌 Logo 动画 (代替国风六角符文)
                 val rotatePhase by infiniteTransition.animateFloat(
                     initialValue = 0f,
                     targetValue = 360f,
@@ -348,77 +399,89 @@ fun SplashVisuals() {
                     ),
                     label = "logoRotation"
                 )
+                val rotatePhaseRev by infiniteTransition.animateFloat(
+                    initialValue = 360f,
+                    targetValue = 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(9000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "logoRotationRev"
+                )
 
                 Box(
-                    modifier = Modifier.size(100.dp),
+                    modifier = Modifier.size(110.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // 外环：旋转的虚线圈
-                    Canvas(modifier = Modifier.size(90.dp)) {
+                    Canvas(modifier = Modifier.size(100.dp)) {
                         drawCircle(
-                            color = themeSecondary.copy(alpha = 0.25f),
-                            radius = size.width * 0.45f,
+                            color = themeSecondary.copy(alpha = 0.22f),
+                            radius = size.width * 0.48f,
                             style = Stroke(
                                 width = 1.5f,
-                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                                    floatArrayOf(15f, 10f),
-                                    0f
-                                )
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(15f, 10f), 0f)
                             )
                         )
                     }
-
-                    // 叠放卡牌 1 (底层，逆时针微调旋转)
                     Canvas(
                         modifier = Modifier
-                            .size(52.dp)
-                            .graphicsLayer {
-                                rotationZ = -rotatePhase * 0.5f
-                            }
+                            .size(88.dp)
+                            .graphicsLayer { rotationZ = rotatePhaseRev }
+                    ) {
+                        drawCircle(
+                            color = themePrimary.copy(alpha = 0.18f),
+                            radius = size.width * 0.48f,
+                            style = Stroke(
+                                width = 1.2f,
+                                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 8f), 0f)
+                            )
+                        )
+                    }
+                    Canvas(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .graphicsLayer { rotationZ = -rotatePhase * 0.4f }
                     ) {
                         drawRoundRect(
-                            color = themeSecondary.copy(alpha = 0.35f),
+                            color = themeSecondary.copy(alpha = 0.30f),
                             size = size,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                                12.dp.toPx(),
-                                12.dp.toPx()
-                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
                             style = Stroke(width = 3f)
                         )
                     }
-
-                    // 叠放卡牌 2 (顶层，顺时针旋转)
                     Canvas(
                         modifier = Modifier
-                            .size(52.dp)
-                            .graphicsLayer {
-                                rotationZ = rotatePhase
-                            }
+                            .size(48.dp)
+                            .graphicsLayer { rotationZ = rotatePhase * 0.7f }
+                    ) {
+                        drawRoundRect(
+                            color = themePrimary.copy(alpha = 0.55f),
+                            size = size,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                            style = Stroke(width = 3f)
+                        )
+                    }
+                    Canvas(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .graphicsLayer { rotationZ = rotatePhase }
                     ) {
                         drawRoundRect(
                             color = themePrimary,
                             size = size,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(
-                                12.dp.toPx(),
-                                12.dp.toPx()
-                            ),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx(), 12.dp.toPx()),
                             style = Stroke(width = 5f)
                         )
-                        // 中心小核心圆点
-                        drawCircle(
-                            color = themeSecondary,
-                            radius = 6f
-                        )
+                        drawCircle(color = themeSecondary, radius = 6f)
                     }
                 }
 
                 Spacer(Modifier.height(24.dp))
 
-                // 游戏标题
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_name),
                     fontSize = 38.sp,
-                    color = themeSecondary,
+                    color = themePrimary,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.SansSerif,
                     textAlign = TextAlign.Center,
@@ -427,7 +490,6 @@ fun SplashVisuals() {
 
                 Spacer(Modifier.height(10.dp))
 
-                // 副标题
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
                     fontSize = 15.sp,
@@ -440,7 +502,6 @@ fun SplashVisuals() {
 
                 Spacer(Modifier.height(16.dp))
 
-                // 分隔线
                 Row(
                     modifier = Modifier.fillMaxWidth(0.6f),
                     horizontalArrangement = Arrangement.Center,
@@ -450,48 +511,39 @@ fun SplashVisuals() {
                         modifier = Modifier
                             .weight(1f)
                             .height(1.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
-                                    )
-                                )
-                            )
+                            .background(Brush.horizontalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))))
                     )
-                    Text(
-                        text = "  ✦  ",
-                        color = themeSecondary.copy(alpha = 0.6f),
-                        fontSize = 12.sp
-                    )
+                    Text(text = "  ✦  ", color = themeSecondary.copy(alpha = 0.6f), fontSize = 12.sp)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(1.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
+                            .background(Brush.horizontalGradient(colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f), Color.Transparent)))
                     )
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                // Loading 指示器
-                SheepsLoading(size = 36.dp)
+                SplashLoadingPulse(primary = themePrimary, secondary = themeSecondary)
             }
         }
 
-        // 底部健康游戏提示区域
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // 适龄提示徽章
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp)),
+                color = themeSecondary,
+                trackColor = themeSecondary.copy(alpha = 0.2f)
+            )
+
+            Spacer(Modifier.height(16.dp))
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center,
@@ -500,7 +552,6 @@ fun SplashVisuals() {
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                // 绿色适龄标记
                 Box(
                     modifier = Modifier
                         .size(20.dp)
@@ -529,6 +580,48 @@ fun SplashVisuals() {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+        }
+    }
+}
+
+@Composable
+private fun SplashLoadingPulse(
+    primary: Color,
+    secondary: Color
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        listOf(0f, 0.2f, 0.4f).forEachIndexed { index, delay ->
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 0.4f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = FastOutSlowInEasing, delayMillis = (delay * 900).toInt()),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulse$index"
+            )
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(900, easing = FastOutSlowInEasing, delayMillis = (delay * 900).toInt()),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "pulseAlpha$index"
+            )
+            Canvas(modifier = Modifier.size(10.dp)) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(if (index % 2 == 0) primary else secondary, Color.Transparent)
+                    ),
+                    radius = (size.width / 2) * scale,
+                    alpha = alpha
+                )
+            }
         }
     }
 }
@@ -593,10 +686,11 @@ fun PrivacyComposeDialog(
                 val fullText =
                     stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_content)
                 val agreementKeywords =
-                    listOf("《用户协议》", "《用戶協議》", "User Agreement", "利用規約", "이용 약관")
+                    listOf("《用户协议》", "《用戶協議》", "《金色体育用户协议》", "User Agreement", "利用規約", "이용 약관")
                 val privacyKeywords = listOf(
                     "《隐私政策》",
                     "《隱私政策》",
+                    "《金色体育隐私协议》",
                     "Privacy Policy",
                     "プライバシーポリシー",
                     "개인정보 처리방침"

@@ -2,6 +2,7 @@ package com.example.sheeps.core.di
 
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.core.AppConfig
+import com.example.sheeps.core.BuildConfig
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.network.EncryptionInterceptor
 import com.apkfuns.logutils.LogUtils
@@ -61,7 +62,9 @@ object NetworkModule {
                 }
             }
         }).apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // 生产环境降级为 NONE：避免将解密后的完整请求/响应体写入日志（隐私泄漏 + 性能开销），
+            // 仅 DEBUG 构建保留 BODY 级别以便本地排查网络问题。
+            level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY else HttpLoggingInterceptor.Level.NONE
         }
 
         // 2. 国际化语言头拦截器：自动根据首选项或系统语言，为所有 API 请求附带 Accept-Language 请求头
@@ -167,7 +170,8 @@ object NetworkModule {
         val encryptionInterceptor = EncryptionInterceptor()
 
         // 6. 弱网/服务器 5xx 故障自动指数退避重试拦截器：
-        // 针对网络异常或后端服务器偶发性 502/504 故障，在 1~3 秒内进行退避重试，最大尝试 3 次，大幅提高不稳网络环境下的通关成绩提交成功率。
+        // 针对网络异常或后端服务器偶发性 502/504 故障，在 1~3 秒内进行退避重试，最大尝试 3 次，大幅提高不稳网络环境下的请求成功率。
+        // 收窄：写接口（POST）遇 5xx 直接返回、不重试，避免重复提交/重复发放道具；连接级 IOException 仍可重试 POST；GET 维持原逻辑。
         val weakNetworkRetryInterceptor = Interceptor { chain ->
             val request = chain.request()
             var attempt = 1
@@ -180,6 +184,11 @@ object NetworkModule {
                     if (response.isSuccessful) {
                         return@Interceptor response
                     } else if (response.code >= 500) {
+                        // 写接口（POST）遇 5xx 不重试：避免重复提交/重复发放道具（score/submit、shop/exchange 等）。
+                        // 注意：仅连接级 IOException（见下方 catch 分支）仍可重试 POST；GET 维持原重试逻辑不变。
+                        if (request.method == "POST") {
+                            return@Interceptor response
+                        }
                         response.close()
                     } else {
                         return@Interceptor response

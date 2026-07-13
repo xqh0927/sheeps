@@ -5,7 +5,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-}
+    }
+
 
 android {
     namespace = "com.example.sheeps.game"

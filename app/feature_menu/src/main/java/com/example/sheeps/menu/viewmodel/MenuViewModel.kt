@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.lifecycle.viewModelScope
 import coil.Coil
 import coil.request.ImageRequest
- import coil.size.Scale
+import coil.size.Scale
 import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseMviViewModel
 import com.example.sheeps.core.cache.ShopCache
@@ -169,7 +169,12 @@ class MenuViewModel @Inject constructor(
     override fun handleIntent(intent: MenuViewIntent) {
         when (intent) {
             is MenuViewIntent.LoadData -> handleLoadData()
-            is MenuViewIntent.SendSmsCode -> authDelegate.handleSendSmsCode(viewModelScope, intent.phone, ::setEffect)
+            is MenuViewIntent.SendSmsCode -> authDelegate.handleSendSmsCode(
+                viewModelScope,
+                intent.phone,
+                ::setEffect
+            )
+
             is MenuViewIntent.LoginWithCode -> authDelegate.handleLoginWithCode(
                 viewModelScope, intent.phone, intent.code,
                 onSuccess = { saveLoginData(it) },
@@ -181,9 +186,19 @@ class MenuViewModel @Inject constructor(
                 setLoading = { updateState { copy(isLoading = it) } },
                 setEffect = ::setEffect
             )
-            is MenuViewIntent.LoginWithPassword -> handleLoginWithPassword(intent.phone, intent.password)
+
+            is MenuViewIntent.LoginWithPassword -> handleLoginWithPassword(
+                intent.phone,
+                intent.password
+            )
+
             is MenuViewIntent.Register -> handleRegister(intent.phone, intent.password, intent.code)
-            is MenuViewIntent.ResetPassword -> handleResetPassword(intent.phone, intent.code, intent.newPassword)
+            is MenuViewIntent.ResetPassword -> handleResetPassword(
+                intent.phone,
+                intent.code,
+                intent.newPassword
+            )
+
             is MenuViewIntent.SetPassword -> handleSetPassword(intent.password)
             is MenuViewIntent.CheckPassword -> handleCheckPassword()
             is MenuViewIntent.Logout -> {
@@ -193,29 +208,62 @@ class MenuViewModel @Inject constructor(
                     handleLoadData()
                 }, ::setEffect)
             }
+
             is MenuViewIntent.ResolveConflict -> authDelegate.handleResolveConflict(
                 viewModelScope, pendingLoginResponse, intent.useLocal,
                 onComplete = { pendingLoginResponse = null; handleLoadData() },
                 setLoading = { updateState { copy(isLoading = it) } },
                 setEffect = ::setEffect
             )
-            is MenuViewIntent.SignIn -> socialActionDelegate.handleSignIn(viewModelScope, { handleLoadData() }, ::setEffect)
+
+            is MenuViewIntent.SignIn -> socialActionDelegate.handleSignIn(
+                viewModelScope,
+                { refreshProfile() },
+                ::setEffect
+            )
+
             is MenuViewIntent.ExchangeShopItem -> socialActionDelegate.handleExchangeShopItem(
                 viewModelScope, intent.shopItemId, intent.count, currentState.shopItems,
-                { handleLoadData() }, ::setEffect
+                { refreshShop(); refreshProfile() }, ::setEffect
             )
+
             is MenuViewIntent.ClaimTask -> socialActionDelegate.handleClaimTask(
-                viewModelScope, intent.taskId, currentState.dailyTasks, { handleLoadData() }, ::setEffect
+                viewModelScope,
+                intent.taskId,
+                currentState.dailyTasks,
+                { refreshTasks() },
+                ::setEffect
             )
+
             is MenuViewIntent.UnlockLevelWithPoints -> socialActionDelegate.handleUnlockLevelWithPoints(
-                viewModelScope, intent.levelId, { handleLoadData() }, ::setEffect
+                viewModelScope, intent.levelId, { refreshProfile() }, ::setEffect
             )
-            is MenuViewIntent.JoinMatch -> matchmakingDelegate.handleJoinMatch(viewModelScope, intent.playerId, currentState, ::updateState)
-            is MenuViewIntent.LeaveMatch -> matchmakingDelegate.handleLeaveMatch(viewModelScope, intent.playerId)
-            
-            is MenuViewIntent.UpdateCarryItem -> handleUpdateCarryItem(intent.itemType, intent.change)
+
+            is MenuViewIntent.JoinMatch -> matchmakingDelegate.handleJoinMatch(
+                viewModelScope,
+                intent.playerId,
+                currentState,
+                ::updateState
+            )
+
+            is MenuViewIntent.LeaveMatch -> matchmakingDelegate.handleLeaveMatch(
+                viewModelScope,
+                intent.playerId
+            )
+
+            is MenuViewIntent.UpdateCarryItem -> handleUpdateCarryItem(
+                intent.itemType,
+                intent.change
+            )
+
             is MenuViewIntent.ClearCarryItems -> updateState { copy(selectedCarryItems = emptyMap()) }
-            is MenuViewIntent.GoToGame -> setEffect(MenuViewEffect.NavigateToGame(intent.levelId, intent.carryItemsJson))
+            is MenuViewIntent.GoToGame -> setEffect(
+                MenuViewEffect.NavigateToGame(
+                    intent.levelId,
+                    intent.carryItemsJson
+                )
+            )
+
             is MenuViewIntent.ChangeLanguage -> handleChangeLanguage(intent.lang)
             is MenuViewIntent.ChangeSkin -> handleChangeSkin(intent.skin)
             is MenuViewIntent.ChangeAvatar -> handleChangeAvatar(intent.imageBytes, intent.fileName)
@@ -240,7 +288,13 @@ class MenuViewModel @Inject constructor(
                 coroutineScope {
                     // 并行发起所有独立请求
                     val shopItemsDef = async { fetchShopItems() }
-                    val noticesDef = async { try { apiService.getNotices() } catch (e: Exception) { currentState.notices } }
+                    val noticesDef = async {
+                        try {
+                            apiService.getNotices()
+                        } catch (e: Exception) {
+                            currentState.notices
+                        }
+                    }
 
                     if (isLoggedIn && networkMonitor.isOnline()) {
                         val authHeader = "Bearer ${prefs.getToken()}"
@@ -249,12 +303,33 @@ class MenuViewModel @Inject constructor(
                         val profileDef = async {
                             syncRepository.pullCloudProfile()
                             syncRepository.syncDirtyData()
-                            try { apiService.getUserProfile(authHeader).avatarUrl ?: "" }
-                            catch (e: Exception) { prefs.getAvatarUrl() }
+                            try {
+                                apiService.getUserProfile(authHeader).avatarUrl ?: ""
+                            } catch (e: Exception) {
+                                prefs.getAvatarUrl()
+                            }
                         }
-                        val dailyDef = async { try { apiService.getDailyTasks(authHeader) } catch (e: Exception) { emptyList() } }
-                        val pointsDef = async { try { apiService.getPointsHistory(authHeader) } catch (e: Exception) { emptyList() } }
-                        val exchangeDef = async { try { apiService.getExchangeHistory(authHeader) } catch (e: Exception) { emptyList() } }
+                        val dailyDef = async {
+                            try {
+                                apiService.getDailyTasks(authHeader)
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+                        }
+                        val pointsDef = async {
+                            try {
+                                apiService.getPointsHistory(authHeader)
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+                        }
+                        val exchangeDef = async {
+                            try {
+                                apiService.getExchangeHistory(authHeader)
+                            } catch (e: Exception) {
+                                emptyList()
+                            }
+                        }
 
                         // 等待全部完成
                         val shopItems = shopItemsDef.await()
@@ -270,11 +345,17 @@ class MenuViewModel @Inject constructor(
 
                         updateState {
                             copy(
-                                isLoading = false, isLoggedIn = true, phone = prefs.getPhone() ?: "",
+                                isLoading = false,
+                                isLoggedIn = true,
+                                phone = prefs.getPhone() ?: "",
                                 username = prefs.getUsername(),
-                                shopItems = shopItems, notices = notices, dailyTasks = dailyTasks,
-                                pointsHistory = pointsHistory, exchangeHistory = exchangeHistory,
-                                todaySigned = prefs.getTodaySigned(), signStreak = prefs.getSignStreak(),
+                                shopItems = shopItems,
+                                notices = notices,
+                                dailyTasks = dailyTasks,
+                                pointsHistory = pointsHistory,
+                                exchangeHistory = exchangeHistory,
+                                todaySigned = prefs.getTodaySigned(),
+                                signStreak = prefs.getSignStreak(),
                                 highestLevelCleared = prefs.getHighestLevelCleared(),
                                 avatarUrl = prefs.getAvatarUrl()
                             )
@@ -298,6 +379,78 @@ class MenuViewModel @Inject constructor(
                 updateState { copy(isLoading = false) }
                 setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_offline_fallback))
             }
+        }
+    }
+
+    /**
+     * 细粒度刷新：仅重新拉取并写入「用户资料」相关 UI 字段
+     * （积分 / 用户名 / 今日签到 / 签到连击 / 最高关卡 / 头像 / 登录态）。
+     *
+     * 适用场景：签到（SignIn）、解锁关卡（UnlockLevelWithPoints）等 delegate 操作完成后。
+     * 设计依据：这些操作仅改变资料类字段，其权威值已在对应 delegate 中通过
+     * [com.example.sheeps.core.preference.UserPreferences] 与本地数据库（乐观写入）落盘；
+     * [setupObservers] 中的本地库流会自动把 points / username / unlockedLevel / backpackItems 同步到 State，
+     * 此处仅补刷 prefs 持有、但不在流中的字段（todaySigned / signStreak / highestLevelCleared / avatarUrl），
+     * 并在线时只读拉取最新头像 URL。不做 pullCloudProfile（避免覆盖 delegate 已提交的本地乐观状态），无破坏性写入。
+     */
+    private fun refreshProfile() {
+        viewModelScope.launch {
+            // 在线且已登录时，只读拉取最新头像 URL（其余字段以本地偏好为准）
+            if (prefs.isLoggedIn() && networkMonitor.isOnline()) {
+                val authHeader = "Bearer ${prefs.getToken()}"
+                val latestAvatarUrl = try {
+                    apiService.getUserProfile(authHeader).avatarUrl ?: prefs.getAvatarUrl()
+                } catch (e: Exception) {
+                    prefs.getAvatarUrl()
+                }
+                if (latestAvatarUrl.isNotEmpty()) prefs.setAvatarUrl(latestAvatarUrl)
+            }
+            // 以本地偏好为准刷新资料相关字段（delegate 乐观写入后已落盘）
+            updateState {
+                copy(
+                    isLoggedIn = prefs.isLoggedIn(),
+                    username = prefs.getUsername(),
+                    points = prefs.getPoints(),
+                    todaySigned = prefs.getTodaySigned(),
+                    signStreak = prefs.getSignStreak(),
+                    highestLevelCleared = prefs.getHighestLevelCleared(),
+                    avatarUrl = prefs.getAvatarUrl()
+                )
+            }
+        }
+    }
+
+    /**
+     * 细粒度刷新：仅重新拉取商城列表并写入 [MenuViewState.shopItems]。
+     * 适用场景：兑换道具（ExchangeShopItem）后商城库存 / 文案需刷新。
+     * 复用 [fetchShopItems]（含多语言动态下发、本地缓存变更检测、TileIconProvider 注册与皮肤预热），
+     * 不做全量 [handleLoadData]，避免无谓重拉资料 / 任务 / 历史。
+     */
+    private fun refreshShop() {
+        viewModelScope.launch {
+            val items = fetchShopItems()
+            updateState { copy(shopItems = items) }
+        }
+    }
+
+    /**
+     * 细粒度刷新：仅重新拉取每日任务列表并写入 [MenuViewState.dailyTasks]。
+     * 适用场景：领取任务奖励（ClaimTask）后任务状态需即时反映到 UI。
+     * 积分变化已由本地库流自动同步到 State，无需全量刷新。
+     */
+    private fun refreshTasks() {
+        if (!prefs.isLoggedIn() || !networkMonitor.isOnline()) {
+            // 未登录或离线：无可拉取的任务数据，保持现状
+            return
+        }
+        viewModelScope.launch {
+            val authHeader = "Bearer ${prefs.getToken()}"
+            val tasks = try {
+                apiService.getDailyTasks(authHeader)
+            } catch (e: Exception) {
+                emptyList()
+            }
+            updateState { copy(dailyTasks = tasks) }
         }
     }
 
@@ -466,7 +619,8 @@ class MenuViewModel @Inject constructor(
                 if (!response.hasPassword) {
                     setEffect(MenuViewEffect.ShowSetPasswordDialog)
                 }
-            } catch (_: Exception) { /* 静默失败 */ }
+            } catch (_: Exception) { /* 静默失败 */
+            }
         }
     }
 
@@ -617,7 +771,8 @@ class MenuViewModel @Inject constructor(
             try {
                 if (networkMonitor.isOnline()) {
                     val info = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+                    val vCode =
+                        if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
                     val appUpdate = apiService.checkUpdate(vCode)
                     updateState {
                         copy(
@@ -626,7 +781,8 @@ class MenuViewModel @Inject constructor(
                         )
                     }
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+            }
         }
     }
 
@@ -643,11 +799,13 @@ class MenuViewModel @Inject constructor(
             try {
                 if (networkMonitor.isOnline()) {
                     val info = context.packageManager.getPackageInfo(context.packageName, 0)
-                    val vCode = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
+                    val vCode =
+                        if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode.toInt() else info.versionCode
                     val appUpdate = apiService.checkUpdate(vCode)
                     updateState { copy(gameModes = appUpdate.game_modes) }
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+            }
         }
     }
 
@@ -665,27 +823,16 @@ class MenuViewModel @Inject constructor(
 
     /**
      * 静默刷新商城（切回前台 / 定时触发）。
-     * 直接信任服务端已本地化字段；仅当内容相对本地缓存有变化时才更新 UI，用户完全无感。
+     * 统一复用细粒度 [refreshShop]：前台回归 / 定时静默刷新与兑换后刷新走同一逻辑（含多语言下发、缓存检测、皮肤预热）。
      */
     private fun refreshShopItems() {
-        viewModelScope.launch {
-            val remoteItems = try {
-                apiService.getShopItems()
-            } catch (e: Exception) {
-                return@launch
-            }
-            // 注入 URL 注册表（图片下发核心）
-            TileIconProvider.setShopItems(remoteItems)
-            // 仅内容变化时回写缓存并刷新 UI
-            if (shopCache.saveIfChanged(remoteItems)) {
-                updateState { copy(shopItems = remoteItems) }
-            }
-        }
+        refreshShop()
     }
 
     companion object {
         /** 商城定时静默刷新间隔：30 分钟。 */
         private const val SHOP_REFRESH_INTERVAL_MS = 30L * 60 * 1000
+
         /** 游戏模式刷新节流：同一前台回归若间隔小于该值则跳过，避免重复请求。 */
         private const val GAME_MODES_REFRESH_THROTTLE_MS = 60L * 1000
     }

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.sheeps.data.model.Tile
@@ -100,8 +101,29 @@ fun GameBoard(
             // 关键修复：用"缩放后实际尺寸"作为 Box size（不是原始 contentWidth）
             // 然后把每个 tile 的 offset 同步乘以 scale
             // 这样 Alignment.Center 会按真实可见大小居中，不再有偏移/裁切
+            // 棋盘内容区根容器：仅在根容器测量一次，捕获其全局坐标（px），
+            // 再按布局公式推导每张可见牌的全局坐标写入 tileGlobalPositions，
+            // 取代此前给每张 TileView 挂 onGloballyPositioned（300 次回调/帧）。
+            // 飞行动画点击瞬间读取 tileGlobalPositions[tile.id] 作为起点，保证首帧布局后即写入。
+            val boardRootPos = remember { mutableStateOf(Offset.Zero) }
+            val density = LocalDensity.current.density
+
             Box(
-                modifier = Modifier.size(width = displayedWidth, height = displayedHeight)
+                modifier = Modifier
+                    .size(width = displayedWidth, height = displayedHeight)
+                    .onGloballyPositioned { coords ->
+                        boardRootPos.value = coords.positionInRoot()
+                        computeTileGlobalPositions(
+                            boardRootPos = boardRootPos.value,
+                            density = density,
+                            minX = minX,
+                            minY = minY,
+                            spacing = spacing,
+                            scale = scale,
+                            visibleTiles = visibleTiles,
+                            tileGlobalPositions = tileGlobalPositions
+                        )
+                    }
             ) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
@@ -122,20 +144,53 @@ fun GameBoard(
                                     y = ((tile.y - minY) * spacing * scale).dp
                                 )
                                 .zIndex(tile.z.toFloat())
-                                .onGloballyPositioned { coords ->
-                                    // ⚠️ 内存隐患提示：tileGlobalPositions 为外部持有的 MutableMap，
-                                    // 此处持续写入卡牌全局坐标。该 Map 由调用方（Screen/父 Composable）拥有并随重组复用，
-                                    // 只要其生命周期不超过棋盘组件即可，避免在长生命周期对象中持有导致卡牌引用滞留。
-                                    val pos = coords.positionInRoot()
-                                    val prev = tileGlobalPositions[tile.id]
-                                    if (prev == null || prev != pos) {
-                                        tileGlobalPositions[tile.id] = pos
-                                    }
-                                }
                         )
                     }
                 }
             }
+
+            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标，
+            // 确保飞行动画在点击瞬间能读到正确起点（首帧布局已写入，此处为兜底）。
+            LaunchedEffect(visibleTiles) {
+                if (boardRootPos.value != Offset.Zero) {
+                    computeTileGlobalPositions(
+                        boardRootPos = boardRootPos.value,
+                        density = density,
+                        minX = minX,
+                        minY = minY,
+                        spacing = spacing,
+                        scale = scale,
+                        visibleTiles = visibleTiles,
+                        tileGlobalPositions = tileGlobalPositions
+                    )
+                }
+            }
         }
+    }
+}
+
+/**
+ * 依据棋盘内容区根容器全局坐标（px）与布局参数，推导每张可见牌的屏幕全局坐标（px）。
+ *
+ * 原实现为每张 TileView 挂 [androidx.compose.ui.layout.onGloballyPositioned]；
+ * 此处改为根容器测一次后按公式推算：
+ * `globalX = boardRootPos.x + (tile.x - minX) * spacing * scale * density`
+ * （[androidx.compose.ui.layout.positionInRoot] 返回 px，TileView 的 offset 为 dp，故需乘 density 还原到 px 坐标系）。
+ * 与逐牌回调写入的卡牌左上角坐标保持一致，飞行动画起点不变。
+ */
+private fun computeTileGlobalPositions(
+    boardRootPos: Offset,
+    density: Float,
+    minX: Float,
+    minY: Float,
+    spacing: Int,
+    scale: Float,
+    visibleTiles: List<Tile>,
+    tileGlobalPositions: MutableMap<String, Offset>
+) {
+    visibleTiles.forEach { tile ->
+        val x = boardRootPos.x + (tile.x - minX) * spacing * scale * density
+        val y = boardRootPos.y + (tile.y - minY) * spacing * scale * density
+        tileGlobalPositions[tile.id] = Offset(x, y)
     }
 }

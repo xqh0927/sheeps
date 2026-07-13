@@ -9,15 +9,13 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
 import com.example.sheeps.core.utils.NetworkMonitor
 import com.example.sheeps.theme.ThemeManager
-import com.example.sheeps.core.utils.NetworkStatus
 import com.example.sheeps.data.repository.SyncRepository
 import dagger.hilt.android.HiltAndroidApp
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import logcat.logcat
 import javax.inject.Inject
@@ -83,26 +81,32 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
         // 初始化主题管理器，恢复用户上次保存的主题偏好
         ThemeManager.init()
 
-        // 注册前后台切换监听
+        // 注册前后台切换监听：仅在前后台切换时触发一次离线脏数据同步
         setupForegroundBackgroundListener()
-        
-        // 注册全局网络状态变化监听
-        setupNetworkObserver()
+
+        // ⚠️ 改动（P2-13）：原 setupNetworkObserver() 会在进程级「永不取消」的全局协程中
+        // 监听网络恢复在线并每次都打 /user/sync。由于 syncDirtyData() 无脏数据时本身为 no-op，
+        // 且同步已收敛到前后台切换（onStart/onStop），此处不再注册网络常驻同步，
+        // 避免每次联网都触发一次同步请求。
     }
 
     /**
      * 设置应用前后台切换监听器。
-     * 当应用进入前台或切往后台时，均会触发一次离线脏数据的静默同步。
+     * 仅当应用进入前台（onStart）或切往后台（onStop）时，各触发一次离线脏数据的静默同步。
+     *
+     * 改动（P2-13）：
+     *  - 原实现在 onStart/onStop 内使用顶层 `CoroutineScope(Dispatchers.IO)` 启动一次性同步协程，
+     *    该作用域无统一生命周期管理；
+     *  - 现改为使用 `owner.lifecycleScope`（即 ProcessLifecycleOwner 绑定的作用域），
+     *    协程随进程生命周期自动取消，不再「永不取消」；
+     *  - 同步仍只在前后台切换时触发一次，保持同步正确性（syncDirtyData() 无脏数据时 no-op 返回）。
      */
     private fun setupForegroundBackgroundListener() {
-        // 匿名 DefaultLifecycleObserver 注册到 ProcessLifecycleOwner（进程级生命周期，与 App 同寿，
-        // 无需反注册，不会泄漏）。onStart/onStop 内各启动一个短生存的 CoroutineScope(Dispatchers.IO)
-        // 执行一次性同步，协程会自然结束；如需可取消，可改用 lifecycleScope。
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 logcat("AppLifecycle") { "App moved to FOREGROUND" }
                 // 回到前台，检查是否有未同步的成绩或道具
-                CoroutineScope(Dispatchers.IO).launch {
+                owner.lifecycleScope.launch(Dispatchers.IO) {
                     syncRepository.syncDirtyData()
                 }
             }
@@ -110,31 +114,10 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
             override fun onStop(owner: LifecycleOwner) {
                 logcat("AppLifecycle") { "App moved to BACKGROUND" }
                 // 切到后台，确保本地更改尽量提交到云端
-                CoroutineScope(Dispatchers.IO).launch {
+                owner.lifecycleScope.launch(Dispatchers.IO) {
                     syncRepository.syncDirtyData()
                 }
             }
         })
-    }
-
-    /**
-     * 设置全局网络监控。
-     * 当检测到网络恢复在线时，立即触发同步任务。
-     */
-    private fun setupNetworkObserver() {
-        // ⚠️ 协程/内存隐患：此处使用独立的顶层 `CoroutineScope(Dispatchers.IO)` 启动并永久 `collectLatest`
-        // 网络状态流，该 CoroutineScope 全程没有任何地方调用 `cancel()`，会随进程一直存活，
-        // 并持续持有 `syncRepository`（间接持有 Application 上下文）的引用。
-        // 因 Application 本身与进程同生命周期，这不会造成传统泄漏，但属于「永不取消的全局协程」，
-        // 会在后台持续触发同步、驻留引用。
-        // 建议：改用 `ProcessLifecycleOwner.get().lifecycleScope` 启动收集，使流随进程生命周期自动取消。
-        CoroutineScope(Dispatchers.IO).launch {
-            networkMonitor.status.collectLatest { status ->
-                if (status == NetworkStatus.ONLINE) {
-                    logcat("NetworkObserver") { "Network came ONLINE, triggering sync..." }
-                    syncRepository.syncDirtyData()
-                }
-            }
-        }
     }
 }

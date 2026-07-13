@@ -4,7 +4,7 @@ buildscript {
     mavenCentral()
   }
   dependencies {
-    classpath("cn.therouter:plugin:1.3.2")
+    classpath(libs.plugin)
   }
 }
 
@@ -17,4 +17,5 @@ plugins {
   alias(libs.plugins.kotlin.kapt) apply false
   alias(libs.plugins.hilt) apply false
   alias(libs.plugins.ksp) apply false
+  alias(libs.plugins.androidx.baselineprofile) apply false
 }

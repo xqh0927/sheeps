@@ -397,18 +397,29 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
             await env.SHEEPS_CACHE.put(top3CacheKey, JSON.stringify(top3), { expirationTtl: 600 });
         }
 
-        // 当前用户昨日排名（按总积分 SUM，每个人不同，不缓存）
+        // 当前用户昨日排名（按总积分 SUM，每个人不同）
+        // P1-5 优化：原本每人每次弹窗都跑两条 leaderboard 大表聚合查询，叠加 KV 短缓存
+        // （按 userId + date 为 key，TTL 60s）后可直接命中返回，降低峰值 DB 压力；
+        // 缓存 miss 仍走原聚合查询，业务逻辑语义不变。需配合 idx_leaderboard_achieved 索引提速。
         let yesterdayRank = 0;
         if (authUser1) {
-            const userTotal = await env.DB.prepare(
-                'SELECT SUM(score) as points FROM leaderboard WHERE user_id = ? AND achieved_at >= ? AND achieved_at <= ?'
-            ).bind(authUser1.userId, yesterdayStart1, yesterdayEnd1).first<{ points: number }>();
-            const points = userTotal?.points ?? 0;
-            if (points > 0) {
-                const higher = await env.DB.prepare(
-                    'SELECT COUNT(*) as cnt FROM (SELECT user_id, SUM(score) as points FROM leaderboard WHERE achieved_at >= ? AND achieved_at <= ? GROUP BY user_id HAVING points > ?)'
-                ).bind(yesterdayStart1, yesterdayEnd1, points).first<{ cnt: number }>();
-                yesterdayRank = (higher?.cnt ?? 0) + 1;
+            const rankCacheKey = `daily_popup_rank_${authUser1.userId}_${yesterdayStart1}`;
+            const cachedRankRaw = await env.SHEEPS_CACHE.get(rankCacheKey);
+            if (cachedRankRaw !== null && cachedRankRaw !== undefined) {
+                yesterdayRank = parseInt(cachedRankRaw, 10) || 0;
+            } else {
+                const userTotal = await env.DB.prepare(
+                    'SELECT SUM(score) as points FROM leaderboard WHERE user_id = ? AND achieved_at >= ? AND achieved_at <= ?'
+                ).bind(authUser1.userId, yesterdayStart1, yesterdayEnd1).first<{ points: number }>();
+                const points = userTotal?.points ?? 0;
+                if (points > 0) {
+                    const higher = await env.DB.prepare(
+                        'SELECT COUNT(*) as cnt FROM (SELECT user_id, SUM(score) as points FROM leaderboard WHERE achieved_at >= ? AND achieved_at <= ? GROUP BY user_id HAVING points > ?)'
+                    ).bind(yesterdayStart1, yesterdayEnd1, points).first<{ cnt: number }>();
+                    yesterdayRank = (higher?.cnt ?? 0) + 1;
+                }
+                // 异步回填 KV（TTL 60s），不阻塞主流程；无成绩记为 0 也缓存，避免反复空查
+                await env.SHEEPS_CACHE.put(rankCacheKey, String(yesterdayRank), { expirationTtl: 60 }).catch(() => {});
             }
         }
 

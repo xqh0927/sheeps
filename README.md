@@ -166,7 +166,7 @@
 │   │   ├── difficulty.ts       # 100 级难度系数系统
 │   │   ├── update.ts           # App 版本更新检测 (D1 + R2 HEAD 探测)
 │   │   ├── websocket.ts        # 多人对决 WebSocket 状态机 (基于 D1 game_commands 轮询同步)
-│   │   ├── legal-docs.ts       # 隐私政策/用户协议 HTML 内联
+│   │   ├── public/                 # 隐私政策/用户协议/收集清单/共享清单 静态 HTML（由 generate-legal-html.js 生成）
 │   │   └── handlers/           # 业务路由 (auth/match/user/shop/task/game/system/admin)
 │   ├── test/                   # 后端单元测试 (level/difficulty/update/admin_assets)
 │   ├── scripts/                # 辅助脚本 (seed-admin.mjs 种子管理员 / generate-legal-html.js 生成法律页)
@@ -302,7 +302,7 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 - `system.ts`：公告列表（多语言 + KV 缓存）、App 版本更新检测。
 - `admin.ts`：**三级角色**（`super`/`operator`/`readonly`）鉴权 + 写守卫（`assertCanWrite`）+ 超管守卫（`assertSuper`）+ 全量后台 CRUD + 审计落库（`admin_audit_log` 仅 INSERT，无改/删接口）。
 
-支撑模块：`crypto.ts`（JWT/PBKDF2/SHA256/AES-GCM）、`auth-utils.ts`（密码哈希）、`helpers.ts`（CORS、鉴权、KV 配置缓存、国际化）、`middleware.ts`（链路加解密）、`level.ts`（LCG 关卡生成）、`difficulty.ts`（难度系数）、`update.ts`（版本探测）、`websocket.ts`（对决同步）、`legal-docs.ts`（内联法律页）。
+支撑模块：`crypto.ts`（JWT/PBKDF2/SHA256/AES-GCM）、`auth-utils.ts`（密码哈希）、`helpers.ts`（CORS、鉴权、KV 配置缓存、国际化）、`middleware.ts`（链路加解密）、`level.ts`（LCG 关卡生成）、`difficulty.ts`（难度系数）、`update.ts`（版本探测）、`websocket.ts`（对决同步），法律页由 `server/public`（静态法律页）直接服务。
 
 ### 3. admin-console/（React 管理后台）
 
@@ -431,8 +431,8 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 ### 静态页 / 文档
 | 方法 | 路径 | 功能描述 | 鉴权 |
 | :--- | :--- | :--- | :--- |
-| GET | `/privacy.html` · `/api/legal/privacy` | 隐私政策 HTML | 公开 |
-| GET | `/agreement.html` · `/api/legal/agreement` | 用户协议 HTML | 公开 |
+| GET | `/privacy.html` · `/api/legal/privacy` | 隐私政策 HTML（.html 由 assets 静态服务，/api/legal/* 为 308 重定向） | 公开 |
+| GET | `/agreement.html` · `/api/legal/agreement` | 用户协议 HTML（.html 由 assets 静态服务，/api/legal/* 为 308 重定向） | 公开 |
 | GET | `/doc` | Swagger UI（OpenAPI 文档） | 公开 |
 
 ---

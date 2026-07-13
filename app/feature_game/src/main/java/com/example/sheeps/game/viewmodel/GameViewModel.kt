@@ -26,6 +26,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -209,7 +210,8 @@ class GameViewModel @Inject constructor(
      * 加载指定关卡数据并初始化本局状态（MVI Intent: [GameViewIntent.LoadLevel]）。
      *
      * 线程边界：
-     * - 计时器协程运行在 [viewModelScope]（主线程），每秒更新 `elapsedMs`；
+     * - 计时已解耦到 UI 本地（[com.example.sheeps.game.ui.components.GameStatusBar] 基于 `levelStartTimestamp` 自增）；
+     *   [viewModelScope] 的计时协程仅作占位、不写全局状态，避免整树每秒重组；
      * - 道具库存扣减与关卡网络请求运行在 [Dispatchers.IO]（`apiService.getLevel` / `localDao`）；
      * - 离线回退时改由本地生成器生成可解关卡，避免阻塞 UI。
      *
@@ -219,18 +221,8 @@ class GameViewModel @Inject constructor(
     private fun handleLoadLevel(levelId: Int, carryItemsJson: String?) {
         updateState { copy(isLoading = true, currentLevelId = levelId) }
         historyStack.clear()
-        levelStartTime = System.currentTimeMillis()
         itemsUsedCount = 0
         carryItemsJsonStr = carryItemsJson
-        // 计时器在 viewModelScope 内启动，VM 销毁时由框架自动取消；先 cancel 旧 Job 防止并发计时器叠加。
-        // 启动计时器协程
-        tickJob?.cancel()
-        tickJob = viewModelScope.launch {
-            while (isActive) {
-                delay(1000)
-                updateState { copy(elapsedMs = System.currentTimeMillis() - levelStartTime) }
-            }
-        }
 
         val carryMap = try {
             if (!carryItemsJson.isNullOrEmpty()) json.decodeFromString<Map<String, Int>>(
@@ -272,6 +264,24 @@ class GameViewModel @Inject constructor(
                     calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis(), numericUserId))
                 updateBoardState(finalTiles, carryMap, true)
             }
+        }
+    }
+
+    /**
+     * 启动计时器：仅在棋盘数据加载完毕、状态切换为 PLAYING 后调用。
+     * 记录关卡开始时间并写入一次 [GameViewState.levelStartTimestamp]（运行于 [viewModelScope] 主线程）；
+     * 不再按秒更新 [GameViewState.elapsedMs]，避免整棵 GameScreen 每秒重组。
+     * VM 销毁时由框架自动取消协程；先 cancel 旧 Job 防止并发计时器叠加。
+     */
+    private fun startTimer() {
+        levelStartTime = System.currentTimeMillis()
+        // 解耦计时：不再每秒写全局 elapsedMs（否则整棵 GameScreen 每秒重组、约 300 张 TileView 重绘 + 300 次 onGloballyPositioned）。
+        // 仅写入一次关卡起始时间戳，供 GameStatusBar 基于本地计时器自增显示；结算时仍用 levelStartTime 计算最终 elapsedMs。
+        updateState { copy(levelStartTimestamp = levelStartTime) }
+        // 保留可被取消的占位协程，使游戏结束时 tickJob?.cancel() 生命周期语义与原有保持一致；不执行任何周期性状态写入。
+        tickJob?.cancel()
+        tickJob = viewModelScope.launch {
+            awaitCancellation()
         }
     }
 
@@ -332,6 +342,8 @@ class GameViewModel @Inject constructor(
                 )
             )
         )
+        // 棋盘加载完成、状态已切换为 PLAYING，此时用户方可点击卡牌，才开始计时
+        startTimer()
     }
 
     /**

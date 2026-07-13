@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.sheeps.data.model.Tile
@@ -79,8 +80,27 @@ fun DuelGameBoard(
 
         if (visibleTiles.isNotEmpty()) {
             // 关键修复：用"缩放后实际尺寸"作为 Box size
+            // 棋盘内容区根容器：仅在此测量一次，捕获全局坐标（px）后按公式推导每张牌全局坐标，
+            // 取代逐牌 onGloballyPositioned。飞行动画点击瞬间读取 tileGlobalPositions[tile.id] 作为起点。
+            val boardRootPos = remember { mutableStateOf(Offset.Zero) }
+            val density = LocalDensity.current.density
+
             Box(
-                modifier = Modifier.size(width = displayedWidth, height = displayedHeight)
+                modifier = Modifier
+                    .size(width = displayedWidth, height = displayedHeight)
+                    .onGloballyPositioned { coords ->
+                        boardRootPos.value = coords.positionInRoot()
+                        computeTileGlobalPositions(
+                            boardRootPos = boardRootPos.value,
+                            density = density,
+                            minX = minX,
+                            minY = minY,
+                            spacing = spacing,
+                            scale = 1f,
+                            visibleTiles = visibleTiles,
+                            tileGlobalPositions = tileGlobalPositions
+                        )
+                    }
             ) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
@@ -98,11 +118,24 @@ fun DuelGameBoard(
                                 )
                                 .zIndex(tile.z.toFloat())
                                 .alpha(if (isFlying) 0f else 1f)
-                                .onGloballyPositioned { coords ->
-                                    tileGlobalPositions[tile.id] = coords.positionInRoot()
-                                }
                         )
                     }
+                }
+            }
+
+            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标（兜底）。
+            LaunchedEffect(visibleTiles) {
+                if (boardRootPos.value != Offset.Zero) {
+                    computeTileGlobalPositions(
+                        boardRootPos = boardRootPos.value,
+                        density = density,
+                        minX = minX,
+                        minY = minY,
+                        spacing = spacing,
+                        scale = 1f,
+                        visibleTiles = visibleTiles,
+                        tileGlobalPositions = tileGlobalPositions
+                    )
                 }
             }
         }
@@ -171,5 +204,27 @@ private fun FogEffectOverlay() {
                 canvas.restore()
             }
         }
+    }
+}
+
+/**
+ * 依据棋盘内容区根容器全局坐标（px）与布局参数，推导每张可见牌的屏幕全局坐标（px）。
+ * 原实现为每张 TileView 挂 [androidx.compose.ui.layout.onGloballyPositioned]；
+ * 此处改为根容器测一次后按公式推算（dp→px 需乘 density），与逐牌回调写入的左上角坐标一致。
+ */
+private fun computeTileGlobalPositions(
+    boardRootPos: Offset,
+    density: Float,
+    minX: Float,
+    minY: Float,
+    spacing: Int,
+    scale: Float,
+    visibleTiles: List<Tile>,
+    tileGlobalPositions: MutableMap<String, Offset>
+) {
+    visibleTiles.forEach { tile ->
+        val x = boardRootPos.x + (tile.x - minX) * spacing * scale * density
+        val y = boardRootPos.y + (tile.y - minY) * spacing * scale * density
+        tileGlobalPositions[tile.id] = Offset(x, y)
     }
 }

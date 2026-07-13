@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.ksp)
     }
 
+
 android {
     namespace = "com.example.sheeps.core"
     compileSdk = 37
@@ -25,6 +26,8 @@ android {
     buildFeatures {
         viewBinding = true
         compose = true
+        // 启用 BuildConfig，使 NetworkModule 可按 BuildConfig.DEBUG 区分构建类型（AGP 8.0+ 库模块默认关闭）
+        buildConfig = true
     }
 }
 

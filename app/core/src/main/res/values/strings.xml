@@ -282,7 +282,7 @@
     <string name="update_download_error">下载失败，请检查网络连接</string>
     <string name="game_won_title">挑战成功！</string>
     <string name="game_won_desc">太棒了，成功通关！</string>
-    <string name="game_won_score">获得金币</string>
+    <string name="game_won_score">获得积分</string>
     <string name="btn_leaderboard">排行榜</string>
     <string name="btn_home">返回首页</string>
     <string name="btn_next_level">下一关</string>
@@ -346,8 +346,8 @@
     <string name="toast_privacy_disagree">很抱歉，您需要同意隐私政策才能体验游戏</string>
     <string name="splash_age_tip">适龄提示：适合 8 岁及以上用户</string>
     <string name="splash_health_advice">健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</string>
-    <string name="privacy_dialog_title">用户服务与隐私协议</string>
-    <string name="privacy_dialog_content">感谢您体验《消了个爽》！\n\n在您开始游戏前，请认真阅读并理解《用户协议》与《隐私政策》。\n\n点击‘同意并开始’表示您已了解并同意以上条款。</string>
+    <string name="privacy_dialog_title">用户隐私政策概要</string>
+    <string name="privacy_dialog_content">欢迎使用 金色体育！我们将通过《金色体育隐私协议》帮助您了解我们收集、使用、存储和共享个人信息的情况，以及您所享有的相关权利。\n\n请您务必审慎阅读、充分理解我们的各项条款，详细信息还可以通过阅读《金色体育用户协议》了解。您也可以在系统"设置"中查看、变更、删除个人信息并管理您的授权。\n\n如果您同意，请点击"同意"开始接受我们的服务。</string>
     <string name="btn_disagree_exit">不同意并退出</string>
     <string name="btn_agree_start">同意并开始</string>
     <string name="toast_offline_fallback">连接服务异常，已载入本地离线数据</string>
@@ -431,6 +431,11 @@
     <!-- ===== i18n 改造新增 key（用户可见中文文案国际化） ===== -->
     <!-- 通用标题 / 标签 -->
     <string name="settings_title">设置</string>
+    <string name="settings_user_agreement">用户协议</string>
+    <string name="settings_privacy_policy">隐私协议</string>
+    <string name="settings_personal_info_collection">个人信息收集清单</string>
+    <string name="settings_third_party_sharing">第三方信息共享清单</string>
+    <string name="login_agreement_hint">我已阅读并同意《用户协议》和《隐私政策》</string>
     <string name="register_title">注册账号</string>
     <string name="profile_title">个人资料</string>
     <string name="profile_edit_title">个人资料</string>

@@ -165,6 +165,10 @@ CREATE INDEX idx_leaderboard_mode ON leaderboard(game_mode, level_id, score DESC
 
 -- 按 user_id 建索引，加速以用户为维度的查询/统计（积分流水、兑换记录、个人榜等）
 CREATE INDEX IF NOT EXISTS idx_leaderboard_user ON leaderboard(user_id);
+-- 按 achieved_at 建索引，加速每日弹窗按时间窗口(>= / <=)过滤的聚合查询（昨日 TOP3、per-user 昨日排名）。
+-- 注意：线上 leaderboard 为不断增长的大表，建索引会触发全表扫描/重写，需由 DBA 在业务低峰期执行；
+-- IF NOT EXISTS 保证该语句幂等，可安全重复执行。
+CREATE INDEX IF NOT EXISTS idx_leaderboard_achieved ON leaderboard(achieved_at);
 CREATE INDEX IF NOT EXISTS idx_point_record_user ON point_record(user_id);
 CREATE INDEX IF NOT EXISTS idx_exchange_record_user ON exchange_record(user_id);
 

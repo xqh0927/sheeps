@@ -17,10 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.times
 import com.example.sheeps.data.model.Tile
 
 /**
@@ -28,11 +27,12 @@ import com.example.sheeps.data.model.Tile
  *
  * - 每列自底向上排布卡牌。
  * - 卡牌采用绝对坐标定位与独立位移动画 [animateDpAsState]，
- *   新加入的卡牌在逻辑上被创建后，从棋盘最顶部 (Y=0) 平滑滑落至目标位置（消除了弹跳或闪烁）。
+ *   新加入的卡牌在逻辑上被创建后，从棋盘底部平滑上升（自底向上堆叠）至目标位置（消除弹跳或闪烁）。
  * - 玩家可点击列中任意深度可见卡牌。点击卡牌飞入卡槽后，
  *   点击位置上方的卡牌受重力影响顺滑下坠 1 格，下方的卡牌保持纹丝不动（完美重力对齐）。
  * - 列顶往下 [visibleLayers] 张做半透明（alpha 0.4）"多层可见"。
- * - 顶部画死亡线（colorScheme.error）。
+ * - **统一间隙**：卡牌四周（上/下/左/右）间隙恒为 [GAP]，棋盘内边距亦为 [GAP]，
+ *   保证视觉上所有方向留白完全一致。列宽固定为牌宽（消除横向多余空隙），棋盘宽度随内容自适应并居中。
  */
 @Composable
 fun EndlessWellBoard(
@@ -42,23 +42,25 @@ fun EndlessWellBoard(
     visibleLayers: Int,
     onColumnClick: (Int, String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // 顶部死亡线（红色）
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.85f))
-        )
-        Spacer(modifier = Modifier.height(2.dp))
+    // 统一间隙：卡牌四周与棋盘内边距保持一致，避免「左右有缝、上下贴死」的不一致
+    val gap = 4.dp
+    val pad = gap // 棋盘内边距（四边一致）
+    val topReserve = gap // 顶部留白：最顶排卡牌与棋盘上沿保持 gap
+    val bottomReserve = gap // 底部留白：最底排卡牌与棋盘下沿保持 gap
 
-        val tileSize = 48.dp // 单张牌基准尺寸（在列内自适应）
-        val boardHeight = tileSize * deathRow
+    val tileSize = 48.dp // 单张牌尺寸（固定）
+    val verticalStep = tileSize + gap // 纵向步进 = 牌高 + 间隙（上下间隙 = gap）
+    val stackHeight = deathRow * tileSize + (deathRow - 1) * gap // 满 deathRow 张的堆叠高度
+    val columnHeight = topReserve + stackHeight + bottomReserve // 列内可用高度
+    val rowHeight = columnHeight + pad * 2 // 含 padding 的 Row 总高
 
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(boardHeight)
+                .height(rowHeight)
                 .clip(RoundedCornerShape(10.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .border(
@@ -66,24 +68,26 @@ fun EndlessWellBoard(
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                     RoundedCornerShape(10.dp)
                 )
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(pad),
+            horizontalArrangement = Arrangement.spacedBy(gap),
             verticalAlignment = Alignment.Bottom
         ) {
             columns.forEachIndexed { colIndex, column ->
                 Box(
                     modifier = Modifier
-                        .weight(1f)
+                        .width(tileSize) // 列宽 = 牌宽，消除横向额外空隙
                         .fillMaxHeight(),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     for (i in column.indices) {
                         val tile = column[i]
                         key(tile.id) {
-                            // 使用 isInitial 标记首次进入，初始位置设为 boardHeight (棋盘底部)，从而平滑自底部滑入
+                            // isInitial：首帧从列底滑入，之后以目标位做重力动画
                             var isInitial by remember { mutableStateOf(true) }
-                            val targetY = boardHeight - tileSize * (column.size - i)
-                            val finalTargetY = if (isInitial) boardHeight else targetY
+                            // p = 距底第几张（0 为最底）。目标顶部 y = columnHeight - bottomReserve - tileSize - p*verticalStep
+                            val p = column.size - 1 - i
+                            val targetY = columnHeight - bottomReserve - tileSize - p * verticalStep
+                            val finalTargetY = if (isInitial) columnHeight else targetY
 
                             val animatedY by animateDpAsState(
                                 targetValue = finalTargetY,

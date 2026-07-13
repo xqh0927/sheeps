@@ -7,7 +7,7 @@
  *   1. CORS 响应头计算              — 准备跨域头（后续各分支复用同一份 `corsHeaders`）。
  *      · D1 自动迁移已移除：避免首请求超时，schema 改由 schema.sql 手工维护。
  *   2. OPTIONS 预检                 — 直接返回空体响应，提前结束跨域握手。
- *   3. 静态法律文件                 — /privacy.html、/agreement.html 等 GET 端点短路返回 HTML。
+ *   3. 静态法律文件                 — /api/legal/* 端点 308 重定向至 server/public 静态资源（HTML 本体由 assets 层服务）。
  *   4. WebSocket 升级               — `/api/ws` 建立双向信道，移交联机对决状态机。
  *   5. /doc Swagger 短路            — /doc 与 /doc/openapi.json 绕过加解密，直接交给 Hono `app` 渲染文档。
  *   6. 加密中间件（解密）          — 若请求含 encrypted 字段，先 `decryptRequest` 还原明文再路由。
@@ -33,7 +33,6 @@ import { handleGameRoutes } from './handlers/game';
 import { handleSystemRoutes } from './handlers/system';
 import { handleAdminRoutes } from './handlers/admin';
 import { decryptRequest, encryptResponse } from './middleware';
-import { privacyHtml, agreementHtml } from './legal-docs';
 export {
   parseReleaseVersionCode,
   findApkAsset,
@@ -76,26 +75,6 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     const lang = getLangSuffix(request);
-
-    // 1.2 处理静态法律文件路由
-    if (request.method === 'GET') {
-      if (path === '/privacy.html' || path === '/api/legal/privacy') {
-        return new Response(privacyHtml, {
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      }
-      if (path === '/agreement.html' || path === '/api/legal/agreement') {
-        return new Response(agreementHtml, {
-          headers: {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Access-Control-Allow-Origin': '*'
-          }
-        });
-      }
-    }
 
     /**
      * 2. WebSocket 联机对决协议升级路由
@@ -223,8 +202,12 @@ export default {
       // 如果对应的业务路由匹配并成功响应则直接返回；否则抛出 404 Not Found
       let finalResponse = response || new Response(JSON.stringify({ error: 'Not Found' }), { status: 404, headers: corsHeaders });
 
-      // JSON 错误国际化翻译
-      if (finalResponse.headers.get('Content-Type')?.includes('application/json')) {
+      // JSON 错误国际化翻译（P2-8 优化：仅对 status >= 400 的错误响应做克隆 + JSON 解析翻译；
+      // 2xx 成功响应直接返回原响应，省去一次全量 JSON parse，降低 CPU/延迟开销）
+      if (
+        finalResponse.status >= 400 &&
+        finalResponse.headers.get('Content-Type')?.includes('application/json')
+      ) {
         try {
           const responseClone = finalResponse.clone();
           const jsonBody = await responseClone.json() as any;

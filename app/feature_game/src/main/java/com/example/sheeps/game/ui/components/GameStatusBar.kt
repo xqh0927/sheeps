@@ -6,7 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -14,11 +15,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.data.model.TileState
+import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.AnimatedCounter
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.core.R
+import kotlinx.coroutines.isActive
 
 /**
  * 游戏状态栏组件
@@ -32,9 +35,26 @@ fun GameStatusBar(state: GameViewState) {
     val remaining = state.boardTiles.count {
         it.state == TileState.NORMAL || it.state == TileState.BLOCKED
     }
-    // 计时器
-    val minutes = (state.elapsedMs / 60000).toInt()
-    val seconds = ((state.elapsedMs % 60000) / 1000).toInt()
+    // 计时器：基于关卡起始时间戳本地自增，每秒仅重绘状态栏自身，不再依赖全局 elapsedMs 实时流（已解耦到 UI 本地计时）。
+    // 仅在 PLAYING 时自增；胜利/失败后定格为当前已用时间（与原有“结算后冻结”表现一致），复活回到 PLAYING 后继续计时。
+    var displayMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(state.levelStartTimestamp, state.gameStatus) {
+        val startTs = state.levelStartTimestamp
+        if (startTs <= 0L) {
+            displayMs = 0L
+            return@LaunchedEffect
+        }
+        if (state.gameStatus != GameStatus.PLAYING) {
+            displayMs = System.currentTimeMillis() - startTs
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            displayMs = System.currentTimeMillis() - startTs
+            delay(1000)
+        }
+    }
+    val minutes = (displayMs / 60000).toInt()
+    val seconds = ((displayMs % 60000) / 1000).toInt()
     val timeText = String.format("%02d:%02d", minutes, seconds)
 
     Box(

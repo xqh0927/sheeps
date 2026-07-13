@@ -43,6 +43,12 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+        <activity
+            android:name=".ui.h5.H5Activity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
     </application>
 
 </manifest>

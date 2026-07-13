@@ -95,7 +95,15 @@ fun PrepareGameDialog(
 ) {
     val context = LocalContext.current
     val isLocked = levelId > state.unlockedLevel
-    val cost = if (levelId == 2) 50 else if (levelId == 3) 100 else 200
+    // 累计计算：从已解锁关+1 到目标关卡，每关费用累加（第2关50、第3关100、第4关及以上每关200）
+    var cost = 0
+    for (lid in (state.unlockedLevel + 1)..levelId) {
+        cost += when (lid) {
+            2 -> 50
+            3 -> 100
+            else -> 200
+        }
+    }
 
     val isRest = levelId >= 5 && levelId % 5 == 0
     val isBlind = !isRest && levelId >= 3 && levelId % 3 == 0

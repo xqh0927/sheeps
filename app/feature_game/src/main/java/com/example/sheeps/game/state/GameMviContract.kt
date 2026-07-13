@@ -99,8 +99,10 @@ data class GameViewState(
     val score: Int = 0,
     /** 当前游戏运行状态 */
     val gameStatus: GameStatus = GameStatus.INIT,
-    /** 本局已用时间（毫秒） */
+    /** 本局已用时间（毫秒），仅在通关结算时由 ViewModel 写入一次（不再每秒更新，避免整树重组） */
     val elapsedMs: Long = 0,
+    /** 关卡开始时间戳（墙钟毫秒），由 ViewModel 在 startTimer 时写入一次；状态栏据此本地计时，避免每秒全局重组 */
+    val levelStartTimestamp: Long = 0,
     /** 通关结算积分（排行榜提交值） */
     val finalScore: Int = 0,
     /** 排行榜数据 */

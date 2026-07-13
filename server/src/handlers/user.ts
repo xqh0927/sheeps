@@ -106,7 +106,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         // DB：单 batch 聚合查询用户资料、关卡解锁、道具背包、今日签到、历史连续天数、最高通关关卡（leaderboard 表），供前端渲染个人中心
         const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, avatar_url FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
@@ -119,7 +119,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         return new Response(JSON.stringify({
             success: true, user: userData, unlocked_levels: levelsResult.results.map((r: any) => r.level_id), items: itemsResult.results,
             today_signed: signedTodayResult.results[0] !== null && signedTodayResult.results[0] !== undefined, sign_streak: (lastSignResult.results[0] as any)?.streak || 0, highest_level_cleared: (highestClearedResult.results[0] as any)?.highest || 0,
-            avatarUrl: userData?.avatar_url || null
+            avatarUrl: userData?.avatar || null
         }), { headers: corsHeaders });
     }
 
