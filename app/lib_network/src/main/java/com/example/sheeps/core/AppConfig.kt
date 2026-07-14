@@ -1,7 +1,7 @@
 package com.example.sheeps.core
 
 /**
- * 全局配置文件，用于定义应用范围内的常量和配置信息。
+ * 全局配置文件，用于定义应用范围内的常量 and 配置信息。
  */
 object AppConfig {
     /**

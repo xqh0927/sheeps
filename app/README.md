@@ -1,141 +1,132 @@
-# Sheeps - MVI 多模块联机手游项目文档
+# Sheeps - MVI 现代多模块联机手游项目文档
 
 ## 1. 项目简介
-**Sheeps** 是一款基于仙侠主题背景的益智类三消手游。本项目不仅实现了单机闯关模式，还集成了基于 WebSocket 的实时多人对战系统（天命对决），并包含完整的商城、背包、任务、排行及离线同步功能。
+**Sheeps** 是一款以视觉背景的益智类层叠三消联机手游。项目集成了单机闯关模式（金字塔叠层网格）、无尽生存模式（死亡之列滑落）以及基于 WebSocket 的实时多人对战系统（天命对决），并包含完整的商城、背包、每日任务、全球排行及离线优先数据同步功能。
 
-项目采用最新的 Android 开发标准，深度实践了 **MVI (Model-View-Intent)** 架构、**Jetpack Compose** 响应式 UI 以及 **多模块化 (Multi-Module)** 工程结构。
-
----
-
-## 2. 技术栈
-### 核心架构
-- **MVI 模式**：通过单向数据流 (Unidirectional Data Flow) 管理 UI 状态，确保状态的可预测性与可测试性。
-- **Multi-Module**：按功能拆分模块，提升编译速度与代码隔离度。
-- **Hilt (Dependency Injection)**：全项目依赖注入，解耦各层级逻辑。
-
-### 视图层 (UI)
-- **Jetpack Compose**：全申明式 UI 开发。
-- **Coil**：图片加载库。
-- **Compose Animation**：丰富的卡牌飞行动画与界面切换效果。
-
-### 数据层 (Data)
-- **Room Persistence**：本地 SQLite 数据库存储（用户信息、关卡进度、道具库存）。
-- **MMKV**：高性能 KV 存储，用于用户偏好设置（主题、语言、UID）。
-- **Retrofit + OkHttp**：RESTful API 通信。
-- **Kotlin Serialization**：轻量级、高性能的 JSON 序列化。
-
-### 联机与异步
-- **WebSocket**：实时全双工对战指令同步。
-- **Kotlin Coroutines & Flow**：响应式异步编程。
-- **WorkManager**：保证离线成绩与数据的最终一致性同步。
+项目采用最新的 Android 开发标准，深度实践了 **MVI (Model-View-Intent)** 架构、**Jetpack Compose** 全声明式 UI 渲染，并经过了彻底的**多模块组件化（Multi-Module）**重塑与解耦，具有极高的工程品位和二开友好度。
 
 ---
 
-## 3. 项目模块说明
-项目按业务和功能划分为以下主要模块：
+## 2. 物理组件化架构设计
 
-| 模块名 | 职能描述 |
-| :--- | :--- |
-| `:app` | 空壳入口模块。初始化 Application，配置 WorkManager，管理全局生命周期。 |
-| `:core` | **核心公共库**。包含 MVI 基类、主题管理、网络监控、数据库实体、协议模型及全局工具类。 |
-| `:feature_menu` | **主菜单模块**。包含游戏大厅、道具商城、个人中心、签到任务、在线匹配逻辑。 |
-| `:feature_game` | **游戏核心模块**。包含单机闯关 (GameScreen) 与 多人对决 (DuelScreen) 的核心逻辑与 UI。 |
-| `:feature_leaderboard` | **排行榜模块**。展示全球及好友之间的关卡成绩排名。 |
-| `:feature_splash` | **启动模块**。处理 App 启动图、初始化校验及路由分发。 |
+为了实现“高内聚、弱耦合”的编译提效与业务隔离，项目采用了三层物理组件化拓扑架构。在最近的重构中，原公共底座 `:core` 被成功重组剥离出独立的 `:lib_base` 技术基建底座与 `:lib_network` 无状态网络底座，使得物理依赖关系更加清晰健壮：
 
----
+### 2.1 架构拓扑依赖图 (Mermaid)
 
-## 4. 核心功能实现细节
+```mermaid
+graph TD
+    %% 壳工程层
+    App[":app (壳入口)"]
+    
+    %% 业务功能组件层
+    feature_splash[":feature_splash (启动页)"]
+    feature_menu[":feature_menu (大厅/商城/个人中心)"]
+    feature_game[":feature_game (闯关/无尽/对决游戏引擎)"]
+    feature_leaderboard[":feature_leaderboard (排行榜)"]
 
-### 4.1 游戏引擎 (GameEngine)
-位于 `:core` 模块，负责卡牌的遮挡算法：
-- **遮挡判定**：基于 3D 坐标 (X, Y, Z)，通过计算卡牌位置重叠度，动态判定卡牌是否被“压住”。
-- **状态刷新**：每当一张卡牌被点击移入槽位，引擎会自动递归计算下方受影响卡牌的锁定状态。
+    %% 核心中间件与基底层
+    core[":core (业务数据与资源)"]
+    lib_network[":lib_network (无状态网络组件)"]
+    lib_base[":lib_base (技术基建底座)"]
 
-### 4.2 联机对战系统 (Duel Mode)
-- **实时同步**：使用 WebSocket 建立持久连接。
-- **能量系统**：玩家消除卡牌会积累能量，能量可用于释放“迷雾咒”、“封印咒”等干扰对手。
-- **退避重连**：`WebSocketManager` 内置了指数退避算法，应对不稳定的移动网络环境。
+    %% 壳依赖
+    App --> feature_splash
+    App --> feature_menu
+    App --> feature_game
+    App --> feature_leaderboard
+    App --> core
+    
+    %% 功能模块对数据的单向依赖
+    feature_splash --> core
+    feature_menu --> core
+    feature_game --> core
+    feature_leaderboard --> core
 
-### 4.3 离线优先同步策略 (SyncRepository)
-- **Dirty 标记位**：本地数据库中的数据（如积分、进度）带有 `isDirty` 字段。
-- **静默同步**：当应用检测到网络恢复在线，或应用前后台切换时，会自动触发 `SyncRepository` 将本地脏数据同步至云端。
+    %% 数据层对底层技术底座的 api 传递依赖
+    core -.-> |api 依赖传递| lib_base
+    core -.-> |api 依赖传递| lib_network
+    
+    %% 网络底座依赖最底层基础库
+    lib_network --> lib_base
+```
 
-### 4.4 ViewModel 委派模式
-为了解决大型页面 ViewModel 逻辑过于复杂的问题，本项目实践了 **Delegate (委派)** 模式：
-- `GameViewModel` 仅负责分发 Intent。
-- 具体的业务逻辑被剥离到 `GameLogicDelegate` (消除判定)、`GameToolDelegate` (道具使用) 等类中，显著提升了可读性。
+### 2.2 模块功能职责划分
 
----
-
-## 5. 近期关键技术重构与算法优化
-
-在最近的重构中，我们针对棋盘视觉体验、动画流畅度、关卡可解性与概率特质进行了全面升级，涉及以下核心实现：
-
-### 5.1 棋盘自适应宽度与卡牌尺寸统一
-* **尺寸完全统一**：全场景卡牌尺寸统一修改为 **`48.dp`**（包括棋盘卡牌、卡槽、置物架、以及飞行动画层），消除空中飞行过程中的突兀缩放感，卡槽允许微溢出，视觉体验更加高级开阔。
-* **双轴完全居中自适应**：宽度基于 `screenWidthDp - 32.dp` 动态算出，高度按卡牌最高堆叠内容高度自适应，多分辨率手机下实现完美的双重居中显示，彻底解决折叠屏/大屏卡牌被裁剪、越界或偏移的漏洞。
-* **消除消牌微动**：修复了对决模式下对齐计算的宽度参考系错误，确保消除牌时其余在场卡牌纹丝不动，杜绝抖动卡顿。
-
-### 5.2 金字塔渐进式叠层布局算法
-* **下大上小收缩**：卡牌堆叠采用网格大小逐层递减 1 ($size = baseSize - z$) 且网格偏移量逐层累加 0.5 ($offset = z \times 0.5f$) 的三维算法。卡牌层层精准坐落在下层四张卡牌的十字接缝处，拟真呈现了中式古典叠放金字塔感。
-
-### 5.3 10% 物理重叠面积遮挡法则
-* **碰撞对齐**：为了让卡牌覆盖视觉表现与点击判定完美契合，将底层 `GameEngine.kt`、本地求解器 `GameLevelGenerator.kt` 及云端 solver `level.ts` 的碰撞面积判定全部统一重构为 10% 面积碰撞（$ox \times oy > 230.4$）。
-* **可解性保障**：只有两张卡牌物理重叠面积超过单张（$48 \times 48 = 2304$ 像素²）的 10% 时，上层才会被判定压住下层。轻微边缘重合不再卡死卡牌，有效消除了死局，保障生成关卡 **100% 可解**。
-
-### 5.4 精确层级锁定抖动（只抖直接遮挡物）
-* **锁定层级过滤**：点击被压住的卡牌时，利用 Z 轴最小极值算法精确筛出直接遮挡它的“第一层”卡牌，上层更远的卡牌保持静止。
-* **次数精简**：水平抖动动画减少为 **只抖动一次 (`repeat(1)`)**，提供克制、干净的物理交互红光反馈。
-
-### 5.5 万能太极牌完全消除平衡机制
-* **道具逻辑严谨化**：玩家卡槽中必须存在两张同花色卡牌才允许使用太极牌（否则报错不耗道具）。使用时会自动从移出置物架或棋盘上搜索并连同消去第 3 张相同花色的卡牌，以保证局内该花色的剩余总卡牌数依然是 3 的倍数，彻底杜绝了因道具使用导致的死局。
-
-### 5.6 卡牌飞行动画 GPU 硬件加速
-* **延迟状态读取**：将飞行动画中的位移（`translationX`/`translationY`）与缩放（`scale`）属性全部收拢至 **`Modifier.graphicsLayer { ... }`** 绘图扩展块内，在 Draw 阶段延迟读取 State 属性。
-* **GPU 直接渲染**：避开了传统直接读取 progress 状态触发全量 Compose Recomposition (重组) 和 Relayout (重测量) 的 CPU 卡顿黑洞。帧率拉满，飞行动画在低端设备下依然稳定在 60/120 满帧运行。
-
-### 5.7 长跨度平滑列表滚动与冷启动防锁死
-* **跨度平滑滚动**：扩展编写了 `LazyListState.animateScrollToItemSmoothly`。当定位跨度真实大于 4 时，先无缝 Snap 跳转到目标项临近 3 个元素内，再以平滑过渡动画滚动至最终位置，极大减少了 LazyColumn 渲染中间大量无用 Item 时对 CPU 造成的严重卡顿负担。
-* **异步加载防锁死**：私有文件级变量 `isColdStartAutoScrolled` 结合 LaunchedEffect 超时轮询。若首帧读到 unlockedLevel 占位符 1，不锁死自动滚动标志，而是等待本地/云端异步数据加载完毕后，再平滑定位到玩家真实的解锁关卡位置，并锁定滚动标志。
-
-### 5.8 全盘地毯式中文注释补全与汉化翻译
-* **代码层极致易读**：对整个项目（包含后端 14 个 TypeScript 代码文件及客户端 80+ 个 Kotlin 源码文件）开展了彻底的中文注释汉化补全与中间算法流程翻译，对双 Token 并发锁刷新、指数退避重连、LCG 金字塔异形网格生成等高难度逻辑补齐了全中文详解，代码维护性显著跃升。
-
-### 5.9 关卡类型全局概率分布与前置弹窗警告
-* **关卡概率**：利用 LCG 生成算法根据关卡种子，判定 40% 封印关卡（金色锁头阻挡）、20% 盲盒关卡（迷雾暗牌问号）和 40% 正常关卡。在盲盒关卡内高层卡牌不生成盲盒，确保前 3-5 步可解。前置准备弹窗 PrepareGameDialog 通过 LCG 同源实时检测，在进入盲盒关卡时展现专用的橙红色警告 Banner。
+| 模块名称 | 物理层次 | 职能描述 | 核心内容 |
+| :--- | :--- | :--- | :--- |
+| **`:app`** | 壳层 | 应用总入口。 | 关联全部子模块依赖、集成 Application 主类并进行 SDK 初始化。 |
+| **`:feature_splash`** | 业务层 | 启动与跳转分发。 | 亮色白金背景启动动画、网络与合规性校验、进入主页的路由分发。 |
+| **`:feature_menu`** | 业务层 | 游戏大厅与外围。 | 包含主菜单、积分商城、个人中心（更换皮肤）、每日签到、日常任务。 |
+| **`:feature_game`** | 业务层 | 游戏玩法核心引擎。 | 包含层叠金字塔网格棋盘、无尽之渊下坠棋盘、联机 WebSocket 天命对决赛场。 |
+| **`:feature_leaderboard`** | 业务层 | 竞技排行数据。 | 展示日榜、总榜，利用 RecyclerView 及 BRVAH 适配器实现高速渲染。 |
+| **`:core`** | 数据与资源层 | 业务数据中心。 | 封装 Room 本地数据库、LocalDao、SyncRepository 同步数据流以及公共资源实体。 |
+| **`:lib_network`** | 技术基础层 | 纯净网络底座。 | 配置 OkHttpClient、加解密拦截器 `EncryptionInterceptor` 与 Retrofit。 |
+| **`:lib_base`** | 技术基础层 | 无状态技术基建。 | 包含 MVI 通用 ViewModel 基类、BaseActivity 基类、MMKV 及 AesGcmCipher 底层算法。 |
 
 ---
 
-## 6. 项目结构导航
+## 3. 核心架构设计与重构亮点
+
+在最近的架构演进中，我们针对 MVI 健壮性、生命周期泄漏以及模块耦合进行了针对性重塑，取得了以下核心成果：
+
+### 3.1 MVI 串行 Intent 通道（防并发竞态条件）
+*   **优化逻辑**：在基类 `BaseMviViewModel` 内部，引入 `Channel<Intent>(Channel.UNLIMITED)` 作为意图队列缓冲区。在初始化时，通过协程在 `viewModelScope` 中排队按序 collect 并分发消费：
+    ```kotlin
+    init {
+        viewModelScope.launch {
+            _intentChannel.receiveAsFlow().collect { intent ->
+                handleIntent(intent)
+            }
+        }
+    }
+    ```
+*   **架构收益**：彻底打断了原本点击卡牌、洗牌、使用道具时可能并行的协程流。所有的 `ViewIntent` 都将在后台顺序**串行处理**，从源头上终结了用户高频狂点屏幕时造成的竞态条件（Race Condition）和消除判定状态紊乱。
+
+### 3.2 声明式 Lifecycle-Safe Flow 收集器
+*   **优化逻辑**：在 `:lib_base` 模块中封装了 `Flow<T>.collectWithLifecycle` 扩展函数，将 `lifecycle.repeatOnLifecycle` 机制内聚于单链式 API 中。
+*   **架构收益**：将 `GameActivity`、`EndlessActivity` 和 `DuelActivity` 中原本繁琐的三层协程嵌套块精炼为单层 Lambda 闭包，彻底净化了 UI 层的订阅代码，保证 Activity 后台挂起时协程自动断开，防止内存泄漏。
+
+### 3.3 契约化 IGameService 跨模块解耦（Hilt 构造注入）
+*   **优化逻辑**：
+    *   在 `:lib_base` 中声明 `IGameService` 通信接口契约，避免 `feature_menu` 物理依赖 `feature_game`。
+    *   在 `feature_game` 的 `GameServiceImpl.kt` 中实现逻辑，并通过 `@Inject` 进行普通 Hilt 构造注入。
+    *   在 `feature_game` 下新建 `di/GameServiceModule.kt` 建立契约绑定。
+*   **架构收益**：大厅模块 `MenuViewModel` 在构造函数中非空引入 `IGameService`，消除了任何运行期反射和包名不配的风险，且在物理编译上两个业务模块完全隔断，架构符合依赖倒置原则。
+
+---
+
+## 4. 最近技术重构与算法优化
+
+在棋盘视觉体验、动画流畅度、关卡可解性与物理重合度上也进行了地毯式升级：
+
+*   **卡牌尺寸 48.dp 统一**：全场景卡牌尺寸统一修改为 `48.dp`（包括棋盘卡牌、卡槽、置物架、以及飞行动画层），消除空中飞行过程中的突兀缩放感。
+*   **双轴完全居中自适应**：棋盘宽度基于 `screenWidthDp - 32.dp` 动态算出，高度按卡牌最高堆叠内容高度自适应，彻底解决折叠屏/大屏卡牌被裁剪、越界或偏移的漏洞。
+*   **金字塔渐进式叠层布局算法**：卡牌堆叠采用网格大小逐层递减 1 且网格偏移量逐层累加 0.5f 的三维算法，卡牌层层精准坐落在下层四张卡牌的十字接缝处。
+*   **10% 物理重叠面积遮挡法则**：底层碰撞面积判定全部统一重构为 10% 面积碰撞。轻微边缘重合不再压制卡牌，有效消除了死局，保障生成关卡 **100% 可解**。
+*   **精确层级锁定抖动**：点击被压住的卡牌时，利用 Z 轴最小极值算法精确筛出直接遮挡它的“第一层”卡牌进行抖动，其余更远的卡牌保持静止，抖动仅执行克制的一次，提供干净的反馈。
+*   **万能太极牌完全消除平衡机制**：玩家卡槽中必须存在两张同花色卡牌才允许使用太极牌，使用时会自动搜索并消去第 3 张相同花色的卡牌，保证局内该花色的剩余总卡牌数依然是 3 的倍数，彻底杜绝了因道具使用导致的死局。
+*   **卡牌飞行动画 GPU 硬件加速**：将飞行动画中的位移与缩放属性全部收拢至 `Modifier.graphicsLayer { ... }` 绘图扩展块内，在 Draw 阶段延迟读取 State 属性，避开了 Compose 重新测量和重布局的 CPU 性能黑洞，低端设备下依然稳定在 60/120 满帧运行。
+*   **长跨度平滑列表滚动与冷启动防锁死**：扩展编写了 `LazyListState.animateScrollToItemSmoothly`。当定位跨度真实大于 4 时，先无缝 Snap 跳转到目标项临近 3 个元素内，再以平滑过渡动画滚动，极大减少了 LazyColumn 对 CPU 造成的严重卡顿负担。
+
+---
+
+## 5. 项目结构导航
+
 ```text
 com.example.sheeps
-├── core
-│   ├── base        # Activity/ViewModel 基类
-│   ├── game        # 游戏核心算法引擎
-│   ├── multiplayer # WebSocket 管理与对战协议
-│   ├── theme       # 仙侠风格主题管理系统
-│   └── utils       # 网络监控、语言工具、事件总线
-├── data
-│   ├── local       # Room 数据库配置与 DAO
-│   ├── model       # 统一的业务数据模型 (MVI State/Intent)
-│   ├── network     # Retrofit 接口定义
-│   └── repository  # 数据仓库与云端同步逻辑
-└── feature_xxx     # 各功能模块
-    ├── ui
-    │   ├── components # 拆分出的功能卡片组件
-    │   ├── dialogs    # 业务相关的弹窗
-    │   └── screens    # 模块主界面
-    └── viewmodel
-        └── delegates  # 业务逻辑委派实现类
+├── lib_base        # 最底层无状态基础公共库（MVI ViewModel/BaseActivity/Aes加解密）
+├── lib_network     # 基础网络连接与加解密拦截器库
+├── core            # 业务数据资产层（本地 Room 数据库、UserPreferences、模型实体类）
+├── feature_splash  # 启动分发模块
+├── feature_menu    # 大厅、商城、背包与个人中心模块
+└── feature_game    # 闯关游戏棋盘、无尽之渊下坠棋盘、联机多人对战赛场
 ```
 
 ---
 
-## 7. 开发与构建
-- **环境要求**：Android Studio Jellyfish+ / AGP 8.0+。
-- **Gradle 命令**：
-    - `assembleDebug`：构建调试版 APK。
-    - `check`：执行静态代码扫描。
-- **路由系统**：项目使用 `TheRouter` 进行模块间跳转，支持动态下发路由。
+## 6. 开发与构建
 
+*   **环境要求**：Android Studio Jellyfish+ / AGP 8.0+。
+*   **Gradle 构建命令**：
+    *   `./gradlew :app:assembleDebug`：构建并打包调试版 APK。
+    *   `./gradlew :baselineprofile:generateBaselineProfile`：在连接设备时运行性能基线轮廓分析，自动输出优化文件并在构建 Release 包时自动装载提速。

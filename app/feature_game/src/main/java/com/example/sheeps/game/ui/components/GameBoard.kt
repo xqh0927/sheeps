@@ -2,10 +2,18 @@ package com.example.sheeps.game.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,7 +105,7 @@ fun GameBoard(
         val visibleTiles = remember(state.boardTiles, flyingTileIds) {
             state.boardTiles.filter { tile ->
                 (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED) &&
-                tile.id !in flyingTileIds
+                        tile.id !in flyingTileIds
             }
         }
 
@@ -110,31 +118,30 @@ fun GameBoard(
                     .size(width = dimensions.displayedWidth, height = dimensions.displayedHeight)
                     .onGloballyPositioned { coords ->
                         boardRootPos.value = coords.positionInRoot()
-                        computeTileGlobalPositions(
-                            boardRootPos = boardRootPos.value,
-                            density = density,
-                            minX = dimensions.minX,
-                            minY = dimensions.minY,
-                            spacing = dimensions.spacing,
-                            scale = dimensions.scale,
-                            visibleTiles = visibleTiles,
-                            tileGlobalPositions = tileGlobalPositions
-                        )
                     }
             ) {
                 visibleTiles.forEach { tile ->
                     key(tile.id) {
-                        val isHighlighted = state.highlightedTileIds.contains(tile.id)
                         val isFlying = flyingTileIds.contains(tile.id)
 
                         TileView(
                             tile = tile,
-                            onClick = { if (!isFlying) onTileClick(tile) },
+                            onClick = {
+                                if (!isFlying) {
+                                    // 精准即时计算当前点击卡牌的全局屏幕位置，省去 O(N) 批量写入导致的大面积重组
+                                    val posX =
+                                        boardRootPos.value.x + (tile.x - dimensions.minX) * dimensions.spacing * dimensions.scale * density
+                                    val posY =
+                                        boardRootPos.value.y + (tile.y - dimensions.minY) * dimensions.spacing * dimensions.scale * density
+                                    tileGlobalPositions[tile.id] = Offset(posX, posY)
+                                    onTileClick(tile)
+                                }
+                            },
                             currentSkin = state.currentSkin,
                             tileSize = (46 * dimensions.scale).dp,
-                            isShaking = state.shakingTileIds.contains(tile.id),
-                            isHighlighted = isHighlighted,
-                            gateLocked = tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds,
+                            isShakingProvider = { state.shakingTileIds.contains(tile.id) },
+                            isHighlightedProvider = { state.highlightedTileIds.contains(tile.id) },
+                            gateLockedProvider = { tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds },
                             modifier = Modifier
                                 .offset(
                                     x = ((tile.x - dimensions.minX) * dimensions.spacing * dimensions.scale).dp,
@@ -143,22 +150,6 @@ fun GameBoard(
                                 .zIndex(tile.z.toFloat())
                         )
                     }
-                }
-            }
-
-            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标
-            LaunchedEffect(visibleTiles) {
-                if (boardRootPos.value != Offset.Zero) {
-                    computeTileGlobalPositions(
-                        boardRootPos = boardRootPos.value,
-                        density = density,
-                        minX = dimensions.minX,
-                        minY = dimensions.minY,
-                        spacing = dimensions.spacing,
-                        scale = dimensions.scale,
-                        visibleTiles = visibleTiles,
-                        tileGlobalPositions = tileGlobalPositions
-                    )
                 }
             }
         }
@@ -174,29 +165,3 @@ internal data class BoardDimensions(
     val displayedWidth: androidx.compose.ui.unit.Dp,
     val displayedHeight: androidx.compose.ui.unit.Dp
 )
-
-/**
- * 依据棋盘内容区根容器全局坐标（px）与布局参数，推导每张可见牌的屏幕全局坐标（px）。
- *
- * 原实现为每张 TileView 挂 [androidx.compose.ui.layout.onGloballyPositioned]；
- * 此处改为根容器测一次后按公式推算：
- * `globalX = boardRootPos.x + (tile.x - minX) * spacing * scale * density`
- * （[androidx.compose.ui.layout.positionInRoot] 返回 px，TileView 的 offset 为 dp，故需乘 density 还原到 px 坐标系）。
- * 与逐牌回调写入的卡牌左上角坐标保持一致，飞行动画起点不变。
- */
-private fun computeTileGlobalPositions(
-    boardRootPos: Offset,
-    density: Float,
-    minX: Float,
-    minY: Float,
-    spacing: Int,
-    scale: Float,
-    visibleTiles: List<Tile>,
-    tileGlobalPositions: MutableMap<String, Offset>
-) {
-    visibleTiles.forEach { tile ->
-        val x = boardRootPos.x + (tile.x - minX) * spacing * scale * density
-        val y = boardRootPos.y + (tile.y - minY) * spacing * scale * density
-        tileGlobalPositions[tile.id] = Offset(x, y)
-    }
-}

@@ -70,15 +70,16 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.AgreePrivacy -> handleAgreePrivacy()
             is GameViewIntent.ChangeUsername -> handleChangeUsername(intent.newName)
             is GameViewIntent.LoadLevel -> handleLoadLevel(intent.levelId, intent.carryItemsJson)
-            is GameViewIntent.ClickTile -> logicDelegate.handleClickTile(
-                viewModelScope,
-                intent.tile,
-                currentState,
-                ::saveHistoryState,
-                ::updateState,
-                ::setEffect,
-                ::processSlotMatchAndCheckEndGame
-            )
+            is GameViewIntent.ClickTile -> viewModelScope.launch {
+                logicDelegate.handleClickTile(
+                    intent.tile,
+                    currentState,
+                    ::saveHistoryState,
+                    ::updateState,
+                    ::setEffect,
+                    ::processSlotMatchAndCheckEndGame
+                )
+            }
 
             is GameViewIntent.UseUndo -> toolDelegate.handleUseUndo(
                 currentState,

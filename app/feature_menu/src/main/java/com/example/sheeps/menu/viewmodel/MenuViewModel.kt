@@ -43,6 +43,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.HttpException
 import javax.inject.Inject
+import com.example.sheeps.core.base.IGameService
 
 /**
  * 菜单主界面 ViewModel
@@ -69,6 +70,7 @@ class MenuViewModel @Inject constructor(
     private val localDao: LocalDao,
     private val syncRepository: SyncRepository,
     private val networkMonitor: NetworkMonitor,
+    private val gameService: IGameService,
     // 业务委派
     private val authDelegate: AuthDelegate,
     private val socialActionDelegate: SocialActionDelegate,
@@ -150,7 +152,7 @@ class MenuViewModel @Inject constructor(
                 currentSkin = prefs.getCurrentSkin(),
                 todaySigned = prefs.getTodaySigned(),
                 signStreak = prefs.getSignStreak(),
-                highestLevelCleared = prefs.getHighestLevelCleared(),
+                highestLevelCleared = gameService.getHighestLevelCleared(),
                 avatarUrl = prefs.getAvatarUrl(),
                 // 首屏先用本地缓存快照，避免空白；后续 handleLoadData 会拉取并比对刷新
                 shopItems = shopCache.getCachedItems()
@@ -356,7 +358,7 @@ class MenuViewModel @Inject constructor(
                                 exchangeHistory = exchangeHistory,
                                 todaySigned = prefs.getTodaySigned(),
                                 signStreak = prefs.getSignStreak(),
-                                highestLevelCleared = prefs.getHighestLevelCleared(),
+                                highestLevelCleared = gameService.getHighestLevelCleared(),
                                 avatarUrl = prefs.getAvatarUrl()
                             )
                         }
@@ -413,7 +415,7 @@ class MenuViewModel @Inject constructor(
                     points = prefs.getPoints(),
                     todaySigned = prefs.getTodaySigned(),
                     signStreak = prefs.getSignStreak(),
-                    highestLevelCleared = prefs.getHighestLevelCleared(),
+                    highestLevelCleared = gameService.getHighestLevelCleared(),
                     avatarUrl = prefs.getAvatarUrl()
                 )
             }

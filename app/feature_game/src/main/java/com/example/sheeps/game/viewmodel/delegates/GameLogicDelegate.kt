@@ -12,6 +12,8 @@ import com.example.sheeps.game.state.SoundType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /** 卡牌飞入卡槽的动画时长，与 GameAnimations.FlyTweenSpec (350ms) 保持一致 */
@@ -27,8 +29,11 @@ class GameLogicDelegate @Inject constructor() {
      * 处理卡牌点击逻辑
      * （闯关模式）线程边界：主流程在调用方主线程执行；被遮挡/封印时的「抖动反馈」通过 `scope.launch { delay(500) }` 在 [viewModelScope] 内延时复位 `shakingTileIds`，VM 销毁时该协程随 scope 取消，无泄漏风险。门控未解锁的封印牌在此拦截，避免产生无效 Undo 步骤。
      */
-    fun handleClickTile(
-        scope: CoroutineScope,
+    /**
+     * 处理卡牌点击事件（挂起函数）。
+     * 主流程在调用方主线程执行，移除 thread switching 上下文切换以实现极致零延迟点击响应。
+     */
+    suspend fun handleClickTile(
         tile: Tile,
         state: GameViewState,
         onAddHistory: () -> Unit,
@@ -38,7 +43,7 @@ class GameLogicDelegate @Inject constructor() {
     ) {
         if (state.gameStatus != GameStatus.PLAYING) return
 
-        // 判断卡牌是否被遮挡
+        // 1. 判断卡牌是否被遮挡
         val isBlocked = tile.state == TileState.BLOCKED || isTileBlocked(tile, state.boardTiles)
 
         if (isBlocked) {
@@ -49,7 +54,8 @@ class GameLogicDelegate @Inject constructor() {
             if (blockerIds.isNotEmpty()) {
                 updateState { copy(shakingTileIds = shakingTileIds + blockerIds) }
                 setEffect(GameViewEffect.Vibrate)
-                scope.launch {
+                // 启动后台定时器清理抖动状态，防止阻塞主协程通道
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
                     delay(500)
                     updateState { copy(shakingTileIds = shakingTileIds - blockerIds) }
                 }
@@ -57,7 +63,7 @@ class GameLogicDelegate @Inject constructor() {
             return
         }
 
-        // 封印门控：未解锁的封印牌不可点击（在记录历史之前拦截，避免产生无效 Undo 步骤）
+        // 2. 封印门控判定
         if (tile.sealedCount > 0 && tile.id !in state.sealedUnlockedIds) {
             val remaining = maxOf(
                 1,
@@ -71,7 +77,6 @@ class GameLogicDelegate @Inject constructor() {
         if (tile.state != TileState.NORMAL && tile.state != TileState.MOVED_OUT) return
 
         onAddHistory()
-
         // 清除当前的高亮提示
         updateState { copy(highlightedTileIds = emptySet()) }
 
@@ -88,21 +93,19 @@ class GameLogicDelegate @Inject constructor() {
                     slotTiles = newSlot
                 )
             }
-            scope.launch {
-                setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                processSlotMatch()
-            }
+            setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+            delay(FLY_ANIMATION_DELAY_MS)
+            processSlotMatch()
         } else {
             // 从棋盘点击
             if (tile.sealedCount > 0) {
                 // 解锁封印
                 val newSealedCount = tile.sealedCount - 1
                 if (newSealedCount == 0) {
-                    // 封印完全解除，直接落槽入盘，不需再额外点击（优化手感与体验）
+                    // 封印完全解除，应用碎冰连锁
                     val clickedTile = tile.copy(sealedCount = 0, isBlind = false, state = TileState.IN_SLOT)
                     val newSlot = insertIntoSlot(state.slotTiles, clickedTile)
 
-                    // 复制棋盘，应用碎冰连锁
                     val tempBoard = state.boardTiles.map { it.copy() }
                     tempBoard.find { it.id == tile.id }?.let { t ->
                         t.sealedCount = 0
@@ -118,11 +121,9 @@ class GameLogicDelegate @Inject constructor() {
                             slotTiles = newSlot
                         )
                     }
-                    scope.launch {
-                        setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                        delay(FLY_ANIMATION_DELAY_MS)
-                        processSlotMatch()
-                    }
+                    setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+                    delay(FLY_ANIMATION_DELAY_MS)
+                    processSlotMatch()
                 } else {
                     // 未完全解封，播放解封音效并更新层数
                     val tempBoard = state.boardTiles.map { t ->
@@ -136,7 +137,7 @@ class GameLogicDelegate @Inject constructor() {
                     }
                 }
             } else {
-                // 普通棋盘牌落槽（纯不可变状态更新，彻底规避引用泄漏与卡牌重复显示）
+                // 普通棋盘牌落槽
                 val clickedTile = tile.copy(isBlind = false, state = TileState.IN_SLOT)
                 val newSlot = insertIntoSlot(state.slotTiles, clickedTile)
                 val newBoard = state.boardTiles.map { t ->
@@ -148,11 +149,9 @@ class GameLogicDelegate @Inject constructor() {
                         slotTiles = newSlot
                     )
                 }
-                scope.launch {
-                    setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                    delay(FLY_ANIMATION_DELAY_MS)
-                    processSlotMatch()
-                }
+                setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+                delay(FLY_ANIMATION_DELAY_MS)
+                processSlotMatch()
             }
         }
     }

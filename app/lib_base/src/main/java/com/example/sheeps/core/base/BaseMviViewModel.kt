@@ -43,12 +43,23 @@ abstract class BaseMviViewModel<State, Intent, Effect>(initialState: State) : Vi
     abstract fun handleIntent(intent: Intent)
 
     /**
+     * 用户发出的意图队列通道，用于保证 Intent 串行处理，防范 Race Condition。
+     */
+    private val _intentChannel = Channel<Intent>(Channel.UNLIMITED)
+
+    init {
+        viewModelScope.launch {
+            _intentChannel.receiveAsFlow().collect { intent ->
+                handleIntent(intent)
+            }
+        }
+    }
+
+    /**
      * 由外部（UI层）调用以发送意图。
      */
     fun sendIntent(intent: Intent) {
-        viewModelScope.launch {
-            handleIntent(intent)
-        }
+        _intentChannel.trySend(intent)
     }
 
     /**

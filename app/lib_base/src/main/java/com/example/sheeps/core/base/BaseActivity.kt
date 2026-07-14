@@ -1,10 +1,10 @@
 package com.example.sheeps.core.base
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
-import com.apkfuns.logutils.LogUtils
 
 /**
  * 应用内所有 Activity 的基类。
@@ -50,9 +50,15 @@ abstract class BaseActivity : ComponentActivity() {
      * ⚠️ 线程约束：@MainThread。
      */
     override fun onCreate(savedInstanceState: Bundle?) {
-        // 配置主题，SplashActivity 使用其特定主题除外
-        if (javaClass.simpleName != "SplashActivity") {
-            setTheme(com.example.sheeps.theme.ThemeManager.getThemeResId())
+        // 优先使用子类特定的主题覆盖，若未提供（为 0）则回退到全局委托提供的主题资源 ID
+        var themeResId = getOverrideThemeResId()
+        if (themeResId == 0) {
+            themeResId = BaseActivityThemeDelegate.themeProvider?.invoke() ?: 0
+        }
+
+        // 应用主题（SplashActivity 已在 Manifest 声明独立主题，在此排除）
+        if (themeResId != 0 && javaClass.simpleName != "SplashActivity") {
+            setTheme(themeResId)
         }
         super.onCreate(savedInstanceState)
 
@@ -61,7 +67,7 @@ abstract class BaseActivity : ComponentActivity() {
             isAppearanceLightStatusBars = true
         }
 
-        LogUtils.d("${javaClass.simpleName} onCreate")
+        Log.d("BaseActivity", "${javaClass.simpleName} onCreate")
 
         // 开启全屏/沉浸式边缘到边缘支持
         enableEdgeToEdge()
@@ -70,6 +76,11 @@ abstract class BaseActivity : ComponentActivity() {
         initView(savedInstanceState)
         initData()
     }
+
+    /**
+     * 子类可以通过重写此方法提供具体的 XML Theme 资源 ID，以解耦底层与业务主题管理器。
+     */
+    protected open fun getOverrideThemeResId(): Int = 0
 
     /**
      * 在此方法中进行视图相关的初始化（如设置 Compose 内容、ViewBinding 等）。
@@ -90,6 +101,13 @@ abstract class BaseActivity : ComponentActivity() {
      */
     override fun onDestroy() {
         super.onDestroy()
-        LogUtils.d("${javaClass.simpleName} onDestroy")
+        Log.d("BaseActivity", "${javaClass.simpleName} onDestroy")
     }
+}
+
+/**
+ * 全局主题回调提供者，用于在底层 BaseActivity 与上层业务主题管理系统之间实现松耦合桥接。
+ */
+object BaseActivityThemeDelegate {
+    var themeProvider: (() -> Int)? = null
 }

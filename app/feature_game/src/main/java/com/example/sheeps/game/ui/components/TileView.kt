@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -70,6 +72,43 @@ fun TileView(
     isHighlighted: Boolean = false,
     gateLocked: Boolean = false
 ) {
+    TileView(
+        tile = tile,
+        onClick = onClick,
+        currentSkin = currentSkin,
+        modifier = modifier,
+        tileSize = tileSize,
+        isShakingProvider = { isShaking },
+        isHighlightedProvider = { isHighlighted },
+        gateLockedProvider = { gateLocked }
+    )
+}
+
+/**
+ * 秘境消消乐 · 卡牌组件（高并发 O(1) 优化版重载）
+ * 使用 Lambda Provider 延时读取状态，隔离大 State 频繁更新引起的全局 TileView 重组。
+ */
+@Composable
+fun TileView(
+    tile: Tile,
+    onClick: () -> Unit,
+    currentSkin: String = SkinConstants.DEFAULT_SKIN,
+    modifier: Modifier = Modifier,
+    tileSize: Dp = 48.dp,
+    isShakingProvider: () -> Boolean,
+    isHighlightedProvider: () -> Boolean,
+    gateLockedProvider: () -> Boolean
+) {
+    // 利用 rememberUpdatedState 保持 Lambda 引用的绝对稳定，消除 key 频繁更新引发的 derivedStateOf 实例重新创建开销
+    val currentShakingProvider by rememberUpdatedState(isShakingProvider)
+    val currentHighlightedProvider by rememberUpdatedState(isHighlightedProvider)
+    val currentGateLockedProvider by rememberUpdatedState(gateLockedProvider)
+
+    // derivedStateOf 在生命周期内只实例化一次，极速提升内存表现与 GC 性能
+    val isShaking by remember { derivedStateOf { currentShakingProvider() } }
+    val isHighlighted by remember { derivedStateOf { currentHighlightedProvider() } }
+    val gateLocked by remember { derivedStateOf { currentGateLockedProvider() } }
+
     // 状态判定：根据卡牌属性判断是否处于迷雾（Blind）或被上方卡牌压制（Blocked）
     val isBlocked = tile.state == TileState.BLOCKED
 

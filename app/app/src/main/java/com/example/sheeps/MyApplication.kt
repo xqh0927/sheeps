@@ -78,6 +78,11 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
         // --- 核心初始化 ---
         // 注意：MMKV, Toaster, Logcat, TheRouter 已通过 App Startup 库自动初始化。
 
+        // 绑定底层 BaseActivity 主题提供者委托，打破物理反向依赖并让所有 Activity 一键获得主题设置支持
+        com.example.sheeps.core.base.BaseActivityThemeDelegate.themeProvider = {
+            com.example.sheeps.theme.ThemeManager.getThemeResId()
+        }
+
         // 初始化主题管理器，恢复用户上次保存的主题偏好
         ThemeManager.init()
 

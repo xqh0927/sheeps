@@ -97,16 +97,6 @@ fun DuelGameBoard(
                     .size(width = dimensions.displayedWidth, height = dimensions.displayedHeight)
                     .onGloballyPositioned { coords ->
                         boardRootPos.value = coords.positionInRoot()
-                        computeTileGlobalPositions(
-                            boardRootPos = boardRootPos.value,
-                            density = density,
-                            minX = dimensions.minX,
-                            minY = dimensions.minY,
-                            spacing = dimensions.spacing,
-                            scale = dimensions.scale,
-                            visibleTiles = visibleTiles,
-                            tileGlobalPositions = tileGlobalPositions
-                        )
                     }
             ) {
                 visibleTiles.forEach { tile ->
@@ -114,7 +104,15 @@ fun DuelGameBoard(
                         val isFlying = flyingTileIds.contains(tile.id)
                         TileView(
                             tile = tile,
-                            onClick = { if (!isFlying) onTileClick(tile) },
+                            onClick = {
+                                if (!isFlying) {
+                                    // 精准即时计算当前点击卡牌的全局屏幕位置，省去 O(N) 批量写入导致的大面积重组
+                                    val posX = boardRootPos.value.x + (tile.x - dimensions.minX) * dimensions.spacing * dimensions.scale * density
+                                    val posY = boardRootPos.value.y + (tile.y - dimensions.minY) * dimensions.spacing * dimensions.scale * density
+                                    tileGlobalPositions[tile.id] = Offset(posX, posY)
+                                    onTileClick(tile)
+                                }
+                            },
                             currentSkin = "shuang",
                             tileSize = (46 * dimensions.scale).dp,
                             isShaking = state.shakingTileIds.contains(tile.id),
@@ -127,22 +125,6 @@ fun DuelGameBoard(
                                 .alpha(if (isFlying) 0f else 1f)
                         )
                     }
-                }
-            }
-
-            // 当 visibleTiles 变化（揭示新牌）而根布局未触发布局回调时，主动补写一次坐标（兜底）。
-            LaunchedEffect(visibleTiles) {
-                if (boardRootPos.value != Offset.Zero) {
-                    computeTileGlobalPositions(
-                        boardRootPos = boardRootPos.value,
-                        density = density,
-                        minX = dimensions.minX,
-                        minY = dimensions.minY,
-                        spacing = dimensions.spacing,
-                        scale = dimensions.scale,
-                        visibleTiles = visibleTiles,
-                        tileGlobalPositions = tileGlobalPositions
-                    )
                 }
             }
         }
@@ -213,27 +195,4 @@ private fun FogEffectOverlay() {
         }
     }
 }
-
-/**
- * 依据棋盘内容区根容器全局坐标（px）与布局参数，推导每张可见牌的屏幕全局坐标（px）。
- * 原实现为每张 TileView 挂 [androidx.compose.ui.layout.onGloballyPositioned]；
- * 此处改为根容器测一次后按公式推算（dp→px 需乘 density），与逐牌回调写入的左上角坐标一致。
- */
-private fun computeTileGlobalPositions(
-    boardRootPos: Offset,
-    density: Float,
-    minX: Float,
-    minY: Float,
-    spacing: Int,
-    scale: Float,
-    visibleTiles: List<Tile>,
-    tileGlobalPositions: MutableMap<String, Offset>
-) {
-    visibleTiles.forEach { tile ->
-        val x = boardRootPos.x + (tile.x - minX) * spacing * scale * density
-        val y = boardRootPos.y + (tile.y - minY) * spacing * scale * density
-        tileGlobalPositions[tile.id] = Offset(x, y)
-    }
-}
-
 
