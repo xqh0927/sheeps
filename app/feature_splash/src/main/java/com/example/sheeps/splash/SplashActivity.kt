@@ -140,11 +140,11 @@ class SplashActivity : BaseActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            // 深邃星空暗蓝到纯黑的渐变
+                            // 极地白金明亮渐变色
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFF0A0F1D),
-                                    Color(0xFF030712)
+                                    Color(0xFFF8FAFC),
+                                    Color(0xFFEDF2F7)
                                 )
                             )
                         )
@@ -250,12 +250,12 @@ fun ParticleBackground() {
         val w = this.size.width
         val h = this.size.height
 
-        // 1. 绘制弥散星河云雾（紫罗兰色 nebula）
+        // 1. 绘制弥散星河云雾（淡马卡龙粉 nebula）
         val nebula1X = w * 0.25f + sin(phase * 0.2f) * w * 0.08f
         val nebula1Y = h * 0.30f + cos(phase * 0.15f) * h * 0.06f
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF4F46E5).copy(alpha = 0.15f), Color.Transparent),
+                colors = listOf(Color(0xFFFBC2EB).copy(alpha = 0.35f), Color.Transparent),
                 center = Offset(nebula1X, nebula1Y),
                 radius = w * 0.55f
             ),
@@ -263,12 +263,12 @@ fun ParticleBackground() {
             center = Offset(nebula1X, nebula1Y)
         )
 
-        // 2. 绘制弥散星河云雾（星海蓝色 nebula）
+        // 2. 绘制弥散星河云雾（淡天蓝色 nebula）
         val nebula2X = w * 0.75f + cos(phase2 * 0.18f) * w * 0.06f
         val nebula2Y = h * 0.65f + sin(phase2 * 0.22f) * h * 0.07f
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF2563EB).copy(alpha = 0.12f), Color.Transparent),
+                colors = listOf(Color(0xFFA6C1EE).copy(alpha = 0.30f), Color.Transparent),
                 center = Offset(nebula2X, nebula2Y),
                 radius = w * 0.6f
             ),
@@ -309,8 +309,8 @@ fun ParticleBackground() {
             val offsetX = cos(phase2 * p.speed * 0.8f) * w * 0.02f
             val alpha = (sin(phase * p.speed * 0.7f + 1f) * 0.3f + 0.15f).coerceIn(0f, 0.5f)
             val radius = sin(phase * p.speed * 0.5f + 2f) * 1.5f + p.baseRadius
-            // 奇偶索引交替使用冷光银白与星空淡蓝色
-            val particleColor = if (index % 2 == 0) Color(0xFFE2E8F0) else Color(0xFF93C5FD)
+            // 奇偶索引交替使用暖金与珊瑚暖粉色系
+            val particleColor = if (index % 2 == 0) Color(0xFFFBBF24) else Color(0xFFFB7185)
 
             drawCircle(
                 brush = Brush.radialGradient(
@@ -335,7 +335,7 @@ fun ParticleBackground() {
             val cx = s.xR * w
             val cy = s.yR * h
             val len = 8f * sa + 3f
-            val sparkleColor = Color(0xFFE2E8F0)
+            val sparkleColor = Color(0xFFFBBF24)
             drawLine(color = sparkleColor.copy(alpha = sa), start = Offset(cx - len, cy), end = Offset(cx + len, cy), strokeWidth = 1.2f)
             drawLine(color = sparkleColor.copy(alpha = sa), start = Offset(cx, cy - len), end = Offset(cx, cy + len), strokeWidth = 1.2f)
         }
@@ -344,7 +344,7 @@ fun ParticleBackground() {
         val pulse = (sin(phase * 0.5f) * 0.05f + 0.12f).coerceIn(0f, 0.20f)
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0xFF2563EB).copy(alpha = pulse), Color.Transparent),
+                colors = listOf(Color(0xFFC084FC).copy(alpha = pulse * 1.5f), Color.Transparent),
                 center = Offset(w * 0.5f, h * 0.78f),
                 radius = w * 0.65f
             ),
@@ -433,8 +433,8 @@ fun SplashVisuals() {
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF2563EB).copy(alpha = glowAlpha * 0.25f),
-                            Color(0xFF4F46E5).copy(alpha = glowAlpha * 0.12f),
+                            Color(0xFFFCD34D).copy(alpha = glowAlpha * 0.4f),
+                            Color(0xFFFBC2EB).copy(alpha = glowAlpha * 0.2f),
                             Color.Transparent
                         ),
                         radius = size.width * 0.5f
@@ -483,8 +483,8 @@ fun SplashVisuals() {
                         drawArc(
                             brush = Brush.sweepGradient(
                                 colors = listOf(
-                                    Color(0xFF93C5FD).copy(alpha = 0.8f),
-                                    Color(0xFF2563EB).copy(alpha = 0.2f),
+                                    Color(0xFFFCD34D).copy(alpha = 0.9f),
+                                    Color(0xFF60A5FA).copy(alpha = 0.3f),
                                     Color.Transparent
                                 )
                             ),
@@ -504,7 +504,7 @@ fun SplashVisuals() {
                             .graphicsLayer { rotationZ = rotatePhaseRev }
                     ) {
                         drawCircle(
-                            color = Color(0xFF4F46E5).copy(alpha = 0.25f),
+                            color = Color(0xFF818CF8).copy(alpha = 0.4f),
                             radius = size.width * 0.48f,
                             style = Stroke(
                                 width = 1.2f,
@@ -518,7 +518,7 @@ fun SplashVisuals() {
                             .graphicsLayer { rotationZ = -rotatePhase * 0.4f }
                     ) {
                         drawRoundRect(
-                            color = Color(0xFF93C5FD).copy(alpha = 0.35f),
+                            color = Color(0xFFFBC2EB).copy(alpha = 0.5f),
                             size = size,
                             cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
                             style = Stroke(width = 3f)
@@ -547,7 +547,7 @@ fun SplashVisuals() {
                             cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
                             style = Stroke(width = 5f)
                         )
-                        drawCircle(color = Color(0xFFE2E8F0), radius = 6f)
+                        drawCircle(color = Color(0xFFFBBF24), radius = 6f)
                     }
                 }
 
@@ -566,9 +566,9 @@ fun SplashVisuals() {
 
                 val shimmerBrush = Brush.linearGradient(
                     colors = listOf(
-                        themePrimary,
-                        Color.White,
-                        themePrimary
+                        Color(0xFF1E293B),
+                        Color(0xFFF59E0B),
+                        Color(0xFF1E293B)
                     ),
                     start = Offset(shimmerTranslateX, 0f),
                     end = Offset(shimmerTranslateX + 250f, 100f)
@@ -591,7 +591,7 @@ fun SplashVisuals() {
                 Text(
                     text = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
                     fontSize = 15.sp,
-                    color = Color(0xFF93C5FD).copy(alpha = 0.85f),
+                    color = Color(0xFF475569),
                     fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.SansSerif,
                     textAlign = TextAlign.Center,
@@ -711,7 +711,7 @@ private fun SplashLoadingPulse(
 
             // 1. 绘制虚线圆形轨道
             drawCircle(
-                color = Color(0xFF93C5FD).copy(alpha = 0.25f),
+                color = Color(0xFFC084FC).copy(alpha = 0.3f),
                 radius = orbitRadius,
                 style = Stroke(
                     width = 1.2f,
@@ -729,10 +729,10 @@ private fun SplashLoadingPulse(
             val p2x = cx + kotlin.math.cos(angle2Rad) * orbitRadius
             val p2y = cy + kotlin.math.sin(angle2Rad) * orbitRadius
 
-            // 3. 绘制绕行粒子 1 (冷光白银尘)
+            // 3. 绘制绕行粒子 1 (珊瑚暖粉)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color.White, Color(0xFF93C5FD).copy(alpha = 0.8f), Color.Transparent),
+                    colors = listOf(Color(0xFFFB7185), Color(0xFFFBC2EB).copy(alpha = 0.8f), Color.Transparent),
                     center = Offset(p1x, p1y),
                     radius = 8f
                 ),
@@ -740,10 +740,10 @@ private fun SplashLoadingPulse(
                 center = Offset(p1x, p1y)
             )
 
-            // 4. 绘制绕行粒子 2 (星河暗蓝尘)
+            // 4. 绘制绕行粒子 2 (晴空蓝)
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFE2E8F0), Color(0xFF2563EB).copy(alpha = 0.7f), Color.Transparent),
+                    colors = listOf(Color(0xFF38BDF8), Color(0xFF60A5FA).copy(alpha = 0.7f), Color.Transparent),
                     center = Offset(p2x, p2y),
                     radius = 6.5f
                 ),
