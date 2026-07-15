@@ -3,7 +3,7 @@
 > 作者：高见远（软件架构师 / software-architect）
 > 日期：2026-07-07
 > 范围：仅机制设计，不含实现代码。供产品 / 主理人评审。
-> 背景：在现有「卡牌层数封印（sealedCount）」之上，叠加一层「进度门控」——玩家必须先消除一定数量的**正常卡牌**，才能「激活 / 解锁」某个封印卡牌，使其可被点击解封。
+> 背景：在现有「卡牌层数封印（sealedCount）」之上，叠加一层「进度门控」——玩家每消除 3 张正常卡牌，门控跨过阈值即把下一张封印牌整张自动解封（`sealedCount` 置 0 + 碎冰连锁），无需逐层点击。
 
 ---
 
@@ -49,19 +49,19 @@
 
 | 选项 | 描述 | 与现有 sealedCount 关系 |
 |------|------|------------------------|
-| **T1. 解锁「下一张封印牌」为可交互（推荐）** | 计数器跨过阈值后，把生成顺序中的「下一张封印牌」加入「已解锁集合」；该牌**仍可点击解封**，其 `sealedCount` 层数保持不变，仍需逐层点击 | 门控 = 外层开关；层数 = 内层机制，两者正交叠加 |
+| **T1. 解锁「下一张封印牌」为整张自动解封（推荐）** | 计数器跨过阈值后，把生成顺序中的「下一张封印牌」加入「已解锁集合」即整张解封：`sealedCount` 置 0、触发 `shatterSealedNeighbors` 碎冰连锁，门控生效瞬间封印消失，玩家无需逐层点击 | 门控跨阈值即整张解封（`sealedCount` 置 0 + 碎冰连锁），门控即解封，逐层点击不再作为独立机制 |
 | T2. 解锁「整个封印簇」 | 跨过阈值即解锁当前簇全部牌 | 同上，只是批量开门 |
 | T3. 直接给所有封印牌各 −1 层 | 计数达标不控制点击，而是直接减层 | 与「必须点光层数」的现有手感冲突，且会干扰碎冰连锁的触发时机，**不推荐** |
 
-> 推荐 **T1（单次解锁一张）**，**解锁顺序 = 按 z 轴从大到小降序排列（自上而下解锁）**。这样可以确保最表层、暴露可见的封印牌最先解锁，避免底层牌被遮挡点不到而导致死锁（Soft-lock）。门控只决定「能不能开始点」，不替玩家减层。
+> 推荐 **T1（单次解锁一张）**，**解锁顺序 = 按 z 轴从大到小降序排列（自上而下解锁）**。这样可以确保最表层、暴露可见的封印牌最先解锁，避免底层牌被遮挡点不到而导致死锁（Soft-lock）。门控跨过阈值即把该封印牌整张解封（`sealedCount` 置 0 + 碎冰连锁），门控即解封，玩家无需逐层点击。
 
 ### 2.4 与现有 sealedCount 层数的关系（叠加方式）
 
-- **推荐（外层门控 + 内层层数，互不改写）**：
-  - 门控开关 `id ∈ sealedUnlockedIds` 决定「该封印牌此刻能否被点击」。
-  - 一旦允许点击，执行**现有逻辑**：`sealedCount--`，归零时 `shatterSealedNeighbors()` 碎冰连锁——**原逻辑一行不改**。
-  - 门控达到阈值只是「开门」，绝不自动减 `sealedCount`。
-- **为什么不合并**：合并（计数达标直接减层）会破坏「点击解封」的既有手感，且碎冰连锁的触发条件（某牌归零）会被绕过，连锁节奏失控。
+- **推荐（门控即解封：跨阈值整张自动解封）**：
+  - 门控开关 `id ∈ sealedUnlockedIds` 与「该封印牌是否整张解封」同步：计数器跨过阈值时，门控生效，封印在瞬间消失。
+  - 跨阈值瞬间直接把 `sealedOrder` 中下一张封印牌的 `sealedCount` 置 0（整张解封），并立即触发 `shatterSealedNeighbors()` 碎冰连锁——**原碎冰连锁逻辑一行不改**。
+  - 门控达到阈值即「开门 + 解封」二合一：一次性把该封印牌 `sealedCount` 归零并触发连锁，玩家**无需逐层点击**。
+- **为什么门控即解封（而非只开门留待逐层点击）**：产品拍板后，门控在跨阈值那一刻顺带完成整张解封，逐层点击不再作为独立机制存在；这样计数达标即「冰封整张碎裂」，节奏干脆，且碎冰连锁在解封瞬间自然触发，连锁节奏不失控（反而更顺）。
 - **碎冰连锁可绕过门控（预期且 desirable）**：若某张「已解锁牌」被点至归零，溅射把一张「尚未门控解锁的牌」减到 0，则该牌直接解封——这是现有行为，保留即可，反而奖励连锁。
 
 ### 2.5 阈值 N 的设定与难度控制
@@ -126,7 +126,7 @@
 | 10 | `app/feature_menu/.../ui/dialogs/PrepareGameDialog.kt` | **文案扩展** | `isSealed` 分支预警文案补充「需先消除 N 张正常卡牌」。 |
 | 11 | 字符串资源（`strings.xml` 等） | **新增** | 门控相关文案（进度条、角标、预警、解锁提示），含多语言。 |
 
-**与碎冰连锁的共存原则**：门控只控制「能否开始点击封印牌」，`shatterSealedNeighbors()` 完全不动；任何因连锁而 `sealedCount` 归零的牌（无论是否已门控解锁）都按现有逻辑直接解封。两者正交，互不依赖。
+**与碎冰连锁的共存原则**：门控达到阈值即把下一张封印牌整张自动解封（sealedCount 置 0 + 触发碎冰连锁），门控既开门也解封；碎冰连锁逻辑本身不变、仍可绕过门控——任何因连锁而 `sealedCount` 归零的牌（无论是否已门控解锁）都按现有逻辑直接解封。
 
 ---
 
@@ -157,7 +157,7 @@
 |---|--------|----------|
 | 1 | 阈值 N 语义 | **底层按卡牌张数计数，`sealedUnlockThreshold = 3`**：每累计消除 3 张正常牌（= 消除 1 组三连）即把 `sealedOrder` 中下一张封印牌加入 `sealedUnlockedIds` 解锁 1 张。产品语境称"消除 1 组"＝"消除 3 张"，二者等价。等价于用户原话「消除 3 张正常卡牌才能解锁一个封印的卡牌」。 |
 | 2 | 计数作用域 | **关卡级共享计数器（方案 A）**：整关 1 个 `sealedClearCount`，**按封印生成降序顺序（z 轴自上而下）** 依次解锁，避免卡牌覆盖导致死锁。 |
-| 3 | 解锁目标粒度 | **单张封印牌（T1）**：跨阈值解锁下一张，仍可点击逐层解封；门控只管「能否点击」，不改写 `sealedCount` |
+| 3 | 解锁目标粒度 | **单张封印牌（T1）**：跨阈值解锁下一张即整张自动解封（`sealedCount` 置 0 + 碎冰连锁），门控既开门也解封，玩家无需逐层点击。 |
 | 4 | 软锁兜底 | **自动解锁剩余**：盘面上无可交互正常牌、且仍有未解锁封印牌时，自动解锁剩余封印牌。 |
 
 ### 6.2 其余待定项（采用推荐默认值，可后续调整）
@@ -171,14 +171,14 @@
 
 ### 6.3 解锁规则一句话
 
-> 关卡加载时所有封印牌处于「门控锁定」；玩家每完成一次三连消除，`sealedClearCount += removedCount`（单次三连通常移除 3 张正常牌），每当累计值跨过下一个 3 的倍数（即 `sealedUnlockThreshold` 的倍数），便把**降序生成顺序（z 轴自上而下）**中的下一张封印牌加入 `sealedUnlockedIds`；被解锁的封印牌恢复可见封印层、可点击逐层解封，归零时照常触发碎冰连锁（可绕过门控）。
+> 关卡加载时所有封印牌处于「门控锁定」；玩家每完成一次三连消除，`sealedClearCount += removedCount`（单次三连通常移除 3 张正常牌），每当累计值跨过下一个 3 的倍数（即 `sealedUnlockThreshold` 的倍数），便把**降序生成顺序（z 轴自上而下）**中的下一张封印牌加入 `sealedUnlockedIds`；被解锁（门控跨阈值）的封印牌在开门瞬间整张自动解封——`sealedCount` 直接置 0 并立即触发碎冰连锁（可绕过门控），封印整张碎裂消失，玩家无需逐层点击。
 
 ### 6.4 实现插入点（复用第 4 节改动清单）
 
-- `GameLogicDelegate.processSlotMatchAndCheckEndGame`（服务端同 `level.ts` 的匹配逻辑）：在三连 `removedCount` 累加处，令 `sealedClearCount += removedCount`；结算后 `while (sealedClearCount >= (unlockedCount+1) * sealedUnlockThreshold) 解锁 z 轴降序排列的 sealedOrder[unlockedCount]`。
+- `GameLogicDelegate.processSlotMatchAndCheckEndGame`（服务端同 `level.ts` 的匹配逻辑）：在三连 `removedCount` 累加处，令 `sealedClearCount += removedCount`；结算后 `while (sealedClearCount >= (unlockedCount+1) * sealedUnlockThreshold) 把 z 轴降序排列的 sealedOrder[unlockedCount] 整张自动解封（sealedCount 置 0 + 触发 shatterSealedNeighbors 碎冰连锁）`。
 - `GameLogicDelegate.handleClickTile` 第 85 行封印分支前：若 `tile.id !in sealedUnlockedIds`，no-op + 「还需消除 X 张」反馈。
 - `GameViewState` 新增：`sealedClearCount / sealedUnlockThreshold(=3) / sealedUnlockedIds / sealedOrder`。
-- 顶部进度条 UI + `TileView` 门控锁定渲染 + `PrepareGameDialog` 预警文案（「需先消除 3 张正常卡牌才能解封」）。
+- 顶部进度条 UI + `TileView` 门控锁定渲染 + `PrepareGameDialog` 预警文案（「每消除 3 张正常卡牌，下一张封印牌即整张自动解封（sealedCount 置 0）」）。
 
 ---
 
@@ -199,21 +199,13 @@ sequenceDiagram
     L->>S: 三连消除, sealedClearCount += 消除张数
     L->>L: sealedClearCount 是否跨过下一阈值?
     alt 达到阈值
-        L->>S: 把 sealedOrder 下一张加入 sealedUnlockedIds
+        L->>S: 把 sealedOrder 下一张整张自动解封（sealedCount 置 0 + 触发碎冰连锁）
         L->>V: 触发「封印解锁」特效 + 进度条更新
     else 未达阈值
         L->>V: 仅更新进度条
     end
-    P->>L: 点击封印牌
-    alt id ∉ sealedUnlockedIds (门控未开)
-        L-->>V: no-op + 反馈「还需消除 X 张」
-    else id ∈ sealedUnlockedIds (门控已开)
-        L->>L: sealedCount--
-        alt sealedCount == 0
-            L->>G: shatterSealedNeighbors(相邻同层 -1, 递归)
-        end
-        L->>V: 刷新棋盘
-    end
+    Note over L,G: 门控跨阈值即把下一张封印牌整张自动解封（sealedCount=0 + 触发碎冰连锁），玩家无需逐层点击
+    Note over L,G: 碎冰连锁溅射至 0（绕过门控）的封印牌同样按现有逻辑直接解封
 ```
 
 ### 门控状态机（单张封印牌）
@@ -221,8 +213,7 @@ sequenceDiagram
 ```mermaid
 stateDiagram-v2
     [*] --> 门控锁定: 关卡加载
-    门控锁定 --> 可交互解封: sealedClearCount 跨过阈值（加入 sealedUnlockedIds）
-    可交互解封 --> 已解封: 点击至 sealedCount==0
+    门控锁定 --> 已解封: 消除满 3 张，门控跨阈值整张自动解封（sealedCount=0 + 碎冰连锁）
     已解封 --> [*]: 卡牌离场
     门控锁定 --> 已解封: 碎冰连锁溅射至 0（绕过门控）
 ```
@@ -231,4 +222,4 @@ stateDiagram-v2
 
 ## 推荐方案总结
 
-**推荐 v1 采用「关卡级共享计数器（方案 A）+ 顺序解锁单张封印牌（T1）」：在 `GameViewState` 维护 `sealedClearCount / sealedUnlockThreshold / sealedUnlockedIds / sealedOrder` 四个字段，于三连消除处累加计数、跨阈值时按生成顺序把下一张封印牌加入可交互集合，封印牌点击前先校验门控开关，门控只控制「能否点击」、完全不改写现有 `sealedCount` 层数与碎冰连锁逻辑，从而以最小改动、最低风险叠加出「消除 N 张正常卡牌才能解封」的新门控体验。**
+**推荐 v1 采用「关卡级共享计数器（方案 A）+ 顺序解锁单张封印牌（T1）」：在 `GameViewState` 维护 `sealedClearCount / sealedUnlockThreshold / sealedUnlockedIds / sealedOrder` 四个字段，于三连消除处累加计数、跨阈值时按生成顺序把下一张封印牌整张自动解封（sealedCount 置 0 + 触发碎冰连锁），门控既开门也解封，玩家无需逐层点击，从而以最小改动、最低风险叠加出「消除 3 张正常卡牌即自动解封」的新门控体验。**

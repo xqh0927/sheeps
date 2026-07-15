@@ -84,7 +84,7 @@ object EndlessEngine {
         val targetTile = column[clickedIndex]
         val newColumn = column.toMutableList().also { it.removeAt(clickedIndex) }
         val newColumns = columns.toMutableList().also { it[col] = newColumn }
-        val newSlot = slot + targetTile.copy(state = TileState.IN_SLOT)
+        val newSlot = insertIntoSlot(slot, targetTile.copy(state = TileState.IN_SLOT))
 
         val matchResult = resolveMatch(newSlot)
         return ClickResult(
@@ -93,6 +93,43 @@ object EndlessEngine {
             matched = matchResult.eliminatedIds.isNotEmpty(),
             eliminatedIds = matchResult.eliminatedIds
         )
+    }
+
+    /**
+     * 仅点击卡牌将其移出列并加入槽位，暂不触发三消。
+     * 专门用于给飞行动画提供 200ms 的纯视觉飞行过渡。
+     */
+    fun clickColumnOnly(
+        columns: List<List<Tile>>,
+        slot: List<Tile>,
+        col: Int,
+        tileId: String
+    ): Pair<List<List<Tile>>, List<Tile>> {
+        if (col < 0 || col >= columns.size) return columns to slot
+        val column = columns[col]
+        val clickedIndex = column.indexOfFirst { it.id == tileId }
+        if (clickedIndex == -1) return columns to slot
+
+        val targetTile = column[clickedIndex]
+        val newColumn = column.toMutableList().also { it.removeAt(clickedIndex) }
+        val newColumns = columns.toMutableList().also { it[col] = newColumn }
+        val newSlot = insertIntoSlot(slot, targetTile.copy(state = TileState.IN_SLOT))
+        return newColumns to newSlot
+    }
+
+    /**
+     * 插入棋子至托盘匹配槽（保证三张相同卡牌挨在一起）。
+     */
+    private fun insertIntoSlot(slot: List<Tile>, newTile: Tile): List<Tile> {
+        val result = slot.toMutableList()
+        val lastIndex = result.indexOfLast { it.type == newTile.type }
+        return if (lastIndex == -1) {
+            result.add(newTile)
+            result
+        } else {
+            result.add(lastIndex + 1, newTile)
+            result
+        }
     }
 
     /**

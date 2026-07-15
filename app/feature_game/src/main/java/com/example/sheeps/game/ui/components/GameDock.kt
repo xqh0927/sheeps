@@ -200,7 +200,7 @@ private fun MatchingSlot(
                         tile = tile,
                         onClick = {},
                         currentSkin = state.currentSkin,
-                        tileSize = 48.dp
+                        tileSize = itemWidth
                     )
                 }
             }

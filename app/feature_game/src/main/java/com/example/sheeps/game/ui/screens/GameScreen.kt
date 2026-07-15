@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.core.game.GameEngine
+import com.example.sheeps.core.game.rememberTileCardBorderColors
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.GameResultOverlay
@@ -32,6 +33,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.core.R
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.sheeps.game.ui.components.GameBoardSurfaceView
 import kotlinx.coroutines.launch
 
 /**
@@ -114,10 +117,9 @@ fun GameScreen(
     var flyingTileIds by remember { mutableStateOf(emptySet<String>()) }
     
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
 
     // 炸弹使用时震屏效果状态
-    var prevBombCount by remember { mutableStateOf(state.bombCount) }
+    var prevBombCount by remember { mutableIntStateOf(state.bombCount) }
     val boardShakeOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
 
     // ⚠️ 内存/生命周期：下方 LaunchedEffect 仅在 state.bombCount 变化时触发一次，
@@ -177,42 +179,48 @@ fun GameScreen(
                 }
 
                 // 2. 游戏核心棋盘：可自适应高度，置物架出现时自动压缩
-                GameBoard(
-                    state = state,
-                    flyingTileIds = flyingTileIds,
-                    tileGlobalPositions = tileGlobalPositions,
-                    onTileClick = { tile ->
-                        // 双层防护：先看 state 标记，再用引擎实时重算（spacing=46，重叠>0.25px即为遮挡）
-                        val isBlocked = tile.state == TileState.BLOCKED || 
-                                GameEngine.isTileBlocked(tile, state.boardTiles)
-                        val isSealed = tile.sealedCount > 0
+                val (borderColor, decorColor) = rememberTileCardBorderColors(state.currentSkin)
+                AndroidView(
+                    factory = { ctx ->
+                        GameBoardSurfaceView(ctx)
+                    },
+                    update = { view ->
+                        view.setSkinColors(borderColor, decorColor)
+                        view.updateData(
+                            state = state,
+                            flyingTileIds = flyingTileIds,
+                            onTileClick = { tile ->
+                                val isBlocked = tile.state == TileState.BLOCKED || 
+                                        GameEngine.isTileBlocked(tile, state.boardTiles)
+                                val isSealed = tile.sealedCount > 0
 
-                        if (isBlocked || isSealed) {
-                             onTileClick(tile)
-                         } else {
-                             // 处理卡片点击逻辑，触发飞行动画
-                             val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
-                             // 计算卡牌在卡槽中的实际插入索引位置，使其飞向真正安放的位置，而非一律追加到卡槽最末尾
-                             val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
-                             val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
-                             val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
-                             
-                             val anim = Animatable(0f)
-                             val fly = GameFlyingTile(tile.id, tile.type, startPos, endPos, anim)
-                             flyingTiles = flyingTiles + fly
-                             flyingTileIds = flyingTileIds + tile.id
-                             
-                             onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
+                                if (isBlocked || isSealed) {
+                                     onTileClick(tile)
+                                 } else {
+                                     val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                                     val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
+                                     val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
+                                     val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                                     
+                                     val anim = Animatable(0f)
+                                     val fly = GameFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                                     flyingTiles = flyingTiles + fly
+                                     flyingTileIds = flyingTileIds + tile.id
+                                     
+                                     onTileClick(tile)
 
-                             // 启动飞行动画；rememberCoroutineScope 作用域，组合销毁时自动取消，无泄漏风险
-                             coroutineScope.launch {
-                                 com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
-                                 flyingTiles = flyingTiles.filter { it.tileId != tile.id }
-                                 flyingTileIds = flyingTileIds - tile.id
-                             }
-                         }
+                                     coroutineScope.launch {
+                                         com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
+                                         flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                                         flyingTileIds = flyingTileIds - tile.id
+                                     }
+                                 }
+                            },
+                            tileGlobalPositions = tileGlobalPositions
+                        )
                     },
                     modifier = Modifier
+                        .fillMaxWidth()
                         .weight(1f)
                         .offset(
                             x = boardShakeOffset.value.x.dp,

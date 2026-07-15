@@ -113,6 +113,8 @@ class GameLevelGenerator @Inject constructor() {
             }
         }
 
+        val reversedEliminationList = mutableListOf<LocalNode>()
+
         // 反向分配卡牌类型，确保顶层总是存在可消除的组合
         while (unassigned.isNotEmpty()) {
             // 覆盖面积累计：累计所有更高层卡牌的覆盖面积，超过 25% 即视为遮挡
@@ -133,6 +135,9 @@ class GameLevelGenerator @Inject constructor() {
                     rem[k].assignedType = t
                     rem[k + 1].assignedType = t
                     rem[k + 2].assignedType = t
+                    reversedEliminationList.add(rem[k])
+                    reversedEliminationList.add(rem[k + 1])
+                    reversedEliminationList.add(rem[k + 2])
                     unassigned.remove(rem[k])
                     unassigned.remove(rem[k + 1])
                     unassigned.remove(rem[k + 2])
@@ -140,6 +145,7 @@ class GameLevelGenerator @Inject constructor() {
                 }
                 for (node in unassigned) {
                     node.assignedType = 1
+                    reversedEliminationList.add(node)
                 }
                 unassigned.clear()
                 break
@@ -151,6 +157,7 @@ class GameLevelGenerator @Inject constructor() {
                 val idx = (randAssign() * exposedMutable.size).toInt()
                 val chosen = exposedMutable.removeAt(idx)
                 chosen.assignedType = type
+                reversedEliminationList.add(chosen)
                 unassigned.remove(chosen)
             }
         }
@@ -174,82 +181,73 @@ class GameLevelGenerator @Inject constructor() {
             normCx = 0f; normCy = 0f; normScale = 1.0f
         }
 
-        // ===== 固定关卡类型规则（替代随机） =====
-        // 休息关（levelId % 5 == 0，levelId >= 5）：卡牌数量打八折
-        // 盲盒关（levelId % 3 == 0，levelId >= 3）：底层卡牌部分变盲盒
-        // 封印关（levelId % 2 == 0）：每张卡有概率带封印
-        // 优先级: 休息 > 盲盒 > 封印 > 普通
+        // ===== 休息关和卡牌装饰规则（与服务端完全一致，基于拓扑逆序防死局分配） =====
         val isRest = isRestLevel(levelId)
         val isBlindLevel = !isRest && levelId >= 3 && levelId % 3 == 0
         val isSealedLevel = !isRest && !isBlindLevel && levelId >= 2 && levelId % 2 == 0
 
-        val maxZ = coordinates.maxOfOrNull { it.z } ?: 0
-        // 盲盒关卡：均匀分布固定数量的盲盒牌
-        val blindIndices = if (isBlindLevel) {
+        // 我们在反向消除有解序列（reversedEliminationList）中按固定步长（step）等距抽取分配特殊牌，
+        // 这样可以确保盲盒与封印牌不会扎堆在同一深度（比如全落在表层或全压在底层），实现空间及玩法层级的完美均匀散布。
+        val blindIndices = mutableSetOf<Int>()
+        val sealedIndices = mutableSetOf<Int>()
+
+        val listSize = reversedEliminationList.size
+
+        // 盲盒分配：等距抽取盲盒卡牌
+        if (isBlindLevel && listSize > 0) {
             val blindProb = minOf(0.20, 0.10 + (levelId - 3) * 0.015)
-            val limitZ = if (maxZ >= 4) (maxZ - 2) else (maxZ - 1)
-            val eligible = nodes.filter { it.coord.z < limitZ }
-            val count = maxOf(1, (eligible.size * blindProb).toInt())
-            // 对 eligible 名单洗牌后取前 count 个作为盲盒牌
-            val indices = eligible.indices.toMutableList()
-            val randShuffle = lcg(seed + 200)
-            for (i in indices.indices.reversed()) {
-                val j = (randShuffle() * (i + 1)).toInt()
-                val tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp
+            val totalBlind = maxOf(1, (listSize * blindProb).toInt())
+            val step = maxOf(1, listSize / totalBlind)
+            for (k in 0 until totalBlind) {
+                val idx = minOf(listSize - 1, k * step)
+                blindIndices.add(reversedEliminationList[idx].index)
             }
-            indices.take(count).map { eligible[it].index }.toSet()
-        } else {
-            emptySet()
         }
 
-        // 封印关卡：多层封印 + 聚簇分布
-        val maxSealLayer = when {
-            levelId <= 6 -> 1
-            levelId <= 14 -> 2
-            else -> 3
-        }
-        val sealRatio = when {
-            levelId <= 6 -> 0.30
-            levelId <= 14 -> 0.35
-            else -> 0.40
-        }
-        val clusterCount = when {
-            levelId <= 6 -> 2
-            levelId <= 14 -> 3
-            else -> 4
-        }
-
-        val randProps = lcg(seed + 300)
-        val sealedClusters = if (isSealedLevel) {
-            generateSealedUniformly(nodes, { randProps() }, sealRatio, maxSealLayer)
-        } else {
-            emptyMap()
+        // 封印分配：在避开最表层 9 张安全卡牌的前提下等距抽取封印牌，保证开局 100% 具备 3 组破局基本牌
+        if (isSealedLevel && listSize > 0) {
+            // 难度等级比例：20关以下10%，60关以下20%，60关以上30%
+            val sealRatio = when {
+                levelId <= 20 -> 0.10
+                levelId <= 60 -> 0.20
+                else -> 0.30
+            }
+            val totalSealed = maxOf(1, (listSize * sealRatio).toInt())
+            
+            // 排除最表层 9 张安全卡牌，在剩余的 eligibleSize 长度路径中进行等距计算
+            val eligibleSize = maxOf(1, listSize - 9)
+            val step = maxOf(1, eligibleSize / totalSealed)
+            for (k in 0 until totalSealed) {
+                var idx = minOf(eligibleSize - 1, k * step)
+                // 冲突避免：若当前选取的卡牌被判定为盲盒牌，则向深层继续索引直至找到非盲盒牌
+                while (idx < eligibleSize && reversedEliminationList[idx].index in blindIndices) {
+                    idx++
+                }
+                if (idx < eligibleSize) {
+                    sealedIndices.add(reversedEliminationList[idx].index)
+                }
+            }
         }
 
         return nodes.map { node ->
             val isBlind = node.index in blindIndices
-            val sealed = sealedClusters[node.index] ?: 0
+            val sealedVal = if (node.index in sealedIndices) 1 else 0
 
             Tile(
                 id = "tile_${node.index}",
                 x = node.coord.x,
                 y = node.coord.y,
                 z = node.coord.z,
-                type = node.assignedType,
-                isBlind = isBlind,
-                sealedCount = sealed
-            )
+                type = node.assignedType
+            ).apply {
+                this.isBlind = isBlind
+                this.sealedCount = sealedVal
+            }
         }
     }
 
     /**
-     * 生成均匀分布的封印牌
-     *
-     * @param nodes 所有卡牌节点
-     * @param rand 随机数生成函数，返回 [0, 1)
-     * @param sealRatio 封印卡牌占总卡牌的比例
-     * @param maxLayer 最大封印层数
-     * @return Map<nodeIndex, sealedCount>
+     * 生成均匀分布的封印牌（与后端 server/src/level.ts 保持一致）
      */
     private fun generateSealedUniformly(
         nodes: List<LocalNode>,
@@ -260,13 +258,11 @@ class GameLevelGenerator @Inject constructor() {
         if (nodes.isEmpty()) return emptyMap()
 
         val maxZ = nodes.maxOfOrNull { it.coord.z } ?: 0
-        // 封印只生成在较低层（z <= 70% 最高层），保证玩家能优先看到
         val eligible = nodes.filter { it.coord.z <= maxZ * 0.7f }
             .takeIf { it.isNotEmpty() } ?: nodes.toList()
 
         val totalSealed = maxOf(1, (nodes.size * sealRatio).toInt())
 
-        // 随机打乱备选节点
         val shuffled = eligible.toMutableList()
         for (i in shuffled.indices.reversed()) {
             val j = (rand() * (i + 1)).toInt()
@@ -277,20 +273,10 @@ class GameLevelGenerator @Inject constructor() {
 
         val result = mutableMapOf<Int, Int>()
         for (node in shuffled.take(totalSealed)) {
-            result[node.index] = randomSealLayer(rand, maxLayer)
+            result[node.index] = 1 // 强制 1 层封印，满足单层需求
         }
 
         return result
-    }
-
-    private fun randomSealLayer(rand: () -> Double, maxLayer: Int): Int = when (maxLayer) {
-        1 -> 1
-        2 -> if (rand() < 0.65) 1 else 2
-        else -> when {
-            rand() < 0.50 -> 1
-            rand() < 0.85 -> 2
-            else -> 3
-        }
     }
 
     // ===== 难度系数系统（与服务端 server/src/difficulty.ts 完全对齐）=====

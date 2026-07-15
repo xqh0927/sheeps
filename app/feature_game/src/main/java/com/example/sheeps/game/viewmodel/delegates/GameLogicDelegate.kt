@@ -106,12 +106,12 @@ class GameLogicDelegate @Inject constructor() {
                     val clickedTile = tile.copy(sealedCount = 0, isBlind = false, state = TileState.IN_SLOT)
                     val newSlot = insertIntoSlot(state.slotTiles, clickedTile)
 
-                    val tempBoard = state.boardTiles.map { it.copy() }
-                    tempBoard.find { it.id == tile.id }?.let { t ->
-                        t.sealedCount = 0
-                        t.state = TileState.IN_SLOT
-                        val shattered = mutableSetOf(t.id)
-                        shatterSealedNeighbors(t, tempBoard, shattered)
+                    val tempBoard = state.boardTiles.map { t ->
+                        if (t.id == tile.id) {
+                            t.copy(sealedCount = 0, state = TileState.IN_SLOT)
+                        } else {
+                            t.copy()
+                        }
                     }
                     val newBoard = calculateBlockedStates(tempBoard)
 
@@ -213,6 +213,10 @@ class GameLogicDelegate @Inject constructor() {
         val sealOrder = state.sealedOrder
         val newClear = prevClear + totalRemoved
         val newUnlocked = state.sealedUnlockedIds.toMutableSet()
+        
+        // 门控机制解锁：每当玩家消除 1 组（3 张）正常卡牌（累计消除数达到 3），
+        // 就依次、独立地将封印锁解封（即把 sealedCount 设为 0，变回普通可交互卡牌且消除锁头图层）。
+        // 遵循最新诉求：封印卡牌不按簇消失（已废除 shatterSealedNeighbors 碎冰级联），只根据累计消除进度实现单卡独立精准解封。
         while (newUnlocked.size < sealOrder.size
             && newClear >= (newUnlocked.size + 1) * gateThreshold
         ) {
@@ -221,25 +225,19 @@ class GameLogicDelegate @Inject constructor() {
 
             // 直接解封：把该封印牌的 sealedCount 设为 0，使其恢复为普通牌并消除带锁图标
             finalBoard.find { it.id == nextUnlockId }?.let { unlockedTile ->
-                if (unlockedTile.sealedCount > 0) {
-                    unlockedTile.sealedCount = 0
-                    val shattered = mutableSetOf(unlockedTile.id)
-                    shatterSealedNeighbors(unlockedTile, finalBoard, shattered)
-                }
+                unlockedTile.sealedCount = 0
             }
         }
-        // 软锁兜底：盘面上已无可交互正常牌、置物架上无正常牌，且仍有未解锁封印牌 → 自动解锁剩余
+        
+        // 软锁兜底机制：若盘面上已无可交互的普通牌，且道具暂存架（movedOut）为空，而此时仍有未解锁的封印卡牌导致游戏陷入死锁，
+        // 则强制一次性自动解锁所有剩余的封印牌，避免玩家卡死。
         val hasClearableNormal = finalBoard.any { it.sealedCount == 0 && it.state == TileState.NORMAL } || movedOut.isNotEmpty()
         if (!hasClearableNormal && newUnlocked.size < sealOrder.size) {
             val toUnlockIds = sealOrder.drop(newUnlocked.size)
             newUnlocked.addAll(toUnlockIds)
             for (unlockId in toUnlockIds) {
                 finalBoard.find { it.id == unlockId }?.let { unlockedTile ->
-                    if (unlockedTile.sealedCount > 0) {
-                        unlockedTile.sealedCount = 0
-                        val shattered = mutableSetOf(unlockedTile.id)
-                        shatterSealedNeighbors(unlockedTile, finalBoard, shattered)
-                    }
+                    unlockedTile.sealedCount = 0
                 }
             }
         }
@@ -268,11 +266,19 @@ class GameLogicDelegate @Inject constructor() {
         updateState {
             val mergedBoard = boardTiles.map { currentTile ->
                 val recomputed = finalBoard.find { it.id == currentTile.id }
-                if (recomputed != null &&
-                    (currentTile.state == TileState.NORMAL || currentTile.state == TileState.BLOCKED) &&
-                    recomputed.state != currentTile.state
-                ) {
-                    currentTile.copy(state = recomputed.state)
+                if (recomputed != null) {
+                    // 同步门控自动解封带来的 sealedCount 归零 / 碎冰连锁层数变化
+                    // （原逻辑只同步 state，会丢弃上面把 sealedCount 置 0 的改动，
+                    //  导致封印牌"门控已开但层数仍在"，需再逐层点击 → "需要两次才能解封"）
+                    if (recomputed.sealedCount != currentTile.sealedCount) {
+                        currentTile.copy(sealedCount = recomputed.sealedCount)
+                    } else if ((currentTile.state == TileState.NORMAL || currentTile.state == TileState.BLOCKED)
+                        && recomputed.state != currentTile.state
+                    ) {
+                        currentTile.copy(state = recomputed.state)
+                    } else {
+                        currentTile
+                    }
                 } else {
                     currentTile
                 }

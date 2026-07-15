@@ -168,6 +168,8 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
     return ox * oy;
   };
 
+  const reversedEliminationList: Node[] = [];
+
   // 反向分配卡牌类型，确保顶层总是存在可消除的组合
   while (unassigned.size > 0) {
     const exposed = [...unassigned].filter((node) => {
@@ -186,6 +188,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
         rem[k].assignedType = t;
         rem[k + 1].assignedType = t;
         rem[k + 2].assignedType = t;
+        reversedEliminationList.push(rem[k], rem[k + 1], rem[k + 2]);
         unassigned.delete(rem[k]);
         unassigned.delete(rem[k + 1]);
         unassigned.delete(rem[k + 2]);
@@ -193,6 +196,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       }
       for (const node of unassigned) {
         node.assignedType = 1;
+        reversedEliminationList.push(node);
       }
       unassigned.clear();
       break;
@@ -204,6 +208,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
       const idx = Math.floor(randAssign() * exposedMutable.length);
       const chosen = exposedMutable.splice(idx, 1)[0];
       chosen.assignedType = type;
+      reversedEliminationList.push(chosen);
       unassigned.delete(chosen);
     }
   }
@@ -243,38 +248,51 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
   const targetRadius = 4.8;   // 最大半径，留出边距避免裁切
   const normScale2 = targetRadius / maxRadius;
 
-  // 盲盒关卡：均匀分布固定数量的盲盒牌
-  let blindIndices: Set<number>;
-  if (isBlindLevel) {
+  // 3. 开始等距、均匀且绝对有解地分配特殊牌
+  // 我们基于 reversedEliminationList（反向消除拓扑序列，后入代表顶层暴露牌，先入代表底层压底牌）进行分配。
+  // 通过在有解路径上以固定步长（step）等距抽取，使特殊牌能够跨越整个 Z 轴层级，达到真正的全场均匀散布。
+  const blindIndices = new Set<number>();
+  const sealedIndices = new Set<number>();
+
+  const listSize = reversedEliminationList.length;
+
+  // 3.1 盲盒关卡：在整条消除路径上平铺进行等距抽取，保证关卡各层均匀产生盲盒
+  if (isBlindLevel && listSize > 0) {
     const blindProb = Math.min(0.20, 0.10 + (levelId - 3) * 0.015);
-    const limitZ = maxZ >= 4 ? (maxZ - 2) : (maxZ - 1);
-    const eligible = nodes.filter((n) => n.coord.z < limitZ);
-    const count = Math.max(1, Math.floor(eligible.length * blindProb));
-    // Fisher–Yates 洗牌取前 count 个
-    const indices = eligible.map((_, i) => i);
-    const randShuffle = lcg(seed + 200);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(randShuffle() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
+    const totalBlind = Math.max(1, Math.floor(listSize * blindProb));
+    const step = Math.max(1, Math.floor(listSize / totalBlind));
+    for (let k = 0; k < totalBlind; k++) {
+      const idx = Math.min(listSize - 1, k * step);
+      blindIndices.add(reversedEliminationList[idx].index);
     }
-    blindIndices = new Set(indices.slice(0, count).map(i => eligible[i].index));
-  } else {
-    blindIndices = new Set();
   }
 
-  // 封印关卡：多层封印 + 聚簇分布
-  const maxSealLayer = levelId <= 6 ? 1 : levelId <= 14 ? 2 : 3;
-  const sealRatio = levelId <= 6 ? 0.30 : levelId <= 14 ? 0.35 : 0.40;
-  const clusterCount = levelId <= 6 ? 2 : levelId <= 14 ? 3 : 4;
-
-  const randProps = lcg(seed + 300);
-  const sealedClusters = isSealedLevel
-    ? generateSealedUniformly(nodes, () => randProps(), sealRatio, maxSealLayer)
-    : new Map<number, number>();
+  // 3.2 封印关卡：采用难度自适应步长等距分配封印牌。
+  // 为了彻底防止由于表层卡牌被锁而导致玩家开局“无牌可消”卡死（死局），
+  // 我们将封印分配范围限制在 listSize - 9 之前，即排除正向消除中最先被玩家接触到的最表层 9 张牌（3 组破局基本牌）。
+  if (isSealedLevel && listSize > 0) {
+    // 难度梯度：20关以下10%，60关以下20%，60关以上30%
+    const sealRatio = levelId <= 20 ? 0.10 : levelId <= 60 ? 0.20 : 0.30;
+    const totalSealed = Math.max(1, Math.floor(listSize * sealRatio));
+    
+    // 排除最表层 9 张安全卡牌，在剩余的 eligibleSize 长度路径中进行等距计算
+    const eligibleSize = Math.max(1, listSize - 9);
+    const step = Math.max(1, Math.floor(eligibleSize / totalSealed));
+    for (let k = 0; k < totalSealed; k++) {
+      let idx = Math.min(eligibleSize - 1, k * step);
+      // 冲突兜底：如果等距抽取的卡牌已经是盲盒牌，则向深层（正向后消除方向）后延寻找可用非盲盒卡牌
+      while (idx < eligibleSize && blindIndices.has(reversedEliminationList[idx].index)) {
+        idx++;
+      }
+      if (idx < eligibleSize) {
+        sealedIndices.add(reversedEliminationList[idx].index);
+      }
+    }
+  }
 
   return nodes.map((node) => {
     const isBlind = blindIndices.has(node.index);
-    const sealedCount = sealedClusters.get(node.index) ?? 0;
+    const sealedCount = sealedIndices.has(node.index) ? 1 : 0;
 
     return {
       id: `tile_${node.index}`,

@@ -39,8 +39,8 @@ class EndlessViewModel @Inject constructor(
         private const val COL_COUNT = 6              // 棋盘列数（无尽叠塔）
         private const val FREEZE_DURATION_MS = 4000L
         private const val FREEZE_INITIAL = 3
-        private const val WAVE_ELIM_STEP = 15       // 每消除 15 张升一波
-        private const val WAVE_TIME_STEP_MS = 30_000L // 每存活 30s 升一波
+        private const val WAVE_ELIM_STEP = 20       // 每消除 20 张升一波
+        private const val WAVE_TIME_STEP_MS = 40_000L // 每存活 40s 升一波
         private const val MAX_SUIT = 12
     }
 
@@ -162,50 +162,66 @@ class EndlessViewModel @Inject constructor(
     private fun handleClickColumn(col: Int, tileId: String) {
         if (currentState.status != EndlessStatus.PLAYING) return
 
-        val result = EndlessEngine.clickColumn(
-            currentState.columns, currentState.slotTiles, col, tileId, currentState.maxSlot
-        )
-
-        val (newScore, newCombo) = if (result.matched) {
-            val combo = currentState.combo + 1
-            val gain = (EndlessEngine.BASE_GAIN * EndlessEngine.comboMultiplier(combo)).toInt()
-            (currentState.score + gain) to combo
-        } else {
-            currentState.score to 0
-        }
-
-        val dead = EndlessEngine.isDead(result.columns, result.slot, currentState.deathRow, currentState.maxSlot)
-        if (dead != null) {
-            if (result.matched) eliminatedCount += result.eliminatedIds.size
-            updateState {
-                copy(
-                    columns = result.columns,
-                    slotTiles = result.slot,
-                    score = newScore,
-                    combo = newCombo,
-                    lastMatchedTileIds = result.eliminatedIds
-                )
-            }
-            handleDeath(dead)
-            return
-        }
-
-        if (result.matched) {
-            eliminatedCount += result.eliminatedIds.size
-            setEffect(EndlessViewEffect.PlaySound(SoundType.MATCH))
-            maybeAdvanceWave()
-        } else {
-            setEffect(EndlessViewEffect.PlaySound(SoundType.CLICK))
-        }
-
+        setEffect(EndlessViewEffect.PlaySound(SoundType.CLICK))
         updateState {
-            copy(
-                columns = result.columns,
-                slotTiles = result.slot,
-                score = newScore,
-                combo = newCombo,
-                lastMatchedTileIds = result.eliminatedIds
+            val (newColumns, newSlot) = EndlessEngine.clickColumnOnly(
+                this.columns, this.slotTiles, col, tileId
             )
+            copy(columns = newColumns, slotTiles = newSlot)
+        }
+
+        // 2. 异步协程延迟 200ms，等待飞行动画完毕后执行匹配与死亡判定
+        viewModelScope.launch {
+            delay(200)
+
+            var matchOccurred = false
+            var matchedIds = emptySet<String>()
+            var deathReason: String? = null
+
+            updateState {
+                val latestSlot = this.slotTiles
+                val tileStillInSlot = latestSlot.any { it.id == tileId }
+                if (!tileStillInSlot) {
+                    this
+                } else {
+                    val matchResult = EndlessEngine.resolveMatch(latestSlot)
+                    val isMatched = matchResult.eliminatedIds.isNotEmpty()
+                    val finalSlot = matchResult.newSlot
+                    val eliminatedIds = matchResult.eliminatedIds
+
+                    matchOccurred = isMatched
+                    matchedIds = eliminatedIds
+
+                    val (newScore, newCombo) = if (isMatched) {
+                        val combo = this.combo + 1
+                        val gain = (EndlessEngine.BASE_GAIN * EndlessEngine.comboMultiplier(combo)).toInt()
+                        (this.score + gain) to combo
+                    } else {
+                        this.score to 0
+                    }
+
+                    val dead = EndlessEngine.isDead(this.columns, finalSlot, this.deathRow, this.maxSlot)
+                    deathReason = dead
+
+                    copy(
+                        slotTiles = finalSlot,
+                        score = newScore,
+                        combo = newCombo,
+                        lastMatchedTileIds = eliminatedIds
+                    )
+                }
+            }
+
+            if (matchOccurred) {
+                eliminatedCount += matchedIds.size
+                setEffect(EndlessViewEffect.PlaySound(SoundType.MATCH))
+                maybeAdvanceWave()
+            }
+
+            val dead = deathReason
+            if (dead != null) {
+                handleDeath(dead)
+            }
         }
     }
 
@@ -238,7 +254,7 @@ class EndlessViewModel @Inject constructor(
     }
 
     private fun advanceWave(target: Int) {
-        val newDrop = (currentState.dropIntervalMs * 0.9).toLong().coerceAtLeast(300L)
+        val newDrop = (currentState.dropIntervalMs * 0.95).toLong().coerceAtLeast(800L)
         val newSuits = minOf(MAX_SUIT, 3 + (target - 1) / 2)
         updateState { copy(wave = target, dropIntervalMs = newDrop, activeSuitCount = newSuits) }
         val banner = context.getString(R.string.endless_wave_banner, target)

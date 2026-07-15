@@ -98,18 +98,31 @@ class DuelViewModel @Inject constructor(
     private fun handleInit(gameId: String, playerId: String, levelId: Int, seed: Int) {
         currentLevelId = levelId
         currentGameSeed = seed
-        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, totalTileCount = 0, opponentEliminatedCount = 0) }
+        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, totalTileCount = 0, opponentEliminatedCount = 0, currentSkin = prefs.getCurrentSkin()) }
         // ⚠️ 内存隐患：建立 WebSocket 连接；若后续未通过 handleLeave → wsManager.disconnect() 关闭，
         // 连接会残留（见类文档 onCleared 兜底建议）。
         wsManager.connect(gameId, playerId)
         
         viewModelScope.launch(Dispatchers.IO) {
+            // ===== 对决模式关卡数据加载逻辑（网络优先 + 离线兜底） =====
             try {
-                val tiles = calculateBlockedStates(apiService.getLevel(levelId, seed).map { it.copy(state = TileState.NORMAL) })
+                // 1. 网络优先：向服务器 API 请求对决中双方一致的关卡布局
+                val rawTiles = apiService.getLevel(levelId, seed).map { it.copy(state = TileState.NORMAL) }
+                
+                // 遵循一致性规则：直接采用接口返回的特殊牌（isBlind）分布，
+                // 仅为了客户端“单次解锁”规则，在 sealedCount > 0 时通过浅拷贝净化重置其值为 1
+                val sanitizedTiles = rawTiles.map { tile ->
+                    val t = tile.copy()
+                    if (t.sealedCount > 0) {
+                        t.sealedCount = 1
+                    }
+                    t
+                }
+                val tiles = calculateBlockedStates(sanitizedTiles)
                 val bounds = if (tiles.isEmpty()) {
-                    com.example.sheeps.game.state.BoardBounds()
+                    BoardBounds()
                 } else {
-                    com.example.sheeps.game.state.BoardBounds(
+                    BoardBounds(
                         minX = tiles.minOf { it.x },
                         maxX = tiles.maxOf { it.x },
                         minY = tiles.minOf { it.y },
@@ -118,7 +131,16 @@ class DuelViewModel @Inject constructor(
                 }
                 updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
             } catch (e: Exception) {
-                val tiles = calculateBlockedStates(levelGenerator.generateDuelLevel())
+                // 2. 离线兜底：若对决模式发生 API 加载异常，回退至本地对决生成算法
+                val rawTiles = levelGenerator.generateDuelLevel()
+                val sanitizedTiles = rawTiles.map { tile ->
+                    val t = tile.copy()
+                    if (t.sealedCount > 0) {
+                        t.sealedCount = 1
+                    }
+                    t
+                }
+                val tiles = calculateBlockedStates(sanitizedTiles)
                 val bounds = if (tiles.isEmpty()) {
                     com.example.sheeps.game.state.BoardBounds()
                 } else {

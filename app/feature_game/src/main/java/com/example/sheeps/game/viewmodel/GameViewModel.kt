@@ -251,7 +251,9 @@ class GameViewModel @Inject constructor(
             }
             syncRepository.syncDirtyData()
 
+            // ===== 关卡数据获取与棋盘装载逻辑（网络优先 + 离线兜底） =====
             try {
+                // 1. 网络模式（优先）：向远程服务器拉取关卡卡牌布局
                 // 每次进入关卡随机生成种子，保证同关卡不同局图案不同
                 val gameSeed = (System.currentTimeMillis() % 1000000).toInt()
                 val finalTiles = calculateBlockedStates(
@@ -259,7 +261,8 @@ class GameViewModel @Inject constructor(
 
                 updateBoardState(finalTiles, carryMap, false)
             } catch (e: Exception) {
-                // 离线回退：使用当前真实用户ID和随机种子保持一致性
+                // 2. 离线模式（兜底）：网络请求失败（无网/超时/服务端异常）时自动进入 catch 块
+                // 离线回退：使用当前真实用户ID和系统随机种子在本地生成卡牌，与服务端后端 level.ts 逻辑完全对齐（等距均匀抽取）
                 val numericUserId = prefs.getUserId().toIntOrNull() ?: 0
                 val finalTiles =
                     calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis(), numericUserId))
@@ -292,17 +295,24 @@ class GameViewModel @Inject constructor(
         carryMap: Map<String, Int>,
         isOffline: Boolean
     ) {
-        val bounds = if (tiles.isEmpty()) {
+        val sanitizedTiles = tiles.map { tile ->
+            val t = tile.copy()
+            if (t.sealedCount > 0) {
+                t.sealedCount = 1
+            }
+            t
+        }
+        val bounds = if (sanitizedTiles.isEmpty()) {
             BoardBounds()
         } else {
             BoardBounds(
-                minX = tiles.minOf { it.x },
-                maxX = tiles.maxOf { it.x },
-                minY = tiles.minOf { it.y },
-                maxY = tiles.maxOf { it.y }
+                minX = sanitizedTiles.minOf { it.x },
+                maxX = sanitizedTiles.maxOf { it.x },
+                minY = sanitizedTiles.minOf { it.y },
+                maxY = sanitizedTiles.maxOf { it.y }
             )
         }
-        val sealedOrder = tiles
+        val sealedOrder = sanitizedTiles
             .filter { it.sealedCount > 0 }
             .sortedByDescending { it.z }
             .map { it.id }
@@ -310,7 +320,7 @@ class GameViewModel @Inject constructor(
         updateState {
             copy(
                 isLoading = false,
-                boardTiles = tiles,
+                boardTiles = sanitizedTiles,
                 boardBounds = bounds,
                 slotTiles = emptyList(),
                 movedOutTiles = emptyList(),

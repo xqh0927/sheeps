@@ -1,5 +1,7 @@
 package com.example.sheeps.core.game
 
+import android.content.Context
+import android.util.TypedValue
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -14,20 +17,75 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
+
+/**
+ * 皮肤对应的边框与装饰色实体类。
+ */
+data class SkinColors(val borderColor: Int, val decorColor: Int)
+
+/**
+ * 辅助获取 Android 主题颜色。
+ */
+fun getThemeColor(context: Context, attrRes: Int, fallbackColor: Int): Int {
+    val typedValue = TypedValue()
+    return if (context.theme.resolveAttribute(attrRes, typedValue, true)) {
+        typedValue.data
+    } else fallbackColor
+}
+
+/**
+ * 非 Composable 环境（如自绘 View 兜底或 AS 布局预览）下的皮肤颜色解析函数。
+ */
+fun getSkinColors(context: Context, skin: String): SkinColors {
+    return when (skin.lowercase()) {
+        "shuang" -> SkinColors("#29B6F6".toColorInt(), "#FFFFCA28".toColorInt())
+        "electronic" -> SkinColors("#21D4FD".toColorInt(), "#B721FF".toColorInt())
+        "daily" -> SkinColors("#FFFF9800".toColorInt(), "#FFFFC107".toColorInt())
+        "vegetable" -> SkinColors("#4CAF50".toColorInt(), "#8BC34A".toColorInt())
+        "fruit" -> SkinColors("#FFFF5252".toColorInt(), "#FFFF8A80".toColorInt())
+        else -> {
+            val primaryColor = getThemeColor(context, android.R.attr.colorPrimary, "#6200EE".toColorInt())
+            val secondaryColor = getThemeColor(context, android.R.attr.colorSecondary, "#FFD54F".toColorInt())
+            SkinColors(primaryColor, secondaryColor)
+        }
+    }
+}
+
+/**
+ * 在 Composable 环境中按 TileCardBase 的算法解析并缓存当前皮肤的边框/装饰色。
+ */
+@Composable
+fun rememberTileCardBorderColors(skin: String): Pair<Int, Int> {
+    val cs = MaterialTheme.colorScheme
+    return remember(skin, cs.primary, cs.secondary) {
+        val borderColor = when (skin.lowercase()) {
+            "shuang" -> Color(0xFF29B6F6)
+            "electronic" -> Color(0xFF21D4FD)
+            "daily" -> Color(0xFFFF9800)
+            "vegetable" -> Color(0xFF4CAF50)
+            "fruit" -> Color(0xFFFF5252)
+            else -> cs.primary
+        }
+        val decorColor = when (skin.lowercase()) {
+            "shuang" -> Color(0xFFFFCA28)
+            "electronic" -> Color(0xFFB721FF)
+            "daily" -> Color(0xFFFFC107)
+            "vegetable" -> Color(0xFF8BC34A)
+            "fruit" -> Color(0xFFFF8A80)
+            else -> cs.secondary
+        }
+        borderColor.toArgb() to decorColor.toArgb()
+    }
+}
 
 /**
  * 卡牌视觉基座 Composable。
  *
  * 负责绘制统一风格的卡牌外框（圆角 + 阴影）与四角装饰折线，并按 [skin] 选择主题色
- * （边框色 / 装饰色）。牌面具体图标由 [content] 插槽注入（通常为 [com.example.sheeps.core.game.TileIconProvider] 提供的 [RemoteImage]）。
- *
- * 线程约束：Composable 默认运行于主线程（@MainThread），仅做 Canvas 绘制，无耗时操作。
- * 重组注意：每次 [skin] 变化会重新计算颜色三元组，开销极小；应避免在调用处高频改变 [skin]。
- *
- * @param skin    皮肤渲染键（如 "shuang"/"electronic"），内部做 `lowercase()` 不区分大小写
- * @param modifier Compose 修饰符
- * @param content 卡牌正面图标内容插槽（@Composable 作用域）
+ * （边框色 / 装饰色）。牌面具体图标由 [content] 插槽注入。
  */
 @Composable
 fun TileCardBase(
@@ -38,15 +96,10 @@ fun TileCardBase(
     val cs = MaterialTheme.colorScheme
     val normalizedSkin = skin.lowercase()
     
-    // 根据皮肤类型定义背景色、边框色和装饰线颜色
-    val (bgColor, borderColor, decorColor) = when (normalizedSkin) {
-        "shuang" -> Triple(cs.surface, Color(0xFF29B6F6), Color(0xFFFFCA28)) // 萌趣竞技：爽爽蓝边框+阳光金装饰
-        "electronic" -> Triple(cs.surface, Color(0xFF21D4FD), Color(0xFFB721FF)) // 数码潮玩：科技蓝边框+霓虹紫装饰
-        "daily" -> Triple(cs.surface, Color(0xFFFF9800), Color(0xFFFFC107)) // 日常好物：暖橙边框+阳光金装饰
-        "vegetable" -> Triple(cs.surface, Color(0xFF4CAF50), Color(0xFF8BC34A)) // 蔬菜园：清新绿边框+嫩绿装饰
-        "fruit" -> Triple(cs.surface, Color(0xFFFF5252), Color(0xFFFF8A80)) // 水果盘：鲜红边框+浅红装饰
-        else -> Triple(cs.surface, cs.primary, cs.secondary) // 默认经典色调
-    }
+    val bgColor = cs.surface
+    val (borderColorInt, decorColorInt) = rememberTileCardBorderColors(normalizedSkin)
+    val borderColor = Color(borderColorInt)
+    val decorColor = Color(decorColorInt)
 
     Box(
         modifier = modifier
@@ -67,9 +120,8 @@ fun TileCardBase(
                 style = Stroke(width = strokeWidth)
             )
 
-            // 根据皮肤绘制边角的装饰线（所有皮肤统一走经典四角折线装饰）
+            // 根据皮肤绘制边角的装饰线
             val decorLen = 12.dp.toPx()
-            // 绘制四个角的折线装饰，颜色从 decorColor 读取
             // 左上角
             drawLine(decorColor, Offset(0f, decorLen), Offset(0f, 0f), strokeWidth)
             drawLine(decorColor, Offset(0f, 0f), Offset(decorLen, 0f), strokeWidth)

@@ -30,12 +30,15 @@ import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.core.game.GameEngine
+import com.example.sheeps.core.game.rememberTileCardBorderColors
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.DuelExitDialog
 import com.example.sheeps.game.ui.dialogs.DuelResultDialog
 import com.example.sheeps.theme.*
 import com.example.sheeps.ui.components.*
+import androidx.compose.ui.viewinterop.AndroidView
+import com.example.sheeps.game.ui.components.DuelGameBoardSurfaceView
 import kotlinx.coroutines.launch
 
 /**
@@ -125,41 +128,50 @@ fun DuelScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // 3. 游戏核心棋盘（包含迷雾特效）
-            DuelGameBoard(
-                state = state,
-                flyingTileIds = flyingTileIds,
-                tileGlobalPositions = tileGlobalPositions,
-                onTileClick = { tile ->
-                    val isBlocked = tile.state == TileState.BLOCKED || 
-                            GameEngine.isTileBlocked(tile, state.boardTiles)
-                    val isSealed = tile.sealedCount > 0
+            // 3. 游戏核心棋盘（包含迷雾特效自绘）
+            val (borderColor, decorColor) = rememberTileCardBorderColors(state.currentSkin)
+            AndroidView(
+                factory = { ctx ->
+                    DuelGameBoardSurfaceView(ctx)
+                },
+                update = { view ->
+                    view.setSkinColors(borderColor, decorColor)
+                    view.updateData(
+                        state = state,
+                        flyingTileIds = flyingTileIds,
+                        onTileClick = { tile ->
+                            val isBlocked = tile.state == TileState.BLOCKED || 
+                                    GameEngine.isTileBlocked(tile, state.boardTiles)
+                            val isSealed = tile.sealedCount > 0
 
-                    if (isBlocked || isSealed) {
-                        onTileClick(tile)
-                    } else {
-                        // 飞行动画触发逻辑
-                        val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
-                        // 计算卡牌在卡槽中的实际插入索引位置，使其飞向真正安放的位置，而非一律追加到卡槽最末尾
-                        val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
-                        val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
-                        val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
-                        val anim = Animatable(0f)
-                        val fly = DuelFlyingTile(tile.id, tile.type, startPos, endPos, anim)
-                        
-                        flyingTiles = flyingTiles + fly
-                        flyingTileIds = flyingTileIds + tile.id
-                        
-                        onTileClick(tile) // 瞬间更新数据状态，以便下一次点击能正确获取下个卡槽位置且刷新棋盘遮挡状态
+                            if (isBlocked || isSealed) {
+                                onTileClick(tile)
+                            } else {
+                                val startPos = tileGlobalPositions[tile.id] ?: Offset.Zero
+                                val lastIdx = state.slotTiles.indexOfLast { it.type == tile.type }
+                                val targetSlotIdx = if (lastIdx == -1) state.slotTiles.size else (lastIdx + 1)
+                                val endPos = slotGlobalPositions[targetSlotIdx] ?: slotGlobalPositions[0] ?: Offset.Zero
+                                val anim = Animatable(0f)
+                                val fly = DuelFlyingTile(tile.id, tile.type, startPos, endPos, anim)
+                                
+                                flyingTiles = flyingTiles + fly
+                                flyingTileIds = flyingTileIds + tile.id
+                                
+                                onTileClick(tile)
 
-                        // 启动飞行动画；使用 rememberCoroutineScope 作用域，组合销毁时自动取消，无泄漏风险
-                        coroutineScope.launch {
-                            com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
-                            flyingTiles = flyingTiles.filter { it.tileId != tile.id }
-                            flyingTileIds = flyingTileIds - tile.id
-                        }
-                    }
-                }
+                                coroutineScope.launch {
+                                    com.example.sheeps.game.ui.animations.GameAnimations.runTileFlyAnimation(anim)
+                                    flyingTiles = flyingTiles.filter { it.tileId != tile.id }
+                                    flyingTileIds = flyingTileIds - tile.id
+                                }
+                            }
+                        },
+                        tileGlobalPositions = tileGlobalPositions
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             )
 
             Spacer(Modifier.height(16.dp))
@@ -354,7 +366,7 @@ private fun DuelMatchingSlot(
                         tile = tile,
                         onClick = {},
                         currentSkin = "shuang",
-                        tileSize = 48.dp
+                        tileSize = itemWidth
                     )
                 }
             }

@@ -148,6 +148,10 @@ class MenuViewModel @Inject constructor(
     private fun initData() {
         updateState {
             copy(
+                isLoggedIn = prefs.isLoggedIn(),
+                phone = prefs.getPhone() ?: "",
+                username = prefs.getUsername(),
+                points = prefs.getPoints(),
                 language = prefs.getLanguage(),
                 currentSkin = prefs.getCurrentSkin(),
                 todaySigned = prefs.getTodaySigned(),

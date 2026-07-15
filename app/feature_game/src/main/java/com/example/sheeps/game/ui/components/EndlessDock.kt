@@ -10,7 +10,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.data.model.Tile
@@ -27,7 +30,9 @@ import com.example.sheeps.data.model.Tile
 @Composable
 fun EndlessDock(
     slotTiles: List<Tile>,
-    currentSkin: String
+    currentSkin: String,
+    flyingTileIds: Set<String> = emptySet(),
+    slotGlobalPositions: MutableMap<Int, Offset> = remember { mutableMapOf() }
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "endlessSlotBorder")
     val slotBorderAlpha by infiniteTransition.animateFloat(
@@ -54,7 +59,22 @@ fun EndlessDock(
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(8.dp)
-            .onGloballyPositioned { coords -> containerWidthPx = coords.size.width }
+            .onGloballyPositioned { coords -> 
+                containerWidthPx = coords.size.width
+                val containerRoot = coords.positionInRoot()
+                val densityVal = density.density
+                if (containerWidthPx > 0) {
+                    val padPx = 8f * densityVal
+                    val gapPx = 4f * densityVal
+                    val rowWidthPx = containerWidthPx - 2f * padPx
+                    val slotW = (rowWidthPx - 6 * gapPx) / 7
+                    for (i in 0 until 7) {
+                        val x = containerRoot.x + padPx + i * (slotW + gapPx)
+                        val y = containerRoot.y + padPx
+                        slotGlobalPositions[i] = Offset(x, y)
+                    }
+                }
+            }
     ) {
         // 1. 7 个空插槽背景
         Row(
@@ -91,17 +111,20 @@ fun EndlessDock(
                     label = "endless_slot_${tile.id}"
                 )
 
+                val isFlying = flyingTileIds.contains(tile.id)
+
                 Box(
                     modifier = Modifier
                         .offset(x = animatedX)
-                        .size(itemWidth),
+                        .size(itemWidth)
+                        .alpha(if (isFlying) 0f else 1f),
                     contentAlignment = Alignment.Center
                 ) {
                     TileView(
                         tile = tile,
                         onClick = { },
                         currentSkin = currentSkin,
-                        tileSize = 48.dp
+                        tileSize = itemWidth
                     )
                 }
             }

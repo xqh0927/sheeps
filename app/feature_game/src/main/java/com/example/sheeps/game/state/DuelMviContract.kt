@@ -63,7 +63,9 @@ data class DuelViewState(
     /** 本局内已使用过的大招 Key 集合（单局限次） */
     val usedSpells: Set<String> = emptySet(),
     /** 正在执行阻挡反馈动画的卡牌 ID 集合 */
-    val shakingTileIds: Set<String> = emptySet()
+    val shakingTileIds: Set<String> = emptySet(),
+    /** 玩家当前装备并选择使用的卡牌皮肤名称 */
+    val currentSkin: String = "classic"
 )
 
 /**
