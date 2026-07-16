@@ -4,17 +4,17 @@
 
     <application>
         <activity
-            android:name=".GameActivity"
+            android:name=".ui.GameActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         <activity
-            android:name=".DuelActivity"
+            android:name=".ui.DuelActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         <activity
-            android:name=".EndlessActivity"
+            android:name=".ui.EndlessActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />

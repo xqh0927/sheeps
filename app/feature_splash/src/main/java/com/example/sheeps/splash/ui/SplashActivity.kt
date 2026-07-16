@@ -1,4 +1,4 @@
-package com.example.sheeps.splash
+package com.example.sheeps.splash.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent

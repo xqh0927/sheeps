@@ -1,4 +1,4 @@
-package com.example.sheeps.game
+package com.example.sheeps.game.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent

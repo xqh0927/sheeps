@@ -1,4 +1,4 @@
-package com.example.sheeps.game
+package com.example.sheeps.game.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -70,21 +70,49 @@ class GameActivity : BaseActivity() {
                         onUseUndo = { viewModel.sendIntent(GameViewIntent.UseUndo) },
                         onUseMoveOut = { viewModel.sendIntent(GameViewIntent.UseMoveOut) },
                         onUseShuffle = { viewModel.sendIntent(GameViewIntent.UseShuffle) },
-                        onRevive = { viewModel.sendIntent(GameViewIntent.Revive) },
+                        onRevive = {
+                            if (state.currentLevelId > 3 && !state.isLoggedIn) {
+                                com.therouter.TheRouter.build("/auth/login")
+                                    .navigation(this@GameActivity)
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
+                            } else {
+                                viewModel.sendIntent(GameViewIntent.Revive)
+                            }
+                        },
                         onUseHint = { viewModel.sendIntent(GameViewIntent.UseHint) },
                         onUseBomb = { viewModel.sendIntent(GameViewIntent.UseBomb) },
                         onUseJoker = { viewModel.sendIntent(GameViewIntent.UseJoker) },
                         onUseDouble = { viewModel.sendIntent(GameViewIntent.UseDoublePoints) },
-                        onRestart = { viewModel.sendIntent(GameViewIntent.RestartLevel) },
+                        onRestart = {
+                            if (state.currentLevelId > 3 && !state.isLoggedIn) {
+                                com.therouter.TheRouter.build("/auth/login")
+                                    .navigation(this@GameActivity)
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
+                            } else {
+                                viewModel.sendIntent(GameViewIntent.RestartLevel)
+                            }
+                        },
                         onBack = { finish() },
                         onNextLevel = {
-                            viewModel.sendIntent(GameViewIntent.LoadLevel(state.currentLevelId + 1, null))
+                            val nextLvl = state.currentLevelId + 1
+                            if (nextLvl > 3 && !state.isLoggedIn) {
+                                com.therouter.TheRouter.build("/auth/login")
+                                    .navigation(this@GameActivity)
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
+                            } else {
+                                viewModel.sendIntent(GameViewIntent.LoadLevel(nextLvl, null))
+                            }
                         },
                         onShowLeaderboard = {
-                            // 路由跳转至排行榜
-                            com.therouter.TheRouter.build("/leaderboard/show")
-                                .withInt("levelId", state.currentLevelId)
-                                .navigation()
+                            if (state.currentLevelId > 3 && !state.isLoggedIn) {
+                                com.therouter.TheRouter.build("/auth/login")
+                                    .navigation(this@GameActivity)
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
+                            } else {
+                                com.therouter.TheRouter.build("/leaderboard/show")
+                                    .withInt("levelId", state.currentLevelId)
+                                    .navigation()
+                            }
                         },
                         onUpdateTempCarryItem = { type, change ->
                             viewModel.sendIntent(GameViewIntent.UpdateTempCarryItem(type, change))
@@ -138,6 +166,11 @@ class GameActivity : BaseActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.sendIntent(GameViewIntent.InitUser)
     }
 
     override fun getOverrideThemeResId(): Int {

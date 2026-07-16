@@ -56,6 +56,7 @@ class GameViewModel @Inject constructor(
     private var carryItemsJsonStr: String? = null
     private var itemsUsedCount: Int = 0
     private var tickJob: kotlinx.coroutines.Job? = null
+    private var hasSubmittedThisRun: Boolean = false
 
     // 历史状态栈（用于撤销功能）
     private val historyStack = mutableListOf<GameHistoryState>()
@@ -130,8 +131,14 @@ class GameViewModel @Inject constructor(
 
             is GameViewIntent.UseDoublePoints -> handleUseDoublePoints()
             is GameViewIntent.LoadLeaderboard -> handleLoadLeaderboard(intent.levelId)
-            is GameViewIntent.RestartLevel -> handleTriggerRestartFlow()
-            is GameViewIntent.TriggerRestartFlow -> handleTriggerRestartFlow()
+            is GameViewIntent.RestartLevel -> {
+                submitFailureRecordIfNeeded()
+                handleTriggerRestartFlow()
+            }
+            is GameViewIntent.TriggerRestartFlow -> {
+                submitFailureRecordIfNeeded()
+                handleTriggerRestartFlow()
+            }
             is GameViewIntent.UpdateTempCarryItem -> handleUpdateTempCarryItem(
                 intent.itemType,
                 intent.change
@@ -140,11 +147,14 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.ConfirmRestartWithCarry -> handleConfirmRestartWithCarry()
             is GameViewIntent.DismissCarrySelection -> updateState { copy(showCarrySelection = false) }
 
-            is GameViewIntent.GoBackToMenu -> updateState {
-                copy(
-                    gameStatus = GameStatus.MENU,
-                    unlockedLevel = prefs.getUnlockedLevel()
-                )
+            is GameViewIntent.GoBackToMenu -> {
+                submitFailureRecordIfNeeded()
+                updateState {
+                    copy(
+                        gameStatus = GameStatus.MENU,
+                        unlockedLevel = prefs.getUnlockedLevel()
+                    )
+                }
             }
         }
     }
@@ -157,6 +167,7 @@ class GameViewModel @Inject constructor(
                 isPrivacyAccepted = accepted,
                 username = prefs.getUsername(),
                 unlockedLevel = prefs.getUnlockedLevel(),
+                isLoggedIn = prefs.isLoggedIn(),
                 gameStatus = if (accepted) GameStatus.MENU else GameStatus.INIT
             )
         }
@@ -317,6 +328,9 @@ class GameViewModel @Inject constructor(
             .sortedByDescending { it.z }
             .map { it.id }
 
+        hasSubmittedThisRun = false
+        itemsUsedCount = 0
+
         updateState {
             copy(
                 isLoading = false,
@@ -385,22 +399,25 @@ class GameViewModel @Inject constructor(
             val computedFinalScore = if (currentState.isDoublePointsActive) baseScore * 2 else baseScore
             updateState { copy(finalScore = computedFinalScore, elapsedMs = elapsedMs) }
 
+            hasSubmittedThisRun = true
             scoreDelegate.submitScoreOnline(
-                // ⚠️ 内存隐患：此处每次通关都新建一个「未绑定 viewModelScope」的 CoroutineScope(Dispatchers.IO)。
-                // 该 Scope 没有持有者引用、也从未调用 cancel()，理论上需依赖 submitScoreOnline 内部
-                // scope.launch 自行结束；若后续误在此处长期持有该 Scope，会造成协程泄漏。
-                // 安全建议：改为复用 viewModelScope（VM 销毁时由框架统一取消），避免匿名 Scope 逃逸。
                 CoroutineScope(Dispatchers.IO),
                 currentState.currentLevelId,
                 computedFinalScore,
                 elapsedMs,
+                itemsUsedCount,
+                1, // isWin = 1
                 ::getLocalizedString,
                 ::setEffect
             )
         }
         // 游戏结束时停止计时器
-        if (currentState.gameStatus == GameStatus.WON || currentState.gameStatus == GameStatus.LOST) {
+        val updatedState = currentState
+        if (updatedState.gameStatus == GameStatus.WON || updatedState.gameStatus == GameStatus.LOST) {
             tickJob?.cancel()
+            if (updatedState.gameStatus == GameStatus.LOST && updatedState.reviveCount <= 0) {
+                submitFailureRecordIfNeeded()
+            }
         }
     }
 
@@ -525,5 +542,23 @@ class GameViewModel @Inject constructor(
             copy(showCarrySelection = false)
         }
         handleLoadLevel(currentState.currentLevelId, carryJson)
+    }
+
+    private fun submitFailureRecordIfNeeded() {
+        if (hasSubmittedThisRun) return
+        val status = currentState.gameStatus
+        if (status != GameStatus.PLAYING && status != GameStatus.LOST) return
+        hasSubmittedThisRun = true
+        val elapsedMs = System.currentTimeMillis() - levelStartTime
+        scoreDelegate.submitScoreOnline(
+            CoroutineScope(Dispatchers.IO),
+            currentState.currentLevelId,
+            0,
+            elapsedMs,
+            itemsUsedCount,
+            0, // isWin = 0
+            ::getLocalizedString,
+            ::setEffect
+        )
     }
 }

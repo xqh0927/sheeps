@@ -78,8 +78,8 @@
     <string name="shop_title">道具商店</string>
     <string name="shop_vault_locked">未解锁</string>
 
-    <string name="task_play_3">累计游玩3次</string>
-    <string name="task_play_5">累计游玩5次</string>
+    <string name="task_win_3">成功过关3次</string>
+    <string name="task_win_5">成功过关5次</string>
     <string name="task_sign_in">每日完成签到</string>
 
     <string name="exchange_record_desc">已兑换 %1$d 个 %2$s</string>

@@ -49,7 +49,7 @@ class SocialActionDelegate @Inject constructor(
         onComplete: () -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
+        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
 
         scope.launch {
             // 1. 记录原始积分，用于发生异常或协程被取消时回滚
@@ -124,7 +124,7 @@ class SocialActionDelegate @Inject constructor(
         onComplete: () -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
+        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
         val item = shopItems.find { it.id == shopItemId }
             ?: return setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_item_not_found))
 
@@ -186,7 +186,7 @@ class SocialActionDelegate @Inject constructor(
         onComplete: () -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
+        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
         val task = dailyTasks.find { it.task_id == taskId } ?: return
 
         if (!task.is_completed || task.is_rewarded) return
@@ -227,7 +227,7 @@ class SocialActionDelegate @Inject constructor(
         onComplete: () -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginDialog)
+        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
 
         val cost = when (levelId) {
             2 -> 50

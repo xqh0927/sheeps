@@ -197,18 +197,27 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         }
 
         // 自动解锁下一关
-        mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now()));
-        // 将成绩录入排行榜表（无尽模式 game_mode=1，level_id 传 0 占位）
-        mutations.push(env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, achieved_at) VALUES (?, ?, ?, ?, ?, ?)').bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, gameMode, Date.now()));
+        if (gameMode === 0 && (body.is_win === undefined || Number(body.is_win) === 1)) {
+            mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now()));
+        }
+
+        const itemsUsed = Number(body.items_used) || 0;
+        const isWin = body.is_win !== undefined ? Number(body.is_win) : 1;
+
+        // 将成绩录入排行榜表（包含 is_win 和 items_used）
+        mutations.push(
+            env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, items_used, is_win, achieved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+                .bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, gameMode, itemsUsed, isWin, Date.now())
+        );
 
         if (mutations.length > 0) await env.DB.batch(mutations);
 
-        // P0-1 修复：遍历用户任务，更新 PLAY_ 前缀的每日任务进度
+        // 仅在普通闯关模式下（gameMode === 0）并且成功通关（isWin === 1）时，更新 WIN_ 或 PLAY_ 前缀的每日任务进度
         const userTasks = tasksResult.results as any[];
-        if (userTasks && userTasks.length > 0) {
+        if (gameMode === 0 && isWin === 1 && userTasks && userTasks.length > 0) {
             const taskMutations = [];
             for (const ut of userTasks) {
-                if (ut.task_id.startsWith('PLAY_') && ut.is_completed === 0) {
+                if ((ut.task_id.startsWith('WIN_') || ut.task_id.startsWith('PLAY_')) && ut.is_completed === 0) {
                     const newProgress = (ut.progress || 0) + 1;
                     const targetCount = ut.target_count || 999;
                     const completed = newProgress >= targetCount;

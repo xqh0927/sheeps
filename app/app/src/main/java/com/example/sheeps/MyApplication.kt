@@ -11,9 +11,11 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
+import com.example.sheeps.core.base.BaseActivityThemeDelegate
 import com.example.sheeps.core.utils.NetworkMonitor
 import com.example.sheeps.theme.ThemeManager
 import com.example.sheeps.data.repository.SyncRepository
+import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,6 +37,9 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
 
     @Inject
     lateinit var networkMonitor: NetworkMonitor
+
+    @Inject
+    lateinit var kv: MMKV
 
     /**
      * 配置 WorkManager 以支持 Hilt 依赖注入。
@@ -79,12 +84,12 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
         // 注意：MMKV, Toaster, Logcat, TheRouter 已通过 App Startup 库自动初始化。
 
         // 绑定底层 BaseActivity 主题提供者委托，打破物理反向依赖并让所有 Activity 一键获得主题设置支持
-        com.example.sheeps.core.base.BaseActivityThemeDelegate.themeProvider = {
-            com.example.sheeps.theme.ThemeManager.getThemeResId()
+       BaseActivityThemeDelegate.themeProvider = {
+            ThemeManager.getThemeResId()
         }
 
         // 初始化主题管理器，恢复用户上次保存的主题偏好
-        ThemeManager.init()
+        ThemeManager.init(kv)
 
         // 注册前后台切换监听：仅在前后台切换时触发一次离线脏数据同步
         setupForegroundBackgroundListener()

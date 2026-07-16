@@ -1,4 +1,4 @@
-package com.example.sheeps.menu
+package com.example.sheeps.menu.ui
 
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -38,6 +38,9 @@ class SettingsActivity : BaseActivity() {
     @Inject
     lateinit var prefs: UserPreferences
 
+    @Inject
+    lateinit var kv: MMKV
+
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
             SheepsTheme {
@@ -61,13 +64,13 @@ class SettingsActivity : BaseActivity() {
                     onChangeLanguage = { lang ->
                         prefs.setLanguage(lang)
                         // 标记语言已变更，MenuActivity 返回时通过 onResume 感知
-                        MMKV.defaultMMKV().encode("language_changed_in_settings", true)
+                        kv.encode("language_changed_in_settings", true)
                         finish()
                     },
                     onThemeChange = {
                         // 标记主题已变更，MenuActivity onResume 检测即可
                         // ThemeManager 是全局 StateFlow，SheepsTheme 自动响应，无需 recreate
-                        MMKV.defaultMMKV().encode("theme_changed_in_settings", true)
+                        kv.encode("theme_changed_in_settings", true)
                     },
                     onShowGameGuide = { showGameGuide = true },
                     onOpenAgreement = { openH5(AppConfig.BASE_URL + "agreement.html", "用户协议") },

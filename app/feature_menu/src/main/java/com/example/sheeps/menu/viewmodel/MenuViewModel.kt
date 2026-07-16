@@ -1,12 +1,17 @@
 package com.example.sheeps.menu.viewmodel
 
 import android.content.Context
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import coil.Coil
 import coil.request.ImageRequest
 import coil.size.Scale
+import coil.size.Size
 import com.example.sheeps.core.R
 import com.example.sheeps.core.base.BaseMviViewModel
+import com.example.sheeps.core.base.IGameService
 import com.example.sheeps.core.cache.ShopCache
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.core.preference.UserPreferences
@@ -25,25 +30,20 @@ import com.example.sheeps.menu.viewmodel.delegates.AuthDelegate
 import com.example.sheeps.menu.viewmodel.delegates.MatchmakingDelegate
 import com.example.sheeps.menu.viewmodel.delegates.SocialActionDelegate
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ProcessLifecycleOwner
-import coil.size.Size
-import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import retrofit2.HttpException
 import javax.inject.Inject
-import com.example.sheeps.core.base.IGameService
 
 /**
  * 菜单主界面 ViewModel
@@ -61,11 +61,10 @@ import com.example.sheeps.core.base.IGameService
  */
 @HiltViewModel
 class MenuViewModel @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext
-    private val context: android.content.Context,
+    @ApplicationContext
+    private val context: Context,
     private val apiService: ApiService,
     private val prefs: UserPreferences,
-    private val json: Json,
     private val shopCache: ShopCache,
     private val localDao: LocalDao,
     private val syncRepository: SyncRepository,

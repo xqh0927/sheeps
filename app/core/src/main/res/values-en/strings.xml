@@ -75,8 +75,8 @@
     <string name="shop_title">Item Shop</string>
     <string name="shop_vault_locked">Locked</string>
 
-    <string name="task_play_3">Play 3 games</string>
-    <string name="task_play_5">Play 5 games</string>
+    <string name="task_win_3">Successfully clear 3 levels</string>
+    <string name="task_win_5">Successfully clear 5 levels</string>
     <string name="task_sign_in">Daily Sign In</string>
 
     <string name="exchange_record_desc">Exchanged %1$d %2$s</string>

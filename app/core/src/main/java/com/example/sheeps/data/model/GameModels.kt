@@ -326,7 +326,9 @@ data class ScoreRequest(
     val clear_time_ms: Long,
     val sign: String,
     /** 0=闯关/PvP，1=无尽生存；默认 0 保持向后兼容 */
-    val game_mode: Int = 0
+    val game_mode: Int = 0,
+    val items_used: Int = 0,
+    val is_win: Int = 1
 )
 
 /** 排行榜单条记录（用户名 / 头像 / 成绩 / 达成时间）。 */

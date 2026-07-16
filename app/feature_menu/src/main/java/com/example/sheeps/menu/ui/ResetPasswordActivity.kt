@@ -1,4 +1,4 @@
-package com.example.sheeps.menu
+package com.example.sheeps.menu.ui
 
 import android.os.Bundle
 import androidx.activity.compose.BackHandler

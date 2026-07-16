@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 无尽生存模式（叠塔）ViewModel。
@@ -129,10 +130,10 @@ class EndlessViewModel @Inject constructor(
         spawnJob = viewModelScope.launch {
             while (currentState.status == EndlessStatus.PLAYING) {
                 if (currentState.isFrozen) {
-                    delay(200)
+                    delay(200.milliseconds)
                     continue
                 }
-                delay(currentState.dropIntervalMs)
+                delay(currentState.dropIntervalMs.milliseconds)
                 if (currentState.status != EndlessStatus.PLAYING) break
                 doSpawn()
             }
@@ -172,7 +173,7 @@ class EndlessViewModel @Inject constructor(
 
         // 2. 异步协程延迟 200ms，等待飞行动画完毕后执行匹配与死亡判定
         viewModelScope.launch {
-            delay(200)
+            delay(200.milliseconds)
 
             var matchOccurred = false
             var matchedIds = emptySet<String>()
@@ -236,7 +237,7 @@ class EndlessViewModel @Inject constructor(
         viewModelScope.launch {
             var remaining = FREEZE_DURATION_MS
             while (remaining > 0 && currentState.isFrozen) {
-                delay(100)
+                delay(100.milliseconds)
                 remaining -= 100
                 updateState { copy(freezeRemainingMs = remaining.coerceAtLeast(0)) }
             }

@@ -7,12 +7,16 @@ import { listLevels, createLevel, updateLevel, deleteLevel } from '../api/admin'
 const columns: ColumnDef[] = [
   { key: 'level_id', label: '关卡 ID', sortable: true },
   { key: 'difficulty', label: '难度', sortable: true, render: (r: any) => (r.difficulty ?? '-') },
+  { key: 'attempts', label: '闯关次数', sortable: true },
+  { key: 'avg_score', label: '平均积分', sortable: true, render: (r: any) => Math.round(r.avg_score || 0) },
+  { key: 'total_items_used', label: '使用道具数', sortable: true },
+  { key: 'avg_time_ms', label: '平均用时', sortable: true, render: (r: any) => r.avg_time_ms ? `${(r.avg_time_ms / 1000).toFixed(1)}秒` : '-' },
   {
     key: 'layout_data',
     label: '布局数据',
     render: (r: any) => (
-      <span style={{ display: 'inline-block', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {typeof r.layout_data === 'string' ? r.layout_data.slice(0, 60) : '-'}
+      <span style={{ display: 'inline-block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {typeof r.layout_data === 'string' ? r.layout_data.slice(0, 40) : '-'}
       </span>
     ),
   },

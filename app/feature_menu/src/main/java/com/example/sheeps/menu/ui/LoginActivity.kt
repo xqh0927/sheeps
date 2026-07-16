@@ -1,4 +1,4 @@
-package com.example.sheeps.menu
+package com.example.sheeps.menu.ui
 
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -22,6 +22,7 @@ import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.ui.screens.LoginScreen
 import com.example.sheeps.core.R
 import com.example.sheeps.theme.SheepsTheme
+import com.tencent.mmkv.MMKV
 import com.hjq.toast.Toaster
 import com.therouter.TheRouter
 import com.therouter.router.Route
@@ -50,6 +51,8 @@ class LoginActivity : BaseActivity() {
     lateinit var apiService: ApiService
     @Inject
     lateinit var prefs: UserPreferences
+    @Inject
+    lateinit var kv: MMKV
     @Inject
     lateinit var localDao: LocalDao
     @Inject
@@ -239,7 +242,7 @@ class LoginActivity : BaseActivity() {
                 // ⚠️ 内存隐患（已规避）：MMKV 为进程级静态单例，仅写入布尔标记，不持有 Activity/Context 引用，无泄漏；
                 // MenuActivity 返回 onResume 时读取该标记并弹出对话框。
                 if (!response.hasPassword) {
-                    com.tencent.mmkv.MMKV.defaultMMKV().encode("need_set_password", true)
+                    kv.encode("need_set_password", true)
                 }
                 finish()
             } catch (e: Exception) {

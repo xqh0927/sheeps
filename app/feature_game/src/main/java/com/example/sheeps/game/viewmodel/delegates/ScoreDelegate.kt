@@ -29,11 +29,13 @@ class ScoreDelegate @Inject constructor(
         levelId: Int,
         finalScore: Int,
         clearTimeMs: Long,
+        itemsUsed: Int,
+        isWin: Int,
         getLocalizedString: (String, String, String, String, String) -> String,
         setEffect: (GameViewEffect) -> Unit
     ) {
         // 更新本地解锁状态
-        if (levelId == prefs.getUnlockedLevel()) {
+        if (isWin == 1 && levelId == prefs.getUnlockedLevel()) {
             prefs.setUnlockedLevel(levelId + 1)
         }
 
@@ -42,13 +44,15 @@ class ScoreDelegate @Inject constructor(
         // 使用独立的 IO 作用域提交，防止页面关闭导致提交中断
         scope.launch(Dispatchers.IO) {
             try {
-                // 1. 本地存储进度
-                syncRepository.saveProgressAndPointsLocally(
-                    levelId = levelId,
-                    score = finalScore,
-                    clearTime = clearTimeMs,
-                    pointsGained = 0
-                )
+                // 1. 本地存储进度（仅成功通关时）
+                if (isWin == 1) {
+                    syncRepository.saveProgressAndPointsLocally(
+                        levelId = levelId,
+                        score = finalScore,
+                        clearTime = clearTimeMs,
+                        pointsGained = 0
+                    )
+                }
 
                 // 2. 云端排行榜同步
                 val userId = prefs.getUserId()
@@ -63,17 +67,24 @@ class ScoreDelegate @Inject constructor(
                         level_id = levelId,
                         score = finalScore,
                         clear_time_ms = clearTimeMs,
-                        sign = sign
+                        sign = sign,
+                        game_mode = 0,
+                        items_used = itemsUsed,
+                        is_win = isWin
                     )
                 )
 
-                setEffect(GameViewEffect.ShowToast(
-                    getLocalizedString("通关成功！进度已安全存储！", "Cleared! Progress saved!", "通關成功！進度已安全存儲！", "クリア成功！セーブしました！", "클리어 성공! 저장되었습니다!")
-                ))
+                if (isWin == 1) {
+                    setEffect(GameViewEffect.ShowToast(
+                        getLocalizedString("通关成功！进度已安全存储！", "Cleared! Progress saved!", "通關成功！進度已安全存儲！", "クリア成功！セーブしました！", "클리어 성공! 저장되었습니다!")
+                    ))
+                }
             } catch (e: Exception) {
-                setEffect(GameViewEffect.ShowToast(
-                    getLocalizedString("通关成功！已离线保存进度，恢复连接后自动同步", "Cleared! Progress saved offline, will sync when reconnected", "通關成功！已離線保存進度，恢復連接後自動同步", "クリア成功！オフラインで保存しました。再接続時に同期されます", "클리어 성공! 오프라인으로 저장되었으며, 재연결 시 동기화됩니다")
-                ))
+                if (isWin == 1) {
+                    setEffect(GameViewEffect.ShowToast(
+                        getLocalizedString("通关成功！已离线保存进度，恢复连接后自动同步", "Cleared! Progress saved offline, will sync when reconnected", "通關成功！已離線保存進度，恢復連接後自動同步", "クリア成功！オフラインで保存しました。再接続時に同期されます", "클리어 성공! 오프라인으로 저장되었으며, 재연결 시 동기화됩니다")
+                    ))
+                }
             }
         }
     }

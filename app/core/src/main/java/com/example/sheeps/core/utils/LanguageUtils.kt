@@ -146,8 +146,8 @@ fun getLocalizedSource(source: String, itemI18n: Map<String, String>? = null): S
 @Composable
 fun getLocalizedTaskName(taskName: String): String {
     return when (taskName.uppercase()) {
-        "PLAY_3_GAMES", "PLAY_3" -> stringResource(id = R.string.task_play_3)
-        "PLAY_5_GAMES", "PLAY_5" -> stringResource(id = R.string.task_play_5)
+        "PLAY_3_GAMES", "PLAY_3", "WIN_3_GAMES", "WIN_3" -> stringResource(id = R.string.task_win_3)
+        "PLAY_5_GAMES", "PLAY_5", "WIN_5_GAMES", "WIN_5" -> stringResource(id = R.string.task_win_5)
         "SIGN_IN" -> stringResource(id = R.string.task_sign_in)
         else -> taskName
     }

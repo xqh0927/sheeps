@@ -1,4 +1,4 @@
-package com.example.sheeps.leaderboard
+package com.example.sheeps.leaderboard.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent

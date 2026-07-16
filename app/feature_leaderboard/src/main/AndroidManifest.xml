@@ -4,12 +4,12 @@
 
     <application>
         <activity
-            android:name=".LeaderboardActivity"
+            android:name=".ui.LeaderboardActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
         <activity
-            android:name=".EndlessLeaderboardActivity"
+            android:name=".ui.EndlessLeaderboardActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />

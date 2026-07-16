@@ -40,6 +40,7 @@ import com.hjq.toast.Toaster
 import com.therouter.TheRouter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 // ⚠️ 状态隐患：文件级顶层可变变量（相当于静态全局状态），跨 Composable 实例与配置变更（如旋转屏幕）
 // 持续保留，用于「冷启动仅自动滚动一次」的全局标记。它不是 Context/View 引用，故不构成内存泄漏，
@@ -71,7 +72,7 @@ fun GameHomeScreen(
             onClick = onNoticeClick
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 区域分割标题（如“天命修行”）
         Row(
@@ -146,7 +147,7 @@ fun GameHomeScreen(
         // 协程绑定组合生命周期，退出组合即取消；delay 为主线程挂起不阻塞 UI。
         LaunchedEffect(state.matchStatus) {
             if (state.matchStatus == "matched") {
-                delay(1500)
+                delay(1500.milliseconds)
                 onNavigateToDuel(state.matchedGameId ?: "", state.phone, state.duelLevel, state.gameSeed)
                 showDuelMatch = false
                 onResetMatch()
@@ -270,7 +271,7 @@ fun GameHomeScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         // 关卡列表
-        val levels = remember(state.unlockedLevel) { (1..maxOf(20, state.unlockedLevel + 5)).toList() }
+        val levels = remember(state.unlockedLevel) { (1..maxOf(20, state.unlockedLevel + 7)).toList() }
         val listState = rememberLazyListState()
         var hasAutoScrolled by remember { mutableStateOf(isColdStartAutoScrolled) }
 
@@ -280,7 +281,7 @@ fun GameHomeScreen(
             if (targetIndex < levels.size) {
                 if (state.unlockedLevel > 1) {
                     if (!hasAutoScrolled) {
-                        delay(300) // 延迟 300ms 等界面渲染稳定后开始滚动
+                        delay(500.milliseconds) // 延迟 300ms 等界面渲染稳定后开始滚动
                         listState.animateScrollToItemSmoothly(targetIndex)
                         hasAutoScrolled = true
                         isColdStartAutoScrolled = true
@@ -291,7 +292,7 @@ fun GameHomeScreen(
                         listState.scrollToItem(0)
                         // 启动一个保护协程：如果 1500ms 内 unlockedLevel 一直保持为 1，说明该用户确实只解锁了第 1 关，此时锁定自动滚动状态
                         launch {
-                            delay(1500)
+                            delay(1500.milliseconds)
                             if (state.unlockedLevel == 1) {
                                 hasAutoScrolled = true
                                 
@@ -323,7 +324,7 @@ fun GameHomeScreen(
                     )
                 }
                 item {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     val levelsUnlockedDesc = stringResource(id = R.string.home_levels_unlocked_desc)
                     Card(
                         shape = RoundedCornerShape(10.dp),
@@ -333,7 +334,7 @@ fun GameHomeScreen(
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp)
+                            .padding(bottom = 12.dp)
                             .clickable {
                                 Toaster.show(levelsUnlockedDesc)
                             }
@@ -341,13 +342,13 @@ fun GameHomeScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp),
+                                .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = stringResource(id = R.string.home_levels_unlocked_btn),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.secondary,
                                 fontFamily = FontFamily.Serif
                             )

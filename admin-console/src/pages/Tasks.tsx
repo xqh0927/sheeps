@@ -14,7 +14,7 @@ const columns: ColumnDef[] = [
 // 表单字段定义：name/description 为 multilingual → 由 CrudPage 渲染 MultilingualField 多语言输入
 const fields: FieldDef[] = [
   // task.id 是字符串主键，新建时必须提供
-  { name: 'id', label: '任务 ID（如 PLAY_3_GAMES）', required: true },
+  { name: 'id', label: '任务 ID（如 WIN_3_GAMES）', required: true },
   { name: 'name', label: '名称', required: true, multilingual: true },
   { name: 'description', label: '描述', type: 'textarea', required: true, multilingual: true },
   { name: 'target_count', label: '目标次数', type: 'number', required: true },

@@ -32,6 +32,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import com.example.sheeps.core.R
@@ -84,6 +86,13 @@ fun EndlessScreen(
 
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
 
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val gapVal = 4
+    val tileSizeVal = remember(screenWidth) {
+        val calculated = (screenWidth * 0.9f - 28) / 6f
+        calculated.coerceIn(40f, 56f) // 限制在 40dp ~ 56dp 之间以保证显示合适
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -120,9 +129,7 @@ fun EndlessScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val gapVal = 4
-                val tileSizeVal = 48
-                val sizes = remember(state.deathRow) {
+                val sizes = remember(state.deathRow, tileSizeVal) {
                     val stackHeightVal =
                         state.deathRow * tileSizeVal + (state.deathRow - 1) * gapVal
                     val columnHeightVal = gapVal + stackHeightVal + gapVal
@@ -144,11 +151,14 @@ fun EndlessScreen(
                         },
                         update = { view ->
                             view.setSkinColors(borderColor, decorColor)
+                            val densityVal = view.context.resources.displayMetrics.density
+                            val tileSizePx = tileSizeVal * densityVal
                             view.updateData(
                                 columns = state.columns,
                                 currentSkin = state.currentSkin,
                                 deathRow = state.deathRow,
                                 visibleLayers = state.visibleLayers,
+                                tileSizePx = tileSizePx,
                                 flyingTileIds = flyingTileIds,
                                 tileGlobalPositions = tileGlobalPositions,
                                 onColumnClick = { col, tileId ->
@@ -210,7 +220,8 @@ fun EndlessScreen(
         EndlessFlyingTilesLayer(
             flyingTiles = flyingTiles,
             currentSkin = state.currentSkin,
-            screenRootOffset = screenRootOffset
+            screenRootOffset = screenRootOffset,
+            tileSize = tileSizeVal.dp
         )
 
         if (state.showResult) {
@@ -233,14 +244,15 @@ fun EndlessScreen(
 private fun EndlessFlyingTilesLayer(
     flyingTiles: List<EndlessFlyingTile>,
     currentSkin: String,
-    screenRootOffset: Offset
+    screenRootOffset: Offset,
+    tileSize: Dp = 48.dp
 ) {
     flyingTiles.forEach { fly ->
         key(fly.tileId) {
             Box(
                 modifier = Modifier
                     .zIndex(999f)
-                    .size(48.dp)
+                    .size(tileSize)
                     .graphicsLayer {
                         val progress = fly.progress.value
                         translationX =
@@ -253,7 +265,7 @@ private fun EndlessFlyingTilesLayer(
                     tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
                     onClick = {},
                     currentSkin = currentSkin,
-                    tileSize = 48.dp
+                    tileSize = tileSize
                 )
             }
         }

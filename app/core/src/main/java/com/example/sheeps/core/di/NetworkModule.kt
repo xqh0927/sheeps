@@ -6,6 +6,8 @@ import com.example.sheeps.core.BuildConfig
 import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.core.network.EncryptionInterceptor
 import com.apkfuns.logutils.LogUtils
+import com.example.sheeps.core.utils.AuthEvent
+import com.example.sheeps.core.utils.AuthEventBus
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -115,7 +117,7 @@ object NetworkModule {
                     val refreshToken = prefs.getRefreshToken()
                     if (refreshToken == null) {
                         prefs.logout()
-                        com.example.sheeps.core.utils.AuthEventBus.post(com.example.sheeps.core.utils.AuthEvent.Logout)
+                     AuthEventBus.post(AuthEvent.Logout)
                         return@Interceptor response
                     }
 
@@ -160,7 +162,7 @@ object NetworkModule {
 
                     // 刷新失败，强制退出登录
                     prefs.logout()
-                    com.example.sheeps.core.utils.AuthEventBus.post(com.example.sheeps.core.utils.AuthEvent.Logout)
+                    AuthEventBus.post(AuthEvent.Logout)
                 }
             }
             response

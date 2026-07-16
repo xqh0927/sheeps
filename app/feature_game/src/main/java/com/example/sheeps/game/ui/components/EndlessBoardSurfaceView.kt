@@ -15,6 +15,8 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withClip
+import androidx.core.graphics.withSave
 import androidx.core.graphics.withTranslation
 import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
@@ -38,6 +40,26 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+
+    companion object {
+        // ==========================================
+        // 静态颜色常量（支持 Android Studio 颜色预览）
+        // ==========================================
+        /** 卡牌柔和投影颜色 */
+        private val COLOR_CARD_SHADOW = "#33000000".toColorInt()
+
+        /** 卡牌边缘细描边线颜色 */
+        private val COLOR_CARD_BORDER = "#E0E0E0".toColorInt()
+
+        /** 竖井外边缘描边线颜色 */
+        private val COLOR_BG_BORDER = "#CCCCCC".toColorInt()
+
+        /** 竖井背景渐变起始浅灰色 */
+        private val COLOR_BG_GRADIENT_START = "#F5F5F5".toColorInt()
+
+        /** 竖井背景渐变结束深灰色 */
+        private val COLOR_BG_GRADIENT_END = "#EEEEEE".toColorInt()
+    }
 
     /** 存储当前 6 列中每列的卡牌数据列表（从井底往井口排序） */
     private var columns: List<List<Tile>> = emptyList()
@@ -76,7 +98,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
 
     /** 卡牌柔和投影画笔，对齐 TileView 中 TileCardBase 的 Modifier.shadow(4.dp) 软阴影 */
     private val cardShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#33000000".toColorInt()
+        color = COLOR_CARD_SHADOW
         maskFilter = BlurMaskFilter(dpToPx(4f), BlurMaskFilter.Blur.NORMAL)
     }
 
@@ -84,7 +106,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = dpToPx(2f)
-        color = "#E0E0E0".toColorInt()
+        color = COLOR_CARD_BORDER
     }
 
     // ==========================================
@@ -97,11 +119,12 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     /** 卡牌边框圆角内补白（4dp） */
     private val pad = dpToPx(4f)
 
-    /** 竖井卡牌的圆角正方形像素边长（默认 48dp） */
-    private val tileSize = dpToPx(48f)
+    /** 竖井卡牌的圆角正方形像素边长（默认 48dp，由 updateData 动态重设） */
+    private var tileSize = dpToPx(48f)
 
     /** 纵向单格卡牌累加像素高度步长（tileSize + gap） */
-    private val verticalStep = tileSize + gap
+    private val verticalStep: Float
+        get() = tileSize + gap
 
     /** 竖井通道容器的计算像素高度 */
     private var totalColumnHeight = 0f
@@ -119,10 +142,9 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     private val bgBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = dpToPx(1f)
-        color = "#CCCCCC".toColorInt()
+        color = COLOR_BG_BORDER
     }
 
-    // Reusable drawing objects to avoid object allocation in onDraw loop
     private val bgRectF = RectF()
     private val tempRectF = RectF()
     private val tempShadowRectF = RectF()
@@ -166,6 +188,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         currentSkin: String,
         deathRow: Int,
         visibleLayers: Int,
+        tileSizePx: Float,
         flyingTileIds: Set<String> = emptySet(),
         tileGlobalPositions: MutableMap<String, androidx.compose.ui.geometry.Offset> = mutableMapOf(),
         onColumnClick: (Int, String) -> Unit
@@ -175,6 +198,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
             this.currentSkin = currentSkin
             this.deathRow = deathRow
             this.visibleLayers = visibleLayers
+            this.tileSize = tileSizePx
             this.flyingTileIds = flyingTileIds
             this.tileGlobalPositions = tileGlobalPositions
             this.onColumnClick = onColumnClick
@@ -291,7 +315,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         // 步骤 1：绘制竖井背景座
         bgRectF.set(offsetX, offsetY, offsetX + totalBoardWidth, offsetY + totalColumnHeight)
         val bgRadius = dpToPx(10f)
-        
+
         var shader = bgPaint.shader
         if (shader == null || lastOffsetX != offsetX || lastOffsetY != offsetY || lastTotalColumnHeight != totalColumnHeight) {
             lastOffsetX = offsetX
@@ -299,8 +323,8 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
             lastTotalColumnHeight = totalColumnHeight
             shader = LinearGradient(
                 offsetX, offsetY, offsetX, offsetY + totalColumnHeight,
-                "#F5F5F5".toColorInt(),
-                "#EEEEEE".toColorInt(),
+                COLOR_BG_GRADIENT_START,
+                COLOR_BG_GRADIENT_END,
                 Shader.TileMode.CLAMP
             )
             bgPaint.shader = shader
@@ -310,26 +334,25 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgBorderPaint)
 
         // 步骤 2：对准偏移行，迭代卡牌绘制
-        val saveCount = canvas.save()
-        canvas.clipRect(offsetX, offsetY, offsetX + totalBoardWidth, offsetY + totalColumnHeight)
-        canvas.withTranslation(offsetX, offsetY) {
-            columns.forEachIndexed { colIndex, colList ->
-                val colLeft = pad + colIndex * (tileSize + gap)
+        canvas.withClip(offsetX, offsetY, offsetX + totalBoardWidth, offsetY + totalColumnHeight) {
+            canvas.withTranslation(offsetX, offsetY) {
+                columns.forEachIndexed { colIndex, colList ->
+                    val colLeft = pad + colIndex * (tileSize + gap)
 
-                colList.forEachIndexed { i, tile ->
-                    if (tile.id !in flyingTileIds) {
-                        val animState = animStateMap[tile.id]
-                        val drawY = animState?.currentY ?: 0f
+                    colList.forEachIndexed { _, tile ->
+                        if (tile.id !in flyingTileIds) {
+                            val animState = animStateMap[tile.id]
+                            val drawY = animState?.currentY ?: 0f
 
-                        cardPaint.alpha = 255
-                        borderPaint.alpha = 255
+                            cardPaint.alpha = 255
+                            borderPaint.alpha = 255
 
-                        drawTile(this, tile, colLeft, drawY, tileSize)
+                            drawTile(this, tile, colLeft, drawY, tileSize)
+                        }
                     }
                 }
             }
         }
-        canvas.restoreToCount(saveCount)
         cardPaint.alpha = 255
         borderPaint.alpha = 255
     }
@@ -359,76 +382,88 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         canvas.drawRoundRect(tempShadowRectF, cornerRadius, cornerRadius, cardShadowPaint)
 
         // 2. 对卡牌本体、折线、图案进行圆角路径裁剪，以物理裁剪代替直角边缘
-        val saveCount = canvas.save()
-        tempClipPath.rewind()
-        tempClipPath.addRoundRect(rect, cornerRadius, cornerRadius, Path.Direction.CW)
-        canvas.clipPath(tempClipPath)
+        canvas.withSave {
+            tempClipPath.rewind()
+            tempClipPath.addRoundRect(rect, cornerRadius, cornerRadius, Path.Direction.CW)
+            canvas.clipPath(tempClipPath)
 
-        // 2.1 绘制卡牌底板
-        canvas.drawRect(rect, baseCardPaint)
+            // 2.1 绘制卡牌底板
+            canvas.drawRect(rect, baseCardPaint)
 
-        // 2.2 获取皮肤配置，绘制皮肤描边外框 + 四角 L 形折角装饰线
-        // 与 TileCardBase 保持一致：外框和装饰线都在 clipPath 内部绘制，2dp 描边外侧一半被裁剪，
-        // 实际可见约 1dp，避免无尽棋盘卡牌边框比 TileView 粗一倍。
-        val bColor = skinBorderColor
-        val dColor = skinDecorColor
-        val colors = if (bColor != null && dColor != null) {
-            SkinColors(bColor, dColor)
-        } else {
-            getSkinColors(context, currentSkin)
+            // 2.2 获取皮肤配置，绘制皮肤描边外框 + 四角 L 形折角装饰线
+            // 与 TileCardBase 保持一致：外框和装饰线都在 clipPath 内部绘制，2dp 描边外侧一半被裁剪，
+            // 实际可见约 1dp，避免无尽棋盘卡牌边框比 TileView 粗一倍。
+            val bColor = skinBorderColor
+            val dColor = skinDecorColor
+            val colors = if (bColor != null && dColor != null) {
+                SkinColors(bColor, dColor)
+            } else {
+                getSkinColors(context, currentSkin)
+            }
+            val strokeWidthPx = dpToPx(2f)
+
+            // 2.2.1 外边框（borderColor）
+            borderPaint.style = Paint.Style.STROKE
+            borderPaint.strokeWidth = strokeWidthPx
+            borderPaint.color = colors.borderColor
+            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
+
+            // 2.2.2 四角装饰折线（decorColor）
+            borderPaint.color = colors.decorColor
+
+            val decorLen = dpToPx(12f)
+            // 左上角
+            canvas.drawLine(rect.left, rect.top, rect.left, rect.top + decorLen, borderPaint)
+            canvas.drawLine(rect.left, rect.top, rect.left + decorLen, rect.top, borderPaint)
+            // 右上角
+            canvas.drawLine(rect.right - decorLen, rect.top, rect.right, rect.top, borderPaint)
+            canvas.drawLine(rect.right, rect.top, rect.right, rect.top + decorLen, borderPaint)
+            // 左下角
+            canvas.drawLine(rect.left, rect.bottom - decorLen, rect.left, rect.bottom, borderPaint)
+            canvas.drawLine(rect.left, rect.bottom, rect.left + decorLen, rect.bottom, borderPaint)
+            // 右下角
+            canvas.drawLine(
+                rect.right - decorLen,
+                rect.bottom,
+                rect.right,
+                rect.bottom,
+                borderPaint
+            )
+            canvas.drawLine(
+                rect.right,
+                rect.bottom,
+                rect.right,
+                rect.bottom - decorLen,
+                borderPaint
+            )
+
+            // 2.3 绘制卡牌图案（比例：普通牌缩进 5% 以对齐 TileView）
+            val bitmap = TileTextureLoader.getTileBitmap(context, currentSkin, tile.type) {
+                triggerRender()
+            }
+            val innerPadding = size * 0.05f
+            tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
+            tempDstRectF.set(
+                rect.left + innerPadding,
+                rect.top + innerPadding,
+                rect.right - innerPadding,
+                rect.bottom - innerPadding
+            )
+            canvas.drawBitmap(bitmap, tempSrcRect, tempDstRectF, cardPaint)
+
+            // 2.4 在 DEBUG 模式下，居中绘制红色 ID 和 Z 层以对齐 TileView.kt
+            if (BuildConfig.DEBUG) {
+                debugPaint.color = Color.RED
+                debugPaint.textSize = size * 0.18f
+                val cleanId = tile.id.removePrefix("tile_").removePrefix("endless_")
+                val yId = rect.top + size * 0.35f
+                canvas.drawText(cleanId, rect.centerX(), yId, debugPaint)
+
+                val yZ = rect.top + size * 0.65f
+                canvas.drawText("z${tile.z}", rect.centerX(), yZ, debugPaint)
+            }
+
         }
-        val strokeWidthPx = dpToPx(2f)
-
-        // 2.2.1 外边框（borderColor）
-        borderPaint.style = Paint.Style.STROKE
-        borderPaint.strokeWidth = strokeWidthPx
-        borderPaint.color = colors.borderColor
-        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
-
-        // 2.2.2 四角装饰折线（decorColor）
-        borderPaint.color = colors.decorColor
-
-        val decorLen = dpToPx(12f)
-        // 左上角
-        canvas.drawLine(rect.left, rect.top, rect.left, rect.top + decorLen, borderPaint)
-        canvas.drawLine(rect.left, rect.top, rect.left + decorLen, rect.top, borderPaint)
-        // 右上角
-        canvas.drawLine(rect.right - decorLen, rect.top, rect.right, rect.top, borderPaint)
-        canvas.drawLine(rect.right, rect.top, rect.right, rect.top + decorLen, borderPaint)
-        // 左下角
-        canvas.drawLine(rect.left, rect.bottom - decorLen, rect.left, rect.bottom, borderPaint)
-        canvas.drawLine(rect.left, rect.bottom, rect.left + decorLen, rect.bottom, borderPaint)
-        // 右下角
-        canvas.drawLine(rect.right - decorLen, rect.bottom, rect.right, rect.bottom, borderPaint)
-        canvas.drawLine(rect.right, rect.bottom, rect.right, rect.bottom - decorLen, borderPaint)
-
-        // 2.3 绘制卡牌图案（比例：普通牌缩进 5% 以对齐 TileView）
-        val bitmap = TileTextureLoader.getTileBitmap(context, currentSkin, tile.type) {
-            triggerRender()
-        }
-        val innerPadding = size * 0.05f
-        tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
-        tempDstRectF.set(
-            rect.left + innerPadding,
-            rect.top + innerPadding,
-            rect.right - innerPadding,
-            rect.bottom - innerPadding
-        )
-        canvas.drawBitmap(bitmap, tempSrcRect, tempDstRectF, cardPaint)
-
-        // 2.4 在 DEBUG 模式下，居中绘制红色 ID 和 Z 层以对齐 TileView.kt
-        if (BuildConfig.DEBUG) {
-            debugPaint.color = Color.RED
-            debugPaint.textSize = size * 0.18f
-            val cleanId = tile.id.removePrefix("tile_").removePrefix("endless_")
-            val yId = rect.top + size * 0.35f
-            canvas.drawText(cleanId, rect.centerX(), yId, debugPaint)
-
-            val yZ = rect.top + size * 0.65f
-            canvas.drawText("z${tile.z}", rect.centerX(), yZ, debugPaint)
-        }
-
-        canvas.restoreToCount(saveCount)
     }
 
     /**
@@ -492,5 +527,4 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         return dp * context.resources.displayMetrics.density
     }
 
-// Skin utilities moved to SkinUtils.kt
 }

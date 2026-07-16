@@ -41,11 +41,13 @@ fun getThemeColor(context: Context, attrRes: Int, fallbackColor: Int): Int {
  */
 fun getSkinColors(context: Context, skin: String): SkinColors {
     return when (skin.lowercase()) {
-        "shuang" -> SkinColors("#29B6F6".toColorInt(), "#FFFFCA28".toColorInt())
-        "electronic" -> SkinColors("#21D4FD".toColorInt(), "#B721FF".toColorInt())
-        "daily" -> SkinColors("#FFFF9800".toColorInt(), "#FFFFC107".toColorInt())
-        "vegetable" -> SkinColors("#4CAF50".toColorInt(), "#8BC34A".toColorInt())
-        "fruit" -> SkinColors("#FFFF5252".toColorInt(), "#FFFF8A80".toColorInt())
+        "shuang" -> SkinColors("#0288D1".toColorInt(), "#FBC02D".toColorInt())
+        "electronic" -> SkinColors("#00E5FF".toColorInt(), "#D500F9".toColorInt())
+        "daily" -> SkinColors("#FF6D00".toColorInt(), "#FFD600".toColorInt())
+        "vegetable" -> SkinColors("#2E7D32".toColorInt(), "#AEEA00".toColorInt())
+        "fruit" -> SkinColors("#D50000".toColorInt(), "#FF80AB".toColorInt())
+        "henan" -> SkinColors("#8D6E63".toColorInt(), "#FFB300".toColorInt())
+        "sichuan" -> SkinColors("#C62828".toColorInt(), "#00897B".toColorInt())
         else -> {
             val primaryColor = getThemeColor(context, android.R.attr.colorPrimary, "#6200EE".toColorInt())
             val secondaryColor = getThemeColor(context, android.R.attr.colorSecondary, "#FFD54F".toColorInt())
@@ -62,19 +64,23 @@ fun rememberTileCardBorderColors(skin: String): Pair<Int, Int> {
     val cs = MaterialTheme.colorScheme
     return remember(skin, cs.primary, cs.secondary) {
         val borderColor = when (skin.lowercase()) {
-            "shuang" -> Color(0xFF29B6F6)
-            "electronic" -> Color(0xFF21D4FD)
-            "daily" -> Color(0xFFFF9800)
-            "vegetable" -> Color(0xFF4CAF50)
-            "fruit" -> Color(0xFFFF5252)
+            "shuang" -> Color(0xFF0288D1)
+            "electronic" -> Color(0xFF00E5FF)
+            "daily" -> Color(0xFFFF6D00)
+            "vegetable" -> Color(0xFF2E7D32)
+            "fruit" -> Color(0xFFD50000)
+            "henan" -> Color(0xFF8D6E63)
+            "sichuan" -> Color(0xFFC62828)
             else -> cs.primary
         }
         val decorColor = when (skin.lowercase()) {
-            "shuang" -> Color(0xFFFFCA28)
-            "electronic" -> Color(0xFFB721FF)
-            "daily" -> Color(0xFFFFC107)
-            "vegetable" -> Color(0xFF8BC34A)
-            "fruit" -> Color(0xFFFF8A80)
+            "shuang" -> Color(0xFFFBC02D)
+            "electronic" -> Color(0xFFD500F9)
+            "daily" -> Color(0xFFFFD600)
+            "vegetable" -> Color(0xFFAEEA00)
+            "fruit" -> Color(0xFFFF80AB)
+            "henan" -> Color(0xFFFFB300)
+            "sichuan" -> Color(0xFF00897B)
             else -> cs.secondary
         }
         borderColor.toArgb() to decorColor.toArgb()

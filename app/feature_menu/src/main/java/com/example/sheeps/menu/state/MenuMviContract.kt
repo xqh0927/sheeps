@@ -156,8 +156,8 @@ sealed interface MenuViewEffect {
     ) : MenuViewEffect
     /** 导航并跳转至游戏 Activity */
     data class NavigateToGame(val levelId: Int, val carryItemsJson: String) : MenuViewEffect
-    /** 强制显示登录对话框 */
-    object ShowLoginDialog : MenuViewEffect
+    /** 强制去登录界面 */
+    object ShowLoginActivity : MenuViewEffect
     /** 显示存档冲突解决对话框 */
     data class ShowConflictDialog(
         val localPoints: Int,

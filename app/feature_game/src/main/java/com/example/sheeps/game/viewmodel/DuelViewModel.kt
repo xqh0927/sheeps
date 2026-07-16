@@ -142,9 +142,9 @@ class DuelViewModel @Inject constructor(
                 }
                 val tiles = calculateBlockedStates(sanitizedTiles)
                 val bounds = if (tiles.isEmpty()) {
-                    com.example.sheeps.game.state.BoardBounds()
+                    BoardBounds()
                 } else {
-                    com.example.sheeps.game.state.BoardBounds(
+                    BoardBounds(
                         minX = tiles.minOf { it.x },
                         maxX = tiles.maxOf { it.x },
                         minY = tiles.minOf { it.y },

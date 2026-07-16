@@ -126,7 +126,9 @@ data class GameViewState(
     /** 已通过门控解锁、可被点击解封的封印牌 id 集合 */
     val sealedUnlockedIds: Set<String> = emptySet(),
     /** 封印牌按 z 轴从大到小（自上而下）排序的解锁顺序 */
-    val sealedOrder: List<String> = emptyList()
+    val sealedOrder: List<String> = emptyList(),
+    /** 用户当前是否已登录 */
+    val isLoggedIn: Boolean = false
 )
 
 /**

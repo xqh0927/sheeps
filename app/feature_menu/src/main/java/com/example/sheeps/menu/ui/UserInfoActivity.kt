@@ -1,4 +1,4 @@
-package com.example.sheeps.menu
+package com.example.sheeps.menu.ui
 
 import android.graphics.Bitmap
 import android.net.Uri

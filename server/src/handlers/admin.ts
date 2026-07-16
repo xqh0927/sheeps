@@ -1124,7 +1124,28 @@ async function listLevels(request: Request, env: Env, url: URL): Promise<Respons
   const { page, pageSize, offset } = parsePaging(url);
   const totalRow = await env.DB.prepare('SELECT COUNT(*) as c FROM levels').bind().first<{ c: number }>();
   const rows = await env.DB.prepare(
-    'SELECT level_id, difficulty, created_at FROM levels ORDER BY rowid DESC LIMIT ? OFFSET ?'
+    `SELECT 
+       l.level_id, 
+       l.difficulty, 
+       l.created_at,
+       COALESCE(stats.attempts, 0) as attempts,
+       COALESCE(stats.avg_score, 0) as avg_score,
+       COALESCE(stats.total_items_used, 0) as total_items_used,
+       COALESCE(stats.avg_time_ms, 0) as avg_time_ms
+     FROM levels l
+     LEFT JOIN (
+       SELECT 
+         level_id, 
+         COUNT(*) as attempts, 
+         AVG(score) as avg_score, 
+         SUM(items_used) as total_items_used, 
+         AVG(clear_time_ms) as avg_time_ms
+       FROM leaderboard
+       WHERE game_mode = 0
+       GROUP BY level_id
+     ) stats ON l.level_id = stats.level_id
+     ORDER BY l.rowid DESC 
+     LIMIT ? OFFSET ?`
   )
     .bind(pageSize, offset)
     .all();

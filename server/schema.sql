@@ -156,6 +156,8 @@ CREATE TABLE leaderboard (
     score INTEGER NOT NULL,
     clear_time_ms INTEGER NOT NULL,
     game_mode INTEGER NOT NULL DEFAULT 0,
+    items_used INTEGER NOT NULL DEFAULT 0,
+    is_win INTEGER NOT NULL DEFAULT 1,
     achieved_at INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
@@ -244,8 +246,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_changes_change ON admin_audit_changes(chang
 
 -- 导入初始多语言配置数据
 INSERT INTO task (id, name, description, target_count, points_reward) VALUES 
-('PLAY_3_GAMES', '小试牛刀', '游玩3局游戏', 3, 20),
-('PLAY_5_GAMES', '大显身手', '游玩5局游戏', 5, 40),
+('WIN_3_GAMES', '小试牛刀', '成功过关3次', 3, 20),
+('WIN_5_GAMES', '大显身手', '成功过关5次', 5, 40),
 ('SIGN_IN_ONCE', '每日晨曦', '完成一次签到', 1, 10);
 
 INSERT INTO notice (title, content, type, created_at) VALUES 

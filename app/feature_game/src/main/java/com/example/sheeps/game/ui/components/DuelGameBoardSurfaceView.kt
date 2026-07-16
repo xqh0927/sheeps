@@ -22,6 +22,9 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withSave
+import androidx.core.graphics.withTranslation
+import androidx.core.graphics.withClip
 import com.example.sheeps.core.R
 import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
@@ -46,6 +49,41 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
+
+    companion object {
+        // ==========================================
+        // 静态颜色常量（支持 Android Studio 颜色预览）
+        // ==========================================
+        /** 卡牌柔和投影颜色 */
+        private val COLOR_CARD_SHADOW = Color.parseColor("#33000000")
+
+        /** DEBUG模式下被遮挡卡牌的高亮亮色 */
+        private val COLOR_MASK_DEBUG_LIGHT = "#ffffff".toColorInt()
+
+        /** 正常模式下被遮挡卡牌的半透明灰色蒙版 */
+        private val COLOR_MASK_NORMAL = "#30ffffff".toColorInt()
+
+        /** 棋盘底座外围细边框颜色 */
+        private val COLOR_BG_BORDER = "#DDDDDD".toColorInt()
+
+        /** 锁关卡半透明深灰背景底色 */
+        private val COLOR_GATE_BG = "#BB2C3E50".toColorInt()
+
+        /** 锁关卡发光金黄色细边框 */
+        private val COLOR_GATE_BORDER = "#F1C40F".toColorInt()
+
+        /** 封印层数气泡背景蓝色 */
+        private val COLOR_BUBBLE_BLUE = "#2980B9".toColorInt()
+
+        /** 迷雾大招全屏黑色面版遮盖颜色 */
+        private val COLOR_FOG_MASK = "#FA202020".toColorInt()
+
+        /** 棋盘背景渐变起始浅灰色 */
+        private val COLOR_BG_GRADIENT_START = "#F5F5F5".toColorInt()
+
+        /** 棋盘背景渐变结束深灰色 */
+        private val COLOR_BG_GRADIENT_END = "#EEEEEE".toColorInt()
+    }
 
     /** 核心多人联机对局状态快照，携带己方棋盘卡牌、分数、诅咒效果时长等属性 */
     private var state: DuelViewState? = null
@@ -72,7 +110,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
 
     /** 卡牌柔和投影画笔，对齐 TileView 中 TileCardBase 的 Modifier.shadow(4.dp) 软阴影 */
     private val cardShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#33000000".toColorInt()
+        color = COLOR_CARD_SHADOW
         maskFilter = BlurMaskFilter(dpToPx(4f), BlurMaskFilter.Blur.NORMAL)
     }
 
@@ -84,7 +122,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
 
     /** 卡牌被上层叠压时的置灰蒙版画笔 */
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (BuildConfig.DEBUG) "#ffffff".toColorInt() else "#30ffffff".toColorInt()
+        color = if (BuildConfig.DEBUG) COLOR_MASK_DEBUG_LIGHT else COLOR_MASK_NORMAL
     }
 
     /** 迷雾法术专用遮罩画笔 */
@@ -156,7 +194,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     private val bgBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = dpToPx(1f)
-        color = "#CCCCCC".toColorInt()
+        color = COLOR_BG_BORDER
     }
 
     // Reusable drawing objects to avoid object allocation in onDraw loop
@@ -180,30 +218,16 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     }
 
     private val gatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#BB2C3E50".toColorInt()
+        color = COLOR_GATE_BG
     }
 
     private val gateBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = "#F1C40F".toColorInt()
+        color = COLOR_GATE_BORDER
     }
 
     private val lockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER
-    }
-
-    private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = "#2980B9".toColorInt()
-    }
-
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textAlign = Paint.Align.CENTER
-        typeface = Typeface.DEFAULT_BOLD
-    }
-
-    init {
-        // 标准 View 初始化
     }
 
     /**
@@ -386,124 +410,122 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
         canvas.drawRoundRect(tempShadowRectF, cornerRadius, cornerRadius, cardShadowPaint)
 
         // 步骤 2：对卡牌本体、折线、图案、遮罩进行圆角路径裁剪，以物理裁剪代替直角边缘
-        val saveCount = canvas.save()
         tempClipPath.rewind()
         tempClipPath.addRoundRect(rect, cornerRadius, cornerRadius, Path.Direction.CW)
-        canvas.clipPath(tempClipPath)
+        canvas.withClip(tempClipPath) {
 
-        // 2.1 绘制卡牌亮白色圆角主体
-        canvas.drawRect(rect, baseCardPaint)
+            // 2.1 绘制卡牌亮白色圆角主体
+            canvas.drawRect(rect, baseCardPaint)
 
-        // 2.2 获取皮肤配置，绘制皮肤描边外框 + 四角 L 形折角装饰线
-        // 与 TileCardBase 保持一致：外框和装饰线都在 clipPath 内部绘制，2dp 描边外侧一半被裁剪，
-        // 实际可见约 1dp，避免对决棋盘卡牌边框比 TileView 粗一倍。
-        val bColor = skinBorderColor
-        val dColor = skinDecorColor
-        val colors = if (bColor != null && dColor != null) {
-            SkinColors(bColor, dColor)
-        } else {
-            getSkinColors(context, gameState.currentSkin)
-        }
-        val strokeWidthPx = dpToPx(2f) * scale
-
-        // 2.2.1 外边框（borderColor）
-        borderPaint.style = Paint.Style.STROKE
-        borderPaint.strokeWidth = strokeWidthPx
-        borderPaint.color = colors.borderColor
-        canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
-
-        // 2.2.2 四角装饰折线（decorColor）
-        borderPaint.color = colors.decorColor
-
-        val decorLen = dpToPx(12f) * scale
-        // 左上角
-        canvas.drawLine(rect.left, rect.top, rect.left, rect.top + decorLen, borderPaint)
-        canvas.drawLine(rect.left, rect.top, rect.left + decorLen, rect.top, borderPaint)
-        // 右上角
-        canvas.drawLine(rect.right - decorLen, rect.top, rect.right, rect.top, borderPaint)
-        canvas.drawLine(rect.right, rect.top, rect.right, rect.top + decorLen, borderPaint)
-        // 左下角
-        canvas.drawLine(rect.left, rect.bottom - decorLen, rect.left, rect.bottom, borderPaint)
-        canvas.drawLine(rect.left, rect.bottom, rect.left + decorLen, rect.bottom, borderPaint)
-        // 右下角
-        canvas.drawLine(rect.right - decorLen, rect.bottom, rect.right, rect.bottom, borderPaint)
-        canvas.drawLine(rect.right, rect.bottom, rect.right, rect.bottom - decorLen, borderPaint)
-
-        // 2.3 绘制内部图案（比例：普通牌缩进 5%，盲盒牌缩进 15% 以对齐 TileView）
-        val isBlind =
-            tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
-        if (isBlind) {
-            val innerPadding = size * 0.15f
-            tempSrcRect.set(0, 0, tileBackBitmap.width, tileBackBitmap.height)
-            tempDstRectF.set(
-                rect.left + innerPadding,
-                rect.top + innerPadding,
-                rect.right - innerPadding,
-                rect.bottom - innerPadding
-            )
-            canvas.drawBitmap(tileBackBitmap, tempSrcRect, tempDstRectF, cardPaint)
-        } else {
-            val bitmap = TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type) {
-                triggerRender()
+            // 2.2 获取皮肤配置，绘制皮肤描边外框 + 四角 L 形折角装饰线
+            // 与 TileCardBase 保持一致：外框和装饰线都在 clipPath 内部绘制，2dp 描边外侧一半被裁剪，
+            // 实际可见约 1dp，避免对决棋盘卡牌边框比 TileView 粗一倍。
+            val bColor = skinBorderColor
+            val dColor = skinDecorColor
+            val colors = if (bColor != null && dColor != null) {
+                SkinColors(bColor, dColor)
+            } else {
+                getSkinColors(context, gameState.currentSkin)
             }
-            val innerPadding = size * 0.05f
-            tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
-            tempDstRectF.set(
-                rect.left + innerPadding,
-                rect.top + innerPadding,
-                rect.right - innerPadding,
-                rect.bottom - innerPadding
+            val strokeWidthPx = dpToPx(2f) * scale
+
+            // 2.2.1 外边框（borderColor）
+            borderPaint.style = Paint.Style.STROKE
+            borderPaint.strokeWidth = strokeWidthPx
+            borderPaint.color = colors.borderColor
+            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
+
+            // 2.2.2 四角装饰折线（decorColor）
+            borderPaint.color = colors.decorColor
+
+            val decorLen = dpToPx(12f) * scale
+            // 左上角
+            canvas.drawLine(rect.left, rect.top, rect.left, rect.top + decorLen, borderPaint)
+            canvas.drawLine(rect.left, rect.top, rect.left + decorLen, rect.top, borderPaint)
+            // 右上角
+            canvas.drawLine(rect.right - decorLen, rect.top, rect.right, rect.top, borderPaint)
+            canvas.drawLine(rect.right, rect.top, rect.right, rect.top + decorLen, borderPaint)
+            // 左下角
+            canvas.drawLine(rect.left, rect.bottom - decorLen, rect.left, rect.bottom, borderPaint)
+            canvas.drawLine(rect.left, rect.bottom, rect.left + decorLen, rect.bottom, borderPaint)
+            // 右下角
+            canvas.drawLine(
+                rect.right - decorLen,
+                rect.bottom,
+                rect.right,
+                rect.bottom,
+                borderPaint
             )
-            canvas.drawBitmap(bitmap, tempSrcRect, tempDstRectF, cardPaint)
+            canvas.drawLine(
+                rect.right,
+                rect.bottom,
+                rect.right,
+                rect.bottom - decorLen,
+                borderPaint
+            )
+
+            // 2.3 绘制内部图案（比例：普通牌缩进 5%，盲盒牌缩进 15% 以对齐 TileView）
+            val isBlind =
+                tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
+            if (isBlind) {
+                val innerPadding = size * 0.15f
+                tempSrcRect.set(0, 0, tileBackBitmap.width, tileBackBitmap.height)
+                tempDstRectF.set(
+                    rect.left + innerPadding,
+                    rect.top + innerPadding,
+                    rect.right - innerPadding,
+                    rect.bottom - innerPadding
+                )
+                canvas.drawBitmap(tileBackBitmap, tempSrcRect, tempDstRectF, cardPaint)
+            } else {
+                val bitmap =
+                    TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type) {
+                        triggerRender()
+                    }
+                val innerPadding = size * 0.05f
+                tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
+                tempDstRectF.set(
+                    rect.left + innerPadding,
+                    rect.top + innerPadding,
+                    rect.right - innerPadding,
+                    rect.bottom - innerPadding
+                )
+                canvas.drawBitmap(bitmap, tempSrcRect, tempDstRectF, cardPaint)
+            }
+
+            // 2.4 在 DEBUG 模式下，居中绘制红色/蓝色 ID 和 Z 层以对齐 TileView.kt
+            if (BuildConfig.DEBUG) {
+                debugPaint.color = if (isBlocked) Color.BLUE else Color.RED
+                debugPaint.textSize = size * 0.18f
+                val cleanId = tile.id.removePrefix("tile_")
+                val yId = rect.top + size * 0.35f
+                canvas.drawText(cleanId, rect.centerX(), yId, debugPaint)
+
+                val yZ = rect.top + size * 0.65f
+                canvas.drawText("z${tile.z}", rect.centerX(), yZ, debugPaint)
+            }
+
+            // 2.5 被遮挡锁定变暗
+            if (isBlocked) {
+                canvas.drawRoundRect(rect, cornerRadius, cornerRadius, maskPaint)
+            }
+
+            // 2.6 状态三：封印锁（对决模式未解锁的封印牌，有黄金边框、灰蓝背景与🔒黄色锁头）
+            val isGateLocked = tile.sealedCount > 0
+            if (isGateLocked) {
+                canvas.drawRoundRect(rect, cornerRadius, cornerRadius, gatePaint)
+                gateBorderPaint.strokeWidth = dpToPx(1.5f) * scale
+                canvas.drawRoundRect(rect, cornerRadius, cornerRadius, gateBorderPaint)
+
+                // 绘制居中锁头黄锁图标 🔒
+                val lockText = "🔒"
+                lockPaint.textSize = size * 0.45f
+                val fontMetrics = lockPaint.fontMetrics
+                val baselineY = rect.centerY() - (fontMetrics.top + fontMetrics.bottom) / 2f
+                canvas.drawText(lockText, rect.centerX(), baselineY, lockPaint)
+            }
+
         }
-
-        // 2.4 在 DEBUG 模式下，居中绘制红色/蓝色 ID 和 Z 层以对齐 TileView.kt
-        if (BuildConfig.DEBUG) {
-            debugPaint.color = if (isBlocked) Color.BLUE else Color.RED
-            debugPaint.textSize = size * 0.18f
-            val cleanId = tile.id.removePrefix("tile_")
-            val yId = rect.top + size * 0.35f
-            canvas.drawText(cleanId, rect.centerX(), yId, debugPaint)
-
-            val yZ = rect.top + size * 0.65f
-            canvas.drawText("z${tile.z}", rect.centerX(), yZ, debugPaint)
-        }
-
-        // 2.5 被遮挡锁定变暗
-        if (isBlocked) {
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, maskPaint)
-        }
-
-        // 2.6 状态三：封印锁（对决模式未解锁的封印牌，有黄金边框、灰蓝背景与🔒黄色锁头）
-        val isGateLocked = tile.sealedCount > 0
-        if (isGateLocked) {
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, gatePaint)
-            gateBorderPaint.strokeWidth = dpToPx(1.5f) * scale
-            canvas.drawRoundRect(rect, cornerRadius, cornerRadius, gateBorderPaint)
-
-            // 绘制居中锁头黄锁图标 🔒
-            val lockText = "🔒"
-            lockPaint.textSize = size * 0.45f
-            val fontMetrics = lockPaint.fontMetrics
-            val baselineY = rect.centerY() - (fontMetrics.top + fontMetrics.bottom) / 2f
-            canvas.drawText(lockText, rect.centerX(), baselineY, lockPaint)
-        } else if (tile.sealedCount > 0) {
-            // 7. 状态四：已解除门控但仍存在剩余封印层数（绘制右上角蓝色圆形气泡）
-            val bubbleRadius = dpToPx(7f) * scale
-            val bubbleCenterX = rect.right - bubbleRadius / 2f
-            val bubbleCenterY = rect.top + bubbleRadius / 2f
-
-            canvas.drawCircle(bubbleCenterX, bubbleCenterY, bubbleRadius, bubblePaint)
-
-            // 绘制数字层数文本
-            val numText = tile.sealedCount.toString()
-            textPaint.textSize = bubbleRadius * 1.3f
-            val fontMetrics = textPaint.fontMetrics
-            val baselineY = bubbleCenterY - (fontMetrics.top + fontMetrics.bottom) / 2f
-            canvas.drawText(numText, bubbleCenterX, baselineY, textPaint)
-        }
-
-        canvas.restoreToCount(saveCount)
     }
 
 
@@ -525,21 +547,20 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
         val saveCount = canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), null)
         try {
             // 步骤 1：填充全屏幕的暗黑色大招迷雾遮盖罩
-            canvas.drawColor("#FA202020".toColorInt())
+            canvas.drawColor(COLOR_FOG_MASK)
 
             // 步骤 2：应用 DST_OUT 擦除混合，绘制手指拖拽位置的镂空光圈
             val offset = touchOffset
             val grad = fogGradient
             if (offset != null && grad != null) {
                 val radius = dpToPx(65f)
-                canvas.save()
-                canvas.translate(offset.x, offset.y)
-                fogOverlayPaint.shader = grad
-                fogOverlayPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
-                canvas.drawCircle(0f, 0f, radius, fogOverlayPaint)
-                fogOverlayPaint.xfermode = null
-                fogOverlayPaint.shader = null
-                canvas.restore()
+                canvas.withTranslation(offset.x, offset.y) {
+                    fogOverlayPaint.shader = grad
+                    fogOverlayPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+                    drawCircle(0f, 0f, radius, fogOverlayPaint)
+                    fogOverlayPaint.xfermode = null
+                    fogOverlayPaint.shader = null
+                }
             }
         } finally {
             canvas.restoreToCount(saveCount)
@@ -625,14 +646,14 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
             bgRectF.set(0f, 0f, surfaceWidth, surfaceHeight)
             bgPaint.shader = LinearGradient(
                 0f, 0f, 0f, surfaceHeight,
-                "#F5F5F5".toColorInt(),
-                "#EEEEEE".toColorInt(),
+                COLOR_BG_GRADIENT_START,
+                COLOR_BG_GRADIENT_END,
                 Shader.TileMode.CLAMP
             )
             val radius = dpToPx(65f)
             fogGradient = RadialGradient(
                 0f, 0f, radius,
-                intArrayOf(Color.TRANSPARENT, "#FA202020".toColorInt()),
+                intArrayOf(Color.TRANSPARENT, COLOR_FOG_MASK),
                 floatArrayOf(0f, 1f),
                 Shader.TileMode.CLAMP
             )
