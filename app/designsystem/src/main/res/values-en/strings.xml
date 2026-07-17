@@ -338,7 +338,6 @@
     <string name="toast_offline_fallback">Network error, loaded local offline data</string>
     <string name="toast_login_failed">Login failed</string>
     <string name="toast_login_failed_retry">Login failed, please try again later</string>
-    <string name="toast_network_error_retry">Network connection abnormal, please try again later</string>
     <string name="toast_register_success">Registration successful, please log in</string>
     <string name="toast_register_failed">Registration failed</string>
     <string name="toast_register_failed_retry">Registration failed, please try again later</string>

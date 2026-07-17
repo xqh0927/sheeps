@@ -308,7 +308,6 @@
     <string name="toast_offline_fallback">ネットワークエラー。ローカルのオフラインデータを読み込みました</string>
     <string name="toast_login_failed">ログインに失敗しました</string>
     <string name="toast_login_failed_retry">ログインに失敗しました。後で再試行してください</string>
-    <string name="toast_network_error_retry">ネットワーク接続エラー。後で再試行してください</string>
     <string name="toast_register_success">登録が完了しました。ログインしてください</string>
     <string name="toast_register_failed">登録に失敗しました</string>
     <string name="toast_register_failed_retry">登録に失敗しました。後で再試行してください</string>

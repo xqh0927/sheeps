@@ -312,7 +312,6 @@
     <string name="toast_offline_fallback">連接服務異常，已載入本地離線數據</string>
     <string name="toast_login_failed">登入失敗</string>
     <string name="toast_login_failed_retry">登入失敗，請稍後重試</string>
-    <string name="toast_network_error_retry">網路連接異常，請稍後重試</string>
     <string name="toast_register_success">註冊成功，請登入</string>
     <string name="toast_register_failed">註冊失敗</string>
     <string name="toast_register_failed_retry">註冊失敗，請稍後重試</string>

@@ -509,7 +509,7 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
+                setEffect(MenuViewEffect.ShowToast(resId = com.example.sheeps.data.R.string.toast_network_error_retry))
             }
         }
     }
@@ -552,7 +552,7 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
+                setEffect(MenuViewEffect.ShowToast(resId = com.example.sheeps.data.R.string.toast_network_error_retry))
             }
         }
     }
@@ -580,7 +580,7 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
+                setEffect(MenuViewEffect.ShowToast(resId = com.example.sheeps.data.R.string.toast_network_error_retry))
             }
         }
     }
@@ -611,7 +611,7 @@ class MenuViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 updateState { copy(isLoading = false) }
-                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_network_error_retry))
+                setEffect(MenuViewEffect.ShowToast(resId = com.example.sheeps.data.R.string.toast_network_error_retry))
             }
         }
     }

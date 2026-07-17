@@ -182,7 +182,7 @@ class LoginActivity : BaseActivity() {
                 Toaster.show(parseAuthError(e, getString(R.string.toast_login_failed_retry)))
             } catch (e: Exception) {
                 setLoading(false)
-                Toaster.show(getString(R.string.toast_network_error_retry))
+                Toaster.show(getString(com.example.sheeps.data.R.string.toast_network_error_retry))
             }
         }
     }

@@ -29,8 +29,6 @@ dependencies {
     implementation(project(":lib_network"))
     // 基座（MMKV / Hilt / 基础工具）
     implementation(project(":lib_base"))
-    // 设计系统（ErrorMessageMapper 引用的 ui.R 字符串资源）
-    implementation(project(":designsystem"))
 
     // Room 本地仓储
     implementation(libs.androidx.room.runtime)

@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="toast_network_error">网络连接异常，请稍后重试</string>
+    <string name="toast_login_expired">登录已过期，请重新登录</string>
+    <string name="toast_business_failed">操作失败，请稍后重试</string>
+    <string name="toast_server_error">服务器开小差了，请稍后重试</string>
+    <string name="toast_network_error_retry">ネットワーク接続エラー。後で再試行してください</string>
+</resources>

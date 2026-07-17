@@ -312,7 +312,6 @@
     <string name="toast_offline_fallback">네트워크 오류가 발생하여 로컬 오프라인 데이터를 불러왔습니다</string>
     <string name="toast_login_failed">로그인 실패</string>
     <string name="toast_login_failed_retry">로그인에 실패했습니다. 나중에 다시 시도하십시오</string>
-    <string name="toast_network_error_retry">네트워크 연결 상태가 불안정합니다. 나중에 다시 시도하십시오</string>
     <string name="toast_register_success">회원가입 성공, 로그인해 주십시오</string>
     <string name="toast_register_failed">회원가입 실패</string>
     <string name="toast_register_failed_retry">회원가입에 실패했습니다. 나중에 다시 시도하십시오</string>

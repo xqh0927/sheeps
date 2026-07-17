@@ -353,7 +353,6 @@
     <string name="toast_offline_fallback">连接服务异常，已载入本地离线数据</string>
     <string name="toast_login_failed">登录失败</string>
     <string name="toast_login_failed_retry">登录失败，请稍后重试</string>
-    <string name="toast_network_error_retry">网络连接异常，请稍后重试</string>
     <string name="toast_register_success">注册成功，请登录</string>
     <string name="toast_register_failed">注册失败</string>
     <string name="toast_register_failed_retry">注册失败，请稍后重试</string>
@@ -495,10 +494,4 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
-    <!-- 统一错误闸门（ApiResult.Error.code → 文案，ErrorMessageMapper 使用） -->
-    <string name="toast_network_error">网络连接异常，请稍后重试</string>
-    <string name="toast_login_expired">登录已过期，请重新登录</string>
-    <string name="toast_business_failed">操作失败，请稍后重试</string>
-    <string name="toast_server_error">服务器开小差了，请稍后重试</string>
-
 </resources>
