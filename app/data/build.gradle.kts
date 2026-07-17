@@ -47,4 +47,6 @@ dependencies {
     // 日志 & 存储（data 层使用）
     implementation(libs.logutils.pengwei)
     implementation(libs.mmkv)
+    // 敏感凭据加密存储（UserPreferences 用 EncryptedSharedPreferences / MasterKey）
+    implementation(libs.androidx.security.crypto)
 }
