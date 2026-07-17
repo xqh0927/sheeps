@@ -34,9 +34,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.core.R
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.ui.R
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.core.utils.AuthEvent
 import com.example.sheeps.core.utils.AuthEventBus
 import com.example.sheeps.core.utils.NetworkStatus
@@ -56,8 +56,8 @@ import com.example.sheeps.menu.ui.screens.GameHomeScreen
 import com.example.sheeps.menu.ui.screens.PersonalScreen
 import com.example.sheeps.menu.ui.screens.ShopScreen
 import com.example.sheeps.menu.viewmodel.MenuViewModel
-import com.example.sheeps.theme.Overlay_Dark_Medium
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.theme.Overlay_Dark_Medium
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.example.sheeps.ui.components.ConfirmDialog
 import com.example.sheeps.ui.components.SheepsLoading
 import com.hjq.toast.Toaster

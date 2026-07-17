@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.data.model.Notice
 import com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog

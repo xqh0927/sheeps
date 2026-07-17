@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 头像来源选择对话框（基于 Material [AlertDialog]）。

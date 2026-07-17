@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import kotlinx.coroutines.delay
 
 /**

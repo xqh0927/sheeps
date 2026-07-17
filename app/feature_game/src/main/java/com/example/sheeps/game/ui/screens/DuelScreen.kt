@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.core.game.GameEngine
@@ -35,7 +35,7 @@ import com.example.sheeps.game.state.*
 import com.example.sheeps.game.ui.components.*
 import com.example.sheeps.game.ui.dialogs.DuelExitDialog
 import com.example.sheeps.game.ui.dialogs.DuelResultDialog
-import com.example.sheeps.theme.*
+import com.example.sheeps.ui.theme.*
 import com.example.sheeps.ui.components.*
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.sheeps.game.ui.components.DuelGameBoardSurfaceView

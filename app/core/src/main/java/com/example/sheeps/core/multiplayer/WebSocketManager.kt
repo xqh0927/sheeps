@@ -1,6 +1,6 @@
 package com.example.sheeps.core.multiplayer
 
-import com.example.sheeps.core.AppConfig
+import com.example.sheeps.lib_network.AppConfig
 import com.example.sheeps.core.multiplayer.model.GameCommand
 import com.apkfuns.logutils.LogUtils
 import kotlinx.coroutines.*

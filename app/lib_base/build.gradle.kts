@@ -43,8 +43,8 @@ dependencies {
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.ui.tooling.preview)
     api(libs.androidx.compose.material3)
-    api("androidx.compose.material:material-icons-core")
-    api("androidx.compose.material:material-icons-extended")
+    api(libs.androidx.compose.icons.core)
+    api(libs.androidx.compose.icons.extended)
 
     // TheRouter
     api(libs.therouter)
@@ -52,8 +52,7 @@ dependencies {
     // MMKV
     api(libs.mmkv)
 
-    // Logcat & Toaster & Common Utils
-    api(libs.logcat)
+    // Toaster & Common Utils（logcat 死依赖已删除，日志统一使用 com.apkfuns.logutils.LogUtils）
     api(libs.toaster)
     api(libs.utilcode)
 

@@ -29,7 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import com.example.sheeps.core.multiplayer.WebSocketManager
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.DuelViewState

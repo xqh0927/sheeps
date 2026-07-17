@@ -7,13 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.sheeps.core.AppConfig
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.lib_network.AppConfig
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.GameGuideDialog
 import com.example.sheeps.menu.ui.screens.SettingsScreen
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.tencent.mmkv.MMKV
 import com.therouter.TheRouter
 import com.therouter.router.Route

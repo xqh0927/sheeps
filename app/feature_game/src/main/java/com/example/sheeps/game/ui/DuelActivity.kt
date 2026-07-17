@@ -11,14 +11,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.core.base.collectWithLifecycle
+import com.example.sheeps.lib_base.base.collectWithLifecycle
 import com.therouter.router.Route
-import com.example.sheeps.core.base.BaseActivity
+import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.game.state.DuelViewEffect
 import com.example.sheeps.game.state.DuelViewIntent
 import com.example.sheeps.game.ui.screens.DuelScreen
 import com.example.sheeps.game.viewmodel.DuelViewModel
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -102,6 +102,6 @@ class DuelActivity : BaseActivity() {
     }
 
     override fun getOverrideThemeResId(): Int {
-        return com.example.sheeps.theme.ThemeManager.getThemeResId()
+        return com.example.sheeps.ui.theme.ThemeManager.getThemeResId()
     }
 }

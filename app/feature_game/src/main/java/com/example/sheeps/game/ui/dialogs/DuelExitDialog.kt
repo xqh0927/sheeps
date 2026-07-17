@@ -9,7 +9,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 退出确认对话框（对决模式）。

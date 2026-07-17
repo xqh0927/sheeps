@@ -48,8 +48,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.core.AppConfig
-import com.example.sheeps.core.R
+import com.example.sheeps.lib_network.AppConfig
+import com.example.sheeps.ui.R
 import com.example.sheeps.ui.components.SheepsLoading
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.hjq.toast.Toaster

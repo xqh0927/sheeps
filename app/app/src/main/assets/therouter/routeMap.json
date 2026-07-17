@@ -1,7 +1,7 @@
 [
   {
     "path": "/splash/entry",
-    "className": "com.example.sheeps.splash.SplashActivity",
+    "className": "com.example.sheeps.splash.ui.SplashActivity",
     "action": "",
     "description": "",
     "params": {}

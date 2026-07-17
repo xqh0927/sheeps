@@ -21,10 +21,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.theme.*
+import com.example.sheeps.ui.theme.*
 import com.example.sheeps.ui.components.*
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 游戏结果覆盖层组件（胜利或失败弹窗）。

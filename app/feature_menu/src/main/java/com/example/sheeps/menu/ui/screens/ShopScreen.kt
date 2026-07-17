@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.ShopItemCard
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems

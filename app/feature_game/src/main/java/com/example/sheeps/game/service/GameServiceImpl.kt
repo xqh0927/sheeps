@@ -1,7 +1,7 @@
 package com.example.sheeps.game.service
 
-import com.example.sheeps.core.base.IGameService
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.lib_base.service.IGameService
+import com.example.sheeps.data.preference.UserPreferences
 import javax.inject.Inject
 import javax.inject.Singleton
 

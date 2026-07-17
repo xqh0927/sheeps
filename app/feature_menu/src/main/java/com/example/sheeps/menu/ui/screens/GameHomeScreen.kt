@@ -32,8 +32,8 @@ import com.example.sheeps.menu.ui.components.EndlessIntroDialog
 import com.example.sheeps.menu.ui.components.EndlessModeEntry
 import com.example.sheeps.menu.ui.components.LevelItemRow
 import com.example.sheeps.menu.ui.dialogs.DuelMatchDialog
-import com.example.sheeps.theme.*
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.theme.*
+import com.example.sheeps.ui.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import com.hjq.toast.Toaster

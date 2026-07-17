@@ -1,6 +1,6 @@
 package com.example.sheeps.game.state
 
-import com.example.sheeps.core.game.SkinConstants
+import com.example.sheeps.data.game.SkinConstants
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.model.Tile
 

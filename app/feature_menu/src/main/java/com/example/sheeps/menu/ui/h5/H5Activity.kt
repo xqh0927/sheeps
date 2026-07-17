@@ -24,8 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
