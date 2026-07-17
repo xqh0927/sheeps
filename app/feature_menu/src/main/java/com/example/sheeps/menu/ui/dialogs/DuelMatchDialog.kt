@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.delay
 

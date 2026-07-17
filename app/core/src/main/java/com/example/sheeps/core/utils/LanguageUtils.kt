@@ -2,7 +2,7 @@ package com.example.sheeps.core.utils
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.data.model.ShopItem
 
 /**

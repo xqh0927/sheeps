@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.DuelViewState
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 
 /** 将法术 key（FOG/SILENCE/SHUFFLE/SHRINK/SEAL_ALL）本地化为展示名称，复用 R.string 多语言资源。 */
 @Composable

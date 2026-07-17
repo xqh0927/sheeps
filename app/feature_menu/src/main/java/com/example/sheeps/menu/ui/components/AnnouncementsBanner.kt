@@ -38,10 +38,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Notice
-import com.example.sheeps.ui.theme.ShapeMedium
-import com.example.sheeps.ui.theme.ShapeSmall
+import com.example.sheeps.theme.ShapeMedium
+import com.example.sheeps.theme.ShapeSmall
 import kotlinx.coroutines.delay
 
 /**

@@ -37,11 +37,7 @@ kapt {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":lib_base"))
-    implementation(project(":lib_network"))
     implementation(libs.therouter)
-    implementation(libs.logutils.pengwei)
-    implementation(libs.xxpermissions)
     kapt(libs.therouter.apt)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.lib_base.base.collectWithLifecycle
+import com.example.sheeps.core.base.collectWithLifecycle
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
@@ -13,11 +13,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.therouter.router.Route
-import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.game.state.GameViewIntent
 import com.example.sheeps.game.ui.screens.GameScreen
 import com.example.sheeps.game.viewmodel.GameViewModel
-import com.example.sheeps.ui.theme.SheepsTheme
+import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 
 /**
@@ -74,7 +74,7 @@ class GameActivity : BaseActivity() {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
                                 com.therouter.TheRouter.build("/auth/login")
                                     .navigation(this@GameActivity)
-                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
                             } else {
                                 viewModel.sendIntent(GameViewIntent.Revive)
                             }
@@ -87,7 +87,7 @@ class GameActivity : BaseActivity() {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
                                 com.therouter.TheRouter.build("/auth/login")
                                     .navigation(this@GameActivity)
-                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
                             } else {
                                 viewModel.sendIntent(GameViewIntent.RestartLevel)
                             }
@@ -98,7 +98,7 @@ class GameActivity : BaseActivity() {
                             if (nextLvl > 3 && !state.isLoggedIn) {
                                 com.therouter.TheRouter.build("/auth/login")
                                     .navigation(this@GameActivity)
-                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
                             } else {
                                 viewModel.sendIntent(GameViewIntent.LoadLevel(nextLvl, null))
                             }
@@ -107,7 +107,7 @@ class GameActivity : BaseActivity() {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
                                 com.therouter.TheRouter.build("/auth/login")
                                     .navigation(this@GameActivity)
-                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
+                                com.hjq.toast.Toaster.show(getString(com.example.sheeps.core.R.string.toast_login_required_level))
                             } else {
                                 com.therouter.TheRouter.build("/leaderboard/show")
                                     .withInt("levelId", state.currentLevelId)
@@ -174,6 +174,6 @@ class GameActivity : BaseActivity() {
     }
 
     override fun getOverrideThemeResId(): Int {
-        return com.example.sheeps.ui.theme.ThemeManager.getThemeResId()
+        return com.example.sheeps.theme.ThemeManager.getThemeResId()
     }
 }

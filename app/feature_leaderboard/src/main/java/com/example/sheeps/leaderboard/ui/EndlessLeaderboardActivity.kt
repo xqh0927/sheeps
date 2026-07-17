@@ -29,13 +29,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.apkfuns.logutils.LogUtils
-import com.example.sheeps.ui.R
-import com.example.sheeps.lib_base.base.BaseActivity
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.R
+import com.example.sheeps.core.base.BaseActivity
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.ui.components.SheepsTopAppBar
-import com.example.sheeps.ui.theme.SheepsTheme
+import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint

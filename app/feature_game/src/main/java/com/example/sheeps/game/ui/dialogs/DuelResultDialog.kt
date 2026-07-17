@@ -18,7 +18,7 @@ import com.example.sheeps.game.state.DuelViewState
 import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.ui.components.PrimaryButton
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 
 /**
  * 对决模式结算对话框。

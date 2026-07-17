@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 
 /**
  * 昵称编辑对话框（基于 Material [AlertDialog]）。

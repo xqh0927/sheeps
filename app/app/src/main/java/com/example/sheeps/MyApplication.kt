@@ -11,9 +11,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
-import com.example.sheeps.lib_base.base.BaseActivityThemeDelegate
-import com.example.sheeps.data.utils.NetworkMonitor
-import com.example.sheeps.ui.theme.ThemeManager
+import com.example.sheeps.core.base.BaseActivityThemeDelegate
+import com.example.sheeps.core.utils.NetworkMonitor
+import com.example.sheeps.theme.ThemeManager
 import com.example.sheeps.data.repository.SyncRepository
 import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp

@@ -38,16 +38,7 @@ kapt {
 
 dependencies {
     implementation(project(":core"))
-    implementation(project(":lib_base"))
-    implementation(project(":lib_network"))
     implementation(libs.therouter)
-    implementation(libs.kotlinx.serialization.json)
-    // 以下依赖原本由 :core 以 api 透传，收紧后归还给真正使用它们的 feature
-    implementation(libs.retrofit)
-    implementation(libs.okhttp)
-    implementation(libs.coil)
-    implementation(libs.coil.compose)
-    implementation(libs.lifecycle.process)
     kapt(libs.therouter.apt)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

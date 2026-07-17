@@ -18,10 +18,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.ui.theme.AppTheme
-import com.example.sheeps.ui.theme.ThemeManager
+import com.example.sheeps.theme.AppTheme
+import com.example.sheeps.theme.ThemeManager
 
 /**
  * 语言设置卡片组件

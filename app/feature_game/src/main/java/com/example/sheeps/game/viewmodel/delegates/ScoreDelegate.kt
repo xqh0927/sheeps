@@ -1,6 +1,6 @@
 package com.example.sheeps.game.viewmodel.delegates
 
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.ScoreRequest
 import com.example.sheeps.data.network.ApiService

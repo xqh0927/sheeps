@@ -1,10 +1,10 @@
 package com.example.sheeps.core.di
 
 import com.example.sheeps.data.network.ApiService
-import com.example.sheeps.lib_network.AppConfig
+import com.example.sheeps.core.AppConfig
 import com.example.sheeps.core.BuildConfig
-import com.example.sheeps.data.preference.UserPreferences
-import com.example.sheeps.lib_network.network.EncryptionInterceptor
+import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.core.network.EncryptionInterceptor
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.core.utils.AuthEvent
 import com.example.sheeps.core.utils.AuthEventBus
@@ -90,6 +90,84 @@ object NetworkModule {
             chain.proceed(builder.build())
         }
 
+        // 4. 双 Token 静默刷新拦截器（带线程同步锁）：
+        // 监听 HTTP 401 错误。如果 AccessToken 过期，会在同步锁内挂起并发请求，并使用 RefreshToken 发起静默刷新；
+        // 刷新成功后自动保存新 Token，并静默重试原始请求。若刷新失败则强行执行本地 Logout。
+        // 注意：下方 synchronized(this) 锁定的是 NetworkModule 单例对象（进程级全局静态锁），
+        // 并发 401 刷新会在此串行化；仅在 401 时触发且频率低，可接受，但锁内不应执行额外耗时阻塞。
+        val tokenRefreshInterceptor = Interceptor { chain ->
+            val request = chain.request()
+            var response = chain.proceed(request)
+
+            if (response.code == 401 && !request.url.toString().contains("/api/auth/refresh")) {
+                synchronized(this) {
+                    val currentToken = prefs.getToken()
+                    val requestToken = request.header("Authorization")?.removePrefix("Bearer ")
+
+                    // 锁并发优化：如果另一个并发网络请求线程已经率先刷新了 Token，当前线程直接读新 Token 重试
+                    if (currentToken != requestToken && currentToken != null) {
+                        response.close()
+                        val newRequest = request.newBuilder()
+                            .header("Authorization", "Bearer $currentToken")
+                            .build()
+                        response = chain.proceed(newRequest)
+                        return@Interceptor response
+                    }
+
+                    val refreshToken = prefs.getRefreshToken()
+                    if (refreshToken == null) {
+                        prefs.logout()
+                     AuthEventBus.post(AuthEvent.Logout)
+                        return@Interceptor response
+                    }
+
+                    try {
+                        // 始终使用独立的 OkHttpClient 实例发起刷新请求以避免 Dispatcher 主机限制下的死锁 (maxRequestsPerHost)
+                        val client = OkHttpClient.Builder()
+                            .connectTimeout(10, TimeUnit.SECONDS)
+                            .readTimeout(10, TimeUnit.SECONDS)
+                            .writeTimeout(10, TimeUnit.SECONDS)
+                            .build()
+                        val mediaType = "application/json".toMediaType()
+                        val requestBody =
+                            "{\"refreshToken\":\"$refreshToken\"}".toRequestBody(mediaType)
+                        val refreshUrl =
+                            request.url.newBuilder().encodedPath("/api/auth/refresh").build()
+                        val refreshRequest = okhttp3.Request.Builder()
+                            .url(refreshUrl)
+                            .method("POST", requestBody)
+                            .build()
+                        val rawResponse = client.newCall(refreshRequest).execute()
+                        val refreshRes = if (rawResponse.isSuccessful) {
+                            val bodyStr = rawResponse.body?.string() ?: ""
+                            json.decodeFromString<com.example.sheeps.data.model.RefreshResponse>(bodyStr)
+                        } else {
+                            null
+                        }
+
+                        if (refreshRes != null && refreshRes.success && refreshRes.token != null) {
+                            prefs.setToken(refreshRes.token)
+                            prefs.setRefreshToken(refreshRes.refreshToken)
+
+                            response.close()
+                            val newRequest = request.newBuilder()
+                                .header("Authorization", "Bearer ${refreshRes.token}")
+                                .build()
+                            response = chain.proceed(newRequest)
+                            return@Interceptor response
+                        }
+                    } catch (e: Exception) {
+                        LogUtils.e("刷新 Token 失败", e)
+                    }
+
+                    // 刷新失败，强制退出登录
+                    prefs.logout()
+                    AuthEventBus.post(AuthEvent.Logout)
+                }
+            }
+            response
+        }
+
         // 5. 加密拦截器：请求体加密 + 响应体解密
         val encryptionInterceptor = EncryptionInterceptor()
 
@@ -147,6 +225,7 @@ object NetworkModule {
             })
             .addInterceptor(languageInterceptor)
             .addInterceptor(authInterceptor)
+            .addInterceptor(tokenRefreshInterceptor)
             .addInterceptor(encryptionInterceptor)
             .addInterceptor(weakNetworkRetryInterceptor)
             .addInterceptor(loggingInterceptor)

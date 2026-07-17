@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.model.ScoreRequest
 import com.example.sheeps.data.network.ApiService
 import dagger.assisted.Assisted

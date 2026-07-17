@@ -24,12 +24,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.ui.theme.Text_Disabled_Dark
-import com.example.sheeps.ui.theme.Text_Secondary_Dark
+import com.example.sheeps.theme.Text_Disabled_Dark
+import com.example.sheeps.theme.Text_Secondary_Dark
 import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.core.game.TileIconProvider
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.getLocalizedItemName
 
 /**

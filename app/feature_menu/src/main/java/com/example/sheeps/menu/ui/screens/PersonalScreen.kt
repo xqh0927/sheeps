@@ -15,7 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.*
 import com.example.sheeps.menu.ui.dialogs.ExchangeHistoryDialog

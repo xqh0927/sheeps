@@ -1,6 +1,6 @@
 package com.example.sheeps.game.ui.components
 
-import com.example.sheeps.data.game.SkinConstants
+import com.example.sheeps.core.game.SkinConstants
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.apkfuns.logutils.LogUtils
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileCardBase
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.Tile

@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.core.utils.getLocalizedItemName
 import com.example.sheeps.core.utils.getLocalizedItemDesc

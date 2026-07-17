@@ -1,17 +1,18 @@
 package com.example.sheeps.menu.viewmodel.delegates
 
-import com.example.sheeps.ui.R
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.R
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.local.UserProgressEntity
 import com.example.sheeps.data.model.LoginRequest
 import com.example.sheeps.data.model.LoginResponse
-import com.example.sheeps.data.repository.UserRepository
-import com.example.sheeps.data.result.ApiResult
-import com.example.sheeps.data.result.ErrorMessageMapper
+import com.example.sheeps.data.model.SendCodeRequest
+import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.state.MenuViewEffect
+import com.apkfuns.logutils.LogUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,28 +21,23 @@ import javax.inject.Inject
  * 用户认证逻辑委派类
  * 处理登录、登出、验证码发送、存档冲突解决。
  *
- * 重构要点（方案 2 / 统一错误闸门）：
- * - 改注入 [UserRepository]，不再直注 [com.example.sheeps.data.network.ApiService] 与
- *   [com.example.sheeps.data.repository.SyncRepository]（消除 delegate 直注 Repo 特例）。
- * - 网络结果统一经 [ApiResult] 分发：`when(result) { is ApiResult.Success -> ... is ApiResult.Error -> ... }`，
- *   **不再出现包裹网络调用的 `try/catch(Exception)`**；仅 `handleResolveConflict` 的本地 DB 写入
- *   保留 `try/finally` 做清理（不属于网络调用）。
- * - 错误文案统一经 [ErrorMessageMapper.toResId]，delegate 不再硬编码 Toast 字符串。
- *
- * 持有关系：由 [com.example.sheeps.menu.viewmodel.MenuViewModel] 通过 Hilt 注入并持有。
+ * 持有关系：由 [com.example.sheeps.menu.viewmodel.MenuViewModel] 通过 Hilt 注入并持有，
+ * 专门负责认证相关的子状态（登录态、登出、验证码、本地/云端存档冲突）。
  * 线程边界：所有公开方法均接收调用方传入的 [CoroutineScope]（实为 MenuViewModel.viewModelScope），
  * 网络请求在挂起函数内自动切到 IO；作用域随 ViewModel 销毁而取消，委派类本身不创建独立协程作用域。
  */
 class AuthDelegate @Inject constructor(
-    private val userRepository: UserRepository,
+    private val apiService: ApiService,
     private val prefs: UserPreferences,
-    private val localDao: LocalDao
+    private val localDao: LocalDao,
+    private val syncRepository: SyncRepository
 ) {
     /**
      * 发送短信验证码。
      * @param scope 调用方协程作用域（MenuViewModel.viewModelScope），退出登录/页面切换时自动取消。
      * @param phone 手机号，长度非 11 位直接在 UI 线程拦截并回调错误 Effect，不发起请求。
      * @param setEffect 向 UI 派发一次性副作用（成功 / 失败 Toast）的回调。
+     * 线程边界：参数校验在主线程；[apiService.sendCode] 挂起函数在 IO 线程执行。
      */
     fun handleSendSmsCode(
         scope: CoroutineScope,
@@ -53,20 +49,16 @@ class AuthDelegate @Inject constructor(
             return
         }
         scope.launch {
-            when (val result = userRepository.sendCode(phone)) {
-                is ApiResult.Success -> {
-                    // 业务成功（Repository 已把 !success 转为 Error，故此处 data.success 恒为 true）
-                    val resp = result.data
-                    setEffect(
-                        MenuViewEffect.ShowToast(
-                            resId = R.string.toast_send_code_success,
-                            formatArgs = listOf(resp.code ?: "")
-                        )
-                    )
+            try {
+                val response = apiService.sendCode(SendCodeRequest(phone))
+                if (response.success) {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_success, formatArgs = listOf(response.code ?: "")))
+                } else {
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_failed))
                 }
-                is ApiResult.Error -> setEffect(
-                    MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code))
-                )
+            } catch (e: Exception) {
+                LogUtils.e("sendCode失败", e)
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_network_error))
             }
         }
     }
@@ -80,6 +72,7 @@ class AuthDelegate @Inject constructor(
      * @param onConflict 本地与云端数据不一致时的回调，参数依次为 (响应, 本地积分, 本地关卡, 云端积分, 云端关卡)。
      * @param setLoading 控制 UI 加载态的回调。
      * @param setEffect 派发一次性副作用（校验失败 / 验证码错误 Toast）。
+     * 线程边界：UI 线程做参数校验与 setLoading(true)；[apiService.login] 在 IO 线程。
      */
     fun handleLoginWithCode(
         scope: CoroutineScope,
@@ -96,9 +89,9 @@ class AuthDelegate @Inject constructor(
         }
         setLoading(true)
         scope.launch {
-            when (val result = userRepository.login(LoginRequest(phone, code, device_uuid = prefs.getUserId()))) {
-                is ApiResult.Success -> {
-                    val response = result.data
+            try {
+                val response = apiService.login(LoginRequest(phone, code, device_uuid = prefs.getUserId()))
+                if (response.success) {
                     val localPoints = prefs.getPoints()
                     val localLevel = prefs.getUnlockedLevel()
                     val cloudPoints = response.user.points
@@ -109,11 +102,13 @@ class AuthDelegate @Inject constructor(
                     } else {
                         onSuccess(response)
                     }
-                }
-                is ApiResult.Error -> {
+                } else {
                     setLoading(false)
-                    setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
+                    setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_login_verification_failed))
                 }
+            } catch (e: Exception) {
+                setLoading(false)
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_code_invalid_or_expired))
             }
         }
     }
@@ -126,9 +121,7 @@ class AuthDelegate @Inject constructor(
      * @param onComplete 处理完成（含成功/失败）后的回调，通常用于重新拉取数据。
      * @param setLoading 控制 UI 加载态。
      * @param setEffect 派发「本地/云端解决成功」或「解决失败」Toast。
-     *
-     * 重构要点：原来直接 `syncRepository.syncDirtyData()` 改为 `userRepository.syncDirtyData()`（返回
-     * [ApiResult]，不再抛网络异常）；仅本地 DB 写入保留 `try/finally`，不包裹网络调用。
+     * 线程边界：本地 DB 写入与 [syncRepository.syncDirtyData] 在挂起函数内切 IO；finally 中恢复加载态。
      */
     fun handleResolveConflict(
         scope: CoroutineScope,
@@ -142,34 +135,28 @@ class AuthDelegate @Inject constructor(
         setLoading(true)
         scope.launch {
             try {
-                // 本地写入：均为本地 IO（Room / MMKV），不属于网络调用，允许 try/finally 兜底
                 prefs.setToken(response.token)
                 prefs.setRefreshToken(response.refreshToken)
                 prefs.setPhone(response.user.phone)
 
+                val now = System.currentTimeMillis()
                 if (useLocal) {
-                    resolveWithLocal(response)
+                    resolveWithLocal(response, now)
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolved_local))
                 } else {
-                    resolveWithCloud(response)
+                    resolveWithCloud(response, now)
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolved_cloud))
                 }
-
-                // 端云同步：统一错误闸门，返回 ApiResult，分流处理（不再 try/catch 网络异常）
-                when (val syncResult = userRepository.syncDirtyData()) {
-                    is ApiResult.Success -> onComplete()
-                    is ApiResult.Error -> setEffect(
-                        MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(syncResult.code))
-                    )
-                }
+                onComplete()
+            } catch (e: Exception) {
+                setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_conflict_resolve_error))
             } finally {
                 setLoading(false)
             }
         }
     }
 
-    private suspend fun resolveWithLocal(response: LoginResponse) {
-        val now = System.currentTimeMillis()
+    private suspend fun resolveWithLocal(response: LoginResponse, now: Long) {
         val localProfile = localDao.getProfile()
         localDao.deleteProfile()
         localDao.insertProfile(
@@ -182,22 +169,18 @@ class AuthDelegate @Inject constructor(
             )
         )
 
-        localDao.insertProgressList(
-            localDao.getAllProgress().map {
-                it.copy(isDirty = true, updateTimestamp = now)
-            }
-        )
+        localDao.insertProgressList(localDao.getAllProgress().map {
+            it.copy(isDirty = true, updateTimestamp = now)
+        })
 
-        localDao.insertItemList(
-            localDao.getAllItems().map {
-                it.copy(isDirty = true, updateTimestamp = now)
-            }
-        )
-        // 端云同步交由 handleResolveConflict 统一经 userRepository.syncDirtyData() 处理
+        localDao.insertItemList(localDao.getAllItems().map {
+            it.copy(isDirty = true, updateTimestamp = now)
+        })
+
+        syncRepository.syncDirtyData()
     }
 
-    private suspend fun resolveWithCloud(response: LoginResponse) {
-        val now = System.currentTimeMillis()
+    private suspend fun resolveWithCloud(response: LoginResponse, now: Long) {
         prefs.setUsername(response.user.username)
         prefs.setPoints(response.user.points)
 
@@ -213,18 +196,14 @@ class AuthDelegate @Inject constructor(
         )
 
         localDao.deleteAllProgress()
-        localDao.insertProgressList(
-            response.unlocked_levels.map {
-                UserProgressEntity(levelId = it, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
-            }
-        )
+        localDao.insertProgressList(response.unlocked_levels.map {
+            UserProgressEntity(levelId = it, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
+        })
 
         localDao.deleteAllItems()
-        localDao.insertItemList(
-            response.items.map {
-                BackpackItemEntity(itemType = it.item_type, count = it.count, isDirty = false, updateTimestamp = now)
-            }
-        )
+        localDao.insertItemList(response.items.map {
+            BackpackItemEntity(itemType = it.item_type, count = it.count, isDirty = false, updateTimestamp = now)
+        })
     }
 
     /**
@@ -232,6 +211,7 @@ class AuthDelegate @Inject constructor(
      * @param scope 调用方协程作用域（MenuViewModel.viewModelScope）。
      * @param onComplete 登出完成后的回调（通常由 ViewModel 重新拉取数据刷新 UI）。
      * @param setEffect 派发登出成功 Toast。
+     * 线程边界：DB 删除/插入在挂起函数内切 IO；末尾 [kotlinx.coroutines.delay] 仅为了让加载指示器有足够渲染时间。
      */
     fun handleLogout(scope: CoroutineScope, onComplete: () -> Unit, setEffect: (MenuViewEffect) -> Unit) {
         scope.launch {

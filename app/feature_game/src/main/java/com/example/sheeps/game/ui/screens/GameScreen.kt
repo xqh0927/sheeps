@@ -32,7 +32,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.sheeps.game.ui.components.GameBoardSurfaceView
 import kotlinx.coroutines.launch

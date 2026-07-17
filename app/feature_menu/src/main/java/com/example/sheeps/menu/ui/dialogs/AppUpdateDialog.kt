@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.core.update.UpdateDownloadManager
 import com.example.sheeps.core.update.UpdateStatus
 import com.example.sheeps.data.model.AppUpdateResponse

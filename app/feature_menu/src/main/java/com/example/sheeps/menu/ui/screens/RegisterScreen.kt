@@ -34,7 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.ui.components.SheepsLoading
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import kotlinx.coroutines.delay

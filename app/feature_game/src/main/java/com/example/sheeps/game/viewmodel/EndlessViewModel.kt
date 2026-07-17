@@ -2,9 +2,9 @@ package com.example.sheeps.game.viewmodel
 
 import android.content.Context
 import androidx.lifecycle.viewModelScope
-import com.example.sheeps.ui.R
-import com.example.sheeps.lib_base.base.BaseMviViewModel
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.R
+import com.example.sheeps.core.base.BaseMviViewModel
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.viewmodel.delegates.EndlessScoreDelegate

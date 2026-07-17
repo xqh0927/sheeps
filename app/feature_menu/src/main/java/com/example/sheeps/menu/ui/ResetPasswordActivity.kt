@@ -9,13 +9,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.core.base.BaseActivity
 import com.example.sheeps.data.model.ResetPasswordRequest
 import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.ui.screens.ResetPasswordScreen
-import com.example.sheeps.ui.R
-import com.example.sheeps.ui.theme.SheepsTheme
+import com.example.sheeps.core.R
+import com.example.sheeps.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint

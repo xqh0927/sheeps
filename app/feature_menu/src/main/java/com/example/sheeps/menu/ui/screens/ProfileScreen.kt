@@ -44,7 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.core.utils.ImageCompressor
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarPickerDialog

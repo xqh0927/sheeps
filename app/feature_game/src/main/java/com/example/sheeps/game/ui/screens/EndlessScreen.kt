@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.game.state.EndlessStatus
 import com.example.sheeps.game.state.EndlessViewIntent

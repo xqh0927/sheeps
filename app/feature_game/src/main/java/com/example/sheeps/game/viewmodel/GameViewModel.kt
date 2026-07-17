@@ -1,9 +1,9 @@
 package com.example.sheeps.game.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.example.sheeps.lib_base.base.BaseMviViewModel
+import com.example.sheeps.core.base.BaseMviViewModel
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
-import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.core.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.RenameRequest

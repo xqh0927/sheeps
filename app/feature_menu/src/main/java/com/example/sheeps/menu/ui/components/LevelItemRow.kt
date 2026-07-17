@@ -24,11 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.ui.R
-import com.example.sheeps.ui.theme.ShapeLarge
-import com.example.sheeps.ui.theme.ShapeMedium
-import com.example.sheeps.ui.theme.ShapeSmall
-import com.example.sheeps.ui.theme.Text_Disabled_Dark
+import com.example.sheeps.core.R
+import com.example.sheeps.theme.ShapeLarge
+import com.example.sheeps.theme.ShapeMedium
+import com.example.sheeps.theme.ShapeSmall
+import com.example.sheeps.theme.Text_Disabled_Dark
 
 /**
  * 单个关卡条目（关卡列表行）。

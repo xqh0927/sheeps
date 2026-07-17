@@ -1,6 +1,6 @@
 package com.example.sheeps.game.viewmodel.helpers
 
-import com.example.sheeps.data.game.SkinConstants
+import com.example.sheeps.core.game.SkinConstants
 import com.example.sheeps.data.model.Tile
 import javax.inject.Inject
 import kotlin.math.abs

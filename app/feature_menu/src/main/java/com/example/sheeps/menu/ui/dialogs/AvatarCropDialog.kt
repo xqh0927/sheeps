@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.canhub.cropper.CropImageView
-import com.example.sheeps.ui.R
+import com.example.sheeps.core.R
 
 /**
  * 全屏头像裁剪弹窗。
