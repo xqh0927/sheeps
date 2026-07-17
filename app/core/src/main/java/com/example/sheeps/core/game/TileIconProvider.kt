@@ -92,21 +92,21 @@ object TileIconProvider {
      * 资源混淆/裁剪影响）。[getFallbackResId] 仅做一次 Map 查表，O(1) 且无反射。
      *
      * 键为 tileIndex（1..12，与 [SkinConstants.MAX_TILE_TYPES] 对齐），值为对应的
-     * `R.drawable.tile_shuang_{index}` 资源 ID。
+     * `com.example.sheeps.ui.R.drawable.tile_shuang_{index}` 资源 ID。
      */
     private val fallbackMap: Map<Int, Int> = mapOf(
-        1 to R.drawable.tile_shuang_1,
-        2 to R.drawable.tile_shuang_2,
-        3 to R.drawable.tile_shuang_3,
-        4 to R.drawable.tile_shuang_4,
-        5 to R.drawable.tile_shuang_5,
-        6 to R.drawable.tile_shuang_6,
-        7 to R.drawable.tile_shuang_7,
-        8 to R.drawable.tile_shuang_8,
-        9 to R.drawable.tile_shuang_9,
-        10 to R.drawable.tile_shuang_10,
-        11 to R.drawable.tile_shuang_11,
-        12 to R.drawable.tile_shuang_12
+        1 to com.example.sheeps.ui.R.drawable.tile_shuang_1,
+        2 to com.example.sheeps.ui.R.drawable.tile_shuang_2,
+        3 to com.example.sheeps.ui.R.drawable.tile_shuang_3,
+        4 to com.example.sheeps.ui.R.drawable.tile_shuang_4,
+        5 to com.example.sheeps.ui.R.drawable.tile_shuang_5,
+        6 to com.example.sheeps.ui.R.drawable.tile_shuang_6,
+        7 to com.example.sheeps.ui.R.drawable.tile_shuang_7,
+        8 to com.example.sheeps.ui.R.drawable.tile_shuang_8,
+        9 to com.example.sheeps.ui.R.drawable.tile_shuang_9,
+        10 to com.example.sheeps.ui.R.drawable.tile_shuang_10,
+        11 to com.example.sheeps.ui.R.drawable.tile_shuang_11,
+        12 to com.example.sheeps.ui.R.drawable.tile_shuang_12
     )
 
     /**
@@ -115,10 +115,10 @@ object TileIconProvider {
      *
      * 通过静态 [fallbackMap] 直接查表返回资源 ID，移除运行时反射。
      * 若 [tileIndex] 超出 [fallbackMap]（理论上不会，类型恒为 1..12），则回退到默认兜底图
-     * [R.drawable.tile_shuang_1]，保证始终返回一个有效 drawable 而非 0（避免调用方
+     * [com.example.sheeps.ui.R.drawable.tile_shuang_1]，保证始终返回一个有效 drawable 而非 0（避免调用方
      * `painterResource(0)` 崩溃）。
      */
     fun getFallbackResId(context: Context, tileIndex: Int): Int {
-        return fallbackMap[tileIndex] ?: R.drawable.tile_shuang_1
+        return fallbackMap[tileIndex] ?: com.example.sheeps.ui.R.drawable.tile_shuang_1
     }
 }

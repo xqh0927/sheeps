@@ -3,7 +3,7 @@ package com.example.sheeps.data.result
 import com.example.sheeps.ui.R
 
 /**
- * 统一错误文案映射：将 [ApiResult.Error.code] 映射为用户可见的 `R.string.*` 资源 ID。
+ * 统一错误文案映射：将 [ApiResult.Error.code] 映射为用户可见的 `com.example.sheeps.ui.R.string.*` 资源 ID。
  *
  * 设计目标：消除 delegate 内各自硬编码的 Toast 字符串，保证同一错误码在全应用
  * 映射为同一文案。delegate 只负责 `setEffect(ShowToast(resId = ErrorMessageMapper.toResId(code)))`。
@@ -17,10 +17,10 @@ import com.example.sheeps.ui.R
  */
 object ErrorMessageMapper {
     fun toResId(code: Int): Int = when (code) {
-        -1 -> R.string.toast_network_error
-        401 -> R.string.toast_login_expired
-        40000 -> R.string.toast_business_failed
-        in 500..599 -> R.string.toast_server_error
-        else -> R.string.toast_network_error_retry
+        -1 -> com.example.sheeps.ui.R.string.toast_network_error
+        401 -> com.example.sheeps.ui.R.string.toast_login_expired
+        40000 -> com.example.sheeps.ui.R.string.toast_business_failed
+        in 500..599 -> com.example.sheeps.ui.R.string.toast_server_error
+        else -> com.example.sheeps.ui.R.string.toast_network_error_retry
     }
 }

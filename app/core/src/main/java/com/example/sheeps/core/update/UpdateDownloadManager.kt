@@ -131,7 +131,7 @@ class UpdateDownloadManager {
             } catch (e: Exception) {
                 _state.value = UpdateDownloadState(
                     status = UpdateStatus.Error,
-                    error = e.message ?: context.getString(R.string.update_download_failed)
+                    error = e.message ?: context.getString(com.example.sheeps.ui.R.string.update_download_failed)
                 )
             } finally {
                 try { output?.close() } catch (_: Exception) {}
@@ -149,7 +149,7 @@ class UpdateDownloadManager {
         if (file == null || !file.exists()) {
             _state.value = UpdateDownloadState(
                 status = UpdateStatus.Error,
-                error = context.getString(R.string.update_install_file_missing)
+                error = context.getString(com.example.sheeps.ui.R.string.update_install_file_missing)
             )
             return false
         }
@@ -180,7 +180,7 @@ class UpdateDownloadManager {
         } catch (e: Exception) {
             _state.value = UpdateDownloadState(
                 status = UpdateStatus.Error,
-                error = context.getString(R.string.update_install_failed, e.message)
+                error = context.getString(com.example.sheeps.ui.R.string.update_install_failed, e.message)
             )
             false
         }
