@@ -50,7 +50,7 @@ data class MenuViewState(
     val selectedCarryItems: Map<String, Int> = emptyMap(),
 
     /** 当前网络连接监控状态 */
-    val networkStatus: com.example.sheeps.core.utils.NetworkStatus = com.example.sheeps.core.utils.NetworkStatus.ONLINE,
+    val networkStatus: com.example.sheeps.data.utils.NetworkStatus = com.example.sheeps.data.utils.NetworkStatus.ONLINE,
 
     /** 当前应用生效的语言代码（如 "zh", "en"） */
     val language: String = "",

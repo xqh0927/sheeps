@@ -9,6 +9,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import com.example.sheeps.data.game.SkinConstants
+import kotlin.getValue
 
 /**
  * 用户偏好与敏感凭据存储（进程级单例）。

@@ -39,7 +39,7 @@ import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.core.utils.AuthEvent
 import com.example.sheeps.core.utils.AuthEventBus
-import com.example.sheeps.core.utils.NetworkStatus
+import com.example.sheeps.data.utils.NetworkStatus
 import com.example.sheeps.data.model.DailyPopupResponse
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.ConflictInfo
