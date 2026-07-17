@@ -24,7 +24,7 @@ import com.example.sheeps.menu.ui.components.CoinCanvas
 import com.example.sheeps.menu.ui.components.CompassCanvas
 import com.example.sheeps.menu.ui.components.GourdCanvas
 import com.example.sheeps.menu.ui.components.StarCanvas
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import androidx.compose.ui.res.stringResource
 
 /**

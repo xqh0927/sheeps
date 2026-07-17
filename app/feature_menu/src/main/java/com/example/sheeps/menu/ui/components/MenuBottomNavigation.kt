@@ -39,9 +39,9 @@ fun MenuBottomNavigation(
     onTabSelected: (String) -> Unit
 ) {
     val navItems = listOf(
-        Triple("game", com.example.sheeps.core.R.string.tab_game, com.example.sheeps.core.R.drawable.ic_nav_game),
-        Triple("shop", com.example.sheeps.core.R.string.tab_shop, com.example.sheeps.core.R.drawable.ic_nav_shop),
-        Triple("me",   com.example.sheeps.core.R.string.tab_me, com.example.sheeps.core.R.drawable.ic_nav_profile)
+        Triple("game", com.example.sheeps.ui.R.string.tab_game, com.example.sheeps.ui.R.drawable.ic_nav_game),
+        Triple("shop", com.example.sheeps.ui.R.string.tab_shop, com.example.sheeps.ui.R.drawable.ic_nav_shop),
+        Triple("me",   com.example.sheeps.ui.R.string.tab_me, com.example.sheeps.ui.R.drawable.ic_nav_profile)
     )
 
     NavigationBar(

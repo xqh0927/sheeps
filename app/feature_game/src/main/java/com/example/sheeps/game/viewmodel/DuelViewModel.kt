@@ -1,19 +1,19 @@
 package com.example.sheeps.game.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.example.sheeps.core.base.BaseMviViewModel
+import com.example.sheeps.lib_base.base.BaseMviViewModel
 import com.example.sheeps.core.multiplayer.WebSocketManager
 import com.example.sheeps.core.multiplayer.model.*
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.*
-import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.data.repository.GameRepository
+import com.example.sheeps.data.result.ApiResult
 import com.example.sheeps.game.state.*
 import com.example.sheeps.game.viewmodel.delegates.DuelActionDelegate
 import com.example.sheeps.game.viewmodel.delegates.DuelCommandHandler
 import com.example.sheeps.game.viewmodel.helpers.DuelLevelGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -28,18 +28,16 @@ import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
  * 生命周期与资源释放：
  * - [init] 中在 [viewModelScope] 内 `collectLatest`/`collect` 监听 [WebSocketManager.connectionState]
  *   与 `messageFlow`，这些 Flow 收集随 VM 销毁（`viewModelScope` 取消）自动停止，无独立泄漏风险。
- * - ⚠️ 内存隐患：[WebSocketManager] 为单例/应用级连接管理，本类未覆写 `onCleared()`，
- *   WebSocket 仅在用户主动触发 [DuelViewIntent.Leave]（[handleLeave] 内 `wsManager.disconnect()`）时关闭。
- *   若用户直接返回而不走 Leave 流程，连接可能残留。安全建议：在 `onCleared()` 中补 `wsManager.disconnect()`
- *   作为兜底，确保 VM 销毁时必然断连。
  *
- * 信令协议对齐：本类通过 [sendEliminateCommand]/[sendAttackCommand]/[sendCastSpellCommand]/[sendSystemEvent]
- * 构造 [GameCommand] 下发，类型与 `CommandType`（ELIMINATE/ATTACK/CAST_SPELL/SYSTEM_EVENT）严格对应服务端对战信令，
- * 不改变既有协议字段。
+ * 重构要点（方案 2 / 统一错误闸门，Phase 2）：
+ * - 改注入 [GameRepository]，不再直注 [com.example.sheeps.data.network.ApiService]。
+ * - [handleInit] 中去掉 `viewModelScope.launch(Dispatchers.IO){ try{ apiService.getLevel } catch }`，
+ *   改用 `when(val r = gameRepository.getLevel(...))` 分流；[ApiResult.Error] 分支保留本地
+ *   [DuelLevelGenerator.generateDuelLevel] 兜底，保证离线可玩。
  */
 @HiltViewModel
 class DuelViewModel @Inject constructor(
-    private val apiService: ApiService,
+    private val gameRepository: GameRepository,
     private val prefs: UserPreferences,
     private val wsManager: WebSocketManager,
     private val json: Json,
@@ -88,7 +86,8 @@ class DuelViewModel @Inject constructor(
      *
      * 线程边界：
      * - `wsManager.connect` 在主线程调用，底层 WebSocket 收发在 SDK 自有线程；
-     * - 关卡数据请求运行在 [Dispatchers.IO]，成功/失败均切回主线程更新 State。
+     * - 关卡数据请求经 [GameRepository]（[ApiResult] 统一错误闸门，Retrofit 主安全）；
+     *   成功/失败均切回主线程更新 State；失败（[ApiResult.Error]）回退本地生成算法。
      *
      * @param gameId 房间 ID
      * @param playerId 本地玩家 ID
@@ -102,58 +101,52 @@ class DuelViewModel @Inject constructor(
         // ⚠️ 内存隐患：建立 WebSocket 连接；若后续未通过 handleLeave → wsManager.disconnect() 关闭，
         // 连接会残留（见类文档 onCleared 兜底建议）。
         wsManager.connect(gameId, playerId)
-        
-        viewModelScope.launch(Dispatchers.IO) {
+
+        viewModelScope.launch {
             // ===== 对决模式关卡数据加载逻辑（网络优先 + 离线兜底） =====
-            try {
-                // 1. 网络优先：向服务器 API 请求对决中双方一致的关卡布局
-                val rawTiles = apiService.getLevel(levelId, seed).map { it.copy(state = TileState.NORMAL) }
-                
-                // 遵循一致性规则：直接采用接口返回的特殊牌（isBlind）分布，
-                // 仅为了客户端“单次解锁”规则，在 sealedCount > 0 时通过浅拷贝净化重置其值为 1
-                val sanitizedTiles = rawTiles.map { tile ->
-                    val t = tile.copy()
-                    if (t.sealedCount > 0) {
-                        t.sealedCount = 1
-                    }
-                    t
+            when (val result = gameRepository.getLevel(levelId, seed)) {
+                is ApiResult.Success -> {
+                    // 1. 网络优先：向服务器 API 请求对决中双方一致的关卡布局
+                    val rawTiles = result.data.map { it.copy(state = TileState.NORMAL) }
+                    val (tiles, bounds) = sanitizeAndBuildTiles(rawTiles)
+                    updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
                 }
-                val tiles = calculateBlockedStates(sanitizedTiles)
-                val bounds = if (tiles.isEmpty()) {
-                    BoardBounds()
-                } else {
-                    BoardBounds(
-                        minX = tiles.minOf { it.x },
-                        maxX = tiles.maxOf { it.x },
-                        minY = tiles.minOf { it.y },
-                        maxY = tiles.maxOf { it.y }
-                    )
+                is ApiResult.Error -> {
+                    // 2. 离线兜底：若对决模式发生 API 加载异常，回退至本地对决生成算法
+                    val rawTiles = levelGenerator.generateDuelLevel()
+                    val (tiles, bounds) = sanitizeAndBuildTiles(rawTiles)
+                    updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
                 }
-                updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
-            } catch (e: Exception) {
-                // 2. 离线兜底：若对决模式发生 API 加载异常，回退至本地对决生成算法
-                val rawTiles = levelGenerator.generateDuelLevel()
-                val sanitizedTiles = rawTiles.map { tile ->
-                    val t = tile.copy()
-                    if (t.sealedCount > 0) {
-                        t.sealedCount = 1
-                    }
-                    t
-                }
-                val tiles = calculateBlockedStates(sanitizedTiles)
-                val bounds = if (tiles.isEmpty()) {
-                    BoardBounds()
-                } else {
-                    BoardBounds(
-                        minX = tiles.minOf { it.x },
-                        maxX = tiles.maxOf { it.x },
-                        minY = tiles.minOf { it.y },
-                        maxY = tiles.maxOf { it.y }
-                    )
-                }
-                updateState { copy(isLoading = false, boardTiles = tiles, boardBounds = bounds, gameStatus = GameStatus.PLAYING, totalTileCount = tiles.size) }
             }
         }
+    }
+
+    /**
+     * 净化并构建可渲染的棋盘：重置盲牌/封印分布、计算遮挡态与棋盘边界。
+     * 同时服务于网络成功分支与本地兜底分支，避免重复代码。
+     */
+    private fun sanitizeAndBuildTiles(rawTiles: List<Tile>): Pair<List<Tile>, BoardBounds> {
+        // 遵循一致性规则：直接采用接口返回的特殊牌（isBlind）分布，
+        // 仅为了客户端“单次解锁”规则，在 sealedCount > 0 时通过浅拷贝净化重置其值为 1
+        val sanitizedTiles = rawTiles.map { tile ->
+            val t = tile.copy()
+            if (t.sealedCount > 0) {
+                t.sealedCount = 1
+            }
+            t
+        }
+        val tiles = calculateBlockedStates(sanitizedTiles)
+        val bounds = if (tiles.isEmpty()) {
+            BoardBounds()
+        } else {
+            BoardBounds(
+                minX = tiles.minOf { it.x },
+                maxX = tiles.maxOf { it.x },
+                minY = tiles.minOf { it.y },
+                maxY = tiles.maxOf { it.y }
+            )
+        }
+        return tiles to bounds
     }
 
     /**

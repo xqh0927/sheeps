@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import com.example.sheeps.data.model.Tile
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import com.example.sheeps.game.state.GameViewState
 import androidx.compose.ui.res.stringResource
 

@@ -10,7 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 无尽生存模式顶栏 HUD：分数 / 连击 / 波次 / 最高分 + 冻结与暂停按钮。

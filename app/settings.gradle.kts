@@ -23,6 +23,8 @@ plugins {
 rootProject.name = "Sheeps"
 include(":app")
 include(":core")
+include(":data")
+include(":designsystem")
 include(":lib_base")
 include(":lib_network")
 include(":feature_splash")

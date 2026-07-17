@@ -8,8 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
@@ -20,8 +20,8 @@ import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.ui.screens.LoginScreen
-import com.example.sheeps.core.R
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.R
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.tencent.mmkv.MMKV
 import com.hjq.toast.Toaster
 import com.therouter.TheRouter

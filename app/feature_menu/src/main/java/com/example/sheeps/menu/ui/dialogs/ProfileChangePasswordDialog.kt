@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 个人资料页"修改密码"对话框（基于 Material [AlertDialog]）。

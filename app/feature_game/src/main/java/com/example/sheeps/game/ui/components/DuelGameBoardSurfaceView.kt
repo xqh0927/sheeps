@@ -25,7 +25,7 @@ import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withSave
 import androidx.core.graphics.withTranslation
 import androidx.core.graphics.withClip
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
 import com.example.sheeps.data.model.Tile

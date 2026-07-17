@@ -63,11 +63,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import com.apkfuns.logutils.LogUtils
-import com.example.sheeps.core.AppConfig
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.theme.ShapeLarge
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.lib_network.AppConfig
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.ui.theme.ShapeLarge
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.example.sheeps.ui.components.GhostButton
 import com.example.sheeps.ui.components.PrimaryButton
 import com.hjq.permissions.OnPermissionCallback
@@ -127,7 +127,7 @@ class SplashActivity : BaseActivity() {
     /**
      * 构建启动页 Compose 内容。
      * 组合粒子背景（[ParticleBackground]）、主体视觉（[SplashVisuals]），
-     * 并按 [com.example.sheeps.core.preference.UserPreferences.isPrivacyAccepted]
+     * 并按 [com.example.sheeps.data.preference.UserPreferences.isPrivacyAccepted]
      * 决定展示隐私协议弹窗（[PrivacyComposeDialog]）或发起权限申请。
      * 纯 UI 组合，无副作用挂起；权限与跳转交由下方方法处理。
      */
@@ -159,11 +159,11 @@ class SplashActivity : BaseActivity() {
                         PrivacyComposeDialog(
                             onConfirm = {
                                 userPrefs.setPrivacyAccepted(true)
-                                Toaster.show(getString(com.example.sheeps.core.R.string.toast_privacy_agree))
+                                Toaster.show(getString(com.example.sheeps.ui.R.string.toast_privacy_agree))
                                 showPrivacyDialog = false
                             },
                             onDismiss = {
-                                Toaster.show(getString(com.example.sheeps.core.R.string.toast_privacy_disagree))
+                                Toaster.show(getString(com.example.sheeps.ui.R.string.toast_privacy_disagree))
                                 finish()
                             }
                         )
@@ -575,7 +575,7 @@ fun SplashVisuals() {
                 )
 
                 Text(
-                    text = stringResource(id = com.example.sheeps.core.R.string.app_name),
+                    text = stringResource(id = com.example.sheeps.ui.R.string.app_name),
                     fontSize = 38.sp,
                     style = TextStyle(
                         brush = shimmerBrush
@@ -589,7 +589,7 @@ fun SplashVisuals() {
                 Spacer(Modifier.height(10.dp))
 
                 Text(
-                    text = stringResource(id = com.example.sheeps.core.R.string.app_subtitle),
+                    text = stringResource(id = com.example.sheeps.ui.R.string.app_subtitle),
                     fontSize = 15.sp,
                     color = Color(0xFF475569),
                     fontWeight = FontWeight.SemiBold,
@@ -661,7 +661,7 @@ fun SplashVisuals() {
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = stringResource(id = com.example.sheeps.core.R.string.splash_age_tip),
+                    text = stringResource(id = com.example.sheeps.ui.R.string.splash_age_tip),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -671,7 +671,7 @@ fun SplashVisuals() {
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = stringResource(id = com.example.sheeps.core.R.string.splash_health_advice),
+                text = stringResource(id = com.example.sheeps.ui.R.string.splash_health_advice),
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 fontSize = 10.sp,
                 lineHeight = 15.sp,
@@ -803,7 +803,7 @@ fun PrivacyComposeDialog(
                     .padding(24.dp)
             ) {
                 Text(
-                    text = stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_title),
+                    text = stringResource(id = com.example.sheeps.ui.R.string.privacy_dialog_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
                     color = MaterialTheme.colorScheme.primary,
@@ -812,7 +812,7 @@ fun PrivacyComposeDialog(
                 )
 
                 val fullText =
-                    stringResource(id = com.example.sheeps.core.R.string.privacy_dialog_content)
+                    stringResource(id = com.example.sheeps.ui.R.string.privacy_dialog_content)
                 val agreementKeywords =
                     listOf("《用户协议》", "《用戶協議》", "《金色体育用户协议》", "User Agreement", "利用規約", "이용 약관")
                 val privacyKeywords = listOf(
@@ -899,13 +899,13 @@ fun PrivacyComposeDialog(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GhostButton(
-                        text = stringResource(id = com.example.sheeps.core.R.string.btn_disagree_exit),
+                        text = stringResource(id = com.example.sheeps.ui.R.string.btn_disagree_exit),
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     PrimaryButton(
-                        text = stringResource(id = com.example.sheeps.core.R.string.btn_agree_start),
+                        text = stringResource(id = com.example.sheeps.ui.R.string.btn_agree_start),
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f)
                     )

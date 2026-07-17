@@ -28,7 +28,7 @@ import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.LanguageSettingsCard
 import com.example.sheeps.menu.ui.components.ThemeSettingsCard
 import com.example.sheeps.ui.components.SheepsTopAppBar
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 import androidx.compose.ui.res.stringResource
 
 /**

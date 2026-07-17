@@ -9,13 +9,13 @@ import coil.Coil
 import coil.request.ImageRequest
 import coil.size.Scale
 import coil.size.Size
-import com.example.sheeps.core.R
-import com.example.sheeps.core.base.BaseMviViewModel
-import com.example.sheeps.core.base.IGameService
+import com.example.sheeps.ui.R
+import com.example.sheeps.lib_base.base.BaseMviViewModel
+import com.example.sheeps.lib_base.service.IGameService
 import com.example.sheeps.core.cache.ShopCache
 import com.example.sheeps.core.game.TileIconProvider
-import com.example.sheeps.core.preference.UserPreferences
-import com.example.sheeps.core.utils.NetworkMonitor
+import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.data.utils.NetworkMonitor
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.LoginResponse
 import com.example.sheeps.data.model.RenameRequest
@@ -393,7 +393,7 @@ class MenuViewModel @Inject constructor(
      *
      * 适用场景：签到（SignIn）、解锁关卡（UnlockLevelWithPoints）等 delegate 操作完成后。
      * 设计依据：这些操作仅改变资料类字段，其权威值已在对应 delegate 中通过
-     * [com.example.sheeps.core.preference.UserPreferences] 与本地数据库（乐观写入）落盘；
+     * [com.example.sheeps.data.preference.UserPreferences] 与本地数据库（乐观写入）落盘；
      * [setupObservers] 中的本地库流会自动把 points / username / unlockedLevel / backpackItems 同步到 State，
      * 此处仅补刷 prefs 持有、但不在流中的字段（todaySigned / signStreak / highestLevelCleared / avatarUrl），
      * 并在线时只读拉取最新头像 URL。不做 pullCloudProfile（避免覆盖 delegate 已提交的本地乐观状态），无破坏性写入。

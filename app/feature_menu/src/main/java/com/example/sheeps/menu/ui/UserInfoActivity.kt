@@ -12,9 +12,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.sheeps.core.R
-import com.example.sheeps.core.base.BaseActivity
-import com.example.sheeps.core.preference.UserPreferences
+import com.example.sheeps.ui.R
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.model.RenameRequest
@@ -24,7 +24,7 @@ import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarCropDialog
 import com.example.sheeps.menu.ui.screens.UserInfoScreen
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint

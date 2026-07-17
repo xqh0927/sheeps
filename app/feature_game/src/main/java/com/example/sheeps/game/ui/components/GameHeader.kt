@@ -16,10 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.theme.Text_Secondary_Dark
+import com.example.sheeps.ui.theme.Text_Secondary_Dark
 
 import androidx.compose.ui.res.stringResource
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
 
 /**
  * 游戏顶栏组件

@@ -90,6 +90,7 @@ kapt {
 dependencies {
     // Modular features dependencies
     implementation(project(":core"))
+    implementation(project(":lib_base"))
     implementation(project(":feature_splash"))
     implementation(project(":feature_menu"))
     implementation(project(":feature_game"))
@@ -102,6 +103,8 @@ dependencies {
     // Hilt must be declared directly in app module (not just via :core api)
     implementation(libs.hilt.android)
     implementation(libs.hilt.work)
+    implementation(libs.workmanager)
+    implementation(libs.lifecycle.process)
 
     // Compose Tooling
     debugImplementation(libs.androidx.compose.ui.tooling)

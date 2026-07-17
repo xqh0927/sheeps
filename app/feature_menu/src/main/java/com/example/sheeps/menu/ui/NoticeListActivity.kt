@@ -3,10 +3,10 @@ package com.example.sheeps.menu.ui
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import com.example.sheeps.core.base.BaseActivity
+import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.model.Notice
 import com.example.sheeps.menu.ui.screens.NoticeListScreen
-import com.example.sheeps.theme.SheepsTheme
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject

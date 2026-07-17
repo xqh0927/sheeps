@@ -1,6 +1,6 @@
 package com.example.sheeps.game.di
 
-import com.example.sheeps.core.base.IGameService
+import com.example.sheeps.lib_base.service.IGameService
 import com.example.sheeps.game.service.GameServiceImpl
 import dagger.Binds
 import dagger.Module

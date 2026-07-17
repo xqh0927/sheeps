@@ -1,7 +1,8 @@
 package com.example.sheeps.core.game
 
 import android.content.Context
-import com.example.sheeps.core.R
+import com.example.sheeps.ui.R
+import com.example.sheeps.data.game.SkinConstants
 import com.example.sheeps.data.model.ShopItem
 
 /**
