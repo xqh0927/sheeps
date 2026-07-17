@@ -106,6 +106,14 @@ dependencies {
     implementation(libs.workmanager)
     implementation(libs.lifecycle.process)
 
+    // Coil 图片加载（MyApplication 实现 ImageLoaderFactory / CacheCleanWorker 使用 Coil API，
+    // 之前由 :core 的 api(coil) 透传，Phase 1 收紧为 implementation 后断链，此处显式声明）
+    implementation(libs.coil)
+
+    // Logcat 日志库（MyApplication 使用 logcat.logcat；原由 :core 经 lib_base api 透传，
+    // 收紧后 :core 改为 implementation(libs.logcat)，:app 需直依赖）
+    implementation(libs.logcat)
+
     // Compose Tooling
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
