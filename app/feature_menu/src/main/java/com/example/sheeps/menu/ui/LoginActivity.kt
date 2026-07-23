@@ -8,8 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.sheeps.lib_base.base.BaseActivity
-import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
@@ -18,12 +16,15 @@ import com.example.sheeps.data.model.LoginRequest
 import com.example.sheeps.data.model.PasswordLoginRequest
 import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.repository.SyncRepository
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.menu.ui.screens.LoginScreen
 import com.example.sheeps.ui.R
 import com.example.sheeps.ui.theme.SheepsTheme
-import com.tencent.mmkv.MMKV
 import com.hjq.toast.Toaster
+import com.tencent.mmkv.MMKV
 import com.therouter.TheRouter
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
@@ -36,27 +37,26 @@ import javax.inject.Inject
 /**
  * 全屏登录 Activity。
  * 支持验证码登录 / 密码登录双模式，登录成功后保存数据并自动关闭。
- *
- * 生命周期与内存说明：
- * - 本 Activity 为独立认证页（非 MenuActivity 的 MVI 体系），自带轻量业务逻辑，登录成功后关闭并回退到菜单。
- * - 注入的 apiService/prefs/localDao/syncRepository/json 均为 Hilt 提供的单例/无界面依赖，Activity 销毁即释放，不长期持有。
- * - UI 协程使用 Compose 的 rememberCoroutineScope()，其生命周期绑定 Composition；
- *   用户返回（finish）导致组合移除时该 scope 自动取消，进行中的网络请求随之取消，无泄漏。
  */
-@Route(path = "/auth/login")
+@Route(path = RouterPath.Auth.LOGIN)
 @AndroidEntryPoint
 class LoginActivity : BaseActivity() {
 
     @Inject
     lateinit var apiService: ApiService
+
     @Inject
     lateinit var prefs: UserPreferences
+
     @Inject
     lateinit var kv: MMKV
+
     @Inject
     lateinit var localDao: LocalDao
+
     @Inject
     lateinit var syncRepository: SyncRepository
+
     @Inject
     lateinit var json: Json
 
@@ -82,10 +82,10 @@ class LoginActivity : BaseActivity() {
                         handleLoginWithPassword(phone, password, scope) { isLoading = it }
                     },
                     onNavigateToRegister = {
-                        TheRouter.build("/auth/register").navigation(this)
+                        TheRouter.build(RouterPath.Auth.REGISTER).navigation(this)
                     },
                     onNavigateToResetPassword = {
-                        TheRouter.build("/auth/reset-password").navigation(this)
+                        TheRouter.build(RouterPath.Auth.RESET_PASSWORD).navigation(this)
                     }
                 )
             }

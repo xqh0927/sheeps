@@ -99,7 +99,12 @@ import kotlin.math.sin
  * ⚠️ 内存隐患：[userPrefs] 由 Hilt 字段注入（Application 级依赖），
  * 不持有 Activity 引用；所有协程均经 `lifecycleScope` / Compose 作用域，无静态泄漏。
  */
-@Route(path = "/splash/entry")
+import com.example.sheeps.lib_base.router.RouterPath
+
+/**
+ * 启动页 / 入口 Activity。
+ */
+@Route(path = RouterPath.Splash.ENTRY)
 @AndroidEntryPoint
 class SplashActivity : BaseActivity() {
 
@@ -209,7 +214,7 @@ class SplashActivity : BaseActivity() {
         // ⚠️ 协程绑定 lifecycleScope：delay 期间销毁即取消，无泄漏
         lifecycleScope.launch {
             delay(2000)
-            TheRouter.build("/menu/main").navigation()
+            TheRouter.build(RouterPath.Menu.MAIN).navigation()
             finish()
         }
     }

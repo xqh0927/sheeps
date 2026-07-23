@@ -1,5 +1,6 @@
 package com.example.sheeps.menu.ui.screens
 
+import com.example.sheeps.lib_base.router.RouterPath
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -134,7 +135,7 @@ fun GameHomeScreen(
                 onDismiss = { showEndlessIntro = false },
                 onStart = {
                     showEndlessIntro = false
-                    TheRouter.build("/endless/play").navigation(context)
+                    TheRouter.build(RouterPath.Endless.PLAY).navigation(context)
                 },
                 onLoginClick = {
                     showEndlessIntro = false
@@ -261,7 +262,7 @@ fun GameHomeScreen(
                         Toaster.show(endlessLoginHint)
                     },
                     onShowLeaderboard = {
-                        TheRouter.build("/endless/leaderboard").navigation(context)
+                        TheRouter.build(RouterPath.Endless.LEADERBOARD).navigation(context)
                     },
                     modifier = Modifier.fillMaxWidth()
                 )

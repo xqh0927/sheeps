@@ -37,13 +37,14 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import top.zibin.luban.api.compressTo
 import java.io.File
+import com.example.sheeps.lib_base.router.RouterPath
 import javax.inject.Inject
 
 /**
  * 全屏用户信息 Activity。
  * 支持头像更换（相机/相册 → Luban 压缩 → R2 上传）、昵称修改、密码修改。
  */
-@Route(path = "/menu/userinfo")
+@Route(path = RouterPath.Menu.USER_INFO)
 @AndroidEntryPoint
 class UserInfoActivity : BaseActivity() {
 
@@ -246,7 +247,7 @@ class UserInfoActivity : BaseActivity() {
                     prefs.logout()
                     Toaster.show(getString(R.string.toast_password_change_success))
                     // 跳转到登录页
-                    com.therouter.TheRouter.build("/auth/login").navigation(this@UserInfoActivity)
+                    com.therouter.TheRouter.build(RouterPath.Auth.LOGIN).navigation(this@UserInfoActivity)
                     finish()
                 } else {
                     Toaster.show(getString(R.string.toast_password_change_failed))

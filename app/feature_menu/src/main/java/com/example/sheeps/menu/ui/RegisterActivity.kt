@@ -26,14 +26,13 @@ import javax.inject.Inject
 
 /**
  * 全屏注册 Activity。
- * 注册成功后 toast 提示并自动关闭，回到登录页。
- *
- * 生命周期与内存说明：
- * - 注入的 apiService 为 Hilt 单例，Activity 销毁即释放，不长期持有界面。
- * - 注册请求刻意使用 [androidx.lifecycle.lifecycleScope]（而非 Compose 的 rememberCoroutineScope），
- *   以保证 finish() 后网络请求仍可被完整执行、toast 能正常弹出；lifecycleScope 在 Activity 销毁时自动取消，无泄漏。
+ * 注册成功后 toast 提示并自动关闭，回到登录页。*/
+import com.example.sheeps.lib_base.router.RouterPath
+
+/**
+ * 注册 Activity。
  */
-@Route(path = "/auth/register")
+@Route(path = RouterPath.Auth.REGISTER)
 @AndroidEntryPoint
 class RegisterActivity : BaseActivity() {
 

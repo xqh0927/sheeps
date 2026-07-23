@@ -44,9 +44,9 @@ dependencies {
     implementation(project(":lib_base"))
     implementation(project(":lib_network"))
 
-    // 物理拆分出的数据层与设计系统（以 api 暴露给 Feature 模块）
-    api(project(":data"))
-    api(project(":designsystem"))
+    // 物理拆分出的数据层与设计系统（收紧为 implementation，解耦依赖传递）
+    implementation(project(":data"))
+    implementation(project(":designsystem"))
 
     // Retrofit / OkHttp 等网络及公共类由于在 lib_network 中 api 声明，此处省略
 

@@ -37,6 +37,8 @@ kapt {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":data"))
+    implementation(project(":designsystem"))
     implementation(project(":lib_base"))
     implementation(project(":lib_network"))
     implementation(libs.therouter)

@@ -25,22 +25,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.sheeps.lib_base.base.BaseActivity
-import com.example.sheeps.ui.theme.SheepsTheme
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.ui.components.SheepsTopAppBar
+import com.example.sheeps.ui.theme.SheepsTheme
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
- * 独立的全屏 H5 加载 Activity。
- *
- * 通过 TheRouter 路由 "/web/h5" 跳转，接收 extras 中的 "url" 与 "title"，
- * 在 Activity 内部使用 WebView（非 Dialog）加载目标页面，统一承载
- * 本地资产页（file:///android_asset/...）与远程协议页（https://...），
- * 不再弹出 Compose Dialog，也不再逃逸到外部浏览器。
- *
- * @Route path "/web/h5"
+ * H5Activity 通用网页承载界面。
  */
-@Route(path = "/web/h5")
+@Route(path = RouterPath.Web.H5)
 @AndroidEntryPoint
 class H5Activity : BaseActivity() {
 

@@ -57,13 +57,14 @@ import com.example.sheeps.data.model.RankingEntry
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import com.example.sheeps.ui.theme.SheepsTheme
+import com.example.sheeps.lib_base.router.RouterPath
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@Route(path = "/leaderboard/show")
+@Route(path = RouterPath.Leaderboard.SHOW)
 @AndroidEntryPoint
 class LeaderboardActivity : BaseActivity() {
 
@@ -121,8 +122,10 @@ class LeaderboardActivity : BaseActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    Column(modifier = Modifier
-                        .fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                    ) {
                         LeaderboardAppBar(
                             levelId = levelId,
                             onBack = { finish() }
@@ -139,7 +142,9 @@ class LeaderboardActivity : BaseActivity() {
                                     )
                                 },
                                 confirmButton = {
-                                    androidx.compose.material3.TextButton(onClick = { showRulesDialog = false }) {
+                                    androidx.compose.material3.TextButton(onClick = {
+                                        showRulesDialog = false
+                                    }) {
                                         Text(stringResource(id = R.string.daily_popup_btn))
                                     }
                                 }
@@ -344,7 +349,11 @@ fun RankingRow(
 
             Box(
                 modifier = Modifier
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
+                        RoundedCornerShape(6.dp)
+                    )
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(

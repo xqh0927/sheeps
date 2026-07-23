@@ -1,24 +1,27 @@
 package com.example.sheeps.game.ui
 
+
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.lib_base.base.collectWithLifecycle
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import com.therouter.router.Route
-import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.game.state.GameViewIntent
 import com.example.sheeps.game.ui.screens.GameScreen
 import com.example.sheeps.game.viewmodel.GameViewModel
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.lib_base.base.collectWithLifecycle
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
+import com.therouter.router.Route
 
 /**
  * 单机游戏模式 Activity（路由路径 `/game/play`）。
@@ -32,11 +35,8 @@ import com.hjq.toast.Toaster
  *   无需要手动释放的资源。
  * - [initData]：加载初始关卡并收集 [com.example.sheeps.game.state.GameViewEffect]；
  *   协程与状态收集均由 Compose / `lifecycleScope` 在销毁时自动取消。
- *
- * 线程约束：UI 构建与回调转发均运行于主线程；振动通过
- * `Context.getSystemService(VIBRATOR_SERVICE)` 局部获取，不持有静态引用。
  */
-@Route(path = "/game/play")
+@Route(path = RouterPath.Game.PLAY)
 @dagger.hilt.android.AndroidEntryPoint
 class GameActivity : BaseActivity() {
 
@@ -72,7 +72,7 @@ class GameActivity : BaseActivity() {
                         onUseShuffle = { viewModel.sendIntent(GameViewIntent.UseShuffle) },
                         onRevive = {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
-                                com.therouter.TheRouter.build("/auth/login")
+                                com.therouter.TheRouter.build(RouterPath.Auth.LOGIN)
                                     .navigation(this@GameActivity)
                                 com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
                             } else {
@@ -85,7 +85,7 @@ class GameActivity : BaseActivity() {
                         onUseDouble = { viewModel.sendIntent(GameViewIntent.UseDoublePoints) },
                         onRestart = {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
-                                com.therouter.TheRouter.build("/auth/login")
+                                com.therouter.TheRouter.build(RouterPath.Auth.LOGIN)
                                     .navigation(this@GameActivity)
                                 com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
                             } else {
@@ -96,7 +96,7 @@ class GameActivity : BaseActivity() {
                         onNextLevel = {
                             val nextLvl = state.currentLevelId + 1
                             if (nextLvl > 3 && !state.isLoggedIn) {
-                                com.therouter.TheRouter.build("/auth/login")
+                                com.therouter.TheRouter.build(RouterPath.Auth.LOGIN)
                                     .navigation(this@GameActivity)
                                 com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
                             } else {
@@ -105,11 +105,11 @@ class GameActivity : BaseActivity() {
                         },
                         onShowLeaderboard = {
                             if (state.currentLevelId > 3 && !state.isLoggedIn) {
-                                com.therouter.TheRouter.build("/auth/login")
+                                com.therouter.TheRouter.build(RouterPath.Auth.LOGIN)
                                     .navigation(this@GameActivity)
                                 com.hjq.toast.Toaster.show(getString(com.example.sheeps.ui.R.string.toast_login_required_level))
                             } else {
-                                com.therouter.TheRouter.build("/leaderboard/show")
+                                com.therouter.TheRouter.build(RouterPath.Leaderboard.SHOW)
                                     .withInt("levelId", state.currentLevelId)
                                     .navigation()
                             }
@@ -148,14 +148,22 @@ class GameActivity : BaseActivity() {
                 is com.example.sheeps.game.state.GameViewEffect.ShowToast -> {
                     Toaster.show(effect.message)
                 }
+
                 is com.example.sheeps.game.state.GameViewEffect.PlaySound -> {
                     // 预留：此处触发全局音效播放
                 }
+
                 is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
                     try {
-                        val vibrator = getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                        val vibrator =
+                            getSystemService(VIBRATOR_SERVICE) as Vibrator
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            vibrator.vibrate(
+                                VibrationEffect.createOneShot(
+                                    100,
+                                    VibrationEffect.DEFAULT_AMPLITUDE
+                                )
+                            )
                         } else {
                             @Suppress("DEPRECATION")
                             vibrator.vibrate(100)

@@ -38,6 +38,8 @@ kapt {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":data"))
+    implementation(project(":designsystem"))
     implementation(project(":lib_base"))
     implementation(libs.therouter)
     implementation(libs.kotlinx.serialization.json)

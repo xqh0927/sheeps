@@ -90,6 +90,8 @@ kapt {
 dependencies {
     // Modular features dependencies
     implementation(project(":core"))
+    implementation(project(":data"))
+    implementation(project(":designsystem"))
     implementation(project(":lib_base"))
     implementation(project(":feature_splash"))
     implementation(project(":feature_menu"))

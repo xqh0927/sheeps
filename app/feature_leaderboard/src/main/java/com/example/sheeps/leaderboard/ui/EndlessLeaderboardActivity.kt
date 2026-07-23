@@ -46,16 +46,14 @@ import javax.inject.Inject
 
 /**
  * 无尽生存排行榜页面（总榜单，无 Tab）。
- *
- * - [com.therouter.router.Route] 路径 "/endless/leaderboard"，由介绍弹窗的"排行榜"按钮跳转。
- * - 调用 [ApiService.getLeaderboard]（levelId=0 表示无尽模式无关卡概念，game_mode=1 区分无尽榜），
- *   一次拉取前 100 名总榜。
- * - 数据加载后自动定位到当前登录用户所在行（[UserPreferences.getUsername]）。
- * - 复用同包下的 [RankingRow] 渲染每一行，并高亮当前用户。
- *
- * 所有配色均走 MaterialTheme.colorScheme 令牌。
  */
-@Route(path = "/endless/leaderboard")
+import com.example.sheeps.lib_base.router.RouterPath
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * 无尽排行榜 Activity。
+ */
+@Route(path = RouterPath.Endless.LEADERBOARD)
 @AndroidEntryPoint
 class EndlessLeaderboardActivity : BaseActivity() {
 
@@ -89,7 +87,7 @@ class EndlessLeaderboardActivity : BaseActivity() {
             LogUtils.d("EndlessLeaderboard: 开始加载")
             isLoading = true
             try {
-                withTimeout(15_000) {
+                withTimeout(15_000.milliseconds) {
                     val resp = apiService.getLeaderboard(0, 100, 1)
                     LogUtils.d("EndlessLeaderboard: 收到响应 success=${resp.success} 条数=${resp.rankings.size}")
                     if (resp.success) {

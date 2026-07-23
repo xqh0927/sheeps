@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.sheeps.game">
 
-    <application>
+     <application>
         <activity
             android:name=".ui.GameActivity"
             android:exported="false"

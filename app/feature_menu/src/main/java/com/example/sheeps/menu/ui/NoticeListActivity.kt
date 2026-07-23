@@ -12,15 +12,12 @@ import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.serialization.json.Json
 
+import com.example.sheeps.lib_base.router.RouterPath
+
 /**
  * 公告列表全屏界面。
- *
- * 生命周期与内存说明：
- * - 数据通过 Intent 的 "noticesJson" 透传（由 MenuActivity 序列化后带入），本身不发起网络请求、无协程。
- * - 反序列化得到的 [notices] 列表作为 Activity 属性持有，随 Activity 销毁而释放，不跨页长期引用，无泄漏。
- * - 反序列化失败则降级为空列表，保证界面可渲染。
  */
-@Route(path = "/menu/notices")
+@Route(path = RouterPath.Menu.NOTICES)
 @AndroidEntryPoint
 class NoticeListActivity : BaseActivity() {
 

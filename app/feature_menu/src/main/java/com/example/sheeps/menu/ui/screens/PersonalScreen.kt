@@ -2,25 +2,43 @@ package com.example.sheeps.menu.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.ui.R
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.menu.ui.components.*
+import com.example.sheeps.menu.ui.components.ActionButtonsSection
+import com.example.sheeps.menu.ui.components.BackpackCard
+import com.example.sheeps.menu.ui.components.DailyTasksCard
+import com.example.sheeps.menu.ui.components.UserProfileCard
 import com.example.sheeps.menu.ui.dialogs.ExchangeHistoryDialog
 import com.example.sheeps.menu.ui.dialogs.GameGuideDialog
 import com.example.sheeps.menu.ui.dialogs.PointHistoryDialog
+import com.example.sheeps.ui.R
 import com.therouter.TheRouter
 
 /**
@@ -53,7 +71,7 @@ fun PersonalScreen(
     var showGameGuide by remember { mutableStateOf(false) }
 
     // --- 弹窗逻辑 ---
-    
+
     // 游戏指南弹窗
     if (showGameGuide) {
         GameGuideDialog(onDismiss = { showGameGuide = false })
@@ -86,12 +104,13 @@ fun PersonalScreen(
     ) {
         // 1. 用户信息卡片与签到（点击头像/昵称跳转用户信息页）
         item {
+
             UserProfileCard(
                 state = state,
                 onLoginClick = onLoginClick,
                 onSignInClick = onSignInClick,
                 onNavigateToUserInfo = {
-                    TheRouter.build("/menu/userinfo").navigation(context)
+                    TheRouter.build(RouterPath.Menu.USER_INFO).navigation(context)
                 }
             )
         }
@@ -128,7 +147,7 @@ fun PersonalScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                TheRouter.build("/menu/settings").navigation(context)
+                                TheRouter.build(RouterPath.Menu.SETTINGS).navigation(context)
                             }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,

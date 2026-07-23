@@ -1,5 +1,6 @@
 package com.example.sheeps.game.ui
 
+
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -9,16 +10,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.lib_base.base.collectWithLifecycle
-import com.therouter.router.Route
-import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.game.state.EndlessViewEffect
 import com.example.sheeps.game.state.EndlessViewIntent
 import com.example.sheeps.game.ui.screens.EndlessScreen
 import com.example.sheeps.game.viewmodel.EndlessViewModel
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.lib_base.base.collectWithLifecycle
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
+import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -33,10 +34,8 @@ import dagger.hilt.android.AndroidEntryPoint
  * - [initView]：在 `onCreate` 之后由 [BaseActivity] 调用，构建界面并发送
  *   Init 意图（非每日、seed=0）；无需要手动释放的资源。
  * - [initData]：收集副作用流；协程绑定 `lifecycleScope`，onDestroy 自动取消。
- *
- * 线程约束：UI 构建与意图转发均运行于主线程。
  */
-@Route(path = "/endless/play")
+@Route(path = RouterPath.Endless.PLAY)
 @AndroidEntryPoint
 class EndlessActivity : BaseActivity() {
 
@@ -80,8 +79,12 @@ class EndlessActivity : BaseActivity() {
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
                 is EndlessViewEffect.ShowToast -> Toaster.show(effect.message)
-                is EndlessViewEffect.PlaySound -> { /* 播放音效（接入音效模块后实现） */ }
-                is EndlessViewEffect.Vibrate -> { /* 设备振动（接入后实现） */ }
+                is EndlessViewEffect.PlaySound -> { /* 播放音效（接入音效模块后实现） */
+                }
+
+                is EndlessViewEffect.Vibrate -> { /* 设备振动（接入后实现） */
+                }
+
                 is EndlessViewEffect.ExitGame -> finish()
             }
         }

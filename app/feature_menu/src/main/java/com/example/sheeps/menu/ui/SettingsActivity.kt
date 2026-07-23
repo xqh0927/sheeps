@@ -1,5 +1,6 @@
 package com.example.sheeps.menu.ui
 
+
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -7,9 +8,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.sheeps.lib_network.AppConfig
-import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.preference.UserPreferences
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.lib_base.router.RouterPath
+import com.example.sheeps.lib_network.AppConfig
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.GameGuideDialog
 import com.example.sheeps.menu.ui.screens.SettingsScreen
@@ -21,17 +23,14 @@ import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /**
- * 全屏设置 Activity。
+ * 设置中心全屏 Activity。
  * 包含语言切换、主题切换、玩法说明等功能。
  *
  * 生命周期与内存说明：
  * - 注入的 prefs 为 Hilt 单例，Activity 销毁即释放。
- * - 语言/主题变更通过 MMKV 静态标记（"language_changed_in_settings"/"theme_changed_in_settings"）通知 MenuActivity，
- *   MMKV 为进程级单例、仅写布尔标记，不持有 Activity/Context，无泄漏；
- *   ThemeManager 为全局 StateFlow，SheepsTheme 自动响应，无需 recreate。
- * - 仅构建精简版 [MenuViewState] 供 SettingsScreen 使用，不持有完整菜单状态。
+ * - 语言/主题变更通过 MMKV 静态标记（"language_changed_in_settings"/"theme_changed_in_settings"）通知 MenuActivity
  */
-@Route(path = "/menu/settings")
+@Route(path = RouterPath.Menu.SETTINGS)
 @AndroidEntryPoint
 class SettingsActivity : BaseActivity() {
 
@@ -105,7 +104,7 @@ class SettingsActivity : BaseActivity() {
      * @param title 顶部标题
      */
     private fun openH5(url: String, title: String) {
-        TheRouter.build("/web/h5")
+        TheRouter.build(RouterPath.Web.H5)
             .withString("url", url)
             .withString("title", title)
             .navigation(this)

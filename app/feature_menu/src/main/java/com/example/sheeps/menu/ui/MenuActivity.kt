@@ -68,12 +68,12 @@ import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
 import kotlinx.serialization.json.Json
 
+import com.example.sheeps.lib_base.router.RouterPath
+
 /**
  * 游戏主入口菜单 Activity。
- * 承载了游戏主页、商店、个人中心三个主要 Tab 页。
- * 负责处理多语言切换、登录冲突解决、App 更新检测以及全局弹窗逻辑。
  */
-@Route(path = "/menu/main")
+@Route(path = RouterPath.Menu.MAIN)
 @AndroidEntryPoint
 class MenuActivity : BaseActivity() {
 
@@ -164,7 +164,7 @@ class MenuActivity : BaseActivity() {
                         AuthEventBus.events.collect { event ->
                             if (event is AuthEvent.Logout) {
                                 Toaster.show(localizedContext.getString(R.string.toast_session_expired))
-                                TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                TheRouter.build(RouterPath.Auth.LOGIN).navigation(this@MenuActivity)
                                 finish()
                             }
                         }
@@ -188,13 +188,13 @@ class MenuActivity : BaseActivity() {
                                 }
 
                                 is MenuViewEffect.ShowLoginActivity -> {
-                                    TheRouter.build("/auth/login").navigation(this@MenuActivity)
+                                    TheRouter.build(RouterPath.Auth.LOGIN).navigation(this@MenuActivity)
                                 }
 
                                 is MenuViewEffect.NavigateToGame -> {
                                     showPrepareDialog = null
                                     viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
-                                    TheRouter.build("/game/play")
+                                    TheRouter.build(RouterPath.Game.PLAY)
                                         .withInt("levelId", effect.levelId)
                                         .withString("carryItemsJson", effect.carryItemsJson)
                                         .navigation()
@@ -267,7 +267,7 @@ class MenuActivity : BaseActivity() {
                                             state = state,
                                             onLevelClick = { lvl ->
                                                 if (lvl > 3 && !state.isLoggedIn) {
-                                                    TheRouter.build("/auth/login")
+                                                    TheRouter.build(RouterPath.Auth.LOGIN)
                                                         .navigation(this@MenuActivity)
                                                     Toaster.show(this@MenuActivity.getString(R.string.toast_login_required_level))
                                                 } else {
@@ -275,12 +275,12 @@ class MenuActivity : BaseActivity() {
                                                 }
                                             },
                                             onShowLeaderboard = { lvl ->
-                                                TheRouter.build("/leaderboard/show")
+                                                TheRouter.build(RouterPath.Leaderboard.SHOW)
                                                     .withInt("levelId", lvl)
                                                     .navigation()
                                             },
                                             onNoticeClick = {
-                                                TheRouter.build("/menu/notices")
+                                                TheRouter.build(RouterPath.Menu.NOTICES)
                                                     .withString(
                                                         "noticesJson",
                                                         json.encodeToString(state.notices)
@@ -288,7 +288,7 @@ class MenuActivity : BaseActivity() {
                                                     .navigation()
                                             },
                                             onLoginClick = {
-                                                TheRouter.build("/auth/login")
+                                                TheRouter.build(RouterPath.Auth.LOGIN)
                                                     .navigation(this@MenuActivity)
                                             },
                                             onJoinMatch = {
@@ -307,7 +307,7 @@ class MenuActivity : BaseActivity() {
                                             },
                                             onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
                                             onNavigateToDuel = { gId, pId, levelId, seed ->
-                                                TheRouter.build("/game/duel")
+                                                TheRouter.build(RouterPath.Game.DUEL)
                                                     .withString("gameId", gId)
                                                     .withString("playerId", pId)
                                                     .withInt("levelId", levelId)
@@ -319,7 +319,7 @@ class MenuActivity : BaseActivity() {
                                         "shop" -> ShopScreen(
                                             state = state,
                                             onLoginClick = {
-                                                TheRouter.build("/auth/login")
+                                                TheRouter.build(RouterPath.Auth.LOGIN)
                                                     .navigation(this@MenuActivity)
                                             },
                                             onExchangeClick = { itemId, count ->
@@ -342,7 +342,7 @@ class MenuActivity : BaseActivity() {
                                         "me" -> PersonalScreen(
                                             state = state,
                                             onLoginClick = {
-                                                TheRouter.build("/auth/login")
+                                                TheRouter.build(RouterPath.Auth.LOGIN)
                                                     .navigation(this@MenuActivity)
                                             },
                                             onLogoutClick = {

@@ -4,22 +4,21 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
-import com.example.sheeps.lib_base.base.collectWithLifecycle
-import com.therouter.router.Route
-import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.game.state.DuelViewEffect
 import com.example.sheeps.game.state.DuelViewIntent
 import com.example.sheeps.game.ui.screens.DuelScreen
 import com.example.sheeps.game.viewmodel.DuelViewModel
+import com.example.sheeps.lib_base.base.BaseActivity
+import com.example.sheeps.lib_base.base.collectWithLifecycle
+import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
+import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -34,11 +33,9 @@ import dagger.hilt.android.AndroidEntryPoint
  * 生命周期职责：
  * - [initView]：在 `onCreate` 之后由 [BaseActivity] 调用，构建界面并发送
  *   Init 意图；无需要手动释放的资源。
- * - [initData]：收集副作用流；协程绑定 `lifecycleScope`，onDestroy 自动取消。
- *
- * 线程约束：UI 构建与回调转发均运行于主线程。
+ * - [initData]：收集副作用流；协程绑定 `lifecycleScope`，onDestroy 自动取消。。
  */
-@Route(path = "/game/duel")
+@Route(path = RouterPath.Game.DUEL)
 @AndroidEntryPoint
 class DuelActivity : BaseActivity() {
 
@@ -68,11 +65,17 @@ class DuelActivity : BaseActivity() {
                     DuelScreen(
                         state = state,
                         onTileClick = { tile -> viewModel.sendIntent(DuelViewIntent.ClickTile(tile)) },
-                        onLeave = { 
+                        onLeave = {
                             viewModel.sendIntent(DuelViewIntent.Leave)
                         },
                         onRestart = { viewModel.sendIntent(DuelViewIntent.Restart) },
-                        onCastSpell = { spellType -> viewModel.sendIntent(DuelViewIntent.CastSpell(spellType)) }
+                        onCastSpell = { spellType ->
+                            viewModel.sendIntent(
+                                DuelViewIntent.CastSpell(
+                                    spellType
+                                )
+                            )
+                        }
                     )
                 }
             }
@@ -94,8 +97,12 @@ class DuelActivity : BaseActivity() {
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
                 is DuelViewEffect.ShowToast -> Toaster.show(effect.message)
-                is DuelViewEffect.PlaySound -> { /* Play sound */ }
-                is DuelViewEffect.Vibrate -> { /* Vibrate */ }
+                is DuelViewEffect.PlaySound -> { /* Play sound */
+                }
+
+                is DuelViewEffect.Vibrate -> { /* Vibrate */
+                }
+
                 is DuelViewEffect.ExitGame -> finish()
             }
         }

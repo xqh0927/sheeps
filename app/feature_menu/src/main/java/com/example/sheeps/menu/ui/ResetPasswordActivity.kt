@@ -26,14 +26,13 @@ import javax.inject.Inject
 
 /**
  * 全屏找回密码 Activity。
- * 重置成功后 toast 提示并自动关闭，回到登录页。
- *
- * 生命周期与内存说明：
- * - 注入的 apiService 为 Hilt 单例，Activity 销毁即释放，不长期持有界面。
- * - 重置请求使用 [androidx.lifecycle.lifecycleScope]，保证 finish() 后请求仍可完成；
- *   lifecycleScope 随 Activity 销毁自动取消，无泄漏。
+ * 重置成功后 toast 提示并自动关闭，回到登录页。*/
+import com.example.sheeps.lib_base.router.RouterPath
+
+/**
+ * 重置密码 Activity。
  */
-@Route(path = "/auth/reset-password")
+@Route(path = RouterPath.Auth.RESET_PASSWORD)
 @AndroidEntryPoint
 class ResetPasswordActivity : BaseActivity() {
 
