@@ -1,0 +1,12 @@
+<resources>
+    <string name="lobby_atlas">關卡圖鑑</string>
+    <string name="lobby_duel">線上對戰</string>
+    <string name="lobby_rest">休整關卡</string>
+    <string name="lobby_unlock_tip">如何解鎖關卡</string>
+    <string name="lobby_previous_page">上一頁關卡</string>
+    <string name="lobby_next_page">下一頁關卡</string>
+    <string name="lobby_loadout">出發準備</string>
+    <string name="lobby_picked">已選 %1$d / 5 種</string>
+    <string name="lobby_opponent">對手</string>
+    <string name="lobby_you">我方</string>
+</resources>

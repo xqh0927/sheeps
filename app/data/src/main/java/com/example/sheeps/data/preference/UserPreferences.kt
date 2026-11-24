@@ -92,6 +92,15 @@ class UserPreferences @Inject constructor(
         return securePrefs.getString("jwt_token", null)
     }
 
+    /** Account scope of the stored access token. Device UUID remains separate for guest saves. */
+    fun accountId(token: String? = getToken()): String? {
+        val payload = token?.split('.')?.getOrNull(1) ?: return null
+        return runCatching {
+            val bytes = android.util.Base64.decode(payload, android.util.Base64.URL_SAFE)
+            org.json.JSONObject(bytes.toString(Charsets.UTF_8)).getString("userId")
+        }.getOrNull()
+    }
+
     fun setToken(token: String?) {
         securePrefs.edit().putString("jwt_token", token).apply()
     }

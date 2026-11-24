@@ -1,6 +1,7 @@
 package com.example.sheeps.game.viewmodel
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.viewModelScope
 import com.example.sheeps.ui.R
 import com.example.sheeps.lib_base.base.BaseMviViewModel
@@ -38,7 +39,6 @@ class EndlessViewModel @Inject constructor(
 
     companion object {
         private const val COL_COUNT = 6              // 棋盘列数（无尽叠塔）
-        private const val FREEZE_DURATION_MS = 4000L
         private const val FREEZE_INITIAL = 3
         private const val WAVE_ELIM_STEP = 20       // 每消除 20 张升一波
         private const val WAVE_TIME_STEP_MS = 40_000L // 每存活 40s 升一波
@@ -47,6 +47,7 @@ class EndlessViewModel @Inject constructor(
 
     /** 下落循环 Job（Restart/Init 时取消旧 Job，避免并发计时器） */
     private var spawnJob: Job? = null
+    private lateinit var dropClock: EndlessDropClock
     /** 累计存活毫秒（近似 = 各次下落间隔之和） */
     private var survivalMs: Long = 0
     /** 累计消除卡牌数（用于波次触发） */
@@ -95,6 +96,7 @@ class EndlessViewModel @Inject constructor(
                 visibleLayers = 2
             )
         }
+        dropClock = EndlessDropClock(SystemClock.uptimeMillis(), currentState.dropIntervalMs)
         startSpawnLoop()
     }
 
@@ -105,7 +107,9 @@ class EndlessViewModel @Inject constructor(
     private fun handlePause() {
         if (currentState.status == EndlessStatus.PLAYING) {
             spawnJob?.cancel()
-            updateState { copy(status = EndlessStatus.PAUSED) }
+            val now = SystemClock.uptimeMillis()
+            dropClock.pause(now)
+            updateState { copy(status = EndlessStatus.PAUSED, freezeRemainingMs = dropClock.freezeRemainingMs(now)) }
         } else if (currentState.status == EndlessStatus.PAUSED) {
             handleResume()
         }
@@ -113,6 +117,7 @@ class EndlessViewModel @Inject constructor(
 
     private fun handleResume() {
         if (currentState.status == EndlessStatus.PAUSED) {
+            dropClock.resume(SystemClock.uptimeMillis())
             updateState { copy(status = EndlessStatus.PLAYING) }
             startSpawnLoop()
         }
@@ -120,22 +125,28 @@ class EndlessViewModel @Inject constructor(
 
     // ===== 下落计时器 =====
 
-    /**
-     * 启动下落循环：取消旧 [spawnJob] 后在 [viewModelScope] 内 `while (PLAYING)` 循环。
-     * 冻结期间以 200ms 轮询跳过实际下落；正常按 `dropIntervalMs` 间隔触发 [doSpawn]。
-     * 旧 Job 先 cancel 防止并发计时器叠加（内存/逻辑隐患防护）。
-     */
+    /** 一个任务负责整局的下落与冻结，到点醒来后重新读取两个截止时间。 */
     private fun startSpawnLoop() {
         spawnJob?.cancel()
         spawnJob = viewModelScope.launch {
             while (currentState.status == EndlessStatus.PLAYING) {
-                if (currentState.isFrozen) {
-                    delay(200.milliseconds)
+                val now = SystemClock.uptimeMillis()
+                val frozenMs = dropClock.freezeRemainingMs(now)
+                if (frozenMs != currentState.freezeRemainingMs) {
+                    updateState { copy(freezeRemainingMs = frozenMs) }
+                }
+                if (frozenMs > 0) {
+                    // 在屏幕显示的秒数变化时唤醒，暂停恢复后可能不足一整秒。
+                    delay((frozenMs - 1) % 1_000 + 1)
                     continue
                 }
-                delay(currentState.dropIntervalMs.milliseconds)
-                if (currentState.status != EndlessStatus.PLAYING) break
+                val untilDrop = dropClock.dropDueInMs(now)
+                if (untilDrop > 0) {
+                    delay(untilDrop)
+                    continue
+                }
                 doSpawn()
+                dropClock.scheduleNextDrop(SystemClock.uptimeMillis(), currentState.dropIntervalMs)
             }
         }
     }
@@ -172,8 +183,10 @@ class EndlessViewModel @Inject constructor(
         }
 
         // 2. 异步协程延迟 200ms，等待飞行动画完毕后执行匹配与死亡判定
+        val round = dropClock
         viewModelScope.launch {
             delay(200.milliseconds)
+            if (round !== dropClock || currentState.status == EndlessStatus.GAMEOVER) return@launch
 
             var matchOccurred = false
             var matchedIds = emptySet<String>()
@@ -226,23 +239,13 @@ class EndlessViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 使用冻结道具：暂停下落并启动倒计时协程（[viewModelScope] 内 100ms 轮询更新 `freezeRemainingMs`）。
-     * 倒计时结束自动解除冻结。运行于主线程。
-     */
     private fun handleUseFreeze() {
-        if (currentState.freezeCount <= 0 || currentState.isFrozen) return
-        if (currentState.status != EndlessStatus.PLAYING) return
-        updateState { copy(isFrozen = true, freezeRemainingMs = FREEZE_DURATION_MS, freezeCount = freezeCount - 1) }
-        viewModelScope.launch {
-            var remaining = FREEZE_DURATION_MS
-            while (remaining > 0 && currentState.isFrozen) {
-                delay(100.milliseconds)
-                remaining -= 100
-                updateState { copy(freezeRemainingMs = remaining.coerceAtLeast(0)) }
-            }
-            if (currentState.isFrozen) updateState { copy(isFrozen = false, freezeRemainingMs = 0) }
-        }
+        if (currentState.status != EndlessStatus.PLAYING || currentState.freezeCount <= 0) return
+        val now = SystemClock.uptimeMillis()
+        if (dropClock.freezeRemainingMs(now) > 0) return
+        dropClock.freeze(now)
+        updateState { copy(freezeRemainingMs = dropClock.freezeRemainingMs(now), freezeCount = freezeCount - 1) }
+        startSpawnLoop()
     }
 
     // ===== 波次与死亡 =====
@@ -275,6 +278,7 @@ class EndlessViewModel @Inject constructor(
         updateState {
             copy(
                 status = EndlessStatus.GAMEOVER,
+                freezeRemainingMs = 0,
                 showResult = true,
                 deathReason = reason,
                 bestScore = maxOf(prevBest, currentState.score)

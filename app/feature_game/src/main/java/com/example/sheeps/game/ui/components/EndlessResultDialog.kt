@@ -1,10 +1,12 @@
 package com.example.sheeps.game.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -38,7 +40,8 @@ fun EndlessResultDialog(
         title = {
             Text(
                 text = stringResource(R.string.endless_game_over),
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
         },
@@ -54,16 +57,12 @@ fun EndlessResultDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                Text(
-                    text = stringResource(R.string.endless_score, score),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.endless_best, bestScore),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh,
+                    RoundedCornerShape(18.dp)).padding(14.dp)) {
+                    MatchScore(stringResource(R.string.game_score_label), score, MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.endless_best, bestScore),
+                        style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (isNewBest) {
                     Text(
                         text = stringResource(R.string.endless_new_best),
@@ -76,7 +75,7 @@ fun EndlessResultDialog(
         confirmButton = {
             Button(
                 onClick = onRestart,
-                shape = RoundedCornerShape(10.dp),
+                shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary

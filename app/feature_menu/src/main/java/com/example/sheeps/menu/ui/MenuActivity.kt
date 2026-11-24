@@ -4,10 +4,10 @@ import android.os.Bundle
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,9 +24,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.foundation.layout.absolutePadding
+import androidx.compose.ui.platform.LocalLayoutDirection
+import com.example.sheeps.menu.ui.components.LocalMenuBottomInset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.pointer.pointerInput
@@ -123,7 +134,10 @@ class MenuActivity : BaseActivity() {
             CompositionLocalProvider(LocalContext provides localizedContext) {
                 SheepsTheme {
                     // --- 界面控制状态 ---
-                    var currentTab by remember { mutableStateOf("game") }
+                    var currentTab by rememberSaveable { mutableStateOf("game") }
+                    val tabState = rememberSaveableStateHolder()
+                    val pageLayer = rememberGraphicsLayer()
+                    var pageOrigin by remember { mutableStateOf(Offset.Zero) }
                     var showPrepareDialog by remember { mutableStateOf<Int?>(null) }
                     var showConflictInfo by remember { mutableStateOf<ConflictInfo?>(null) }
                     var showSetPasswordDialog by remember { mutableStateOf(false) }
@@ -226,145 +240,151 @@ class MenuActivity : BaseActivity() {
                         },
                         bottomBar = {
                             MenuBottomNavigation(
+                                pageLayer = pageLayer, pageOrigin = pageOrigin,
                                 currentTab = currentTab,
-                                onTabSelected = { tab ->
-                                    currentTab = tab
-                                    viewModel.sendIntent(MenuViewIntent.LoadData)
-                                }
+                                onTabSelected = { tab -> currentTab = tab }
                             )
                         }
                     ) { paddingValues ->
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.background,
-                                            MaterialTheme.colorScheme.surface,
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        )
-                                    )
-                                )
+                                .background(MaterialTheme.colorScheme.background)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(paddingValues)
+                                    .absolutePadding(
+                                        left = paddingValues.calculateLeftPadding(LocalLayoutDirection.current),
+                                        right = paddingValues.calculateRightPadding(LocalLayoutDirection.current),
+                                        top = paddingValues.calculateTopPadding()
+                                    )
                             ) {
                                 // 标签页切换动画
-                                AnimatedContent(
-                                    targetState = currentTab,
-                                    transitionSpec = {
-                                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(
-                                            animationSpec = tween(300)
-                                        )
-                                    },
-                                    label = "tabChange"
-                                ) { targetTab ->
-                                    when (targetTab) {
-                                        "game" -> GameHomeScreen(
-                                            state = state,
-                                            onLevelClick = { lvl ->
-                                                if (lvl > 3 && !state.isLoggedIn) {
-                                                    TheRouter.build(RouterPath.Auth.LOGIN)
-                                                        .navigation(this@MenuActivity)
-                                                    Toaster.show(this@MenuActivity.getString(R.string.toast_login_required_level))
-                                                } else {
-                                                    showPrepareDialog = lvl
-                                                }
+                                CompositionLocalProvider(LocalMenuBottomInset provides paddingValues.calculateBottomPadding()) {
+                                    AnimatedContent(
+                                        modifier = Modifier.fillMaxSize().onGloballyPositioned { pageOrigin = it.positionInRoot() }
+                                            .drawWithContent {
+                                                pageLayer.record { this@drawWithContent.drawContent() }
+                                                drawLayer(pageLayer)
                                             },
-                                            onShowLeaderboard = { lvl ->
-                                                TheRouter.build(RouterPath.Leaderboard.SHOW)
-                                                    .withInt("levelId", lvl)
-                                                    .navigation()
-                                            },
-                                            onNoticeClick = {
-                                                TheRouter.build(RouterPath.Menu.NOTICES)
-                                                    .withString(
-                                                        "noticesJson",
-                                                        json.encodeToString(state.notices)
-                                                    )
-                                                    .navigation()
-                                            },
-                                            onLoginClick = {
-                                                TheRouter.build(RouterPath.Auth.LOGIN)
-                                                    .navigation(this@MenuActivity)
-                                            },
-                                            onJoinMatch = {
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.JoinMatch(
-                                                        state.phone
-                                                    )
+                                        targetState = currentTab,
+                                        transitionSpec = {
+                                            val tabs = listOf("game", "shop", "me")
+                                            val direction = if (tabs.indexOf(targetState) > tabs.indexOf(initialState))
+                                                AnimatedContentTransitionScope.SlideDirection.Start
+                                            else AnimatedContentTransitionScope.SlideDirection.End
+                                            slideIntoContainer(direction, tween(240, easing = FastOutSlowInEasing)) togetherWith
+                                                slideOutOfContainer(direction, tween(240, easing = FastOutSlowInEasing))
+                                        },
+                                        label = "tabChange"
+                                    ) { targetTab ->
+                                        tabState.SaveableStateProvider(targetTab) {
+                                            when (targetTab) {
+                                                "game" -> GameHomeScreen(
+                                                    state = state,
+                                                    onLevelClick = { lvl ->
+                                                        if (lvl > 3 && !state.isLoggedIn) {
+                                                            TheRouter.build(RouterPath.Auth.LOGIN)
+                                                                .navigation(this@MenuActivity)
+                                                            Toaster.show(this@MenuActivity.getString(R.string.toast_login_required_level))
+                                                        } else {
+                                                            showPrepareDialog = lvl
+                                                        }
+                                                    },
+                                                    onShowLeaderboard = { lvl ->
+                                                        TheRouter.build(RouterPath.Leaderboard.SHOW)
+                                                            .withInt("levelId", lvl)
+                                                            .navigation()
+                                                    },
+                                                    onNoticeClick = {
+                                                        TheRouter.build(RouterPath.Menu.NOTICES)
+                                                            .withString(
+                                                                "noticesJson",
+                                                                json.encodeToString(state.notices)
+                                                            )
+                                                            .navigation()
+                                                    },
+                                                    onLoginClick = {
+                                                        TheRouter.build(RouterPath.Auth.LOGIN)
+                                                            .navigation(this@MenuActivity)
+                                                    },
+                                                    onJoinMatch = {
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.JoinMatch(
+                                                                state.phone
+                                                            )
+                                                        )
+                                                    },
+                                                    onLeaveMatch = {
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.LeaveMatch(
+                                                                state.phone
+                                                            )
+                                                        )
+                                                    },
+                                                    onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
+                                                    onNavigateToDuel = { gId, pId, levelId, seed ->
+                                                        TheRouter.build(RouterPath.Game.DUEL)
+                                                            .withString("gameId", gId)
+                                                            .withString("playerId", pId)
+                                                            .withInt("levelId", levelId)
+                                                            .withInt("seed", seed)
+                                                            .navigation()
+                                                    }
                                                 )
-                                            },
-                                            onLeaveMatch = {
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.LeaveMatch(
-                                                        state.phone
-                                                    )
-                                                )
-                                            },
-                                            onResetMatch = { viewModel.sendIntent(MenuViewIntent.ResetMatchStatus) },
-                                            onNavigateToDuel = { gId, pId, levelId, seed ->
-                                                TheRouter.build(RouterPath.Game.DUEL)
-                                                    .withString("gameId", gId)
-                                                    .withString("playerId", pId)
-                                                    .withInt("levelId", levelId)
-                                                    .withInt("seed", seed)
-                                                    .navigation()
-                                            }
-                                        )
 
-                                        "shop" -> ShopScreen(
-                                            state = state,
-                                            onLoginClick = {
-                                                TheRouter.build(RouterPath.Auth.LOGIN)
-                                                    .navigation(this@MenuActivity)
-                                            },
-                                            onExchangeClick = { itemId, count ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.ExchangeShopItem(
-                                                        itemId,
-                                                        count
-                                                    )
+                                                "shop" -> ShopScreen(
+                                                    state = state,
+                                                    onLoginClick = {
+                                                        TheRouter.build(RouterPath.Auth.LOGIN)
+                                                            .navigation(this@MenuActivity)
+                                                    },
+                                                    onExchangeClick = { itemId, count ->
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.ExchangeShopItem(
+                                                                itemId,
+                                                                count
+                                                            )
+                                                        )
+                                                    },
+                                                    onChangeSkin = { skin ->
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.ChangeSkin(
+                                                                skin
+                                                            )
+                                                        )
+                                                    }
                                                 )
-                                            },
-                                            onChangeSkin = { skin ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.ChangeSkin(
-                                                        skin
-                                                    )
+
+                                                "me" -> PersonalScreen(
+                                                    state = state,
+                                                    onLoginClick = {
+                                                        TheRouter.build(RouterPath.Auth.LOGIN)
+                                                            .navigation(this@MenuActivity)
+                                                    },
+                                                    onLogoutClick = {
+                                                        showLogoutConfirm = true
+                                                    },
+                                                    onSignInClick = {
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.SignIn
+                                                        )
+                                                    },
+                                                    onClaimTask = { taskId ->
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.ClaimTask(taskId)
+                                                        )
+                                                    },
+                                                    onApplySkin = { skin ->
+                                                        viewModel.sendIntent(
+                                                            MenuViewIntent.ChangeSkin(skin)
+                                                        )
+                                                    },
+                                                    onGoToPlay = { currentTab = "game" }
                                                 )
                                             }
-                                        )
-
-                                        "me" -> PersonalScreen(
-                                            state = state,
-                                            onLoginClick = {
-                                                TheRouter.build(RouterPath.Auth.LOGIN)
-                                                    .navigation(this@MenuActivity)
-                                            },
-                                            onLogoutClick = {
-                                                showLogoutConfirm = true
-                                            },
-                                            onSignInClick = {
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.SignIn
-                                                )
-                                            },
-                                            onClaimTask = { taskId ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.ClaimTask(taskId)
-                                                )
-                                            },
-                                            onApplySkin = { skin ->
-                                                viewModel.sendIntent(
-                                                    MenuViewIntent.ChangeSkin(skin)
-                                                )
-                                            },
-                                            onGoToPlay = { currentTab = "game" }
-                                        )
+                                        }
                                     }
                                 }
 
@@ -525,7 +545,7 @@ class MenuActivity : BaseActivity() {
 
 
     override fun initData() {
-        // ViewModel 在创建时自动加载初始数据
+        // onResume requests the menu data after the local view state is available.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -557,14 +577,10 @@ class MenuActivity : BaseActivity() {
         if (kv.decodeBool("language_changed_in_settings", false)) {
             kv.removeValueForKey("language_changed_in_settings")
             viewModel.sendIntent(MenuViewIntent.ChangeLanguage(userPrefs.getLanguage()))
-            // handleLoadData 已在 ChangeLanguage 中调用，无需再发 LoadData
-            return
+        } else {
+            viewModel.sendIntent(MenuViewIntent.LoadData)
         }
-
-        // 每次回到前台刷新一次数据（如积分、体力等）
-        viewModel.sendIntent(MenuViewIntent.LoadData)
-
-        // 每次回到前台重新拉取游戏模式开关状态，确保管理后台变更即时生效
+        // Both paths recheck mode switches when their foreground refresh interval has elapsed.
         viewModel.refreshGameModes()
     }
 }

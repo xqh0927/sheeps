@@ -65,7 +65,7 @@ fun PrimaryButton(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
         ),
         label = "primaryButtonScale"
@@ -85,13 +85,13 @@ fun PrimaryButton(
         },
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = Text_OnPrimary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
             disabledContentColor = Text_Disabled_Dark
         ),
         shape = ShapeMedium,
         elevation = ButtonDefaults.buttonElevation(
-            defaultElevation = 4.dp,
+            defaultElevation = 0.dp,
             pressedElevation = 0.dp // 按压时取消投影，增加下沉感
         )
     ) {
@@ -130,7 +130,7 @@ fun SecondaryButton(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium
         ),
         label = "secondaryButtonScale"
@@ -221,7 +221,7 @@ fun DangerButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
         label = "dangerScale"
     )
 
@@ -259,7 +259,7 @@ fun ToolItemButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed && enabled) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy),
         label = "toolButtonScale"
     )
 

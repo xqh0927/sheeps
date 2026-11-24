@@ -1,0 +1,12 @@
+<resources>
+    <string name="lobby_atlas">关卡图鉴</string>
+    <string name="lobby_duel">在线对战</string>
+    <string name="lobby_rest">休整关卡</string>
+    <string name="lobby_unlock_tip">如何解锁关卡</string>
+    <string name="lobby_previous_page">上一页关卡</string>
+    <string name="lobby_next_page">下一页关卡</string>
+    <string name="lobby_loadout">出发准备</string>
+    <string name="lobby_picked">已选 %1$d / 5 种</string>
+    <string name="lobby_opponent">对手</string>
+    <string name="lobby_you">我方</string>
+</resources>

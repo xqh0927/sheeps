@@ -1,40 +1,27 @@
 package com.example.sheeps.menu.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.sheeps.ui.R
 import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.ui.R
 
-/**
- * 用户信息卡片组件
- * 展示用户基本信息、积分、签到天数和最高关卡，并提供登录/签到入口
- *
- * @param state 界面状态数据
- * @param onLoginClick 登录点击回调
- * @param onSignInClick 签到点击回调
- * @param onNavigateToUserInfo 点击头像/昵称区域跳转用户信息页回调
- */
 @Composable
 fun UserProfileCard(
     state: MenuViewState,
@@ -42,118 +29,68 @@ fun UserProfileCard(
     onSignInClick: () -> Unit,
     onNavigateToUserInfo: () -> Unit = {}
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // 第一部分：头像与昵称/UID（登录后点击跳转用户信息页）
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clickable {
-                        if (state.isLoggedIn) onNavigateToUserInfo() else onLoginClick()
-                    }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (state.avatarUrl.isNotBlank()) {
-                        AsyncImage(
-                            model = state.avatarUrl,
-                            contentDescription = "头像",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Me",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+    val colors = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = colors.surface) {
+        Column {
+            Row(Modifier.fillMaxWidth().clickable(
+                onClick = if (state.isLoggedIn) onNavigateToUserInfo else onLoginClick
+            ).padding(horizontal = 18.dp, vertical = 18.dp), horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                PlayerPortrait(state.avatarUrl, Modifier.size(60.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (state.isLoggedIn) state.username else stringResource(R.string.user_guest),
+                        style = typography.headlineSmall, fontWeight = FontWeight.Bold, color = colors.onSurface)
+                    if (state.isLoggedIn && state.phone.isNotBlank()) {
+                        Text(state.phone, style = typography.bodyMedium, color = colors.onSurfaceVariant)
                     }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (state.isLoggedIn) state.username else stringResource(id = R.string.user_guest),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontFamily = FontFamily.Serif
-                    )
-                    Text(
-                        text = if (state.isLoggedIn) "UID: ${state.phone}" else stringResource(id = R.string.user_not_logged_in),
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.onSurfaceVariant)
+            }
+            CatalogDivider(18.dp)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.points_balance_label), style = typography.bodySmall, color = colors.onSurfaceVariant)
+                    AnimatedContent(state.points, label = "wallet") { amount ->
+                        Text(amount.toString(), style = typography.headlineLarge, fontWeight = FontWeight.Bold, color = colors.onSurface)
+                    }
                 }
-                if (state.isLoggedIn) {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "查看个人信息",
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                    )
+                Button(onClick = if (state.isLoggedIn) onSignInClick else onLoginClick,
+                    enabled = !state.isLoggedIn || !state.todaySigned, shape = CircleShape) {
+                    Text(stringResource(when {
+                        !state.isLoggedIn -> R.string.btn_login_sync
+                        state.todaySigned -> R.string.btn_signed_today
+                        else -> R.string.btn_sign_today
+                    }))
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 第二部分：积分、签到天数、最高关卡数据展示
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(stringResource(id = R.string.points_balance_label), fontSize = 12.sp, color = Color.Gray)
-                    Text("${state.points}", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-                Column {
-                    Text(stringResource(id = R.string.streak_label), fontSize = 12.sp, color = Color.Gray)
-                    Text(stringResource(id = R.string.streak_days, state.signStreak), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-                Column {
-                    Text(stringResource(id = R.string.highest_level_label), fontSize = 12.sp, color = Color.Gray)
-                    Text(stringResource(id = R.string.level_number, state.highestLevelCleared), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 第三部分：交互按钮（登录或签到）
-            if (state.isLoggedIn) {
-                Button(
-                    onClick = onSignInClick,
-                    enabled = !state.todaySigned,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = if (state.todaySigned) stringResource(id = R.string.btn_signed_today) else stringResource(id = R.string.btn_sign_today),
-                        color = if (state.todaySigned) Color.DarkGray else Color.White
-                    )
-                }
-            } else {
-                Button(
-                    onClick = onLoginClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(stringResource(id = R.string.btn_login_sync), color = Color.White)
-                }
+            Row(Modifier.fillMaxWidth().background(colors.primary.copy(alpha = .06f)).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                StatTile(stringResource(R.string.highest_level_label), stringResource(R.string.level_number, state.highestLevelCleared), Modifier.weight(1f))
+                VerticalDivider(Modifier.height(32.dp), color = colors.outlineVariant)
+                StatTile(stringResource(R.string.streak_label), stringResource(R.string.streak_days, state.signStreak), Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Composable
+internal fun PlayerPortrait(url: String, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Box(modifier.clip(CircleShape).background(colors.primaryContainer), contentAlignment = Alignment.Center) {
+        if (url.isNotBlank()) {
+            AsyncImage(url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Icon(Icons.Default.Person, contentDescription = null, tint = colors.onPrimaryContainer, modifier = Modifier.fillMaxSize(.56f))
+        }
+    }
+}
+
+@Composable
+private fun StatTile(label: String, value: String, modifier: Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
     }
 }

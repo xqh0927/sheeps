@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
 
-    <string name="app_name">消了个爽</string>
+    <string name="app_name">秘境消消乐</string>
     <string name="app_subtitle">超好玩的消除闯关游戏</string>
     <string name="tab_game">游戏</string>
     <string name="tab_shop">商店</string>
@@ -252,7 +252,7 @@
     <string name="label_duel_energy">能量</string>
 
 
-    <string name="guide_title">消了个爽 - 玩法说明</string>
+    <string name="guide_title">秘境消消乐 - 玩法说明</string>
     <string name="guide_sec1_title">一、基础消除规则</string>
     <string name="guide_sec1_desc">点击盘面上的卡牌放入下方槽位，凑齐三个相同图案的卡牌即可自动消除。若槽位被填满（共七格）且没有可以消除的卡牌，则挑战失败。</string>
     <string name="guide_sec2_title">二、辅助道具说明</string>
@@ -315,6 +315,18 @@
     <string name="carried_magic_items">随身道具</string>
 
 
+    <string name="item_skin_henan">河南美食</string>
+    <string name="item_skin_sichuan">四川美食</string>
+    <string name="item_skin_electronic">数码潮玩</string>
+    <string name="item_skin_daily">日常好物</string>
+    <string name="item_skin_vegetable">蔬菜园</string>
+    <string name="item_skin_fruit">水果盘</string>
+    <string name="item_skin_classic">经典国风</string>
+    <string name="item_skin_ink">水墨江山皮肤</string>
+    <string name="item_skin_cyber">赛博霓虹皮肤</string>
+    <string name="item_skin_keai">萌趣卡通皮肤</string>
+    <string name="item_skin_daimeng">呆萌手绘皮肤</string>
+    <string name="item_skin_custom">自定义卡牌皮肤</string>
     <string name="item_skin_shuang">萌趣竞技</string>
     <string name="item_skin_shuang_desc">12种萌系小羊卡牌，爽爽蓝边框搭配阳光金装饰</string>
 
@@ -347,7 +359,7 @@
     <string name="splash_age_tip">适龄提示：适合 8 岁及以上用户</string>
     <string name="splash_health_advice">健康游戏忠告\n抵制不良游戏，拒绝盗版游戏。注意自我保护，谨防受骗上当。\n适度游戏益脑，沉迷游戏伤身。合理安排时间，享受健康生活。</string>
     <string name="privacy_dialog_title">用户隐私政策概要</string>
-    <string name="privacy_dialog_content">欢迎使用 金色体育！我们将通过《金色体育隐私协议》帮助您了解我们收集、使用、存储和共享个人信息的情况，以及您所享有的相关权利。\n\n请您务必审慎阅读、充分理解我们的各项条款，详细信息还可以通过阅读《金色体育用户协议》了解。您也可以在系统"设置"中查看、变更、删除个人信息并管理您的授权。\n\n如果您同意，请点击"同意"开始接受我们的服务。</string>
+    <string name="privacy_dialog_content">欢迎使用《%1$s》！我们将通过《隐私政策》帮助您了解我们收集、使用、存储和共享个人信息的情况，以及您所享有的相关权利。\n\n请您务必审慎阅读、充分理解我们的各项条款，详细信息还可以通过阅读《用户协议》了解。您也可以在系统"设置"中查看、变更、删除个人信息并管理您的授权。\n\n如果您同意，请点击"同意"开始接受我们的服务。</string>
     <string name="btn_disagree_exit">不同意并退出</string>
     <string name="btn_agree_start">同意并开始</string>
     <string name="toast_offline_fallback">连接服务异常，已载入本地离线数据</string>
@@ -494,4 +506,8 @@
     <string name="update_install_file_missing">安装文件不存在</string>
     <string name="update_install_failed">安装失败: %1$s</string>
     <string name="duel_match_id_label">对局号: %1$s</string>
+    <string name="theme_polar">极夜青</string>
+    <string name="current_challenge">当前挑战</string>
+    <string name="level_list">关卡列表</string>
+    <string name="locate_current_level">定位最新关卡</string>
 </resources>

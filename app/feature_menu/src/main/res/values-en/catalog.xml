@@ -1,0 +1,31 @@
+<resources>
+    <string name="catalog_empty">No items are available right now</string>
+    <string name="catalog_other_series">Other collections</string>
+    <string name="catalog_decrease">Decrease quantity</string>
+    <string name="catalog_increase">Increase quantity</string>
+    <string name="catalog_balance_low">Insufficient coins</string>
+    <string name="catalog_stock_low">Insufficient stock</string>
+    <string name="catalog_backpack_empty">Your backpack is empty</string>
+    <string name="catalog_privacy">Terms and privacy</string>
+    <string name="catalog_fun">Arcade</string>
+    <string name="catalog_forest">Forest</string>
+    <string name="catalog_sakura">Sakura</string>
+    <string name="catalog_cosmic">Cosmic</string>
+    <string name="catalog_sunset">Sunset</string>
+    <string name="catalog_update">Update</string>
+    <string name="catalog_maintenance">Maintenance</string>
+    <string name="catalog_terms">User agreement</string>
+    <string name="catalog_policy">Privacy policy</string>
+    <string name="catalog_collection">Personal data collection</string>
+    <string name="catalog_sharing">Third-party data sharing</string>
+    <string name="catalog_profile_title">Player profile</string>
+    <string name="catalog_settings_title">Settings</string>
+    <string name="catalog_label_not_set">Not set</string>
+    <string name="catalog_shop_balance_label">Balance</string>
+    <string name="catalog_shop_total_label">Total</string>
+    <string name="catalog_shop_unit_price_label">Unit price</string>
+    <string name="catalog_shop_exchange_title">Confirm exchange</string>
+    <string name="catalog_shop_exchange_item_desc">Choose how many you want to exchange.</string>
+    <string name="catalog_shop_exchange_skin_desc">Spend coins to unlock this tile skin.</string>
+    <string name="catalog_carry_stock_label">Available %1$d</string>
+</resources>

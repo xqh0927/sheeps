@@ -1,0 +1,6 @@
+<resources>
+    <string name="auth_terms_link">이용 약관</string>
+    <string name="auth_privacy_link">개인정보 처리방침</string>
+    <string name="login_agreement_hint">이용 약관 및 개인정보 처리방침을 읽었으며 이에 동의합니다.</string>
+    <string name="topbar_action">작업</string>
+</resources>

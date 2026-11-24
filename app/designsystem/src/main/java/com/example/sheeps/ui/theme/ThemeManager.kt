@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * 应用支持的主题枚举
  */
 enum class AppTheme(val key: String, val displayName: String) {
-    SHUANG_FUN("shuang_fun", "萌趣竞技（默认）"),            // 爽爽蓝+阳光金，轻竞技卡通
+    SYSTEM_GLASS("system_glass", "Liquid Glass"),
+    POLAR("polar", "极夜青"),
+    SHUANG_FUN("shuang_fun", "萌趣竞技"),            // 爽爽蓝+阳光金，轻竞技卡通
     FOREST("forest", "🌿 森林绿"),                           // 淡绿基调，治愈自然
     QING_RI_CHUN("qing_ri_chun", "清日春"),                 // 浅色，宣纸白+朱砂
     MO_YE_GOLD("mo_ye_gold", "墨夜金"),                     // 暗色，墨夜底色+帝王金
@@ -25,7 +27,7 @@ enum class AppTheme(val key: String, val displayName: String) {
 
     companion object {
         fun fromKey(key: String): AppTheme =
-            values().find { it.key == key } ?: SHUANG_FUN
+            values().find { it.key == key } ?: SYSTEM_GLASS
     }
 }
 
@@ -36,7 +38,7 @@ enum class AppTheme(val key: String, val displayName: String) {
 object ThemeManager {
     private const val THEME_KEY = "app_current_theme"
 
-    private val _currentTheme = MutableStateFlow(AppTheme.QING_RI_CHUN)
+    private val _currentTheme = MutableStateFlow(AppTheme.SYSTEM_GLASS)
     val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
 
     private var kv: MMKV? = null
@@ -45,7 +47,7 @@ object ThemeManager {
     fun init(kvInstance: MMKV) {
         kv = kvInstance
         val savedKey =
-            kvInstance.decodeString(THEME_KEY, AppTheme.QING_RI_CHUN.key) ?: AppTheme.QING_RI_CHUN.key
+            kvInstance.decodeString(THEME_KEY, AppTheme.SYSTEM_GLASS.key) ?: AppTheme.SYSTEM_GLASS.key
         _currentTheme.value = AppTheme.fromKey(savedKey)
     }
 
@@ -62,6 +64,8 @@ object ThemeManager {
     /** 获取 XML 主题的 Style 资源 ID */
     fun getThemeResId(theme: AppTheme = _currentTheme.value): Int {
         return when (theme) {
+            AppTheme.SYSTEM_GLASS -> R.style.Theme_Sheeps_SystemGlass
+            AppTheme.POLAR -> R.style.Theme_Sheeps_Polar
             AppTheme.MO_YE_GOLD -> R.style.Theme_Sheeps_MoYeGold
             AppTheme.QING_RI_CHUN -> R.style.Theme_Sheeps_QingRiChun
             AppTheme.SAKURA -> R.style.Theme_Sheeps_Sakura
@@ -72,7 +76,13 @@ object ThemeManager {
         }
     }
 
-    /** 是否为暗色主题 */
-    fun isDarkTheme(theme: AppTheme = _currentTheme.value): Boolean =
-        theme == AppTheme.MO_YE_GOLD
+    fun isDarkTheme(theme: AppTheme = _currentTheme.value): Boolean = when (theme) {
+        AppTheme.SYSTEM_GLASS -> {
+            val mode = android.content.res.Resources.getSystem().configuration.uiMode
+            (mode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        AppTheme.MO_YE_GOLD, AppTheme.POLAR -> true
+        else -> false
+    }
 }

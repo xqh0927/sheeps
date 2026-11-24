@@ -222,6 +222,18 @@
     <string name="guide_sec2_desc">一時退避：左側の3枚を一時的にスロット外に退避します。\nシャッフル：残りのカードをランダムに並び替えます。\n元に戻す：直前の操作を取り消します。</string>
     <string name="guide_sec3_title">3. コインの獲得</string>
     <string name="guide_sec3_desc">毎日のログインボーナスや、ステージの初クリアでコインを獲得できます。対戦モードで勝利することでも大量 of コインを獲得できます！</string>
+    <string name="item_skin_henan">河南グルメ</string>
+    <string name="item_skin_sichuan">四川グルメ</string>
+    <string name="item_skin_electronic">デジタルガジェット</string>
+    <string name="item_skin_daily">日常のあれこれ</string>
+    <string name="item_skin_vegetable">畑の野菜</string>
+    <string name="item_skin_fruit">彩りフルーツ</string>
+    <string name="item_skin_classic">クラシック赤</string>
+    <string name="item_skin_ink">水墨山水スキン</string>
+    <string name="item_skin_cyber">サイバーネオンスキン</string>
+    <string name="item_skin_keai">萌えカートゥーンスキン</string>
+    <string name="item_skin_daimeng">手描きスケッチスキン</string>
+    <string name="item_skin_custom">カスタムタイルスキン</string>
     <string name="item_skin_shuang">萌趣競技</string>
     <string name="item_skin_shuang_desc">スカイブルーのボーダーとサンライトゴールドのアクセントを持つ12種のかわいい羊タイル</string>
 
@@ -302,7 +314,7 @@
     <string name="splash_age_tip">対象年齢：8歳以上</string>
     <string name="splash_health_advice">健康的なゲーム生活へのアドバイス\n不健全なゲームを控え、海賊版ゲームを拒否しましょう。自己保護に注意し、詐欺に引っかからないようにしてください。\n適度なゲームは脳に良いですが、ゲームへの没頭は健康を損ないます。時間を合理的に計画し、健康的な生活を楽しみましょう。</string>
     <string name="privacy_dialog_title">利用規約とプライバシーポリシー</string>
-    <string name="privacy_dialog_content">「国風水墨絵あわせ」をプレイしていただきありがとうございます！\n\nゲームを開始する前に、利用規約とプライバシーポリシーをよくお読みになり、理解してください。\n\n「同意して開始」をクリックすると、上記の条件を理解し同意したことになります。</string>
+    <string name="privacy_dialog_content">「%1$s」をプレイしていただきありがとうございます！\n\nゲームを開始する前に、利用規約とプライバシーポリシーをよくお読みになり、理解してください。\n\n「同意して開始」をクリックすると、上記の条件を理解し同意したことになります。</string>
     <string name="btn_disagree_exit">同意しない（終了）</string>
     <string name="btn_agree_start">同意して開始</string>
     <string name="toast_offline_fallback">ネットワークエラー。ローカルのオフラインデータを読み込みました</string>
@@ -460,4 +472,8 @@
 遮り（3消費）：相手の盤面を覆い、相手がふき取るまで回復しません。
 制限（6消費）：相手のスロット1マスをロック（6マスに短縮）、相手のスロットが満杯ならあなたの勝利。
 遮蔽（10消費）：相手の現在の全カードを隠します。</string>
+    <string name="theme_polar">極夜の青</string>
+    <string name="current_challenge">現在のチャレンジ</string>
+    <string name="level_list">ステージ一覧</string>
+    <string name="locate_current_level">現在のステージへ</string>
 </resources>

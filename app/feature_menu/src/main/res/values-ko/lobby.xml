@@ -1,0 +1,12 @@
+<resources>
+    <string name="lobby_atlas">스테이지 지도</string>
+    <string name="lobby_duel">온라인 대전</string>
+    <string name="lobby_rest">휴식 스테이지</string>
+    <string name="lobby_unlock_tip">스테이지 해금 방법</string>
+    <string name="lobby_previous_page">이전 스테이지 목록</string>
+    <string name="lobby_next_page">다음 스테이지 목록</string>
+    <string name="lobby_loadout">출발 준비</string>
+    <string name="lobby_picked">%1$d / 5종 선택</string>
+    <string name="lobby_opponent">상대</string>
+    <string name="lobby_you">나</string>
+</resources>

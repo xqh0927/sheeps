@@ -1,152 +1,99 @@
 package com.example.sheeps.menu.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.sheeps.data.model.Notice
+import com.example.sheeps.menu.R as MenuR
+import com.example.sheeps.menu.ui.components.CatalogDivider
+import com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog
 import com.example.sheeps.ui.R
 import com.example.sheeps.ui.components.SheepsTopAppBar
-import com.example.sheeps.data.model.Notice
-import com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 
-/**
- * 公告列表页（全屏）。
- * 以列表形式展示系统公告（标题/类型/时间），点击条目弹出详情对话框。
- *
- * @param notices 公告列表 [com.example.sheeps.data.model.Notice]，由调用方（Screen/ViewModel）提供。
- * @param onBack 返回上一页回调。
- *
- * 说明：
- * - 无状态（Stateless）屏幕组件：数据来自 [notices]，交互（返回、查看详情）通过回调上抛，
- *   符合单向数据流；列表通过 `LazyColumn` 惰性布局，仅在**主线程**组合与滚动。
- * - 详情弹窗 [com.example.sheeps.menu.ui.dialogs.NoticeDetailDialog] 由本地 `remember` 状态控制显隐。
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoticeListScreen(
-    notices: List<Notice>,
-    onBack: () -> Unit
-) {
-    var selectedNotice by remember { mutableStateOf<Notice?>(null) }
-
-    Scaffold(
-        topBar = {
-            SheepsTopAppBar(
-                title = stringResource(id = R.string.notice_list_title),
-                onBack = onBack
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(padding)
-        ) {
-            if (notices.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.notice_empty),
-                        color = Color.Gray,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(notices) { notice ->
-                        Card(
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedNotice = notice }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = notice.title,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    val typeText = when (notice.type) {
-                                        "SYSTEM" -> stringResource(id = R.string.notice_type_system)
-                                        "ACTIVITY" -> stringResource(id = R.string.notice_type_activity)
-                                        else -> stringResource(id = R.string.notice_type_general)
+fun NoticeListScreen(notices: List<Notice>, onBack: () -> Unit) {
+    var selectedId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val colors = MaterialTheme.colorScheme
+    val locale = LocalConfiguration.current.locales[0]
+    val formatter = remember(locale) { DateFormat.getDateInstance(DateFormat.MEDIUM, locale) }
+    Scaffold(topBar = { SheepsTopAppBar(stringResource(R.string.notice_list_title), onBack) }) { inset ->
+        if (notices.isEmpty()) {
+            Column(Modifier.fillMaxSize().padding(inset), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
+                Icon(Icons.Default.NotificationsNone, null, modifier = Modifier.size(44.dp), tint = colors.primary)
+                Text(stringResource(R.string.notice_empty), color = colors.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize().padding(inset), contentPadding = PaddingValues(18.dp)) {
+                itemsIndexed(notices, key = { _, notice -> notice.id }) { index, notice ->
+                    val top = if (index == 0) 20.dp else 0.dp
+                    val bottom = if (index == notices.lastIndex) 20.dp else 0.dp
+                    Surface(onClick = { selectedId = notice.id }, color = colors.surface,
+                        shape = RoundedCornerShape(top, top, bottom, bottom)) {
+                        Column {
+                            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                val icon = when (notice.type) {
+                                    "ACTIVITY" -> Icons.Default.Event
+                                    "UPDATE" -> Icons.Default.SystemUpdate
+                                    "MAINTENANCE" -> Icons.Default.Build
+                                    "SYSTEM" -> Icons.Default.Info
+                                    else -> Icons.Default.NotificationsNone
+                                }
+                                Box(Modifier.size(34.dp).background(colors.primary.copy(alpha = .09f), RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center) {
+                                    Icon(icon, null, tint = colors.primary, modifier = Modifier.size(18.dp))
+                                }
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(stringResource(noticeTypeLabel(notice.type)), Modifier.weight(1f), color = colors.primary,
+                                            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                                        Text(formatter.format(Date(notice.created_at)), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = typeText,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
+                                    Text(notice.title, color = colors.onSurface, fontWeight = FontWeight.SemiBold,
+                                        style = MaterialTheme.typography.titleMedium)
+                                    if (notice.content.isNotBlank()) {
+                                        Text(notice.content, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(notice.created_at)),
-                                    fontSize = 11.sp,
-                                    color = Color.Gray
-                                )
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp).align(Alignment.CenterVertically))
                             }
+                            if (index < notices.lastIndex) CatalogDivider(62.dp)
                         }
                     }
                 }
             }
         }
     }
+    notices.firstOrNull { it.id == selectedId }?.let { NoticeDetailDialog(it) { selectedId = null } }
+}
 
-    if (selectedNotice != null) {
-        NoticeDetailDialog(
-            notice = selectedNotice!!,
-            onDismiss = { selectedNotice = null }
-        )
-    }
+internal fun noticeTypeLabel(type: String): Int = when (type) {
+    "SYSTEM" -> R.string.notice_type_system
+    "ACTIVITY" -> R.string.notice_type_activity
+    "UPDATE" -> MenuR.string.catalog_update
+    "MAINTENANCE" -> MenuR.string.catalog_maintenance
+    else -> R.string.notice_type_general
 }

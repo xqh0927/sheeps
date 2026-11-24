@@ -1,0 +1,12 @@
+<resources>
+    <string name="lobby_atlas">Stage atlas</string>
+    <string name="lobby_duel">Online duel</string>
+    <string name="lobby_rest">Rest stage</string>
+    <string name="lobby_unlock_tip">Unlocking stages</string>
+    <string name="lobby_previous_page">Previous stages</string>
+    <string name="lobby_next_page">Next stages</string>
+    <string name="lobby_loadout">Loadout</string>
+    <string name="lobby_picked">%1$d / 5 types</string>
+    <string name="lobby_opponent">Opponent</string>
+    <string name="lobby_you">You</string>
+</resources>

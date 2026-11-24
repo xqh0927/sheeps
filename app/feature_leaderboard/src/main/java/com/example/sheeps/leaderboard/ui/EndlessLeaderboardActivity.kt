@@ -2,19 +2,15 @@ package com.example.sheeps.leaderboard.ui
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.ui.R
 import com.example.sheeps.lib_base.base.BaseActivity
@@ -39,7 +33,6 @@ import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
 import javax.inject.Inject
@@ -140,42 +133,11 @@ class EndlessLeaderboardActivity : BaseActivity() {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
                 } else if (isDisabled) {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.leaderboard_endless_disabled),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                            fontSize = 15.sp
-                        )
-                    }
+                    RankingNotice(stringResource(R.string.leaderboard_endless_disabled), Modifier.weight(1f).fillMaxWidth())
                 } else if (rankings.isEmpty()) {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.leaderboard_empty),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                            fontSize = 15.sp
-                        )
-                    }
+                    RankingNotice(stringResource(R.string.leaderboard_empty), Modifier.weight(1f).fillMaxWidth())
                 } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        itemsIndexed(rankings) { index, entry ->
-                            RankingRow(
-                                index = index,
-                                entry = entry,
-                                isCurrentUser = entry.username == userPrefs.getUsername()
-                            )
-                        }
-                    }
+                    RankingBoard(rankings, userPrefs.getUsername(), Modifier.weight(1f).fillMaxWidth(), listState)
                 }
             }
         }

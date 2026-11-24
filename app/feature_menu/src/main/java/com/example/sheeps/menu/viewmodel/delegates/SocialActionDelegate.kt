@@ -2,7 +2,6 @@ package com.example.sheeps.menu.viewmodel.delegates
 
 import com.example.sheeps.ui.R
 import com.example.sheeps.data.preference.UserPreferences
-import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.local.UserProgressEntity
@@ -114,12 +113,12 @@ class SocialActionDelegate @Inject constructor(
     }
 
     /**
-     * 处理道具兑换（本地先扣积分与入库，再同步云端）。
+     * 道具兑换成功后刷新云端存量。
      * @param scope 协程作用域（MenuViewModel.viewModelScope）。
      * @param shopItemId 商城道具 ID。
      * @param count 兑换数量。
      * @param shopItems 当前商城列表（用于按 ID 查找单价与 item_type）。
-     * @param onComplete 云端失败时刷新页面的回调。
+     * @param onComplete 云端兑换完成后刷新页面的回调。
      * @param setEffect 派发兑换成功/失败/积分不足 Toast。
      */
     fun handleExchangeShopItem(
@@ -141,32 +140,17 @@ class SocialActionDelegate @Inject constructor(
         }
 
         scope.launch {
-            // 1. 本地扣减（乐观更新，均为本地 IO）
-            val currentPoints = prefs.getPoints() - totalCost
-            prefs.setPoints(currentPoints)
-
-            val localItem = localDao.getAllItems().find { it.itemType == item.item_type }
-            val newCount = (localItem?.count ?: 0) + count
-
-            updateLocalPoints(currentPoints, true)
-            localDao.insertItem(
-                BackpackItemEntity(
-                    itemType = item.item_type,
-                    count = newCount,
-                    isDirty = true,
-                    updateTimestamp = System.currentTimeMillis()
-                )
-            )
-
-            // 2. 同步云端（统一错误闸门，不再手写 "Bearer $token"）
-            when (val result = userRepository.exchangeItem(ExchangeRequest(shopItemId, count))) {
+            val order = ExchangeRequest(shopItemId, count, java.util.UUID.randomUUID().toString())
+            when (val result = userRepository.exchangeItem(order)) {
                 is ApiResult.Success -> {
+                    if (prefs.getToken() == token) {
+                        prefs.setPoints(result.data.remaining_points)
+                        updateLocalPoints(result.data.remaining_points, false)
+                    }
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_exchange_success))
-                    localDao.clearProfileDirty(prefs.getUserId())
-                    localDao.clearItemDirty(item.item_type)
+                    onComplete()
                 }
                 is ApiResult.Error -> {
-                    // 云端失败/网络异常：保留本地乐观扣减（离线优先），提示并刷新
                     setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
                     onComplete()
                 }
@@ -204,7 +188,7 @@ class SocialActionDelegate @Inject constructor(
             when (val result = userRepository.claimTaskReward(TaskClaimRequest(taskId))) {
                 is ApiResult.Success -> {
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_task_claim_success))
-                    localDao.clearProfileDirty(prefs.getUserId())
+                    localDao.clearProfileDirty(prefs.accountId() ?: prefs.getUserId())
                     onComplete()
                 }
                 is ApiResult.Error -> {
@@ -263,7 +247,7 @@ class SocialActionDelegate @Inject constructor(
             when (val result = userRepository.unlockLevel(UnlockLevelRequest(levelId))) {
                 is ApiResult.Success -> {
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_success_level, formatArgs = listOf(levelId)))
-                    localDao.clearProfileDirty(prefs.getUserId())
+                    localDao.clearProfileDirty(prefs.accountId() ?: prefs.getUserId())
                     localDao.clearProgressDirty(levelId)
                 }
                 is ApiResult.Error -> {
@@ -281,7 +265,7 @@ class SocialActionDelegate @Inject constructor(
     ) {
         localDao.insertProfile(
             UserProfileEntity(
-                userId = prefs.getUserId(),
+                userId = prefs.accountId() ?: prefs.getUserId(),
                 username = prefs.getUsername(),
                 points = points,
                 isDirty = isDirty,

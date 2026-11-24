@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
@@ -30,9 +29,8 @@ import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
-import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.state.DuelViewState
-import com.example.sheeps.game.ui.utils.TileTextureLoader
+import com.example.sheeps.core.game.TileTextureLoader
 import kotlin.math.sin
 
 /**
@@ -63,9 +61,6 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
         /** 正常模式下被遮挡卡牌的半透明灰色蒙版 */
         private val COLOR_MASK_NORMAL = "#30ffffff".toColorInt()
 
-        /** 棋盘底座外围细边框颜色 */
-        private val COLOR_BG_BORDER = "#DDDDDD".toColorInt()
-
         /** 锁关卡半透明深灰背景底色 */
         private val COLOR_GATE_BG = "#BB2C3E50".toColorInt()
 
@@ -77,12 +72,6 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
 
         /** 迷雾大招全屏黑色面版遮盖颜色 */
         private val COLOR_FOG_MASK = "#FA202020".toColorInt()
-
-        /** 棋盘背景渐变起始浅灰色 */
-        private val COLOR_BG_GRADIENT_START = "#F5F5F5".toColorInt()
-
-        /** 棋盘背景渐变结束深灰色 */
-        private val COLOR_BG_GRADIENT_END = "#EEEEEE".toColorInt()
     }
 
     /** 核心多人联机对局状态快照，携带己方棋盘卡牌、分数、诅咒效果时长等属性 */
@@ -122,7 +111,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
 
     /** 卡牌被上层叠压时的置灰蒙版画笔 */
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (BuildConfig.DEBUG) COLOR_MASK_DEBUG_LIGHT else COLOR_MASK_NORMAL
+        color = if (showTileDiagnostics) COLOR_MASK_DEBUG_LIGHT else COLOR_MASK_NORMAL
     }
 
     /** 迷雾法术专用遮罩画笔 */
@@ -187,15 +176,8 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     /** 线程数据安全同步锁 */
     private val renderLock = Any()
 
-    /** 棋盘底版背景色画笔 */
-    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal val backdrop = BoardBackdrop(resources.displayMetrics.density)
 
-    /** 棋盘底盘圆角边缘线画笔 */
-    private val bgBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dpToPx(1f)
-        color = COLOR_BG_BORDER
-    }
 
     // Reusable drawing objects to avoid object allocation in onDraw loop
     private val bgRectF = RectF()
@@ -323,6 +305,8 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     /**
      * 主动要求 Canvas 重绘整个棋盘组件
      */
+    private val onTextureLoaded: () -> Unit = ::triggerRender
+
     private fun triggerRender() {
         invalidate()
     }
@@ -347,8 +331,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
     private fun drawBoard(canvas: Canvas) {
         if (surfaceWidth > 0f && surfaceHeight > 0f) {
             val bgRadius = dpToPx(16f)
-            canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgPaint)
-            canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgBorderPaint)
+            backdrop.draw(canvas, bgRectF, bgRadius)
         }
 
         val s = state ?: return
@@ -479,9 +462,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
                 canvas.drawBitmap(tileBackBitmap, tempSrcRect, tempDstRectF, cardPaint)
             } else {
                 val bitmap =
-                    TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type) {
-                        triggerRender()
-                    }
+                    TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type, onTextureLoaded)
                 val innerPadding = size * 0.05f
                 tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
                 tempDstRectF.set(
@@ -494,7 +475,7 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
             }
 
             // 2.4 在 DEBUG 模式下，居中绘制红色/蓝色 ID 和 Z 层以对齐 TileView.kt
-            if (BuildConfig.DEBUG) {
+            if (showTileDiagnostics) {
                 debugPaint.color = if (isBlocked) Color.BLUE else Color.RED
                 debugPaint.textSize = size * 0.18f
                 val cleanId = tile.id.removePrefix("tile_")
@@ -644,12 +625,6 @@ class DuelGameBoardSurfaceView @JvmOverloads constructor(
         surfaceHeight = h.toFloat()
         if (w > 0 && h > 0) {
             bgRectF.set(0f, 0f, surfaceWidth, surfaceHeight)
-            bgPaint.shader = LinearGradient(
-                0f, 0f, 0f, surfaceHeight,
-                COLOR_BG_GRADIENT_START,
-                COLOR_BG_GRADIENT_END,
-                Shader.TileMode.CLAMP
-            )
             val radius = dpToPx(65f)
             fogGradient = RadialGradient(
                 0f, 0f, radius,

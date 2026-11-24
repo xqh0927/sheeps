@@ -1,0 +1,5 @@
+<resources>
+    <string name="auth_terms_link">《用户协议》</string>
+    <string name="auth_privacy_link">《隐私政策》</string>
+    <string name="topbar_action">操作</string>
+</resources>

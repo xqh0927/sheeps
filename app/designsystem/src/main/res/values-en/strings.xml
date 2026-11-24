@@ -300,6 +300,18 @@
     <string name="slot_not_carried">None</string>
     <string name="carried_magic_items">Carried Items</string>
 
+    <string name="item_skin_henan">Henan Food</string>
+    <string name="item_skin_sichuan">Sichuan Food</string>
+    <string name="item_skin_electronic">Digital Gadgets</string>
+    <string name="item_skin_daily">Daily Life</string>
+    <string name="item_skin_vegetable">Fresh Veggies</string>
+    <string name="item_skin_fruit">Juicy Fruits</string>
+    <string name="item_skin_classic">Classic Red</string>
+    <string name="item_skin_ink">Ink Landscape Skin</string>
+    <string name="item_skin_cyber">Cyber Neon Skin</string>
+    <string name="item_skin_keai">Cute Cartoon Skin</string>
+    <string name="item_skin_daimeng">Doodle Sketch Skin</string>
+    <string name="item_skin_custom">Custom tile skin</string>
     <string name="item_skin_shuang">Shuang Fun Skin</string>
     <string name="item_skin_shuang_desc">12 cute sheep tiles with sky blue borders and sunlit gold accents</string>
 
@@ -332,7 +344,7 @@
     <string name="splash_age_tip">Age Rating: Suitable for ages 8 and above</string>
     <string name="splash_health_advice">Healthy Gaming Advice\nBoycott unhealthy games, reject pirated games. Pay attention to self-protection, beware of being deceived.\nModerate gaming benefits the mind, excessive gaming harms the body. Manage time reasonably, enjoy a healthy life.</string>
     <string name="privacy_dialog_title">User Service &amp; Privacy Agreement</string>
-    <string name="privacy_dialog_content">Thank you for playing Ink &amp; Tiles: Zen Match!\n\nBefore you start, please read and understand the User Agreement and Privacy Policy carefully.\n\nClicking \'Agree &amp; Start\' means you understand and agree to the above terms.</string>
+    <string name="privacy_dialog_content">Thank you for playing %1$s!\n\nBefore you start, please read and understand the User Agreement and Privacy Policy carefully.\n\nClicking \'Agree &amp; Start\' means you understand and agree to the above terms.</string>
     <string name="btn_disagree_exit">Disagree &amp; Exit</string>
     <string name="btn_agree_start">Agree &amp; Start</string>
     <string name="toast_offline_fallback">Network error, loaded local offline data</string>
@@ -460,4 +472,8 @@
     <string name="sealed_gate_progress">Eliminated %1$d / %2$d · Seals unlocked %3$d / %4$d</string>
     <string name="sealed_gate_need_more">Eliminate %1$d more normal tiles to unlock</string>
     <string name="sealed_gate_unlocked">Seal broken! %1$d sealed tiles unlocked</string>
+    <string name="theme_polar">Polar Night</string>
+    <string name="current_challenge">Current challenge</string>
+    <string name="level_list">Levels</string>
+    <string name="locate_current_level">Locate current level</string>
 </resources>

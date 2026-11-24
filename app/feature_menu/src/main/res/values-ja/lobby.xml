@@ -1,0 +1,12 @@
+<resources>
+    <string name="lobby_atlas">ステージマップ</string>
+    <string name="lobby_duel">オンライン対戦</string>
+    <string name="lobby_rest">休息ステージ</string>
+    <string name="lobby_unlock_tip">解放のヒント</string>
+    <string name="lobby_previous_page">前のステージ一覧</string>
+    <string name="lobby_next_page">次のステージ一覧</string>
+    <string name="lobby_loadout">出発準備</string>
+    <string name="lobby_picked">%1$d / 5 種類</string>
+    <string name="lobby_opponent">対戦相手</string>
+    <string name="lobby_you">自分</string>
+</resources>

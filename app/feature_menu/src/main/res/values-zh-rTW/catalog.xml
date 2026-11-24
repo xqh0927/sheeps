@@ -1,0 +1,31 @@
+<resources>
+    <string name="catalog_empty">目前沒有可兌換的商品</string>
+    <string name="catalog_other_series">其他系列</string>
+    <string name="catalog_decrease">減少數量</string>
+    <string name="catalog_increase">增加數量</string>
+    <string name="catalog_balance_low">金幣餘額不足</string>
+    <string name="catalog_stock_low">庫存不足</string>
+    <string name="catalog_backpack_empty">背包裡還沒有物品</string>
+    <string name="catalog_privacy">條款與隱私</string>
+    <string name="catalog_fun">萌趣競技</string>
+    <string name="catalog_forest">森林綠</string>
+    <string name="catalog_sakura">櫻花粉</string>
+    <string name="catalog_cosmic">星空藍</string>
+    <string name="catalog_sunset">暖陽橙</string>
+    <string name="catalog_update">更新</string>
+    <string name="catalog_maintenance">維護</string>
+    <string name="catalog_terms">使用者協議</string>
+    <string name="catalog_policy">隱私權政策</string>
+    <string name="catalog_collection">個人資料蒐集清單</string>
+    <string name="catalog_sharing">第三方資料共享清單</string>
+    <string name="catalog_profile_title">個人資料</string>
+    <string name="catalog_settings_title">設定</string>
+    <string name="catalog_label_not_set">尚未設定</string>
+    <string name="catalog_shop_balance_label">目前餘額</string>
+    <string name="catalog_shop_total_label">總計</string>
+    <string name="catalog_shop_unit_price_label">單價</string>
+    <string name="catalog_shop_exchange_title">確認兌換</string>
+    <string name="catalog_shop_exchange_item_desc">選擇要兌換的數量。</string>
+    <string name="catalog_shop_exchange_skin_desc">使用金幣解鎖這款卡牌外觀。</string>
+    <string name="catalog_carry_stock_label">庫存 %1$d</string>
+</resources>

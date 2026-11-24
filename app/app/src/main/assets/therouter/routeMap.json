@@ -15,84 +15,84 @@
   },
   {
     "path": "/menu/userinfo",
-    "className": "com.example.sheeps.menu.UserInfoActivity",
+    "className": "com.example.sheeps.menu.ui.UserInfoActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/menu/settings",
-    "className": "com.example.sheeps.menu.SettingsActivity",
+    "className": "com.example.sheeps.menu.ui.SettingsActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/auth/reset-password",
-    "className": "com.example.sheeps.menu.ResetPasswordActivity",
+    "className": "com.example.sheeps.menu.ui.ResetPasswordActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/auth/register",
-    "className": "com.example.sheeps.menu.RegisterActivity",
+    "className": "com.example.sheeps.menu.ui.RegisterActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/menu/notices",
-    "className": "com.example.sheeps.menu.NoticeListActivity",
+    "className": "com.example.sheeps.menu.ui.NoticeListActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/menu/main",
-    "className": "com.example.sheeps.menu.MenuActivity",
+    "className": "com.example.sheeps.menu.ui.MenuActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/auth/login",
-    "className": "com.example.sheeps.menu.LoginActivity",
+    "className": "com.example.sheeps.menu.ui.LoginActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/leaderboard/show",
-    "className": "com.example.sheeps.leaderboard.LeaderboardActivity",
+    "className": "com.example.sheeps.leaderboard.ui.LeaderboardActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/endless/leaderboard",
-    "className": "com.example.sheeps.leaderboard.EndlessLeaderboardActivity",
+    "className": "com.example.sheeps.leaderboard.ui.EndlessLeaderboardActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/game/play",
-    "className": "com.example.sheeps.game.GameActivity",
+    "className": "com.example.sheeps.game.ui.GameActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/endless/play",
-    "className": "com.example.sheeps.game.EndlessActivity",
+    "className": "com.example.sheeps.game.ui.EndlessActivity",
     "action": "",
     "description": "",
     "params": {}
   },
   {
     "path": "/game/duel",
-    "className": "com.example.sheeps.game.DuelActivity",
+    "className": "com.example.sheeps.game.ui.DuelActivity",
     "action": "",
     "description": "",
     "params": {}

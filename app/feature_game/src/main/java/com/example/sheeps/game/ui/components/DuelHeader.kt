@@ -1,178 +1,88 @@
 package com.example.sheeps.game.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.ui.R
 import com.example.sheeps.core.multiplayer.WebSocketManager
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.DuelViewState
+import com.example.sheeps.ui.R
 
-/**
- * 对决模式顶部状态栏
- * 展示：对决标题、连接状态、双方进度条、能量条
- * 
- * @param state 对决界面状态
- * @param onLeave 离开按钮点击回调
- */
 @Composable
 fun DuelHeader(state: DuelViewState, onLeave: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // 第一行：标题与连接状态
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = stringResource(id = R.string.duel_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary,
-                fontFamily = FontFamily.Serif
-            )
-
-            // 连接状态指示
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val statusColor = when (state.connectionState) {
-                    WebSocketManager.ConnectionState.Connected -> Color.Green
-                    WebSocketManager.ConnectionState.Connecting -> Color.Yellow
-                    else -> Color.Red
-                }
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(statusColor)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = when (state.connectionState) {
-                        WebSocketManager.ConnectionState.Connected -> stringResource(id = R.string.duel_status_connected)
-                        WebSocketManager.ConnectionState.Connecting -> stringResource(id = R.string.duel_status_connecting)
-                        else -> stringResource(id = R.string.duel_status_disconnected)
-                    },
-                    style = MaterialTheme.typography.labelSmall
-                )
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.duel_title), Modifier.weight(1f),
+                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            val (label, color) = when (state.connectionState) {
+                WebSocketManager.ConnectionState.Connected -> R.string.duel_status_connected to colors.primary
+                WebSocketManager.ConnectionState.Connecting -> R.string.duel_status_connecting to colors.tertiary
+                else -> R.string.duel_status_disconnected to colors.error
             }
-
+            Box(Modifier.size(7.dp).background(color, CircleShape))
+            Spacer(Modifier.width(5.dp))
+            Text(stringResource(label), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
             IconButton(onClick = onLeave) {
-                Icon(Icons.Default.Close, contentDescription = "退出")
+                Box(Modifier.size(36.dp).gameControlSurface(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Close, stringResource(R.string.duel_btn_leave),
+                        Modifier.size(19.dp), tint = colors.onSurface)
+                }
             }
         }
-
-        Spacer(Modifier.height(8.dp))
-
-        // 第二部分：双方进度条对比
-        DuelProgressBars(state = state)
-
-        Spacer(Modifier.height(4.dp))
-
-        // 第三部分：能量流光槽
-        DuelEnergyBar(currentEnergy = state.currentEnergy)
-    }
-}
-
-@Composable
-private fun DuelProgressBars(state: DuelViewState) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        // 己方进度
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(id = R.string.label_duel_me),
-                modifier = Modifier.width(30.dp),
-                style = MaterialTheme.typography.labelSmall
+        val remaining = state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } +
+            state.movedOutTiles.size
+        val progress = if (state.totalTileCount > 0) 1f - remaining.toFloat() / state.totalTileCount else 0f
+        Scoreboard {
+            DuelSide(
+                stringResource(R.string.label_duel_me), state.score, progress,
+                colors.primary, Modifier.weight(1f)
             )
-            val remaining =
-                state.boardTiles.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED } + state.movedOutTiles.size
-            val totalTiles = if (state.totalTileCount > 0) state.totalTileCount else 100
-            LinearProgressIndicator(
-                progress = { 1f - (remaining.toFloat() / totalTiles.toFloat()).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
-        // 对手进度
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(id = R.string.label_duel_enemy),
-                modifier = Modifier.width(30.dp),
-                style = MaterialTheme.typography.labelSmall
-            )
-            LinearProgressIndicator(
-                progress = { state.opponentProgress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            Spacer(Modifier.width(24.dp))
+            DuelSide(
+                stringResource(R.string.label_duel_enemy), state.opponentScore, state.opponentProgress,
+                colors.secondary, Modifier.weight(1f)
             )
         }
     }
 }
 
 @Composable
-private fun DuelEnergyBar(currentEnergy: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            stringResource(id = R.string.label_duel_energy),
-            modifier = Modifier.width(30.dp),
-            style = MaterialTheme.typography.labelSmall
-        )
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(currentEnergy.toFloat() / 10f)
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(Color(0xFF00E5FF), Color(0xFF0288D1))
-                        )
-                    )
+private fun DuelSide(label: String, score: Int, progress: Float, ink: Color, modifier: Modifier) {
+    val animatedProgress by animateFloatAsState(progress.coerceIn(0f, 1f), label = "duelProgress")
+    Column(modifier) {
+        MatchScore(label, score, MaterialTheme.colorScheme.onSurface)
+        LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth().height(4.dp),
+            color = ink, trackColor = ink.copy(alpha = .15f))
+    }
+}
+
+@Composable
+internal fun DuelEnergyBar(currentEnergy: Int) {
+    val colors = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(stringResource(R.string.label_duel_energy), style = MaterialTheme.typography.labelMedium)
+        repeat(10) { segment ->
+            val fill by animateColorAsState(
+                if (segment < currentEnergy) colors.primary else colors.surfaceContainerHighest, label = "energyCell"
             )
+            Box(Modifier.weight(1f).height(6.dp).background(fill, CircleShape))
         }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = "$currentEnergy/10",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF00E5FF)
-        )
+        Text("$currentEnergy/10", style = MaterialTheme.typography.labelMedium, color = colors.primary)
     }
 }

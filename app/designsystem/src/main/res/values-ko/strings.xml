@@ -274,6 +274,18 @@
     <string name="slot_not_carried">없음</string>
     <string name="carried_magic_items">가져온 아이템</string>
 
+    <string name="item_skin_henan">허난 음식</string>
+    <string name="item_skin_sichuan">사천 음식</string>
+    <string name="item_skin_electronic">디지털 가젯</string>
+    <string name="item_skin_daily">일상의 순간</string>
+    <string name="item_skin_vegetable">신선 채소</string>
+    <string name="item_skin_fruit">싱그러운 과일</string>
+    <string name="item_skin_classic">클래식 레드</string>
+    <string name="item_skin_ink">수묵강산 스킨</string>
+    <string name="item_skin_cyber">사이버 네온 스킨</string>
+    <string name="item_skin_keai">귀여운 카툰 스킨</string>
+    <string name="item_skin_daimeng">두들 스케치 스킨</string>
+    <string name="item_skin_custom">맞춤 타일 스킨</string>
     <string name="item_skin_shuang">멍취징지</string>
     <string name="item_skin_shuang_desc">하늘색 테두리와 햇살 금 장식이 있는 12가지 귀여운 양 타일</string>
 
@@ -306,7 +318,7 @@
     <string name="splash_age_tip">연령 등급: 8세 이상 이용가</string>
     <string name="splash_health_advice">건전한 게임 조언\n유해한 게임을 멀리하고 불법 복제 게임을 거부하십시오. 개인 정보 보호에 주의하고 사기 피해를 당하지 않도록 주의하십시오.\n적당한 게임은 두뇌 발달에 도움이 되나 과도한 몰입은 신체 건강을 해칩니다. 시간을 합리적으로 계획하여 건강한 생활을 즐기십시오.</string>
     <string name="privacy_dialog_title">이용 약관 및 개인정보 처리방침</string>
-    <string name="privacy_dialog_content">《국풍 수묵 매치-3》를 이용해 주셔서 감사합니다!\n\n게임을 시작하기 전에 이용 약관 및 개인정보 처리방침을 주의 깊게 읽고 이해해 주시기 바랍니다.\n\n‘동의하고 시작’을 클릭하면 위의 약관에 동의한 것으로 간주됩니다.</string>
+    <string name="privacy_dialog_content">《%1$s》를 이용해 주셔서 감사합니다!\n\n게임을 시작하기 전에 이용 약관 및 개인정보 처리방침을 주의 깊게 읽고 이해해 주시기 바랍니다.\n\n‘동의하고 시작’을 클릭하면 위의 약관에 동의한 것으로 간주됩니다.</string>
     <string name="btn_disagree_exit">동의하지 않음 및 종료</string>
     <string name="btn_agree_start">동의하고 시작</string>
     <string name="toast_offline_fallback">네트워크 오류가 발생하여 로컬 오프라인 데이터를 불러왔습니다</string>
@@ -457,4 +469,8 @@
     <string name="endless_wave_banner">Wave %1$d · 속도 업!</string>
     <string name="endless_leaderboard_title">무한 서바이벌 · 종합 랭킹</string>
     <string name="endless_leaderboard_entry">랭킹</string>
+    <string name="theme_polar">극야</string>
+    <string name="current_challenge">현재 도전</string>
+    <string name="level_list">스테이지 목록</string>
+    <string name="locate_current_level">현재 스테이지로 이동</string>
 </resources>

@@ -27,6 +27,8 @@ kotlin {
 }
 
 dependencies {
+    testImplementation(libs.junit)
+
     // 基座（Compose BOM / material3 / therouter / mmkv / hilt 等经 api 透传）
     api(project(":lib_base"))
 

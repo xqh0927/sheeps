@@ -1,125 +1,53 @@
 package com.example.sheeps.menu.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.sheeps.ui.R
 import com.example.sheeps.core.utils.getLocalizedTaskName
 import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.ui.R
 
-/**
- * 每日任务卡片组件
- * 展示用户的每日任务列表、进度以及领取奖励按钮
- *
- * @param state 界面状态数据，包含任务列表
- * @param onClaimTask 领取任务奖励的回调
- */
 @Composable
-fun DailyTasksCard(
-    state: MenuViewState,
-    onClaimTask: (String) -> Unit
-) {
+fun DailyTasksCard(state: MenuViewState, onClaimTask: (String) -> Unit) {
     if (!state.isLoggedIn) return
-
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = stringResource(id = R.string.tasks_title),
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 12.dp),
-                fontFamily = FontFamily.Serif
-            )
-
+    val colors = MaterialTheme.colorScheme
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = colors.surface) {
+        Column(Modifier.padding(horizontal = 15.dp)) {
             if (state.dailyTasks.isEmpty()) {
-                Text(
-                    text = stringResource(id = R.string.tasks_empty),
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-            } else {
-                state.dailyTasks.forEach { task ->
-                    TaskItem(
-                        task = task,
-                        onClaimTask = onClaimTask
-                    )
-                }
+                Text(stringResource(R.string.tasks_empty), Modifier.padding(vertical = 16.dp), color = colors.onSurfaceVariant)
             }
-        }
-    }
-}
-
-/**
- * 单个任务条目组件
- */
-@Composable
-private fun TaskItem(
-    task: com.example.sheeps.data.model.DailyTask,
-    onClaimTask: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = getLocalizedTaskName(task.name),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "${getLocalizedTaskName(task.description)} (${task.progress}/${task.target_count})",
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
-        }
-        
-        if (task.is_rewarded) {
-            Text(
-                text = stringResource(id = R.string.task_rewarded),
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-        } else {
-            Button(
-                onClick = { onClaimTask(task.task_id) },
-                enabled = task.is_completed,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = Color.LightGray
-                ),
-                contentPadding = PaddingValues(horizontal = 8.dp),
-                shape = RoundedCornerShape(4.dp),
-                modifier = Modifier.height(28.dp)
-            ) {
-                Text(
-                    text = if (task.is_completed) 
-                        stringResource(id = R.string.task_claim, task.points_reward) 
-                    else 
-                        stringResource(id = R.string.task_incomplete),
-                    fontSize = 10.sp,
-                    color = Color.White
-                )
+            state.dailyTasks.forEachIndexed { index, task ->
+                if (index > 0) HorizontalDivider(color = colors.outlineVariant)
+                Column(Modifier.padding(vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text(getLocalizedTaskName(task.name), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text(getLocalizedTaskName(task.description), color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (task.is_completed && !task.is_rewarded) {
+                            FilledTonalButton(onClick = { onClaimTask(task.task_id) }) {
+                                Text(stringResource(R.string.task_claim, task.points_reward))
+                            }
+                        } else {
+                            Text(stringResource(if (task.is_rewarded) R.string.task_rewarded else R.string.task_incomplete),
+                                style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+                        }
+                    }
+                    val fraction by animateFloatAsState(
+                        (task.progress.toFloat() / task.target_count.coerceAtLeast(1)).coerceIn(0f, 1f), label = "taskProgress")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.weight(1f))
+                        Text("${task.progress} / ${task.target_count}", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                    }
+                }
             }
         }
     }

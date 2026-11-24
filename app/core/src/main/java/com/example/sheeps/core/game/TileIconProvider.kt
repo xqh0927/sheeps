@@ -1,6 +1,9 @@
 package com.example.sheeps.core.game
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.example.sheeps.ui.R
 import com.example.sheeps.data.game.SkinConstants
 import com.example.sheeps.data.model.ShopItem
@@ -22,7 +25,7 @@ import com.example.sheeps.data.model.ShopItem
 object TileIconProvider {
 
     /** skinKey(小写渲染键) -> 12 张卡面 URL（index 0..11 对应 tile 1..12，缺失为 null） */
-    private val skinTileUrls = mutableMapOf<String, List<String?>>()
+    private var skinTileUrls by mutableStateOf<Map<String, List<String>>>(emptyMap())
 
     /** item_type(大写) -> 道具图标 URL */
     private val itemIconUrls = mutableMapOf<String, String?>()
@@ -39,18 +42,19 @@ object TileIconProvider {
      */
     fun setShopItems(items: List<ShopItem>) {
         allItems = items
-        skinTileUrls.clear()
+        val newTiles = mutableMapOf<String, List<String>>()
         itemIconUrls.clear()
         groups.clear()
         for (item in items) {
             if (item.item_type.startsWith("SKIN_")) {
                 val key = item.item_type.removePrefix("SKIN_").lowercase()
-                skinTileUrls[key] = item.tiles ?: emptyList()
+                newTiles[key] = item.tiles ?: emptyList()
                 groups.getOrPut(item.group) { mutableListOf() }.add(item)
             } else {
                 itemIconUrls[item.item_type.uppercase()] = item.image_url
             }
         }
+        skinTileUrls = newTiles
     }
 
     /**
@@ -61,7 +65,7 @@ object TileIconProvider {
         val list = skinTileUrls[skinKey.lowercase()] ?: return null
         if (tileIndex !in 1..12) return null
         val idx = tileIndex - 1
-        return if (idx < list.size) list[idx] else null
+        return list.getOrNull(idx)?.takeIf { it.isNotBlank() }
     }
 
     /**

@@ -1,0 +1,31 @@
+<resources>
+    <string name="catalog_empty">現在交換できる商品はありません</string>
+    <string name="catalog_other_series">その他のシリーズ</string>
+    <string name="catalog_decrease">数量を減らす</string>
+    <string name="catalog_increase">数量を増やす</string>
+    <string name="catalog_balance_low">コインが足りません</string>
+    <string name="catalog_stock_low">在庫が足りません</string>
+    <string name="catalog_backpack_empty">バッグは空です</string>
+    <string name="catalog_privacy">利用規約とプライバシー</string>
+    <string name="catalog_fun">アーケード</string>
+    <string name="catalog_forest">フォレスト</string>
+    <string name="catalog_sakura">桜</string>
+    <string name="catalog_cosmic">星空</string>
+    <string name="catalog_sunset">夕焼け</string>
+    <string name="catalog_update">更新</string>
+    <string name="catalog_maintenance">メンテナンス</string>
+    <string name="catalog_terms">利用規約</string>
+    <string name="catalog_policy">プライバシーポリシー</string>
+    <string name="catalog_collection">収集する個人情報</string>
+    <string name="catalog_sharing">第三者への情報提供</string>
+    <string name="catalog_profile_title">プロフィール</string>
+    <string name="catalog_settings_title">設定</string>
+    <string name="catalog_label_not_set">未設定</string>
+    <string name="catalog_shop_balance_label">残高</string>
+    <string name="catalog_shop_total_label">合計</string>
+    <string name="catalog_shop_unit_price_label">単価</string>
+    <string name="catalog_shop_exchange_title">交換する</string>
+    <string name="catalog_shop_exchange_item_desc">交換する数量を選んでください。</string>
+    <string name="catalog_shop_exchange_skin_desc">コインを使ってこのスキンを解放します。</string>
+    <string name="catalog_carry_stock_label">在庫 %1$d</string>
+</resources>

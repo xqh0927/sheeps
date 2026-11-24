@@ -1,0 +1,6 @@
+<resources>
+    <string name="auth_terms_link">《用戶協議》</string>
+    <string name="auth_privacy_link">《隱私政策》</string>
+    <string name="login_agreement_hint">我已閱讀並同意《用戶協議》和《隱私政策》</string>
+    <string name="topbar_action">操作</string>
+</resources>

@@ -24,19 +24,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.sheeps.ui.R
 import com.example.sheeps.ui.theme.*
 
-// =============================================================================
-// 秘境消消乐 · 设计系统 - 统一 Dialog 组件
-// 统一弹窗样式：深色毛玻璃背景 + 金色边框 + 弹性进入动画
-// =============================================================================
-
-/**
- * 标准 Dialog（替代 AlertDialog）
- * 特性：
- * - 深色表面 + 金色细边框
- * - 标题使用衬线国风字体
- * - 弹性进入/淡出动画
- * - 按钮统一样式
- */
 @Composable
 fun SheepsDialog(
     onDismissRequest: () -> Unit,
@@ -55,70 +42,27 @@ fun SheepsDialog(
             usePlatformDefaultWidth = false
         )
     ) {
+        val visible = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
         AnimatedVisibility(
-            visible = true,
-            enter   = scaleIn(
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness    = Spring.StiffnessMedium
-                ),
-                initialScale = 0.85f
-            ) + fadeIn(androidx.compose.animation.core.tween(250)),
-            exit    = scaleOut(targetScale = 0.9f) + fadeOut(androidx.compose.animation.core.tween(200))
+            visibleState = visible,
+            enter = fadeIn(androidx.compose.animation.core.tween(160)) +
+                slideInVertically(androidx.compose.animation.core.tween(240)) { it / 10 }
         ) {
-            Box(
-                modifier = modifier
-                    .fillMaxWidth(0.92f)
-                    .clip(ShapeLarge)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .then(
-                        Modifier.padding(1.dp) // 金色细边框效果（通过外层 padding+内层 background 模拟）
-                    )
+            Surface(
+                modifier = modifier.widthIn(max = 480.dp).fillMaxWidth(.92f),
+                shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface
             ) {
-                // 金色边框
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clip(ShapeLarge)
-                        .background(
-                            androidx.compose.ui.graphics.Brush.linearGradient(
-                                colors = listOf(MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
-                            )
-                        )
-                )
-
-                // 内容区域
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(ShapeLarge)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(1.5.dp)
-                        .clip(ShapeLarge)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(24.dp)
-                ) {
-                    // 标题
-                    Text(
-                        text       = title,
-                        style      = MaterialTheme.typography.headlineSmall,
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.Bold,
-                        color      = MaterialTheme.colorScheme.primary,
-                        modifier   = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    // 自定义内容区域
+                Column(Modifier.padding(22.dp)) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface)
+                    Spacer(Modifier.height(14.dp))
                     content()
-
-                    // 按钮区域
                     if (confirmButton != null || dismissButton != null) {
-                        Spacer(Modifier.height(20.dp))
-                        Row(
-                            modifier              = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                            verticalAlignment     = Alignment.CenterVertically
-                        ) {
+                        Spacer(Modifier.height(22.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Row(Modifier.fillMaxWidth().padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                            verticalAlignment = Alignment.CenterVertically) {
                             dismissButton?.invoke()
                             confirmButton?.invoke()
                         }

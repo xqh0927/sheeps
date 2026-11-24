@@ -45,9 +45,12 @@ import com.example.sheeps.core.game.TileCardBase
 import com.example.sheeps.core.game.TileIconProvider
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
-import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.ui.animations.GameAnimations
 import com.example.sheeps.ui.components.RemoteImage
+
+/** Opt in with adb shell setprop log.tag.SheepsTiles DEBUG before launching a debug build. */
+internal val showTileDiagnostics = com.example.sheeps.game.BuildConfig.DEBUG &&
+    android.util.Log.isLoggable("SheepsTiles", android.util.Log.DEBUG)
 
 /**
  * 秘境消消乐 · 卡牌组件（重构版）
@@ -113,7 +116,7 @@ fun TileView(
     val isBlocked = tile.state == TileState.BLOCKED
 
     //不可点击遮罩透明度
-    val mask = if (BuildConfig.DEBUG) 0f else 0.35f
+    val mask = if (showTileDiagnostics) 0f else 0.35f
 
     val isBlind =
         tile.isBlind && (tile.state == TileState.NORMAL || tile.state == TileState.BLOCKED)
@@ -139,9 +142,7 @@ fun TileView(
 
     // 缓存图片 URL 和 fallback 资源 ID，避免高频重构触发 Map 查询与资源解析
     val context = LocalContext.current
-    val tileUrl = remember(currentSkin, tile.type) {
-        TileIconProvider.getTileUrl(currentSkin, tile.type)
-    }
+    val tileUrl = TileIconProvider.getTileUrl(currentSkin, tile.type)
     val fallbackResId = remember(tile.type) {
         TileIconProvider.getFallbackResId(context, tile.type)
     }
@@ -230,7 +231,7 @@ fun TileView(
                 }
 
                 // 临时显示 tile.id：NORMAL=红色，BLOCKED=蓝色，附带 z 层
-                if (BuildConfig.DEBUG) {
+                if (showTileDiagnostics) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)

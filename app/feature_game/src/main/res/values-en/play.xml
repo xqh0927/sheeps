@@ -1,0 +1,5 @@
+<resources>
+    <string name="match_tray">Matching tray</string>
+    <string name="endless_freeze_uses">Freeze ×%1$d</string>
+    <string name="endless_freeze_countdown">Frozen · %1$d s</string>
+</resources>

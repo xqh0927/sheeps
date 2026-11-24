@@ -1,0 +1,5 @@
+<resources>
+    <string name="match_tray">매칭 칸</string>
+    <string name="endless_freeze_uses">동결 ×%1$d</string>
+    <string name="endless_freeze_countdown">동결 중 %1$d초</string>
+</resources>

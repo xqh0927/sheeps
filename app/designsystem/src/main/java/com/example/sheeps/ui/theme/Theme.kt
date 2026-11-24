@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 
 // =============================================================================
@@ -309,6 +310,81 @@ private val ShuangFunColors = AppThemeColors(
 // =============================================================================
 // SheepsTheme - 根据 ThemeManager 的当前主题动态切换并推导配色
 // =============================================================================
+private val SystemGlassLight = lightColorScheme(
+    primary = Color(0xFF135BC8),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFE6EFFF),
+    onPrimaryContainer = Color(0xFF123E86),
+    secondary = Color(0xFF6650AA),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFEFE9FB),
+    onSecondaryContainer = Color(0xFF493785),
+    tertiary = Color(0xFF176E52),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFDDF4E7),
+    onTertiaryContainer = Color(0xFF15553B),
+    background = Color(0xFFF3F4F8),
+    onBackground = Color(0xFF181920),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF181920),
+    surfaceVariant = Color(0xFFECEEF4),
+    onSurfaceVariant = Color(0xFF545660),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFAFBFE),
+    surfaceContainer = Color(0xFFF0F1F6),
+    surfaceContainerHigh = Color(0xFFE7E8F0),
+    surfaceContainerHighest = Color(0xFFDDDFE8),
+    outline = Color(0xFF848691),
+    outlineVariant = Color(0xFFD7D8E1),
+    error = Color(0xFFB42231),
+    onError = Color(0xFFFFFFFF)
+)
+
+private val SystemGlassDark = darkColorScheme(
+    primary = Color(0xFF80B4FF),
+    onPrimary = Color(0xFF07294D),
+    primaryContainer = Color(0xFF183453),
+    onPrimaryContainer = Color(0xFFD5E7FF),
+    secondary = Color(0xFFBBA8FF),
+    onSecondary = Color(0xFF2E1B4B),
+    secondaryContainer = Color(0xFF352B4B),
+    onSecondaryContainer = Color(0xFFE9DAFF),
+    tertiary = Color(0xFF80DBB5),
+    onTertiary = Color(0xFF103A2D),
+    tertiaryContainer = Color(0xFF163D32),
+    onTertiaryContainer = Color(0xFFBAEDCE),
+    background = Color(0xFF101115),
+    onBackground = Color(0xFFF3F3F7),
+    surface = Color(0xFF202127),
+    onSurface = Color(0xFFF3F3F7),
+    surfaceVariant = Color(0xFF292A31),
+    onSurfaceVariant = Color(0xFFC2C2CC),
+    surfaceContainerLowest = Color(0xFF101115),
+    surfaceContainerLow = Color(0xFF191A20),
+    surfaceContainer = Color(0xFF22232A),
+    surfaceContainerHigh = Color(0xFF2D2E36),
+    surfaceContainerHighest = Color(0xFF373842),
+    outline = Color(0xFF737581),
+    outlineVariant = Color(0xFF42434D),
+    error = Color(0xFFFFAAA6),
+    onError = Color(0xFF510C12)
+)
+
+private val PolarColors = darkColorScheme(
+    primary = Color(0xFF78E3D2), onPrimary = Color(0xFF052F2D),
+    primaryContainer = Color(0xFF193F40), onPrimaryContainer = Color(0xFFA7F4E7),
+    secondary = Color(0xFFF4C889), onSecondary = Color(0xFF332413),
+    secondaryContainer = Color(0xFF3D3327), onSecondaryContainer = Color(0xFFFFDBA9),
+    tertiary = Color(0xFFA8C7FF), onTertiary = Color(0xFF112644),
+    background = Color(0xFF0B141C), onBackground = Color(0xFFE9F1F4),
+    surface = Color(0xFF111E28), onSurface = Color(0xFFE9F1F4),
+    surfaceVariant = Color(0xFF172732), onSurfaceVariant = Color(0xFFACBDC6),
+    surfaceContainerLowest = Color(0xFF0A121A), surfaceContainerLow = Color(0xFF101C25),
+    surfaceContainer = Color(0xFF192932), surfaceContainerHigh = Color(0xFF21323D),
+    surfaceContainerHighest = Color(0xFF293D49), surfaceTint = Color(0xFF78E3D2),
+    outline = Color(0xFF415360), outlineVariant = Color(0xFF2A3B46)
+)
+
 @Composable
 fun SheepsTheme(
     // 支持外部强制指定主题（用于预览或测试）
@@ -319,6 +395,8 @@ fun SheepsTheme(
     val activeTheme = forceTheme ?: themeState.value
 
     val colorScheme = when (activeTheme) {
+        AppTheme.SYSTEM_GLASS  -> if (isSystemInDarkTheme()) SystemGlassDark else SystemGlassLight
+        AppTheme.POLAR         -> PolarColors
         AppTheme.MO_YE_GOLD    -> MoYeGoldColors.toColorScheme()
         AppTheme.QING_RI_CHUN  -> QingRiChunColors.toColorScheme()
         AppTheme.SAKURA        -> SakuraColors.toColorScheme()
@@ -326,6 +404,16 @@ fun SheepsTheme(
         AppTheme.SUNSET        -> SunsetColors.toColorScheme()
         AppTheme.FOREST        -> ForestColors.toColorScheme()
         AppTheme.SHUANG_FUN    -> ShuangFunColors.toColorScheme()
+    }
+
+    val view = androidx.compose.ui.platform.LocalView.current
+    val window = (view.context as? android.app.Activity)?.window
+    androidx.compose.runtime.SideEffect {
+        if (window != null && !view.isInEditMode) {
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = colorScheme.background.luminance() > 0.5f
+            controller.isAppearanceLightNavigationBars = colorScheme.background.luminance() > 0.5f
+        }
     }
 
     MaterialTheme(

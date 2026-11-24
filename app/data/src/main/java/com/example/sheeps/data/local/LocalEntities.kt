@@ -59,3 +59,20 @@ data class UserProfileEntity(
     /** 最近一次写入时间戳（毫秒） */
     val updateTimestamp: Long
 )
+
+/** Durable negative inventory adjustment, scoped to the account that used the item. */
+@Entity(tableName = "pending_item_consumptions", primaryKeys = ["userId", "operationId"])
+data class PendingItemConsumption(
+    val userId: String,
+    val operationId: String,
+    val itemType: String,
+    val quantity: Int
+)
+
+/** Actual allocation for a game start, retained after its inventory adjustment is acknowledged. */
+@Entity(tableName = "carry_run_receipts")
+data class CarryRunReceipt(
+    @PrimaryKey val runId: String,
+    val userId: String?,
+    val carriedJson: String
+)

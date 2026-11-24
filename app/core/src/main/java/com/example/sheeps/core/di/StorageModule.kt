@@ -33,7 +33,7 @@ object StorageModule {
     @Singleton
     fun provideUserPreferences(mmkv: MMKV, @ApplicationContext context: Context): UserPreferences = UserPreferences(mmkv, context)
 
-    /** 提供 Room 数据库单例（sheeps_local.db），迁移采用 fallbackToDestructiveMigration。 */
+    /** 提供 Room 数据库单例（sheeps_local.db）。 */
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
@@ -42,7 +42,7 @@ object StorageModule {
             AppDatabase::class.java,
             "sheeps_local.db"
         )
-        .fallbackToDestructiveMigration()
+        .addMigrations(AppDatabase.MIGRATION_1_2)
         .build()
     }
 

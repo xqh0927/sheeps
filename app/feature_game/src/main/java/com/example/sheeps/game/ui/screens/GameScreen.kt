@@ -3,20 +3,17 @@ package com.example.sheeps.game.ui.screens
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.graphicsLayer
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
@@ -134,27 +131,16 @@ fun GameScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surface,
-                        MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
             .onGloballyPositioned { coords ->
-                screenRootOffset = coords.positionInRoot()
+                screenRootOffset = coords.positionOnScreen()
             }
     ) {
-        // 背景装饰
-        GameBackgroundDecoration()
-
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 SheepsTopAppBar(
-                    title = stringResource(id = R.string.prepare_title_unlocked, state.currentLevelId),
+                    title = stringResource(id = R.string.level_number, state.currentLevelId),
                     onBack = onBack,
                     showAction = true,
                     actionIcon = Icons.Default.Refresh,
@@ -168,10 +154,22 @@ fun GameScreen(
                     .padding(paddingValues)
                     .padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // 1. 顶部状态栏（得分、卡牌数）
                 GameStatusBar(state = state)
+
+                // 携带道具放在计分区下方，底部专用于接牌。
+                GameTools(
+                    state = state,
+                    onUseMoveOut = onUseMoveOut,
+                    onUseUndo = onUseUndo,
+                    onUseShuffle = onUseShuffle,
+                    onUseHint = onUseHint,
+                    onUseBomb = onUseBomb,
+                    onUseJoker = onUseJoker,
+                    onUseDouble = onUseDouble
+                )
 
                 // 封印门控进度条（仅封印关卡显示）
                 if (state.sealedOrder.isNotEmpty()) {
@@ -179,12 +177,14 @@ fun GameScreen(
                 }
 
                 // 2. 游戏核心棋盘：可自适应高度，置物架出现时自动压缩
+                val boardColors = MaterialTheme.colorScheme
                 val (borderColor, decorColor) = rememberTileCardBorderColors(state.currentSkin)
                 AndroidView(
                     factory = { ctx ->
                         GameBoardSurfaceView(ctx)
                     },
                     update = { view ->
+                        view.backdrop.setColors(boardColors)
                         view.setSkinColors(borderColor, decorColor)
                         view.updateData(
                             state = state,
@@ -234,18 +234,6 @@ fun GameScreen(
                     flyingTileIds = flyingTileIds,
                     slotGlobalPositions = slotGlobalPositions,
                     onTileClick = onTileClick
-                )
-
-                // 4. 道具交互与展示区
-                GameTools(
-                    state = state,
-                    onUseMoveOut = onUseMoveOut,
-                    onUseUndo = onUseUndo,
-                    onUseShuffle = onUseShuffle,
-                    onUseHint = onUseHint,
-                    onUseBomb = onUseBomb,
-                    onUseJoker = onUseJoker,
-                    onUseDouble = onUseDouble
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -304,7 +292,7 @@ private fun SealedGateProgress(state: GameViewState) {
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Text(
@@ -317,14 +305,14 @@ private fun SealedGateProgress(state: GameViewState) {
                 ),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.secondary,
-                trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.15f)
+                trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
             )
         }
     }
@@ -379,29 +367,6 @@ private fun FlyingTilesLayer(
 }
 
 /**
- * 游戏背景装饰（微光效果）。
- *
- * 在顶部绘制一个以主题主色径向渐变形成的柔光圆，纯静态装饰，不依赖动画或状态。
- *
- * 线程约束：纯 Composable，运行于主线程；`Canvas` 绘制在布局/绘制阶段的主线程完成。
- */
-@Composable
-private fun GameBackgroundDecoration() {
-    val glowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(glowColor, Color.Transparent),
-                center = Offset(this.size.width * 0.5f, 0f),
-                radius = this.size.width * 0.7f
-            ),
-            radius = this.size.width * 0.7f,
-            center = Offset(this.size.width * 0.5f, 0f)
-        )
-    }
-}
-
-/**
  * 游戏结果处理区。
  *
  * 依据 [state.gameStatus] 以 `AnimatedVisibility` 分别呈现胜利覆盖层
@@ -433,7 +398,7 @@ private fun GameResultSection(
     // 胜利覆盖层
     AnimatedVisibility(
         visible = state.gameStatus == GameStatus.WON,
-        enter   = fadeIn(tween(400)) + scaleIn(initialScale = 0.85f),
+        enter   = fadeIn(tween(260)) + slideInVertically(tween(300)) { it / 7 },
         exit    = fadeOut(tween(300))
     ) {
         GameResultOverlay(
@@ -448,7 +413,7 @@ private fun GameResultSection(
     // 失败覆盖层
     AnimatedVisibility(
         visible = state.gameStatus == GameStatus.LOST,
-        enter   = fadeIn(tween(400)) + scaleIn(initialScale = 0.85f),
+        enter   = fadeIn(tween(260)) + slideInVertically(tween(300)) { it / 7 },
         exit    = fadeOut(tween(300))
     ) {
         GameResultOverlay(

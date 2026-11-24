@@ -4,12 +4,10 @@ import android.content.Context
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -21,8 +19,7 @@ import androidx.core.graphics.withTranslation
 import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
 import com.example.sheeps.data.model.Tile
-import com.example.sheeps.game.BuildConfig
-import com.example.sheeps.game.ui.utils.TileTextureLoader
+import com.example.sheeps.core.game.TileTextureLoader
 import java.util.concurrent.ConcurrentHashMap
 
 
@@ -50,15 +47,6 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
 
         /** 卡牌边缘细描边线颜色 */
         private val COLOR_CARD_BORDER = "#E0E0E0".toColorInt()
-
-        /** 竖井外边缘描边线颜色 */
-        private val COLOR_BG_BORDER = "#CCCCCC".toColorInt()
-
-        /** 竖井背景渐变起始浅灰色 */
-        private val COLOR_BG_GRADIENT_START = "#F5F5F5".toColorInt()
-
-        /** 竖井背景渐变结束深灰色 */
-        private val COLOR_BG_GRADIENT_END = "#EEEEEE".toColorInt()
     }
 
     /** 存储当前 6 列中每列的卡牌数据列表（从井底往井口排序） */
@@ -135,15 +123,8 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     /** 线程同步锁，保证数据交互更新时的绝对安全 */
     private val renderLock = Any()
 
-    /** 竖井底盘容器填充背景画笔 */
-    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal val backdrop = BoardBackdrop(resources.displayMetrics.density)
 
-    /** 竖井外边缘线画笔 */
-    private val bgBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dpToPx(1f)
-        color = COLOR_BG_BORDER
-    }
 
     private val bgRectF = RectF()
     private val tempRectF = RectF()
@@ -162,9 +143,6 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         typeface = Typeface.DEFAULT_BOLD
     }
 
-    private var lastOffsetX = -1f
-    private var lastOffsetY = -1f
-    private var lastTotalColumnHeight = -1f
 
     /**
      * 封印牌单张位移动画状态属性类。
@@ -285,6 +263,8 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
     /**
      * 发起 View 重画请求
      */
+    private val onTextureLoaded: () -> Unit = ::triggerRender
+
     private fun triggerRender() {
         invalidate()
     }
@@ -316,22 +296,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
         bgRectF.set(offsetX, offsetY, offsetX + totalBoardWidth, offsetY + totalColumnHeight)
         val bgRadius = dpToPx(10f)
 
-        var shader = bgPaint.shader
-        if (shader == null || lastOffsetX != offsetX || lastOffsetY != offsetY || lastTotalColumnHeight != totalColumnHeight) {
-            lastOffsetX = offsetX
-            lastOffsetY = offsetY
-            lastTotalColumnHeight = totalColumnHeight
-            shader = LinearGradient(
-                offsetX, offsetY, offsetX, offsetY + totalColumnHeight,
-                COLOR_BG_GRADIENT_START,
-                COLOR_BG_GRADIENT_END,
-                Shader.TileMode.CLAMP
-            )
-            bgPaint.shader = shader
-        }
-
-        canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgPaint)
-        canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgBorderPaint)
+        backdrop.draw(canvas, bgRectF, bgRadius)
 
         // 步骤 2：对准偏移行，迭代卡牌绘制
         canvas.withClip(offsetX, offsetY, offsetX + totalBoardWidth, offsetY + totalColumnHeight) {
@@ -438,9 +403,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
             )
 
             // 2.3 绘制卡牌图案（比例：普通牌缩进 5% 以对齐 TileView）
-            val bitmap = TileTextureLoader.getTileBitmap(context, currentSkin, tile.type) {
-                triggerRender()
-            }
+            val bitmap = TileTextureLoader.getTileBitmap(context, currentSkin, tile.type, onTextureLoaded)
             val innerPadding = size * 0.05f
             tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
             tempDstRectF.set(
@@ -452,7 +415,7 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
             canvas.drawBitmap(bitmap, tempSrcRect, tempDstRectF, cardPaint)
 
             // 2.4 在 DEBUG 模式下，居中绘制红色 ID 和 Z 层以对齐 TileView.kt
-            if (BuildConfig.DEBUG) {
+            if (showTileDiagnostics) {
                 debugPaint.color = Color.RED
                 debugPaint.textSize = size * 0.18f
                 val cleanId = tile.id.removePrefix("tile_").removePrefix("endless_")
@@ -517,9 +480,6 @@ class EndlessBoardSurfaceView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        lastOffsetX = -1f
-        lastOffsetY = -1f
-        lastTotalColumnHeight = -1f
         triggerRender()
     }
 

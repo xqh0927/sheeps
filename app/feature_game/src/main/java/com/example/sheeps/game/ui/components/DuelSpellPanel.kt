@@ -7,7 +7,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,11 +43,11 @@ fun DuelSpellPanel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         val spells = listOf(
-            SpellInfo("FOG", 3, Color(0xFF8C7B70)),
-            SpellInfo("SILENCE", 4, Color(0xFF7E57C2)),
-            SpellInfo("SHUFFLE", 5, Color(0xFF26A69A)),
+            SpellInfo("FOG", 3, MaterialTheme.colorScheme.primary),
+            SpellInfo("SILENCE", 4, MaterialTheme.colorScheme.primary),
+            SpellInfo("SHUFFLE", 5, MaterialTheme.colorScheme.primary),
             SpellInfo("SHRINK", 6, MaterialTheme.colorScheme.primary),
-            SpellInfo("SEAL_ALL", 10, MaterialTheme.colorScheme.secondary)
+            SpellInfo("SEAL_ALL", 10, MaterialTheme.colorScheme.primary)
         )
 
         spells.forEach { spell ->
@@ -81,7 +80,6 @@ private fun SpellButton(
     modifier: Modifier = Modifier
 ) {
     val isEnabled = currentEnergy >= info.cost && !isUsed && !isSilenced
-    val alpha = if (isEnabled) 1.0f else 0.4f
     
     val buttonText = when {
         isUsed -> stringResource(id = R.string.spell_state_used)
@@ -94,11 +92,11 @@ private fun SpellButton(
         enabled = isEnabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = info.color,
-            disabledContainerColor = info.color.copy(alpha = 0.2f)
+            disabledContainerColor = MaterialTheme.colorScheme.surface
         ),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(16.dp),
         contentPadding = PaddingValues(vertical = 8.dp, horizontal = 2.dp),
-        modifier = modifier.alpha(alpha)
+        modifier = modifier
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -111,8 +109,8 @@ private fun SpellButton(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = stringResource(id = R.string.spell_energy_cost, info.cost),
-                fontSize = 9.sp,
-                color = if (isEnabled) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                color = if (isEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
         }

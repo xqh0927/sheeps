@@ -1,10 +1,10 @@
 package com.example.sheeps.game.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.sheeps.lib_base.base.BaseMviViewModel
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.data.preference.UserPreferences
-import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.Tile
@@ -40,6 +40,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class GameViewModel @Inject constructor(
+    savedState: SavedStateHandle,
     private val apiService: ApiService,
     private val prefs: UserPreferences,
     private val json: Json,
@@ -53,7 +54,7 @@ class GameViewModel @Inject constructor(
 ) : BaseMviViewModel<GameViewState, GameViewIntent, GameViewEffect>(GameViewState()) {
 
     private var levelStartTime: Long = 0
-    private var carryItemsJsonStr: String? = null
+    private val runs = LevelRuns(savedState)
     private var itemsUsedCount: Int = 0
     private var tickJob: kotlinx.coroutines.Job? = null
     private var hasSubmittedThisRun: Boolean = false
@@ -70,7 +71,9 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.InitUser -> handleInitUser()
             is GameViewIntent.AgreePrivacy -> handleAgreePrivacy()
             is GameViewIntent.ChangeUsername -> handleChangeUsername(intent.newName)
-            is GameViewIntent.LoadLevel -> handleLoadLevel(intent.levelId, intent.carryItemsJson)
+            is GameViewIntent.LoadLevel -> if (!currentState.isLoading) {
+                handleLoadLevel(runs.start(intent.levelId, intent.carryItemsJson))
+            }
             is GameViewIntent.ClickTile -> viewModelScope.launch {
                 logicDelegate.handleClickTile(
                     intent.tile,
@@ -159,6 +162,20 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun openLevel(levelId: Int, carryJson: String?) {
+        runs.open(levelId, carryJson)?.let(::handleLoadLevel)
+    }
+
+    fun saveRemainingCarry() {
+        val state = currentState
+        if (state.isLoading || state.gameStatus == GameStatus.INIT || state.gameStatus == GameStatus.MENU) return
+        runs.saveRemaining(mapOf(
+            "UNDO" to state.undoCount, "MOVEOUT" to state.moveOutCount, "SHUFFLE" to state.shuffleCount,
+            "REVIVE" to state.reviveCount, "HINT" to state.hintCount, "BOMB" to state.bombCount,
+            "JOKER" to state.jokerCount, "DOUBLE_POINTS" to state.doublePointsCount,
+        ))
+    }
+
     /** 初始化用户信息：读取隐私协议状态、昵称与已解锁关卡，并进入 MENU 或 INIT 状态。运行于主线程。 */
     private fun handleInitUser() {
         val accepted = prefs.isPrivacyAccepted()
@@ -168,7 +185,9 @@ class GameViewModel @Inject constructor(
                 username = prefs.getUsername(),
                 unlockedLevel = prefs.getUnlockedLevel(),
                 isLoggedIn = prefs.isLoggedIn(),
-                gameStatus = if (accepted) GameStatus.MENU else GameStatus.INIT
+                gameStatus = if (gameStatus == GameStatus.INIT || gameStatus == GameStatus.MENU) {
+                    if (accepted) GameStatus.MENU else GameStatus.INIT
+                } else gameStatus
             )
         }
     }
@@ -227,16 +246,16 @@ class GameViewModel @Inject constructor(
      * - 道具库存扣减与关卡网络请求运行在 [Dispatchers.IO]（`apiService.getLevel` / `localDao`）；
      * - 离线回退时改由本地生成器生成可解关卡，避免阻塞 UI。
      *
-     * @param levelId 目标关卡 ID
-     * @param carryItemsJson 进入关卡前选择的携带道具 JSON（可空）
+     * @param run 已保存的开局信息；明确重玩或进入下一关时使用新的开局 ID。
      */
-    private fun handleLoadLevel(levelId: Int, carryItemsJson: String?) {
+    private fun handleLoadLevel(run: LevelRun) {
+        val levelId = run.level
+        val carryItemsJson = run.carryJson
         updateState { copy(isLoading = true, currentLevelId = levelId) }
         historyStack.clear()
         itemsUsedCount = 0
-        carryItemsJsonStr = carryItemsJson
 
-        val carryMap = try {
+        val requested = try {
             if (!carryItemsJson.isNullOrEmpty()) json.decodeFromString<Map<String, Int>>(
                 carryItemsJson
             ) else emptyMap()
@@ -245,21 +264,11 @@ class GameViewModel @Inject constructor(
         }
 
         viewModelScope.launch(Dispatchers.IO) {
-            // 扣除携带道具库存
-            val now = System.currentTimeMillis()
-            carryMap.forEach { (type, count) ->
-                if (count > 0) {
-                    val current = localDao.getAllItems().find { it.itemType == type }
-                    localDao.insertItem(
-                        BackpackItemEntity(
-                            type,
-                            maxOf(0, (current?.count ?: 0) - count),
-                            true,
-                            now
-                        )
-                    )
-                }
-            }
+            val owner = prefs.accountId()
+            val allocated = localDao.consumeForRun(run.id, owner, requested, prefs.getUserId())
+            val carryMap = run.remaining?.let { remaining ->
+                allocated.mapValues { (type, count) -> minOf(count, remaining[type] ?: 0) }
+            } ?: allocated
             syncRepository.syncDirtyData()
 
             // ===== 关卡数据获取与棋盘装载逻辑（网络优先 + 离线兜底） =====
@@ -537,11 +546,12 @@ class GameViewModel @Inject constructor(
 
     /** 确认重开：将临时携带道具序列化为 JSON 并重新 [handleLoadLevel]。运行于主线程。 */
     private fun handleConfirmRestartWithCarry() {
+        if (!currentState.showCarrySelection || currentState.isLoading) return
         val carryJson = json.encodeToString<Map<String, Int>>(currentState.tempCarryItems)
         updateState {
             copy(showCarrySelection = false)
         }
-        handleLoadLevel(currentState.currentLevelId, carryJson)
+        handleLoadLevel(runs.start(currentState.currentLevelId, carryJson))
     }
 
     private fun submitFailureRecordIfNeeded() {

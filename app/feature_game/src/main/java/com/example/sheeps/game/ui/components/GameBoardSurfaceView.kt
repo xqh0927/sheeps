@@ -5,12 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -27,9 +25,8 @@ import com.example.sheeps.core.game.SkinColors
 import com.example.sheeps.core.game.getSkinColors
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
-import com.example.sheeps.game.BuildConfig
 import com.example.sheeps.game.state.GameViewState
-import com.example.sheeps.game.ui.utils.TileTextureLoader
+import com.example.sheeps.core.game.TileTextureLoader
 import kotlin.math.sin
 import androidx.core.graphics.withSave
 
@@ -63,20 +60,11 @@ class GameBoardSurfaceView @JvmOverloads constructor(
         /** 封印剩余层数显示气泡背景蓝色 */
         private val COLOR_BUBBLE_BLUE = "#1976D2".toColorInt()
 
-        /** 棋盘底座外围细边框颜色 */
-        private val COLOR_BG_BORDER = "#CCCCCC".toColorInt()
-
         /** 锁关卡半透明深灰背景底色 */
         private val COLOR_GATE_BG = "#BB2C3E50".toColorInt()
 
         /** 锁关卡发光金黄色细边框 */
         private val COLOR_GATE_BORDER = "#F1C40F".toColorInt()
-
-        /** 棋盘背景渐变起始浅灰色 */
-        private val COLOR_BG_GRADIENT_START = "#F5F5F5".toColorInt()
-
-        /** 棋盘背景渐变结束深灰色 */
-        private val COLOR_BG_GRADIENT_END = "#EEEEEE".toColorInt()
 
         /** 兜底锁头主体圆角矩形金黄色 */
         private val COLOR_LOCK_BODY = "#F1C40F".toColorInt()
@@ -132,7 +120,7 @@ class GameBoardSurfaceView @JvmOverloads constructor(
 
     /** 处于被遮挡（BLOCKED）状态的卡牌在其上覆盖的半透明变暗蒙版画笔，DEBUG 模式下为半透明白以供诊断 */
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (BuildConfig.DEBUG) COLOR_MASK_DEBUG_LIGHT else COLOR_MASK_NORMAL
+        color = if (showTileDiagnostics) COLOR_MASK_DEBUG_LIGHT else COLOR_MASK_NORMAL
     }
 
     /** 黄金高亮边框画笔，用于绘制提示道具选中时的发光特效 */
@@ -225,15 +213,8 @@ class GameBoardSurfaceView @JvmOverloads constructor(
     /** 数据同步锁，防止非 UI 线程更新状态数据（如协程回调）与 UI 线程 onDraw 渲染之间发生读写冲突 */
     private val renderLock = Any()
 
-    /** 棋盘背景填充画笔 */
-    private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    internal val backdrop = BoardBackdrop(resources.displayMetrics.density)
 
-    /** 棋盘底座外围细边框画笔 */
-    private val bgBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dpToPx(1f)
-        color = COLOR_BG_BORDER
-    }
 
     // Reusable drawing objects to avoid object allocation in onDraw loop
     private val bgRectF = RectF()
@@ -374,6 +355,8 @@ class GameBoardSurfaceView @JvmOverloads constructor(
      * 触发 Canvas 请求重绘。
      * 内部包装 invalidate 以利于将来重构优化。
      */
+    private val onTextureLoaded: () -> Unit = ::triggerRender
+
     private fun triggerRender() {
         invalidate()
     }
@@ -396,8 +379,7 @@ class GameBoardSurfaceView @JvmOverloads constructor(
     private fun drawBoard(canvas: Canvas) {
         if (surfaceWidth > 0f && surfaceHeight > 0f) {
             val bgRadius = dpToPx(16f)
-            canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgPaint)
-            canvas.drawRoundRect(bgRectF, bgRadius, bgRadius, bgBorderPaint)
+            backdrop.draw(canvas, bgRectF, bgRadius)
         }
 
         val s = state ?: return
@@ -532,9 +514,7 @@ class GameBoardSurfaceView @JvmOverloads constructor(
                 canvas.drawBitmap(tileBackBitmap, tempSrcRect, tempDstRectF, cardPaint)
             } else {
                 val bitmap =
-                    TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type) {
-                        triggerRender()
-                    }
+                    TileTextureLoader.getTileBitmap(context, gameState.currentSkin, tile.type, onTextureLoaded)
                 val innerPadding = size * 0.05f
                 tempSrcRect.set(0, 0, bitmap.width, bitmap.height)
                 tempDstRectF.set(
@@ -547,7 +527,7 @@ class GameBoardSurfaceView @JvmOverloads constructor(
             }
 
             // 2.4 在 DEBUG 模式下，居中绘制红色/蓝色 ID 和 Z 层以对齐 TileView.kt
-            if (BuildConfig.DEBUG) {
+            if (showTileDiagnostics) {
                 debugPaint.color = if (isBlocked) Color.BLUE else Color.RED
                 debugPaint.textSize = size * 0.18f
                 val cleanId = tile.id.removePrefix("tile_")
@@ -585,7 +565,7 @@ class GameBoardSurfaceView @JvmOverloads constructor(
         }
 
         // 8. 状态四：封印层数蓝色小气泡（仅在 sealedCount > 0 时显示在卡牌右上角）
-        if (tile.sealedCount > 0 && BuildConfig.DEBUG) {
+        if (tile.sealedCount > 0 && showTileDiagnostics) {
             val bubbleRadius = size * 0.18f
             val bCx = rect.right - bubbleRadius / 1.5f
             val bCy = rect.top + bubbleRadius / 1.5f
@@ -660,12 +640,6 @@ class GameBoardSurfaceView @JvmOverloads constructor(
         surfaceHeight = h.toFloat()
         if (w > 0 && h > 0) {
             bgRectF.set(0f, 0f, surfaceWidth, surfaceHeight)
-            bgPaint.shader = LinearGradient(
-                0f, 0f, 0f, surfaceHeight,
-                COLOR_BG_GRADIENT_START,
-                COLOR_BG_GRADIENT_END,
-                Shader.TileMode.CLAMP
-            )
         }
         state?.let {
             updateData(it, flyingTileIds, onTileClick ?: {}, tileGlobalPositions ?: mutableMapOf())

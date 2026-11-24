@@ -1,89 +1,38 @@
 package com.example.sheeps.menu.ui.dialogs
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import com.example.sheeps.ui.R
-import com.example.sheeps.core.utils.getLocalizedItemName
-import com.example.sheeps.menu.state.MenuViewState
-import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.core.game.TileIconProvider
+import com.example.sheeps.core.utils.getLocalizedItemName
+import com.example.sheeps.menu.R as MenuR
+import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.ui.R
+import com.example.sheeps.ui.components.ItemIcon
 import com.hjq.toast.Toaster
 
-/**
- * 进入关卡前的准备对话框（自定义全屏遮罩 + [Card] 内容）。
- *
- * 展示关卡标题，并根据关卡规则提示特殊玩法（盲关/封印关/休息关）；
- * 关卡未解锁时显示解锁费用与"解锁"按钮（消耗积分），已解锁时可选择携带道具
- * （增减各种道具数量），最后点击"开始"进入游戏。
- *
- * 触发来源：首页/关卡选择（MenuScreen）点击某关卡进入。
- * 确认后：
- *  - 已解锁：由 [onConfirm] 回传 [levelId] 进入对局；
- *  - 道具增减：由 [onUpdateItem] 实时回写 ViewModel 的 `selectedCarryItems`；
- *  - 未解锁：由 [onUnlock] 回传 [levelId] 扣除积分并解锁（积分不足用 [Toaster] 提示）。
- *
- * 线程约束：所有 `state`（[MenuViewState]）读取与道具选择发生在主线程（UI 线程），
- * [onConfirm]/[onUpdateItem]/[onUnlock] 由上层负责切到 IO/网络线程提交。
- * [LocalContext] 仅用于 [Toaster] 提示，组合期间引用，Dialog 关闭后释放。
- *
- * ⚠️ 内存隐患：道具网格（8 种道具 × 多项状态）与图标列表在每次重组时由
- * `listOf(...)`/`chunked(4)` 重新创建，数据量小可接受；[ItemIcon] 加载的网络图片
- * 由图片加载库管理回收。本对话框无静态 Context 持有、无未取消协程，关闭即释放。
- *
- * @param levelId 目标关卡 ID（1 起）。
- * @param state 菜单视图状态（[MenuViewState]），含 unlockedLevel、points、selectedCarryItems、backpackItems 等。
- * @param onDismiss 关闭对话框的回调（返回/关闭按钮或点击遮罩触发）。
- * @param onConfirm 点击"开始"的回调，参数为 [levelId]，用于进入对局。
- * @param onUpdateItem 增减携带道具的回调，参数为 (道具类型, 变更数量 +1/-1)。
- * @param onUnlock 点击"解锁"的回调，参数为 [levelId]，用于扣除积分并解锁关卡。
- */
+private val carryTypes = listOf("UNDO", "SHUFFLE", "MOVEOUT", "REVIVE", "HINT", "BOMB", "JOKER", "DOUBLE_POINTS")
+
 @Composable
 fun PrepareGameDialog(
     levelId: Int,
@@ -94,360 +43,119 @@ fun PrepareGameDialog(
     onUnlock: (Int) -> Unit
 ) {
     val context = LocalContext.current
-    val isLocked = levelId > state.unlockedLevel
-    // 累计计算：从已解锁关+1 到目标关卡，每关费用累加（第2关50、第3关100、第4关及以上每关200）
-    var cost = 0
-    for (lid in (state.unlockedLevel + 1)..levelId) {
-        cost += when (lid) {
-            2 -> 50
-            3 -> 100
-            else -> 200
-        }
+    val colors = MaterialTheme.colorScheme
+    val locked = levelId > state.unlockedLevel
+    val cost = ((state.unlockedLevel + 1)..levelId).fold(0) { total, stage ->
+        total + when (stage) { 2 -> 50; 3 -> 100; else -> 200 }
+    }
+    val selectedTypes = state.selectedCarryItems.count { it.value > 0 }
+    val warning = when {
+        levelId % 5 == 0 -> null
+        levelId % 3 == 0 -> R.string.prepare_blind_warning
+        levelId % 2 == 0 -> R.string.prepare_sealed_warning
+        else -> null
     }
 
-    val isRest = levelId >= 5 && levelId % 5 == 0
-    val isBlind = !isRest && levelId >= 3 && levelId % 3 == 0
-    val isSealed = !isRest && !isBlind && levelId >= 2 && levelId % 2 == 0
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }) { onDismiss() },
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.95f)
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }) { /* Block click propagation */ },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(
-                    2.dp,
-                    Brush.linearGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.secondary,
-                            Color(0xFFEDD9A3),
-                            MaterialTheme.colorScheme.secondary
-                        )
-                    )
-                ),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(20.dp)
-                        .fillMaxWidth()
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), modifier = Modifier.fillMaxWidth(), color = colors.surface) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 20.dp, top = 15.dp, end = 10.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // 对话框头部主标题文本
-                    Text(
-                        text = if (isLocked) stringResource(id = R.string.prepare_title_locked) else stringResource(
-                            id = R.string.prepare_title_unlocked,
-                            levelId
-                        ),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 18.sp,
-                        fontFamily = FontFamily.Serif,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    if (isLocked) {
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Text(
-                                text = stringResource(
-                                    id = R.string.prepare_locked_desc,
-                                    cost,
-                                    state.points
-                                ),
-                                fontSize = 13.sp,
-                                lineHeight = 20.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = onDismiss) {
-                                    Text(
-                                        stringResource(id = R.string.dialog_prepare_back),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Button(
-                                    onClick = {
-                                        if (state.points >= cost) {
-                                            onUnlock(levelId)
-                                        } else {
-                                            Toaster.show(context.getString(R.string.prepare_locked_insufficient))
-                                        }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        stringResource(id = R.string.dialog_prepare_unlock),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
-                            }
-                        }
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(if (locked) R.string.prepare_title_locked else MenuR.string.lobby_loadout),
+                            color = colors.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                        Text(stringResource(R.string.level_number, levelId), color = colors.onSurface,
+                            fontSize = 29.sp, lineHeight = 36.sp, letterSpacing = (-1).sp, fontWeight = FontWeight.Bold)
+                    }
+                    LobbyDialogClose(onDismiss, stringResource(R.string.dialog_prepare_close))
+                }
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    if (locked) {
+                        Text(stringResource(R.string.prepare_locked_desc, cost, state.points),
+                            color = colors.onSurface, style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(5.dp))
                     } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = stringResource(id = R.string.prepare_setup_desc),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 16.sp
-                            )
-
-                            if (isBlind) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(id = R.string.prepare_blind_warning),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            lineHeight = 15.sp
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (isSealed) {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                                    border = BorderStroke(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = stringResource(id = R.string.prepare_sealed_warning),
-                                            color = MaterialTheme.colorScheme.secondary,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            lineHeight = 15.sp
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            val itemTypes = listOf(
-                                "UNDO",
-                                "SHUFFLE",
-                                "MOVEOUT",
-                                "REVIVE",
-                                "HINT",
-                                "BOMB",
-                                "JOKER",
-                                "DOUBLE_POINTS"
-                            )
-
-                            val selectedTypesCount = remember(state.selectedCarryItems) {
-                                state.selectedCarryItems.count { it.value > 0 }
-                            }
-
-                            val chunkedItems = itemTypes.chunked(4)
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                chunkedItems.forEach { rowItems ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        rowItems.forEach { type ->
-                                            val name = getLocalizedItemName(type)
-                                            val stock =
-                                                state.backpackItems.find { it.item_type == type }?.count
-                                                    ?: 0
-                                            val selected = state.selectedCarryItems[type] ?: 0
-                                            val isGray = selected == 0
-
-                                            Column(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .background(
-                                                        MaterialTheme.colorScheme.surfaceVariant,
-                                                        RoundedCornerShape(12.dp)
-                                                    )
-                                                    .border(
-                                                        1.dp,
-                                                        if (selected > 0) MaterialTheme.colorScheme.primary.copy(
-                                                            alpha = 0.5f
-                                                        ) else MaterialTheme.colorScheme.outlineVariant,
-                                                        RoundedCornerShape(12.dp)
-                                                    )
-                                                    .padding(vertical = 8.dp, horizontal = 4.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                                            ) {
-                                                ItemIcon(
-                                                    itemType = type,
-                                                    imageUrl = TileIconProvider.getItemIconUrl(type),
-                                                    size = 38.dp,
-                                                    isGray = isGray
-                                                )
-                                                Text(
-                                                    text = name,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    maxLines = 1
-                                                )
-                                                Text(
-                                                    stringResource(
-                                                        id = R.string.stock_prefix,
-                                                        stock
-                                                    ),
-                                                    fontSize = 9.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 1
-                                                )
-
-                                                Spacer(modifier = Modifier.height(2.dp))
-
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(22.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (selected > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
-                                                            .clickable(enabled = selected > 0) {
-                                                                onUpdateItem(
-                                                                    type,
-                                                                    -1
-                                                                )
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = "减少",
-                                                            tint = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-
-                                                    val textScale by animateFloatAsState(
-                                                        targetValue = if (selected > 0) 1.15f else 1f,
-                                                        animationSpec = spring(stiffness = Spring.StiffnessHigh),
-                                                        label = "textScale"
-                                                    )
-                                                    Text(
-                                                        text = selected.toString(),
-                                                        modifier = Modifier
-                                                            .padding(horizontal = 6.dp)
-                                                            .graphicsLayer(
-                                                                scaleX = textScale,
-                                                                scaleY = textScale
-                                                            ),
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (selected > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                    )
-
-                                                    val canIncrease =
-                                                        selected < stock && (selected > 0 || selectedTypesCount < 5)
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(22.dp)
-                                                            .clip(CircleShape)
-                                                            .background(if (canIncrease) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.outlineVariant)
-                                                            .clickable(enabled = canIncrease) {
-                                                                onUpdateItem(
-                                                                    type,
-                                                                    1
-                                                                )
-                                                            },
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.KeyboardArrowUp,
-                                                            contentDescription = "增加",
-                                                            tint = if (canIncrease) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        if (rowItems.size < 4) {
-                                            for (i in 0 until (4 - rowItems.size)) {
-                                                Spacer(modifier = Modifier.weight(1f))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                TextButton(onClick = onDismiss) {
-                                    Text(
-                                        stringResource(id = R.string.dialog_prepare_close),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Button(
-                                    onClick = { onConfirm(levelId) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        stringResource(id = R.string.prepare_btn_start),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                        if (warning != null) {
+                            Text(stringResource(warning), color = colors.onSecondaryContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.fillMaxWidth().background(colors.secondaryContainer, RoundedCornerShape(13.dp)).padding(10.dp))
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        Row(Modifier.padding(horizontal = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.prepare_setup_desc), modifier = Modifier.weight(1f),
+                                color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                            Spacer(Modifier.width(9.dp))
+                            Text(stringResource(MenuR.string.lobby_picked, selectedTypes), color = colors.primary,
+                                fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Column(Modifier.clip(RoundedCornerShape(17.dp)).background(colors.surfaceContainer)) {
+                            carryTypes.forEachIndexed { index, type ->
+                                val stock = state.backpackItems.find { it.item_type == type }?.count ?: 0
+                                val selected = state.selectedCarryItems[type] ?: 0
+                                CarryItem(type, stock, selected, canAdd = selected < stock && (selected > 0 || selectedTypes < 5),
+                                    onChange = { delta -> onUpdateItem(type, delta) })
+                                if (index < carryTypes.lastIndex) {
+                                    HorizontalDivider(Modifier.padding(start = 48.dp), thickness = .5.dp,
+                                        color = colors.outlineVariant)
                                 }
                             }
                         }
                     }
                 }
+                Button(onClick = {
+                    if (!locked) onConfirm(levelId)
+                    else if (state.points >= cost) onUnlock(levelId)
+                    else Toaster.show(context.getString(R.string.prepare_locked_insufficient))
+                }, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
+                    .heightIn(min = 48.dp), shape = CircleShape) {
+                    Icon(if (locked) Icons.Outlined.Lock else Icons.Default.ArrowForward, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(if (locked) R.string.dialog_prepare_unlock else R.string.prepare_btn_start))
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun CarryItem(type: String, stock: Int, selected: Int, canAdd: Boolean, onChange: (Int) -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val name = getLocalizedItemName(type)
+    Row(
+        Modifier.fillMaxWidth().padding(start = 10.dp, end = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ItemIcon(itemType = type, imageUrl = TileIconProvider.getItemIconUrl(type),
+            size = 30.dp, isGray = stock == 0)
+        Spacer(Modifier.width(9.dp))
+        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Text(name, color = colors.onSurface, fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.stock_prefix, stock), color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall)
+        }
+        IconButton(enabled = selected > 0, onClick = { onChange(-1) }) {
+            Icon(Icons.Default.Remove, "${stringResource(R.string.prepare_desc_decrease)} $name",
+                Modifier.size(26.dp).background(colors.surface, CircleShape).padding(5.dp))
+        }
+        Text(selected.toString(), color = if (selected > 0) colors.primary else colors.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall)
+        IconButton(enabled = canAdd, onClick = { onChange(1) }) {
+            Icon(Icons.Default.Add, "${stringResource(R.string.prepare_desc_increase)} $name",
+                Modifier.size(26.dp).background(colors.surface, CircleShape).padding(5.dp))
+        }
+    }
+}
+
+@Composable
+internal fun LobbyDialogClose(onClick: () -> Unit, description: String) {
+    val colors = MaterialTheme.colorScheme
+    IconButton(onClick = onClick) {
+        Icon(Icons.Default.Close, description, tint = colors.onSurfaceVariant,
+            modifier = Modifier.size(32.dp).background(colors.surfaceContainer, CircleShape).padding(8.dp))
     }
 }

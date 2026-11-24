@@ -3,6 +3,11 @@ package com.example.sheeps.game.ui.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,14 +34,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import com.example.sheeps.ui.R
+import com.example.sheeps.game.R as GameR
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.game.state.EndlessStatus
 import com.example.sheeps.game.state.EndlessViewIntent
@@ -50,13 +55,10 @@ import com.example.sheeps.core.game.rememberTileCardBorderColors
 import com.example.sheeps.ui.components.SheepsTopAppBar
 import kotlinx.coroutines.launch
 
-private data class WellBoardSizes(
-    val rowHeight: androidx.compose.ui.unit.Dp
-)
-
 private data class EndlessFlyingTile(
     val tileId: String,
     val type: Int,
+    val size: Dp,
     val start: Offset,
     val end: Offset,
     val progress: Animatable<Float, AnimationVector1D>
@@ -86,17 +88,10 @@ fun EndlessScreen(
 
     var screenRootOffset by remember { mutableStateOf(Offset.Zero) }
 
-    val screenWidth = LocalConfiguration.current.screenWidthDp
-    val gapVal = 4
-    val tileSizeVal = remember(screenWidth) {
-        val calculated = (screenWidth * 0.9f - 28) / 6f
-        calculated.coerceIn(40f, 56f) // 限制在 40dp ~ 56dp 之间以保证显示合适
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .onGloballyPositioned { screenRootOffset = it.positionInRoot() }
+            .onGloballyPositioned { screenRootOffset = it.positionOnScreen() }
     ) {
         Scaffold(
             topBar = {
@@ -114,42 +109,36 @@ fun EndlessScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(8.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 EndlessHud(
                     score = state.score,
                     combo = state.combo,
                     wave = state.wave,
-                    bestScore = state.bestScore,
-                    isFrozen = state.isFrozen,
-                    freezeCount = state.freezeCount,
-                    onFreeze = { onIntent(EndlessViewIntent.UseFreeze) }
+                    bestScore = state.bestScore
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val sizes = remember(state.deathRow, tileSizeVal) {
-                    val stackHeightVal =
-                        state.deathRow * tileSizeVal + (state.deathRow - 1) * gapVal
-                    val columnHeightVal = gapVal + stackHeightVal + gapVal
-                    val rowHeight = (columnHeightVal + gapVal * 2).dp
-                    WellBoardSizes(rowHeight = rowHeight)
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(sizes.rowHeight)
-                        .fillMaxWidth(0.95f)
-                        .padding(gapVal.dp),
+                BoxWithConstraints(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
+                    // Mirrors the Canvas grid padding (4dp per side, plus the outer vertical inset).
+                    val rows = state.deathRow.coerceAtLeast(1)
+                    val columns = state.columns.size.takeIf { it > 0 } ?: 6
+                    val byWidth = (maxWidth.value - 8f - (columns - 1) * 4f) / columns
+                    val byHeight = (maxHeight.value - 16f - (rows - 1) * 4f) / rows
+                    val tileSizeVal = minOf(byWidth, byHeight, 56f).coerceAtLeast(1f)
+                    val boardColors = MaterialTheme.colorScheme
                     val (borderColor, decorColor) = rememberTileCardBorderColors(state.currentSkin)
                     AndroidView(
                         factory = { context ->
                             EndlessBoardSurfaceView(context)
                         },
                         update = { view ->
+                            view.backdrop.setColors(boardColors)
                             view.setSkinColors(borderColor, decorColor)
                             val densityVal = view.context.resources.displayMetrics.density
                             val tileSizePx = tileSizeVal * densityVal
@@ -177,6 +166,7 @@ fun EndlessScreen(
                                         val fly = EndlessFlyingTile(
                                             tile.id,
                                             tile.type,
+                                            tileSizeVal.dp,
                                             startPos,
                                             endPos,
                                             anim
@@ -212,7 +202,29 @@ fun EndlessScreen(
                     currentSkin = state.currentSkin,
                     flyingTileIds = flyingTileIds,
                     slotGlobalPositions = slotGlobalPositions
-                )
+                ) {
+                    val colors = MaterialTheme.colorScheme
+                    FilledTonalButton(
+                        onClick = { onIntent(EndlessViewIntent.UseFreeze) },
+                        enabled = state.status == EndlessStatus.PLAYING && state.freezeCount > 0 && !state.isFrozen,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = colors.primaryContainer,
+                            contentColor = colors.onPrimaryContainer,
+                            disabledContainerColor = colors.surfaceContainerHigh,
+                            disabledContentColor = colors.onSurfaceVariant
+                        )
+                    ) {
+                        Text(
+                            if (state.isFrozen) {
+                                val seconds = (state.freezeRemainingMs + 999) / 1_000
+                                stringResource(GameR.string.endless_freeze_countdown, seconds)
+                            } else {
+                                stringResource(GameR.string.endless_freeze_uses, state.freezeCount)
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -220,8 +232,7 @@ fun EndlessScreen(
         EndlessFlyingTilesLayer(
             flyingTiles = flyingTiles,
             currentSkin = state.currentSkin,
-            screenRootOffset = screenRootOffset,
-            tileSize = tileSizeVal.dp
+            screenRootOffset = screenRootOffset
         )
 
         if (state.showResult) {
@@ -244,15 +255,14 @@ fun EndlessScreen(
 private fun EndlessFlyingTilesLayer(
     flyingTiles: List<EndlessFlyingTile>,
     currentSkin: String,
-    screenRootOffset: Offset,
-    tileSize: Dp = 48.dp
+    screenRootOffset: Offset
 ) {
     flyingTiles.forEach { fly ->
         key(fly.tileId) {
             Box(
                 modifier = Modifier
                     .zIndex(999f)
-                    .size(tileSize)
+                    .size(fly.size)
                     .graphicsLayer {
                         val progress = fly.progress.value
                         translationX =
@@ -265,7 +275,7 @@ private fun EndlessFlyingTilesLayer(
                     tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0),
                     onClick = {},
                     currentSkin = currentSkin,
-                    tileSize = tileSize
+                    tileSize = fly.size
                 )
             }
         }

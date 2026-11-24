@@ -12,6 +12,7 @@ android {
 
     defaultConfig {
         minSdk = 24
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -29,6 +30,10 @@ kotlin {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+
     // 网络层（Retrofit / OkHttp / kotlinx-serialization 经 lib_network 以 api 透传）
     implementation(project(":lib_network"))
     // 基座（MMKV / Hilt / 基础工具）

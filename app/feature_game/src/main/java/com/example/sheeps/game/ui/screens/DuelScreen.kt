@@ -17,8 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalDensity
@@ -26,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
 import androidx.compose.ui.zIndex
-import com.example.sheeps.ui.R
 import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.core.game.GameEngine
@@ -113,11 +111,11 @@ fun DuelScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.surface)))
-            .onGloballyPositioned { screenRootOffset = it.positionInRoot() }
+            .background(MaterialTheme.colorScheme.background)
+            .onGloballyPositioned { screenRootOffset = it.positionOnScreen() }
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().statusBarsPadding().padding(16.dp),
+            modifier = Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 1. 顶部：对决信息与进度
@@ -126,15 +124,17 @@ fun DuelScreen(
             // 2. 攻击/施法提示条
             SpellMessageBar(state = state)
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(6.dp))
 
             // 3. 游戏核心棋盘（包含迷雾特效自绘）
+            val boardColors = MaterialTheme.colorScheme
             val (borderColor, decorColor) = rememberTileCardBorderColors(state.currentSkin)
             AndroidView(
                 factory = { ctx ->
                     DuelGameBoardSurfaceView(ctx)
                 },
                 update = { view ->
+                    view.backdrop.setColors(boardColors)
                     view.setSkinColors(borderColor, decorColor)
                     view.updateData(
                         state = state,
@@ -174,7 +174,7 @@ fun DuelScreen(
                     .weight(1f)
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(6.dp))
             
             // 4. 置物架区域
             DuelMovedOutTray(state = state, onTileClick = onTileClick)
@@ -182,11 +182,12 @@ fun DuelScreen(
             Spacer(Modifier.height(8.dp))
 
             // 5. 消除槽区域
-            DuelMatchingSlot(state = state, flyingTileIds = flyingTileIds, slotGlobalPositions = slotGlobalPositions)
+            MatchingTray(state.slotTiles, state.currentSkin, flyingTileIds, slotGlobalPositions, state.maxSlotSize)
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(5.dp))
 
             // 6. 技能释放面板
+            DuelEnergyBar(state.currentEnergy)
             DuelSpellPanel(state = state, onCastSpell = onCastSpell)
         }
 
@@ -201,7 +202,8 @@ fun DuelScreen(
         // 9. 飞行卡片动画层
         DuelFlyingTilesLayer(
             flyingTiles = flyingTiles,
-            screenRootOffset = screenRootOffset
+            screenRootOffset = screenRootOffset,
+            currentSkin = state.currentSkin
         )
     }
 }
@@ -230,12 +232,12 @@ private fun SpellMessageBar(state: DuelViewState) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f))
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = msg, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+                Text(text = msg, color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
         }
     }
@@ -258,117 +260,13 @@ private fun DuelMovedOutTray(state: DuelViewState, onTileClick: (Tile) -> Unit) 
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .padding(8.dp)
     ) {
         state.movedOutTiles.forEach { tile ->
             key(tile.id) {
-                TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = "shuang", tileSize = 48.dp)
-            }
-        }
-    }
-}
-
-/**
- * 对决模式消除槽位（支持缩减槽位诅咒）。
- *
- * 渲染 7 个插槽背景（当 [DuelViewState.maxSlotSize] == 6 时第 7 个插槽锁定并显示 🔒），
- * 并以 `animateDpAsState` + spring 动画驱动已放置卡牌的横向滑动定位。
- * 通过 [slotGlobalPositions] 将每个插槽的全局坐标回填，供飞行卡牌计算落点。
- *
- * ⚠️ 内存/生命周期提示：[slotGlobalPositions] 为外部传入的可变 Map，由
- * `onGloballyPositioned` 在布局阶段写入；该回调绑定于布局测量，随组件销毁
- * 释放，不会长期持有引用。注意不要在回调中捕获 Activity/Context，否则会造成泄漏。
- *
- * 线程约束：纯 Composable，运行于主线程；坐标换算 `toDp()` 借助 `LocalDensity`。
- *
- * @param state              当前对决视图状态，提供卡槽卡牌与最大槽位数
- * @param flyingTileIds      正在飞行中的卡牌 id 集合（飞行时隐藏原槽位卡牌）
- * @param slotGlobalPositions 插槽全局坐标映射（会被本函数回填写入）
- */
-@Composable
-private fun DuelMatchingSlot(
-    state: DuelViewState,
-    flyingTileIds: Set<String>,
-    slotGlobalPositions: MutableMap<Int, Offset>
-) {
-    val density = LocalDensity.current
-    var containerWidthPx by remember { mutableStateOf(0) }
-    val containerRoot = remember { mutableStateOf(Offset.Zero) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(8.dp)
-            .onGloballyPositioned { coords ->
-                // 仅在此根容器测量一次，捕获容器全局坐标与宽度（px），
-                // 再按固定布局（padding 8dp + 7 等分槽位 + 4dp 间隔）推导 7 个槽位全局坐标，
-                // 取代此前给每个槽位挂 onGloballyPositioned（7 次回调）。
-                containerRoot.value = coords.positionInRoot()
-                containerWidthPx = coords.size.width
-                computeSlotGlobalPositions(
-                    containerRoot = containerRoot.value,
-                    density = density.density,
-                    containerWidthPx = containerWidthPx,
-                    slotCount = 7,
-                    slotGlobalPositions = slotGlobalPositions
-                )
-            }
-    ) {
-        // 1. 绘制 7 个空插槽背景（不再挂 onGloballyPositioned）
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            for (i in 0 until 7) {
-                val isLocked = i == 6 && state.maxSlotSize == 6
-                Box(
-                    modifier = Modifier
-                        .weight(1f).aspectRatio(1f)
-                        .background(if (isLocked) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .border(width = 1.dp, color = if (isLocked) MaterialTheme.colorScheme.primary else Color.Transparent, shape = RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isLocked) {
-                        Text("🔒", fontSize = 16.sp)
-                    }
-                }
-            }
-        }
-
-        // 2. 绘制卡槽中的实体卡牌，并添加位置滑动动画
-        if (containerWidthPx > 0 && state.slotTiles.isNotEmpty()) {
-            val containerWidthDp = with(density) { containerWidthPx.toDp() }
-            val itemWidth = (containerWidthDp - 24.dp) / 7
-
-            state.slotTiles.forEachIndexed { index, tile ->
-                val targetX = index * (itemWidth + 4.dp)
-                val animatedX by animateDpAsState(
-                    targetValue = targetX,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = "duel_slot_tile_move_${tile.id}"
-                )
-
-                val isFlying = flyingTileIds.contains(tile.id)
-
-                Box(
-                    modifier = Modifier
-                        .offset(x = animatedX)
-                        .size(itemWidth)
-                        .alpha(if (isFlying) 0f else 1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    TileView(
-                        tile = tile,
-                        onClick = {},
-                        currentSkin = "shuang",
-                        tileSize = itemWidth
-                    )
-                }
+                TileView(tile = tile, onClick = { onTileClick(tile) }, currentSkin = state.currentSkin, tileSize = 48.dp)
             }
         }
     }
@@ -386,7 +284,7 @@ private fun DuelMatchingSlot(
 @Composable
 private fun FullScreenLoadingOverlay() {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f))
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f))
             .pointerInput(Unit) { awaitEachGesture { while (true) { awaitPointerEvent().changes.forEach { it.consume() } } } }
             .clickable(enabled = false, onClick = {}),
         contentAlignment = Alignment.Center
@@ -413,7 +311,8 @@ private fun FullScreenLoadingOverlay() {
 @Composable
 private fun DuelFlyingTilesLayer(
     flyingTiles: List<DuelFlyingTile>,
-    screenRootOffset: Offset
+    screenRootOffset: Offset,
+    currentSkin: String
 ) {
     flyingTiles.forEach { fly ->
         key(fly.tileId) {
@@ -430,34 +329,8 @@ private fun DuelFlyingTilesLayer(
                         scaleY = 1f
                     }
             ) {
-                TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = "shuang", tileSize = 48.dp)
+                TileView(tile = Tile(id = "fly_view", type = fly.type, x = 0f, y = 0f, z = 0), onClick = {}, currentSkin = currentSkin, tileSize = 48.dp)
             }
         }
-    }
-}
-
-/**
- * 依据消除槽容器根坐标与宽度（px）推导各槽位全局坐标（px）。
- *
- * 布局：容器 padding 8dp，内部 Row 为 7 等分（weight(1f)）加 4dp 间隔（共 6 个间隔）。
- * 与原始逐槽 [androidx.compose.ui.layout.onGloballyPositioned] 写入的槽位左上角坐标一致，飞行动画落点不变。
- * `density` 用于把 dp 间距换算为 px，与 [androidx.compose.ui.layout.positionInRoot] 的 px 坐标系对齐。
- */
-private fun computeSlotGlobalPositions(
-    containerRoot: Offset,
-    density: Float,
-    containerWidthPx: Int,
-    slotCount: Int,
-    slotGlobalPositions: MutableMap<Int, Offset>
-) {
-    if (containerWidthPx <= 0) return
-    val padPx = 8f * density
-    val gapPx = 4f * density
-    val rowWidthPx = containerWidthPx - 2f * padPx
-    val slotW = (rowWidthPx - (slotCount - 1) * gapPx) / slotCount
-    for (i in 0 until slotCount) {
-        val x = containerRoot.x + padPx + i * (slotW + gapPx)
-        val y = containerRoot.y + padPx
-        slotGlobalPositions[i] = Offset(x, y)
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -25,87 +26,27 @@ import com.example.sheeps.ui.theme.*
 import kotlin.math.cos
 import kotlin.math.sin
 
-// =============================================================================
-// 秘境消消乐 · 设计系统 - 自定义 Loading 组件
-// 替代系统 CircularProgressIndicator，使用国风太极旋转动画
-// =============================================================================
-
-/**
- * 太极旋转 Loading 指示器（替代系统 ProgressBar）
- * 由两个半圆旋转组成，金色+朱砂双色
- */
+/** Three tiles lift in sequence while work is pending. */
 @Composable
-fun SheepsLoading(
-    modifier: Modifier = Modifier,
-    size: Dp = 48.dp
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "sheepsLoading")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue  = 360f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "loadingRotation"
+fun SheepsLoading(modifier: Modifier = Modifier, size: Dp = 48.dp) {
+    val phase = rememberInfiniteTransition(label = "tileSequence").animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1080, easing = LinearEasing)),
+        label = "tileLift"
     )
-    val innerRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue  = -360f,
-        animationSpec = infiniteRepeatable(
-            animation  = tween(durationMillis = 800, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "innerLoadingRotation"
-    )
-
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val accentColor  = MaterialTheme.colorScheme.secondary
-    val bgColor      = MaterialTheme.colorScheme.surfaceContainer
-    val innerColor   = MaterialTheme.colorScheme.onPrimaryContainer
-
-    Canvas(
-        modifier = modifier
-            .size(size)
-            .rotate(rotation)
-    ) {
-        val strokeWidth = size.toPx() * 0.12f
-        val radius = (size.toPx() - strokeWidth) / 2f
-        val cx = this.size.width / 2f
-        val cy = this.size.height / 2f
-
-        // 外圈：朱砂弧
-        drawArc(
-            color      = primaryColor,
-            startAngle = 0f,
-            sweepAngle = 200f,
-            useCenter  = false,
-            topLeft    = Offset(cx - radius, cy - radius),
-            size       = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-            style      = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-        // 外圈：金色弧（另一侧）
-        drawArc(
-            color      = accentColor,
-            startAngle = 200f,
-            sweepAngle = 160f,
-            useCenter  = false,
-            topLeft    = Offset(cx - radius, cy - radius),
-            size       = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-            style      = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-
-        // 内圈：反向旋转小圆弧
-        val innerRadius = radius * 0.5f
-        rotate(degrees = innerRotation, pivot = Offset(cx, cy)) {
-            drawArc(
-                color      = innerColor,
-                startAngle = 0f,
-                sweepAngle = 120f,
-                useCenter  = false,
-                topLeft    = Offset(cx - innerRadius, cy - innerRadius),
-                size       = androidx.compose.ui.geometry.Size(innerRadius * 2, innerRadius * 2),
-                style      = Stroke(width = strokeWidth * 0.7f, cap = StrokeCap.Round)
+    val colors = MaterialTheme.colorScheme
+    Canvas(modifier.size(size).progressSemantics()) {
+        val unit = this.size.minDimension
+        for (index in 0..2) {
+            val cycle = (phase.value - index * 0.14f + 1f) % 1f
+            val lift = sin((cycle / 0.55f).coerceAtMost(1f) * Math.PI).toFloat()
+            val edge = unit * .2f
+            val x = unit * (.1f + index * .30f)
+            val y = unit * (.49f - .19f * lift)
+            drawRoundRect(
+                color = androidx.compose.ui.graphics.lerp(colors.onSurfaceVariant, colors.primary, lift),
+                topLeft = Offset(x, y), size = androidx.compose.ui.geometry.Size(edge, edge),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(edge * .23f)
             )
         }
     }

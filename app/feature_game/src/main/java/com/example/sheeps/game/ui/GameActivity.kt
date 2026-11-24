@@ -31,9 +31,9 @@ import com.therouter.router.Route
  * 交给 [GameViewModel]；同时处理与 UI 相关的副作用（Toast、音效预留、振动、路由跳转）。
  *
  * 生命周期职责：
- * - [initView]：在 `onCreate` 之后由 [BaseActivity] 调用，仅做界面组合构建，
+ * - [initView]：在 `onCreate` 中由 [BaseActivity] 调用，打开或恢复关卡并构建游戏界面，
  *   无需要手动释放的资源。
- * - [initData]：加载初始关卡并收集 [com.example.sheeps.game.state.GameViewEffect]；
+ * - [initData]：收集 [com.example.sheeps.game.state.GameViewEffect]；
  *   协程与状态收集均由 Compose / `lifecycleScope` 在销毁时自动取消。
  */
 @Route(path = RouterPath.Game.PLAY)
@@ -41,7 +41,6 @@ import com.therouter.router.Route
 class GameActivity : BaseActivity() {
 
     private val viewModel: GameViewModel by viewModels()
-    private var levelId: Int = 1
 
     /**
      * 初始化界面（由 [BaseActivity] 在 onCreate 之后调用）。
@@ -51,8 +50,9 @@ class GameActivity : BaseActivity() {
      * 协程与状态收集由 Compose / lifecycleScope 在销毁时自动取消。
      */
     override fun initView(savedInstanceState: Bundle?) {
-        // 从 intent 中获取关卡 ID，默认为第 1 关
-        levelId = intent.getIntExtra("levelId", 1)
+        // 老版本保存的 Activity 没有开局回执，恢复时其原始携带参数可能已经扣过库存。
+        val carryJson = if (savedInstanceState == null) intent.getStringExtra("carryItemsJson") else null
+        viewModel.openLevel(intent.getIntExtra("levelId", 1), carryJson)
 
         setContent {
             SheepsTheme {
@@ -131,17 +131,12 @@ class GameActivity : BaseActivity() {
 
     /**
      * 初始化数据（由 [BaseActivity] 在 initView 之后调用）。
-     * 职责：读取携带道具 JSON 并发送 LoadLevel 意图加载关卡；
-     * 在生命周期范围内收集 [com.example.sheeps.game.state.GameViewEffect]
+     * 职责：在生命周期范围内收集 [com.example.sheeps.game.state.GameViewEffect]
      * 副作用（Toast / 音效 / 振动）。
      * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，onDestroy 时自动取消；
      * 振动通过 getSystemService 局部获取 Vibrator，不持有静态引用，无泄漏。
      */
     override fun initData() {
-        val carryJson = intent.getStringExtra("carryItemsJson")
-        // 发送初始加载关卡意图
-        viewModel.sendIntent(GameViewIntent.LoadLevel(levelId, carryJson))
-
         // 在生命周期范围内收集 ViewModel 发出的副作用
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
@@ -174,6 +169,11 @@ class GameActivity : BaseActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        viewModel.saveRemainingCarry()
+        super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {

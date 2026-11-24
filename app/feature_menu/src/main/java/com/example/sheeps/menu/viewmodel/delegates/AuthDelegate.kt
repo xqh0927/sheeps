@@ -2,7 +2,6 @@ package com.example.sheeps.menu.viewmodel.delegates
 
 import com.example.sheeps.ui.R
 import com.example.sheeps.data.preference.UserPreferences
-import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.local.UserProgressEntity
@@ -212,19 +211,13 @@ class AuthDelegate @Inject constructor(
             )
         )
 
-        localDao.deleteAllProgress()
-        localDao.insertProgressList(
+        localDao.replaceProgress(
             response.unlocked_levels.map {
                 UserProgressEntity(levelId = it, score = 0, clearTime = 0, isDirty = false, updateTimestamp = now)
             }
         )
 
-        localDao.deleteAllItems()
-        localDao.insertItemList(
-            response.items.map {
-                BackpackItemEntity(itemType = it.item_type, count = it.count, isDirty = false, updateTimestamp = now)
-            }
-        )
+        localDao.replaceCloudInventory(response.user.id, response.items)
     }
 
     /**

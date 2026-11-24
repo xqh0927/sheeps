@@ -16,7 +16,6 @@ import com.example.sheeps.ui.R
 import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
-import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.ResetPasswordRequest
 import com.example.sheeps.data.model.SendCodeRequest
@@ -205,20 +204,12 @@ class UserInfoActivity : BaseActivity() {
         setLoading(true)
         scope.launch {
             try {
+                val owner = prefs.accountId() ?: return@launch
                 apiService.rename(RenameRequest(nickname))
+                if (prefs.accountId() != owner) return@launch
                 prefs.setUsername(nickname)
-                // 同步更新本地 DB 中的 profile，MenuViewModel observer 立即感知变更
-                val userId = prefs.getUserId()
-                localDao.deleteProfile()
-                localDao.insertProfile(
-                    UserProfileEntity(
-                        userId = userId,
-                        username = nickname,
-                        points = prefs.getPoints(),
-                        isDirty = false,
-                        updateTimestamp = System.currentTimeMillis()
-                    )
-                )
+                localDao.repairLegacyProfile(owner, prefs.getUserId())
+                localDao.renameProfile(owner, nickname)
                 onSuccess(nickname)
                 Toaster.show(getString(R.string.toast_nickname_update_success))
             } catch (e: Exception) {

@@ -40,6 +40,7 @@ kapt {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     // 依赖拆分出的基础层与网络层（收紧为 implementation，防止依赖透传给 Feature 模块）
     implementation(project(":lib_base"))
     implementation(project(":lib_network"))

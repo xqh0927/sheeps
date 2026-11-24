@@ -1,0 +1,5 @@
+<resources>
+    <string name="match_tray">消除槽</string>
+    <string name="endless_freeze_uses">凍結 ×%1$d</string>
+    <string name="endless_freeze_countdown">凍結中 %1$d 秒</string>
+</resources>

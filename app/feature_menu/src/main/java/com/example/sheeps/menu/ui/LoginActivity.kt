@@ -8,7 +8,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.example.sheeps.data.local.BackpackItemEntity
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.local.UserProgressEntity
@@ -216,8 +215,7 @@ class LoginActivity : BaseActivity() {
                     )
                 )
 
-                localDao.deleteAllProgress()
-                localDao.insertProgressList(response.unlocked_levels.map {
+                localDao.replaceProgress(response.unlocked_levels.map {
                     UserProgressEntity(
                         levelId = it,
                         score = 0,
@@ -227,15 +225,7 @@ class LoginActivity : BaseActivity() {
                     )
                 })
 
-                localDao.deleteAllItems()
-                localDao.insertItemList(response.items.map {
-                    BackpackItemEntity(
-                        itemType = it.item_type,
-                        count = it.count,
-                        isDirty = false,
-                        updateTimestamp = now
-                    )
-                })
+                localDao.replaceCloudInventory(response.user.id, response.items)
 
                 Toaster.show(getString(R.string.toast_login_success))
                 // 验证码登录后若未设密码，通知 MenuActivity 弹出强制设密

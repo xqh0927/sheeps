@@ -72,23 +72,23 @@ class SettingsActivity : BaseActivity() {
                         kv.encode("theme_changed_in_settings", true)
                     },
                     onShowGameGuide = { showGameGuide = true },
-                    onOpenAgreement = { openH5(AppConfig.BASE_URL + "agreement.html", "用户协议") },
+                    onOpenAgreement = { openH5(AppConfig.BASE_URL + "agreement.html", getString(com.example.sheeps.menu.R.string.catalog_terms)) },
                     onOpenPrivacyPolicy = {
                         openH5(
                             AppConfig.BASE_URL + "privacy.html",
-                            "隐私政策"
+                            getString(com.example.sheeps.menu.R.string.catalog_policy)
                         )
                     },
                     onOpenPersonalInfoCollection = {
                         openH5(
                             AppConfig.BASE_URL + "personal-info-collection.html",
-                            "个人信息收集清单"
+                            getString(com.example.sheeps.menu.R.string.catalog_collection)
                         )
                     },
                     onOpenThirdPartySharing = {
                         openH5(
                             AppConfig.BASE_URL + "third-party-sharing.html",
-                            "第三方信息共享清单"
+                            getString(com.example.sheeps.menu.R.string.catalog_sharing)
                         )
                     }
                 )

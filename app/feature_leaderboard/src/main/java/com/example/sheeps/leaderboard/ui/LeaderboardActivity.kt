@@ -3,28 +3,24 @@ package com.example.sheeps.leaderboard.ui
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,7 +28,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,12 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
 import com.apkfuns.logutils.LogUtils
 import com.example.sheeps.ui.R
 import com.example.sheeps.lib_base.base.BaseActivity
@@ -62,7 +54,6 @@ import com.hjq.toast.Toaster
 import com.therouter.router.Route
 import dagger.hilt.android.AndroidEntryPoint
 import jakarta.inject.Inject
-import kotlinx.coroutines.launch
 
 @Route(path = RouterPath.Leaderboard.SHOW)
 @AndroidEntryPoint
@@ -93,29 +84,21 @@ class LeaderboardActivity : BaseActivity() {
                 var isLoading by remember { mutableStateOf(false) }
                 var showRulesDialog by remember { mutableStateOf(false) }
 
-                val loadRankings = {
-                    isLoading = true
-                    lifecycleScope.launch {
-                        try {
-                            LogUtils.d("Fetching rankings for level: $levelId, type: $selectedTab")
-                            val response =
-                                apiService.getLeaderboardPaged(levelId, selectedTab, 1, 50)
-                            if (response.success) {
-                                rankings = response.rankings
-                            } else {
-                                Toaster.show(getString(R.string.leaderboard_data_error))
-                            }
-                        } catch (e: Exception) {
-                            LogUtils.e(e)
-                            Toaster.show(getString(R.string.leaderboard_load_error))
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                }
-
                 LaunchedEffect(selectedTab) {
-                    loadRankings()
+                    isLoading = true
+                    rankings = emptyList()
+                    try {
+                        val response = apiService.getLeaderboardPaged(levelId, selectedTab, 1, 50)
+                        if (response.success) rankings = response.rankings
+                        else Toaster.show(getString(R.string.leaderboard_data_error))
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        LogUtils.e(e)
+                        Toaster.show(getString(R.string.leaderboard_load_error))
+                    } finally {
+                        isLoading = false
+                    }
                 }
 
                 Surface(
@@ -168,34 +151,9 @@ class LeaderboardActivity : BaseActivity() {
                             }
                         } else {
                             if (rankings.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = stringResource(id = R.string.leaderboard_empty),
-                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                        fontSize = 15.sp
-                                    )
-                                }
+                                RankingNotice(stringResource(R.string.leaderboard_empty), Modifier.weight(1f).fillMaxWidth())
                             } else {
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth(),
-                                    contentPadding = PaddingValues(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    itemsIndexed(rankings) { index, entry ->
-                                        RankingRow(
-                                            index = index,
-                                            entry = entry,
-                                            isCurrentUser = entry.username == userPrefs.getUsername()
-                                        )
-                                    }
-                                }
+                                RankingBoard(rankings, userPrefs.getUsername(), Modifier.weight(1f).fillMaxWidth())
                             }
                         }
                     }
@@ -211,7 +169,6 @@ fun LeaderboardAppBar(
     levelId: Int,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
     SheepsTopAppBar(
         title = stringResource(id = R.string.leaderboard_title_format, levelId),
         onBack = onBack,
@@ -225,144 +182,40 @@ fun LeaderboardTabs(
     onTabSelected: (String) -> Unit,
     onShowRules: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(start = 4.dp, top = 4.dp, bottom = 4.dp, end = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val tabs = listOf(
-            "daily" to stringResource(id = R.string.leaderboard_tab_daily),
-            "weekly" to stringResource(id = R.string.leaderboard_tab_weekly),
-            "history" to stringResource(id = R.string.leaderboard_tab_history)
+            "daily" to stringResource(R.string.leaderboard_tab_daily),
+            "weekly" to stringResource(R.string.leaderboard_tab_weekly),
+            "history" to stringResource(R.string.leaderboard_tab_history)
         )
-        tabs.forEach { (tabKey, tabLabel) ->
-            val isSelected = selectedTab == tabKey
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
-                    .border(
-                        width = if (isSelected) 1.dp else 0.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.secondary else Color.Transparent,
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .clickable { onTabSelected(tabKey) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = tabLabel,
-                    color = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-        }
-        // 积分规则按钮
-        IconButton(
-            onClick = onShowRules,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Info,
-                contentDescription = "积分规则",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-fun RankingRow(
-    index: Int,
-    entry: RankingEntry,
-    isCurrentUser: Boolean
-) {
-    val medalColor = when (index) {
-        0 -> Color(0xFFFFD700) // 金牌
-        1 -> Color(0xFFC0C0C0) // 银牌
-        2 -> Color(0xFFCD7F32) // 铜牌
-        else -> Color.Transparent
-    }
-
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (isCurrentUser) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = if (isCurrentUser) 1.dp else 0.dp,
-                color = if (isCurrentUser) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
-            )
-    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            Modifier.weight(1f).background(colors.surfaceContainerHigh, CircleShape)
+                .selectableGroup().padding(3.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = if (index < 3) medalColor else MaterialTheme.colorScheme.surfaceVariant,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = (index + 1).toString(),
-                    color = if (index < 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+            tabs.forEach { (tabKey, tabLabel) ->
+                val selected = selectedTab == tabKey
+                val pill = if (selected) Modifier.shadow(2.dp, CircleShape).background(colors.surface, CircleShape)
+                    else Modifier
+                Box(
+                    Modifier.weight(1f).then(pill).clip(CircleShape)
+                        .selectable(selected, role = Role.Tab) { onTabSelected(tabKey) }
+                        .heightIn(min = 42.dp).padding(horizontal = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(tabLabel, color = if (selected) colors.onSurface else colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+                }
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = entry.username,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isCurrentUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(
-                        id = R.string.leaderboard_clear_time_format,
-                        entry.clear_time_ms / 1000.0
-                    ),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-                        RoundedCornerShape(6.dp)
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(id = R.string.leaderboard_score_format, entry.score),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        }
+        Spacer(Modifier.width(4.dp))
+        IconButton(onClick = onShowRules) {
+            Icon(Icons.Default.Info, stringResource(R.string.leaderboard_rules_title),
+                tint = colors.primary, modifier = Modifier.size(22.dp))
         }
     }
 }

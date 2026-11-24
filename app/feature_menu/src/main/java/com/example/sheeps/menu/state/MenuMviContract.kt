@@ -10,6 +10,8 @@ import com.example.sheeps.data.model.*
 data class MenuViewState(
     /** 是否正在执行全局加载（如刷新数据） */
     val isLoading: Boolean = false,
+    /** 首次商城请求尚未完成，加载提示只显示在商城页。 */
+    val isShopLoading: Boolean = true,
     /** 当前用户是否已登录 */
     val isLoggedIn: Boolean = false,
     /** 用户昵称 */

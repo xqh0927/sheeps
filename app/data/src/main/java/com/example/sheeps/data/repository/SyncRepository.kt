@@ -7,6 +7,8 @@ import com.example.sheeps.data.local.*
 import com.example.sheeps.data.model.*
 import com.example.sheeps.data.network.ApiService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,66 +25,43 @@ class SyncRepository @Inject constructor(
     private val networkMonitor: NetworkMonitor
 ) {
 
-    /**
-     * 获取当前用户的 Bearer 授权请求头
-     * @return 返回格式化的 Authorization 请求头字符串，若未登录则返回空串
-     */
-    private fun getAuthHeader(): String {
-        val token = userPreferences.getToken()
-        return if (token != null) "Bearer $token" else ""
-    }
+    private val cloudInventory = Mutex()
 
     /**
      * 将本地标记为脏数据 (isDirty = true) 的离线操作同步上传至云端 D1 数据库。
      * 同步成功后，会自动清除本地 Room 对应的脏数据标记，保证端云最终一致性。
      */
-    suspend fun syncDirtyData() = withContext(Dispatchers.IO) {
-        if (!userPreferences.isLoggedIn()) return@withContext
-        if (!networkMonitor.isOnline()) return@withContext
+    suspend fun syncDirtyData() = cloudInventory.withLock {
+        val token = userPreferences.getToken() ?: return@withLock
+        val owner = userPreferences.accountId(token) ?: return@withLock
+        localDao.repairLegacyProfile(owner, userPreferences.getUserId())
+        if (!networkMonitor.isOnline() || !localDao.hasProfile(owner)) return@withLock
+        val dirtyProgress = localDao.getDirtyProgress()
+        val dirtyProfiles = localDao.getDirtyProfiles().filter { it.userId == owner }
+        val pending = localDao.pendingConsumptions(owner)
+        if (pending.isEmpty() && dirtyProgress.isEmpty() && dirtyProfiles.isEmpty() &&
+            localDao.getDirtyItems().isEmpty()) return@withLock
 
         try {
-            // 获取所有本地发生变更但尚未同步的脏数据条目
-            val dirtyProgress = localDao.getDirtyProgress()
-            val dirtyItems = localDao.getDirtyItems()
-            val dirtyProfiles = localDao.getDirtyProfiles()
-
-            if (dirtyProgress.isEmpty() && dirtyItems.isEmpty() && dirtyProfiles.isEmpty()) {
-                return@withContext
-            }
-
-            LogUtils.d("开始同步本地离线脏数据: ${dirtyProgress.size} 条关卡进度, ${dirtyItems.size} 个道具, ${dirtyProfiles.size} 个个人资料")
-
-            // 1. 构建云端同步请求体
-            val currentPoints = userPreferences.getPoints()
-            val allProgress = localDao.getAllProgress()
-            val unlockedLevels = allProgress.map { it.levelId }
-
-            val allLocalItems = localDao.getAllItems()
-            val userItemsList = allLocalItems.map { UserItem(it.itemType, it.count) }
-
-            val request = SyncRequest(
-                points = currentPoints,
-                unlocked_levels = unlockedLevels,
-                items = userItemsList
-            )
-
-            // 2. 调用云端 API 发送同步数据负载
-            val response = apiService.syncData(
-                auth = getAuthHeader(),
-                request = request
-            )
-
-            if (response.success) {
-                // 3. 成功后，原子清除本地的脏数据标记 (isDirty 置为 false)
-                dirtyProgress.forEach { localDao.clearProgressDirty(it.levelId) }
-                dirtyItems.forEach { localDao.clearItemDirty(it.itemType) }
-                if (dirtyProfiles.isNotEmpty()) {
-                    localDao.clearProfileDirty(userPreferences.getUserId())
+            val batches = pending.chunked(40).ifEmpty { listOf(emptyList()) }
+            for ((index, ops) in batches.withIndex()) {
+                val request = SyncRequest(
+                    points = if (index == 0 && dirtyProfiles.isNotEmpty()) userPreferences.getPoints() else 0,
+                    unlocked_levels = if (index == 0) dirtyProgress.map { it.levelId } else emptyList(),
+                    consumptions = ops.map { ItemConsumption(it.operationId, it.itemType, it.quantity) }
+                )
+                val result = apiService.syncData("Bearer $token", request)
+                if (!result.success || result.user.id != owner || userPreferences.accountId() != owner) return@withLock
+                val confirmed = result.acknowledged_consumptions.intersect(ops.map { it.operationId }.toSet())
+                if (ops.isNotEmpty() && confirmed.isEmpty()) return@withLock // Older Worker: keep the durable operations.
+                localDao.replaceCloudInventory(owner, result.items, confirmed.toList())
+                if (index == 0) {
+                    dirtyProgress.forEach { localDao.clearProgressDirty(it.levelId) }
+                    dirtyProfiles.forEach { localDao.clearProfileDirty(it.userId) }
                 }
-                LogUtils.d("端云数据同步成功，已清除本地 Room 脏数据标记。")
             }
         } catch (e: Exception) {
-            LogUtils.e("端云数据同步失败: ${e.message}", e)
+            LogUtils.e("端云数据同步失败: ${e.message}")
         }
     }
 
@@ -122,7 +101,7 @@ class SyncRepository @Inject constructor(
         userPreferences.setPoints(currentPoints)
         
         val profile = UserProfileEntity(
-            userId = userPreferences.getUserId(),
+            userId = userPreferences.accountId() ?: userPreferences.getUserId(),
             username = userPreferences.getUsername(),
             points = currentPoints,
             isDirty = true,
@@ -135,35 +114,16 @@ class SyncRepository @Inject constructor(
     }
 
     /**
-     * 将玩家最新的法宝道具存量写入本地 Room，并触发后台同步。
-     * 
-     * @param itemType 道具的标识符 (如 'UNDO', 'SHUFFLE')
-     * @param newCount 扣减或增加后最新的道具拥有量
-     */
-    suspend fun saveItemLocally(itemType: String, newCount: Int) = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        val item = BackpackItemEntity(
-            itemType = itemType,
-            count = newCount,
-            isDirty = true,
-            updateTimestamp = now
-        )
-        localDao.insertItem(item)
-
-        // 触发数据同步
-        syncDirtyData()
-    }
-
-    /**
      * 从云端下载最新权威的用户资料并完全覆盖刷新本地 Room 数据库（常用于重新登录或网络切换时的最终对齐）。
      * 
      * @return 返回获取到的最新 UserProfileResponse 对象，失败时返回 null
      */
-    suspend fun pullCloudProfile(): UserProfileResponse? = withContext(Dispatchers.IO) {
-        if (!userPreferences.isLoggedIn()) return@withContext null
+    suspend fun pullCloudProfile(): UserProfileResponse? = cloudInventory.withLock {
+        val token = userPreferences.getToken() ?: return@withLock null
+        val owner = userPreferences.accountId(token) ?: return@withLock null
         try {
-            val response = apiService.getUserProfile(getAuthHeader())
-            if (response.success && response.user != null) {
+            val response = apiService.getUserProfile("Bearer $token")
+            if (response.success && response.user?.id == owner && userPreferences.accountId() == owner) {
                 val now = System.currentTimeMillis()
                 
                 // 1. 同步覆盖本地 SharedPreferences (MMKV) 用户状态数据
@@ -192,22 +152,15 @@ class SyncRepository @Inject constructor(
                         updateTimestamp = now
                     )
                 }
-                localDao.deleteAllProgress()
-                localDao.insertProgressList(progressList)
+                localDao.replaceProgress(progressList)
 
-                // 3. 同步覆盖本地背包道具余量
-                val itemList = response.items.map {
-                    BackpackItemEntity(
-                        itemType = it.item_type,
-                        count = it.count,
-                        isDirty = false,
-                        updateTimestamp = now
-                    )
+                // A missing acknowledgement may mean that D1 already applied the debit.
+                // Preserve the local view until sync retries the exact same operations.
+                if (localDao.pendingConsumptions(owner).isEmpty()) {
+                    localDao.replaceCloudInventory(owner, response.items)
                 }
-                localDao.deleteAllItems()
-                localDao.insertItemList(itemList)
 
-                return@withContext response
+                return@withLock response
             }
         } catch (e: Exception) {
             LogUtils.e("拉取云端用户资料并对齐失败: ${e.message}", e)

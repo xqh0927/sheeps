@@ -1,6 +1,7 @@
 package com.example.sheeps.core.utils
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.ui.R
 import com.example.sheeps.data.model.ShopItem
@@ -27,21 +28,36 @@ import com.example.sheeps.data.model.ShopItem
  */
 @Composable
 fun getLocalizedItemName(itemType: String, itemI18n: Map<String, String>? = null): String {
-    // 优先：后台接口多语言
-    itemI18n?.get(itemType.uppercase())?.let { return it }
-    // 回退：本地 com.example.sheeps.ui.R.string
-    return when (itemType.uppercase()) {
-        "UNDO" -> stringResource(id = com.example.sheeps.ui.R.string.item_undo)
-        "MOVEOUT" -> stringResource(id = com.example.sheeps.ui.R.string.item_moveout)
-        "SHUFFLE" -> stringResource(id = com.example.sheeps.ui.R.string.item_shuffle)
-        "REVIVE" -> stringResource(id = com.example.sheeps.ui.R.string.item_revive)
-        "HINT" -> stringResource(id = com.example.sheeps.ui.R.string.item_hint)
-        "BOMB" -> stringResource(id = com.example.sheeps.ui.R.string.item_bomb)
-        "JOKER" -> stringResource(id = com.example.sheeps.ui.R.string.item_joker)
-        "DOUBLE_POINTS" -> stringResource(id = com.example.sheeps.ui.R.string.item_double_points)
-        "SKIN_SHUANG" -> stringResource(id = com.example.sheeps.ui.R.string.item_skin_shuang)
-        else -> itemType
+    return resolveItemName(itemType, itemI18n?.get(itemType.uppercase()), LocalResources.current::getString)
+}
+
+internal fun resolveItemName(itemType: String, catalogName: String?, getString: (Int) -> String): String {
+    catalogName?.takeIf { it.isNotBlank() }?.let { return it }
+    val type = itemType.uppercase()
+    val nameResource = when (type) {
+        "UNDO" -> R.string.item_undo
+        "MOVEOUT" -> R.string.item_moveout
+        "SHUFFLE" -> R.string.item_shuffle
+        "REVIVE" -> R.string.item_revive
+        "HINT" -> R.string.item_hint
+        "BOMB" -> R.string.item_bomb
+        "JOKER" -> R.string.item_joker
+        "DOUBLE_POINTS" -> R.string.item_double_points
+        "SKIN_SHUANG" -> R.string.item_skin_shuang
+        "SKIN_HENAN" -> R.string.item_skin_henan
+        "SKIN_SICHUAN" -> R.string.item_skin_sichuan
+        "SKIN_ELECTRONIC" -> R.string.item_skin_electronic
+        "SKIN_DAILY" -> R.string.item_skin_daily
+        "SKIN_VEGETABLE" -> R.string.item_skin_vegetable
+        "SKIN_FRUIT" -> R.string.item_skin_fruit
+        "SKIN_INK" -> R.string.item_skin_ink
+        "SKIN_CYBER" -> R.string.item_skin_cyber
+        "SKIN_KEAI" -> R.string.item_skin_keai
+        "SKIN_DAIMENG" -> R.string.item_skin_daimeng
+        "CLASSIC", "SKIN_CLASSIC" -> R.string.item_skin_classic
+        else -> if (type.startsWith("SKIN_")) R.string.item_skin_custom else return itemType
     }
+    return getString(nameResource)
 }
 
 /**
@@ -75,19 +91,10 @@ fun getLocalizedItemDesc(
     }
 }
 
-/**
- * 商店商品显示名：优先使用服务端已本地化的 [ShopItem.name]。
- * 仅当默认皮肤 shuang 且服务端名为空时，回退本地 com.example.sheeps.ui.R.string.item_skin_shuang，保证离线必显。
- */
+/** 商城卡片与历史记录使用同一套商品名称和离线译名。 */
 @Composable
-fun getShopItemName(item: ShopItem): String {
-    if (item.item_type.equals("SKIN_SHUANG", ignoreCase = true)) {
-        val server = item.name
-        if (!server.isNullOrBlank()) return server
-        return stringResource(id = com.example.sheeps.ui.R.string.item_skin_shuang)
-    }
-    return item.name ?: item.item_type
-}
+fun getShopItemName(item: ShopItem): String =
+    resolveItemName(item.item_type, item.name, LocalResources.current::getString)
 
 /**
  * 商店商品显示描述：优先使用服务端已本地化的 [ShopItem.description]。

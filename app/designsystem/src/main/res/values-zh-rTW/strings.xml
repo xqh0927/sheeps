@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">消了個爽</string>
+    <string name="app_name">秘境消消樂</string>
     <string name="app_subtitle">超好玩的消除闖關遊戲</string>
     <string name="tab_game">遊戲</string>
     <string name="tab_shop">商店</string>
@@ -215,7 +215,7 @@
     <string name="label_duel_enemy">對手</string>
     <string name="label_duel_energy">能量</string>
 
-    <string name="guide_title">消了個爽 - 玩法說明</string>
+    <string name="guide_title">秘境消消樂 - 玩法說明</string>
     <string name="guide_sec1_title">一、基礎消除規則</string>
     <string name="guide_sec1_desc">點擊盤面上的卡牌放入下方槽位，湊齊三個相同圖案的卡牌即可自動消除。若槽位被填滿（共七格）且沒有可以消除的卡牌，則挑戰失敗。</string>
     <string name="guide_sec2_title">二、輔助道具說明</string>
@@ -274,6 +274,18 @@
     <string name="slot_not_carried">未帶</string>
     <string name="carried_magic_items">隨身道具</string>
 
+    <string name="item_skin_henan">中原美食</string>
+    <string name="item_skin_sichuan">巴蜀美食</string>
+    <string name="item_skin_electronic">數碼潮玩</string>
+    <string name="item_skin_daily">日常好物</string>
+    <string name="item_skin_vegetable">蔬菜園</string>
+    <string name="item_skin_fruit">水果盤</string>
+    <string name="item_skin_classic">經典國風</string>
+    <string name="item_skin_ink">水墨江山皮膚</string>
+    <string name="item_skin_cyber">賽博霓虹皮膚</string>
+    <string name="item_skin_keai">萌趣卡通皮膚</string>
+    <string name="item_skin_daimeng">呆萌手繪皮膚</string>
+    <string name="item_skin_custom">自訂卡牌皮膚</string>
     <string name="item_skin_shuang">萌趣競技</string>
     <string name="item_skin_shuang_desc">12種萌系小羊卡牌，爽爽藍邊框搭配陽光金裝飾</string>
 
@@ -306,7 +318,7 @@
     <string name="splash_age_tip">適齡提示：適合 8 歲及以上用戶</string>
     <string name="splash_health_advice">健康遊戲忠告\n抵制不良遊戲，拒絕盜版遊戲。注意自我保護，謹防受騙上當。\n適度遊戲益腦，沉迷遊戲傷身。合理安排時間，享受健康生活。</string>
     <string name="privacy_dialog_title">用戶服務與隱私協議</string>
-    <string name="privacy_dialog_content">感謝您體驗《消了個爽》！\n\n在您開始遊戲前，請認真閱讀並理解《用戶協議》與《隱私政策》。\n\n點擊‘同意並開始’表示您已了解並同意以上條款。</string>
+    <string name="privacy_dialog_content">感謝您體驗《%1$s》！\n\n在您開始遊戲前，請認真閱讀並理解《用戶協議》與《隱私政策》。\n\n點擊‘同意並開始’表示您已了解並同意以上條款。</string>
     <string name="btn_disagree_exit">不同意並退出</string>
     <string name="btn_agree_start">同意並開始</string>
     <string name="toast_offline_fallback">連接服務異常，已載入本地離線數據</string>
@@ -457,4 +469,8 @@
     <string name="endless_wave_banner">Wave %1$d · 提速！</string>
     <string name="endless_leaderboard_title">無盡生存 · 總榜單</string>
     <string name="endless_leaderboard_entry">排行榜</string>
+    <string name="theme_polar">極夜青</string>
+    <string name="current_challenge">目前挑戰</string>
+    <string name="level_list">關卡列表</string>
+    <string name="locate_current_level">定位最新關卡</string>
 </resources>

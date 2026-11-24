@@ -32,8 +32,6 @@ data class EndlessViewState(
     val bestScore: Int = 0,
     /** 当前下落间隔（毫秒），随波次提速缩短 */
     val dropIntervalMs: Long = 1500,
-    /** 是否处于冻结状态（暂停下落） */
-    val isFrozen: Boolean = false,
     /** 冻结剩余毫秒 */
     val freezeRemainingMs: Long = 0,
     /** 可用冻结次数 */
@@ -52,7 +50,9 @@ data class EndlessViewState(
     val showResult: Boolean = false,
     /** 死因："death_line" / "slot_overflow" */
     val deathReason: String = ""
-)
+) {
+    val isFrozen: Boolean get() = freezeRemainingMs > 0
+}
 
 enum class EndlessStatus { READY, PLAYING, PAUSED, GAMEOVER }
 

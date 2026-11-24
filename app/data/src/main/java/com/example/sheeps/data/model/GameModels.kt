@@ -186,12 +186,20 @@ data class LoginResponse(
     val hasPassword: Boolean = false
 )
 
+@Serializable
+data class ItemConsumption(
+    val operation_id: String,
+    val item_type: String,
+    val quantity: Int
+)
+
 /** 端云数据同步请求体（积分 + 已解锁关卡 + 道具背包）。 */
 @Serializable
 data class SyncRequest(
     val points: Int,
     val unlocked_levels: List<Int>,
-    val items: List<UserItem>
+    val items: List<UserItem> = emptyList(),
+    val consumptions: List<ItemConsumption> = emptyList()
 )
 
 /** 端云数据同步响应（返回云端权威的用户/关卡/道具数据）。 */
@@ -200,7 +208,8 @@ data class SyncResponse(
     val success: Boolean,
     val user: UserInfo,
     val unlocked_levels: List<Int>,
-    val items: List<UserItem>
+    val items: List<UserItem>,
+    val acknowledged_consumptions: List<String> = emptyList()
 )
 
 /** 解锁关卡请求（目标关卡编号）。 */
@@ -220,7 +229,8 @@ data class UnlockLevelResponse(
 @Serializable
 data class ExchangeRequest(
     val shop_item_id: Int,
-    val count: Int
+    val count: Int,
+    val operation_id: String
 )
 
 /** 积分兑换道具响应（含兑换后数量与剩余积分）。 */
