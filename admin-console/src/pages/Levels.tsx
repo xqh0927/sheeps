@@ -31,7 +31,7 @@ const fields: FieldDef[] = [
 
 /**
  * 关卡管理页。
- * 通过 CrudPage 泛型组件承载列表、搜索、排序、增删改查表单，
+ * 通过 CrudPage 泛型组件承载列表、排序、增删改查表单，
  * 业务仅声明列与字段，所有数据流（loading/error/分页/提交）由 CrudPage 统一管理。
  */
 export default function Levels() {
@@ -45,8 +45,6 @@ export default function Levels() {
       creator={createLevel}
       updater={updateLevel}
       deleter={deleteLevel}
-      searchable
-      searchPlaceholder="搜索关卡 ID"
       getDeleteConfirmText={(row: any) => `确定要删除「关卡#${row.level_id}」吗？此操作不可撤销。`}
       sortable
     />

@@ -148,9 +148,9 @@ export const deleteTask = (id: string | number) =>
   api.delete(`/api/admin/tasks/${id}`).then((r) => r.data);
 
 // ============ 关卡 ============
-/** GET /api/admin/levels —— 分页 + 关键字查询关卡列表。 */
-export const listLevels = (page = 1, pageSize = 20, keyword = '') =>
-  api.get<PageResult<any>>(`/api/admin/levels${buildQuery({ page, pageSize, keyword })}`).then((r) => r.data);
+/** GET /api/admin/levels —— 分页查询关卡列表。 */
+export const listLevels = (page = 1, pageSize = 20) =>
+  api.get<PageResult<any>>(`/api/admin/levels${buildQuery({ page, pageSize })}`).then((r) => r.data);
 
 /** POST /api/admin/levels —— 新建关卡。 */
 export const createLevel = (body: Record<string, any>) =>
@@ -246,9 +246,9 @@ export interface AppVersionRow {
   created_at: number;
 }
 
-/** GET /api/admin/app-versions —— 分页查询 App 版本列表。 */
-export const listAppVersions = (page = 1, pageSize = 20) =>
-  api.get<PageResult<AppVersionRow>>(`/api/admin/app-versions${buildQuery({ page, pageSize })}`).then((r) => r.data);
+/** GET /api/admin/app-versions —— 按版本名称筛选，分页查询 App 版本列表。 */
+export const listAppVersions = (page = 1, pageSize = 20, keyword = '') =>
+  api.get<PageResult<AppVersionRow>>(`/api/admin/app-versions${buildQuery({ page, pageSize, keyword })}`).then((r) => r.data);
 
 /** POST /api/admin/app-versions —— 新建版本记录。 */
 export const createAppVersion = (body: Record<string, any>) =>

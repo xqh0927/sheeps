@@ -1,3 +1,4 @@
+import loginTilesAvif from '../assets/login-tiles.avif';
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -11,7 +12,7 @@ import {
   InputAdornment,
   IconButton,
 } from '@mui/material';
-import { Visibility, VisibilityOff, LockOutlined } from '@mui/icons-material';
+import { Visibility, VisibilityOff, ArrowForwardRounded } from '@mui/icons-material';
 import { useAuth } from '../store/auth';
 import { extractError } from '../api/client';
 
@@ -67,68 +68,40 @@ export default function Login() {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #6a4c93 0%, #b07d3c 100%)',
-        p: 2,
-      }}
-    >
-      <Card sx={{ width: 380, maxWidth: '100%' }}>
-        <CardContent sx={{ p: 4 }}>
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <LockOutlined sx={{ fontSize: 48, color: 'primary.main' }} />
-            <Typography variant="h5" sx={{ mt: 1, fontWeight: 700 }}>
-              管理后台登录
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              秘境消消乐 · 运营控制台
-            </Typography>
+    <Box sx={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', bgcolor: 'background.default', p: { xs: 2, md: 5 } }}>
+      <Card sx={{ width: '100%', maxWidth: 990, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+        borderRadius: '20px', overflow: 'hidden', boxShadow: '0 16px 60px #1631250e' }}>
+        <Box sx={{ position: 'relative', minHeight: { xs: 160, sm: 215, md: 545 }, bgcolor: '#071b1d',
+          overflow: 'hidden' }}>
+          <picture>
+            <source srcSet={loginTilesAvif} type="image/avif" />
+            <Box component="img" src="/login-tiles.jpg" alt="" sx={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%',
+              objectFit: 'cover', objectPosition: { xs: 'center 52%', md: 'center' },
+            }} />
+          </picture>
+          <Box aria-hidden sx={{ position: 'absolute', inset: 0,
+            background: 'linear-gradient(0deg, #061718cc, transparent 55%)', pointerEvents: 'none' }} />
+          <Box sx={{ position: 'absolute', bottom: { xs: 16, md: 30 }, left: { xs: 22, md: 30 }, color: 'white' }}>
+            <Typography fontWeight={700} fontSize={{ xs: 23, md: 30 }}>秘境消消乐</Typography>
+            <Typography fontSize={14}>运营管理后台</Typography>
           </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="手机号"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              margin="normal"
-              autoFocus
-            />
-            <TextField
-              fullWidth
-              label="密码"
-              type={showPwd ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              margin="normal"
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPwd((v) => !v)} edge="end" aria-label="toggle-password">
-                      {showPwd ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{ mt: 3 }}
-            >
+        </Box>
+        <CardContent sx={{ alignSelf: 'center', p: { xs: 3, sm: 5, md: 6 }, '&:last-child': { pb: { xs: 3, sm: 5, md: 6 } } }}>
+          <Typography variant="h5" component="h1" sx={{ mb: 3 }}>管理员登录</Typography>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Box component="form" onSubmit={handleSubmit} sx={{ display: 'grid', gap: 2.5 }}>
+            <TextField fullWidth label="手机号" type="tel" autoComplete="username" value={phone}
+              onChange={(e) => setPhone(e.target.value)} required />
+            <TextField fullWidth label="密码" autoComplete="current-password" type={showPwd ? 'text' : 'password'}
+              value={password} onChange={(e) => setPassword(e.target.value)} required
+              InputProps={{ endAdornment: <InputAdornment position="end">
+                <IconButton onClick={() => setShowPwd(!showPwd)} edge="end" aria-label={showPwd ? '隐藏密码' : '显示密码'}>
+                  {showPwd ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment> }} />
+            <Button type="submit" variant="contained" disabled={loading} size="large"
+              endIcon={<ArrowForwardRounded />} sx={{ mt: 1, minHeight: 46 }}>
               {loading ? '登录中…' : '登录'}
             </Button>
           </Box>

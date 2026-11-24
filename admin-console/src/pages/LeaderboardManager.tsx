@@ -213,11 +213,11 @@ export default function LeaderboardManager() {
 
   return (
     <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} spacing={2}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} spacing={2} useFlexGap flexWrap="wrap">
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           排行榜管理
         </Typography>
-        <Stack direction="row" spacing={1.5} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
           <TextField
             size="small"
             label="关卡筛选"
@@ -226,9 +226,9 @@ export default function LeaderboardManager() {
             onChange={(e) => { setLevelFilter(e.target.value); setPage(0); }}
             sx={{ minWidth: 140 }}
           />
-          <Button variant="contained" startIcon={<Add />} disabled={!canWrite || disabled} onClick={openCreate}>
+          {canWrite && <Button variant="contained" startIcon={<Add />} disabled={disabled} onClick={openCreate}>
             手动新增
-          </Button>
+          </Button>}
         </Stack>
       </Stack>
 

@@ -98,7 +98,7 @@ export default function AppVersions() {
       updater={updateAppVersion}
       deleter={deleteAppVersion}
       searchable
-      searchPlaceholder="搜索版本号/名称"
+      searchPlaceholder="搜索版本名称"
     />
   );
 }

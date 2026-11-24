@@ -1,0 +1,101 @@
+.ops-dashboard {
+  --ops-ink: #182b25;
+  --ops-muted: #586b63;
+  --ops-line: #dce4de;
+  color: var(--ops-ink);
+  min-width: 0;
+}
+
+.ops-dashboard :is(h1, h2, dl, dt, dd) { margin: 0; }
+.ops-dashboard h1 { font-size: clamp(1.75rem, 3vw, 2.25rem); line-height: 1.25; letter-spacing: -.045em; }
+.ops-dashboard h2 { font-size: 1.0625rem; font-weight: 700; line-height: 1.5; }
+.ops-header, .ops-today-header, .ops-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+.ops-header { margin-bottom: 1.5rem; }
+.ops-update { color: var(--ops-muted); font-size: .8125rem; margin-top: .45rem; }
+.ops-header .ops-refresh {
+  border-color: #b6c5bb;
+  background: #fff;
+  color: #234d3d;
+  padding: .45rem .9rem;
+  font-size: .8125rem;
+}
+.ops-dashboard .MuiAlert-root { margin-bottom: 1rem; }
+.ops-sections { container-type: inline-size; }
+.ops-today {
+  overflow: hidden;
+  color: #f7faf5;
+  background: linear-gradient(110deg, #153d33 0%, #1d4b3c 100%);
+  border: 1px solid #214f40;
+  border-radius: 16px;
+}
+.ops-today-header {
+  padding: 1.1rem 1.6rem;
+  border-bottom: 1px solid #ffffff26;
+}
+.ops-today-header span { color: #c1d7ca; font-size: .75rem; }
+.ops-today-metrics, .ops-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ops-today-metrics { padding: 1.5rem 0; }
+.ops-daily-metric { min-width: 0; padding: 0 1.65rem; }
+.ops-daily-metric + .ops-daily-metric { border-left: 1px solid #ffffff30; }
+.ops-daily-metric > dt:first-child { font-size: .875rem; font-weight: 600; color: #e7f1e9; }
+.ops-daily-metric .ops-daily-value {
+  font-size: clamp(2.2rem, 5.2cqi, 4.25rem);
+  font-weight: 590;
+  line-height: 1.15;
+  letter-spacing: -.055em;
+  margin: .45rem 0 .9rem;
+  overflow-wrap: anywhere;
+}
+.ops-daily-value, .ops-inventory dd, .ops-ledger dd, .ops-context-value { font-variant-numeric: tabular-nums; }
+.ops-dashboard .ops-unit { color: var(--ops-muted); font-size: .75rem; font-weight: 500; letter-spacing: 0; margin-inline-start: .35rem; white-space: nowrap; }
+.ops-daily-metric .ops-unit { color: #c1d7ca; }
+.ops-context-label, .ops-context-value { display: inline; font-size: .8125rem; }
+.ops-context-label { color: #b9d0c3; }
+.ops-daily-metric .ops-context-value { margin-left: .6rem; overflow-wrap: anywhere; }
+.ops-dashboard .ops-value-skeleton { display: inline-block; vertical-align: middle; }
+.ops-today .ops-value-skeleton { background-color: #ffffff2c; }
+
+.ops-detail-grid { gap: 1rem; margin-top: 1rem; }
+.ops-panel {
+  min-width: 0;
+  padding: 1.25rem 1.5rem;
+  background: #fff;
+  border: 1px solid var(--ops-line);
+  border-radius: 14px;
+}
+.ops-panel-header a { color: #216a4a; font-size: .8125rem; font-weight: 600; text-decoration: none; }
+.ops-panel-header a:hover { text-decoration: underline; }
+.ops-panel-header a:focus-visible { outline: 2px solid #216a4a; outline-offset: 4px; }
+.ops-panel-header a span { padding-inline-start: .15rem; }
+
+.ops-panel .ops-inventory { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1rem; }
+.ops-inventory > div { padding: .75rem 0; }
+.ops-inventory > div:nth-child(even) { padding-inline-start: 1.1rem; border-inline-start: 1px solid var(--ops-line); }
+.ops-inventory > div:nth-child(n+3) { border-top: 1px solid var(--ops-line); }
+.ops-inventory dt, .ops-ledger dt { color: var(--ops-muted); font-size: .875rem; }
+.ops-inventory dd { font-size: 1.5rem; letter-spacing: -.03em; font-weight: 650; overflow-wrap: anywhere; }
+.ops-panel .ops-ledger { margin-top: 1rem; }
+.ops-ledger > div { display: flex; gap: .75rem; align-items: baseline; justify-content: space-between; padding: .85rem 0; }
+.ops-ledger > div + div { border-top: 1px solid var(--ops-line); }
+.ops-ledger dt { flex-shrink: 0; }
+.ops-ledger dd { text-align: end; font-size: 1.05rem; font-weight: 650; overflow-wrap: anywhere; }
+
+@container (max-width: 640px) {
+  .ops-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .ops-today-header, .ops-panel { padding: 1rem 1.15rem; }
+  .ops-daily-metric { padding: 0 1.15rem; }
+}
+@container (max-width: 400px) {
+  .ops-today-metrics { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1rem 1.15rem; }
+  .ops-daily-metric { padding: 0; }
+  .ops-daily-metric + .ops-daily-metric { padding-top: 1rem; border-left: 0; border-top: 1px solid #ffffff30; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ops-dashboard .ops-value-skeleton { animation: none; }
+}

@@ -12,7 +12,8 @@ import {
   TablePagination,
   Button,
   IconButton,
-  Chip,
+  TableSortLabel,
+  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -22,7 +23,7 @@ import {
   Stack,
   Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, Search } from '@mui/icons-material';
+import { Add, EditOutlined, DeleteOutline, Search } from '@mui/icons-material';
 import { PageResult } from '../api/admin';
 import { extractError } from '../api/client';
 import { useAuth } from '../store/auth';
@@ -146,6 +147,9 @@ export default function CrudPage({
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const reload = () => setRevision((current) => current + 1);
 
   // —— 表单/弹窗状态 ——
   // editing：null=弹窗关闭，{} = 新建态，object = 编辑态（携带行数据）
@@ -167,24 +171,30 @@ export default function CrudPage({
     sortable && initialSort ? { field: initialSort.field, order: initialSort.order } : null
   );
 
-  // 拉取当前页数据：fetcher 为 1-based 页码（故 page+1）。
-  // 依赖 [fetcher, page, pageSize, keyword, show]：分页/搜索变化时自动重新拉取；
-  // 闭包稳定，避免每次渲染都重建函数触发无限刷新
-  const load = useCallback(() => {
-    setLoading(true);
-    fetcher(page + 1, pageSize, keyword)
-      .then((d) => {
-        setRows(d.list);
-        setTotal(d.total);
-      })
-      .catch((e) => show(extractError(e), 'error'))
-      .finally(() => setLoading(false));
-  }, [fetcher, page, pageSize, keyword, show]);
-
-  // 首屏加载与分页/搜索变化时的自动重载（依赖 load，load 变化即重拉）
+  // 快速切换搜索或页码时，仅接收当前请求的结果。
   useEffect(() => {
-    load();
-  }, [load]);
+    let current = true;
+    setLoading(true);
+    setLoadError(null);
+    fetcher(page + 1, pageSize, keyword)
+      .then((result) => {
+        if (!current) return;
+        const lastPage = Math.max(0, Math.ceil(result.total / pageSize) - 1);
+        if (page > lastPage) {
+          setPage(lastPage);
+          return;
+        }
+        setRows(result.list);
+        setTotal(result.total);
+        setLoading(false);
+      })
+      .catch((error) => {
+        if (!current) return;
+        setLoadError(extractError(error));
+        setLoading(false);
+      });
+    return () => { current = false; };
+  }, [fetcher, page, pageSize, keyword, revision]);
 
   // 卸载时清理防抖定时器
   useEffect(() => {
@@ -199,11 +209,12 @@ export default function CrudPage({
     setPage(0);
   }, []);
 
-  const handleSearchChange = (e: any) => {
-    const value = e.target.value;
+  const scheduleSearch = (value: string, composing: boolean) => {
     setKeywordInput(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => applyKeyword(value), searchDebounceMs);
+    if (!composing) {
+      debounceRef.current = setTimeout(() => applyKeyword(value), searchDebounceMs);
+    }
   };
 
   /** 回车立即触发（取消防抖定时器） */
@@ -212,10 +223,14 @@ export default function CrudPage({
     applyKeyword(keywordInput);
   };
 
+  const isCreate = editing?.[idField] === undefined;
+  const createFields = fields.filter((f) => !f.hideOnCreate && (f.type !== 'image' || f.upload));
+  const formFields = isCreate ? createFields : fields;
+
   const openCreate = () => {
     const init: Record<string, any> = {};
-    fields.forEach((f) => {
-      init[f.name] = f.type === 'number' ? '' : '';
+    createFields.forEach((f) => {
+      init[f.name] = f.type === 'select' ? f.options?.[0]?.value ?? '' : '';
       // 多语言字段：初始化 5 语言空值（zh 即 f.name 本身，其余语言用后缀键）
       if (f.multilingual) {
         for (const loc of I18N_LOCALES) {
@@ -231,16 +246,16 @@ export default function CrudPage({
   const openEdit = (row: any) => {
     const init: Record<string, any> = {};
     fields.forEach((f) => {
-      init[f.name] = row[f.name] ?? (f.type === 'number' ? '' : '');
+      init[f.name] = row[f.name] ?? '';
     });
     setForm(init);
     setEditing(row);
   };
 
   const handleSubmit = async () => {
-    const isCreate = !(editing && editing[idField] !== undefined);
+    if (!canWrite || busy || uploading) return;
     // 校验必填
-    for (const f of fields) {
+    for (const f of formFields) {
       // 多语言字段（新建态）：强制 5 语言全非空；任一为空 → 拦截并红字提示
       if (f.multilingual && isCreate) {
         const missing = I18N_LOCALES.filter((loc) => {
@@ -262,7 +277,7 @@ export default function CrudPage({
     }
     // 构建提交体（数字空值显式契约）
     const body: Record<string, any> = {};
-    for (const f of fields) {
+    for (const f of formFields) {
       // 图片字段由行内弹窗/上传按钮维护，submit 时不随表单提交（避免覆盖封面镜像）
       if (f.type === 'image') continue;
       // 多语言字段（新建态）：组装 5 语言键（base + base_en/_tw/_ja/_ko）
@@ -305,7 +320,7 @@ export default function CrudPage({
         else show('创建成功', 'success');
       }
       setEditing(null);
-      load();
+      reload();
     } catch (e) {
       show(extractError(e), 'error');
     } finally {
@@ -314,13 +329,13 @@ export default function CrudPage({
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!canWrite || !deleteTarget) return;
     setDeleting(true);
     try {
       await deleter(deleteTarget[idField]);
       show('已删除', 'success');
       setDeleteTarget(null);
-      load();
+      reload();
     } catch (e) {
       show(extractError(e), 'error');
     } finally {
@@ -337,12 +352,10 @@ export default function CrudPage({
   };
 
   const handleSort = (field: string) => {
-    if (!sortable) return;
-    setSortState((prev) => {
-      if (!prev || prev.field !== field) return { field, order: 'asc' };
-      if (prev.order === 'asc') return { field, order: 'desc' };
-      return { field, order: 'asc' };
-    });
+    setSortState((prev) => ({
+      field,
+      order: prev?.field === field && prev.order === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   /** 客户端排序：仅对当前页 rows 排序，不触发 fetcher、不影响 total */
@@ -362,95 +375,150 @@ export default function CrudPage({
     return sorted;
   }, [rows, sortable, sortState]);
 
-  const createFields = fields.filter((f) => !f.hideOnCreate);
+  const uploadField = async (field: FieldDef, input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    if (!file || !field.upload) return;
+    setUploading(true);
+    try {
+      const url = await field.upload(file);
+      setForm((prev) => ({ ...prev, [field.name]: url }));
+      show('上传成功', 'success');
+    } catch (error) {
+      show(extractError(error), 'error');
+    } finally {
+      setUploading(false);
+      input.value = '';
+    }
+  };
+
+  const columnCount = columns.length + Number(canWrite);
+  const formBusy = busy || uploading;
 
   return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} spacing={2}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+    <Box sx={{ minWidth: 0 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        spacing={2}
+        sx={{ mb: { xs: 2, sm: 3 } }}
+      >
+        <Typography component="h1" variant="h5" sx={{ fontWeight: 700 }}>
           {title}
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          {searchable && (
-            <TextField
-              size="small"
-              placeholder={searchPlaceholder ?? '搜索'}
-              value={keywordInput}
-              onChange={handleSearchChange}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearchEnter()}
-              InputProps={{ endAdornment: <Search fontSize="small" /> }}
-              sx={{ minWidth: 240 }}
-            />
-          )}
-          <Button variant="contained" startIcon={<Add />} disabled={!canWrite} onClick={openCreate}>
-            新建
-          </Button>
-        </Box>
+        {canWrite && (
+          <Button variant="contained" startIcon={<Add />} onClick={openCreate}>新建</Button>
+        )}
       </Stack>
 
-      <Card elevation={2}>
-        <TableContainer>
-          <Table>
+      <Card variant="outlined">
+        {searchable && (
+          <Box sx={{ p: { xs: 1.5, sm: 2 }, borderBottom: 1, borderColor: 'divider' }}>
+            <TextField
+              size="small"
+              type="search"
+              placeholder={searchPlaceholder ?? '搜索'}
+              inputProps={{
+                'aria-label': searchPlaceholder ?? '搜索',
+                onCompositionEnd: (e) => scheduleSearch(e.currentTarget.value, false),
+              }}
+              value={keywordInput}
+              onChange={(e) => scheduleSearch(e.target.value, (e.nativeEvent as InputEvent).isComposing)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSearchEnter();
+              }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+              }}
+              sx={{ width: { xs: '100%', sm: 320 } }}
+            />
+          </Box>
+        )}
+        <TableContainer
+          tabIndex={0}
+          role="region"
+          aria-label={`${title}列表`}
+          sx={{ '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 } }}
+        >
+          <Table
+            size="small"
+            aria-label={title}
+            aria-busy={loading}
+            sx={{
+              '& th': { whiteSpace: 'nowrap', py: 1.5 },
+              '& td': { py: 1.25, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' },
+              '& th, & td': { px: { xs: 1.5, sm: 2 } },
+              '& tbody tr:last-child td': { borderBottom: 0 },
+              '& tbody td:first-of-type': { fontWeight: 600 },
+            }}
+          >
             <TableHead>
               <TableRow>
                 {columns.map((c) => {
-                  const isSortable = sortable && c.sortable;
-                  const active = isSortable && sortState?.field === c.key;
+                  const active = sortState?.field === c.key;
+                  const direction = active ? sortState.order : 'asc';
                   return (
-                    <TableCell
-                      key={c.key}
-                      sortDirection={active ? sortState!.order : false}
-                      sx={isSortable ? { cursor: 'pointer', userSelect: 'none' } : undefined}
-                      onClick={isSortable ? () => handleSort(c.key) : undefined}
-                    >
-                      {c.label}
-                      {active ? (sortState!.order === 'asc' ? ' ▲' : ' ▼') : ''}
+                    <TableCell key={c.key} scope="col" sortDirection={active ? direction : false}>
+                      {sortable && c.sortable ? (
+                        <TableSortLabel
+                          active={active}
+                          direction={direction}
+                          aria-label={`按${c.label}排序（当前页）`}
+                          title="对当前页排序"
+                          onClick={() => handleSort(c.key)}
+                        >
+                          {c.label}
+                        </TableSortLabel>
+                      ) : c.label}
                     </TableCell>
                   );
                 })}
-                {canWrite && <TableCell align="right">操作</TableCell>}
+                {canWrite && <TableCell scope="col" align="right">操作</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {loading || loadError !== null || rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length + 1} align="center" sx={{ py: 5 }}>
-                    <CircularProgress size={28} />
-                  </TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length + 1} align="center" sx={{ py: 5 }} color="text.secondary">
-                    暂无数据
+                  <TableCell colSpan={columnCount} align="center" sx={{ height: 132 }}>
+                    {loading ? (
+                      <CircularProgress size={24} aria-label="正在加载列表" />
+                    ) : loadError !== null ? (
+                      <Stack alignItems="center" spacing={1}>
+                        <Typography role="alert" variant="body2" color="text.secondary">{loadError}</Typography>
+                        <Button size="small" onClick={reload}>重新加载</Button>
+                      </Stack>
+                    ) : (
+                      <Typography role="status" variant="body2" color="text.secondary">
+                        {keyword ? '没有匹配的记录' : '暂无记录'}
+                      </Typography>
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
                 displayRows.map((r) => (
-                  <TableRow key={r[idField]}>
+                  <TableRow hover key={r[idField]}>
                     {columns.map((c) => (
                       <TableCell key={c.key}>
-                        {c.render ? c.render(r) : String(r[c.key] ?? '-')}
+                        {c.render ? c.render(r) : String(r[c.key] ?? '—')}
                       </TableCell>
                     ))}
                     {canWrite && (
                       <TableCell align="right">
-                        {rowActions && (
-                          <Box component="span" sx={{ mr: 1 }}>
-                            {rowActions(r)}
-                          </Box>
-                        )}
-                        <Tooltip title="编辑">
-                          <IconButton size="small" onClick={() => openEdit(r)}>
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        {deletable && (
-                          <Tooltip title="删除">
-                            <IconButton size="small" color="error" onClick={() => setDeleteTarget(r)}>
-                              <Delete fontSize="small" />
+                        <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5} sx={{ whiteSpace: 'nowrap' }}>
+                          {rowActions?.(r)}
+                          <Tooltip title="编辑">
+                            <IconButton aria-label={`编辑 ${r[idField]}`} onClick={() => openEdit(r)}>
+                              <EditOutlined fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                        )}
+                          {deletable && (
+                            <Tooltip title="删除">
+                              <IconButton aria-label={`删除 ${r[idField]}`} color="error" onClick={() => setDeleteTarget(r)}>
+                                <DeleteOutline fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
                       </TableCell>
                     )}
                   </TableRow>
@@ -459,23 +527,38 @@ export default function CrudPage({
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={total}
-          page={page}
-          onPageChange={(_, p) => setPage(p)}
-          rowsPerPage={pageSize}
-          onRowsPerPageChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
-          rowsPerPageOptions={[10, 20, 50, 100]}
-        />
+        {loadError === null && total > 0 && (
+          total <= 10 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'right', borderTop: 1, borderColor: 'divider' }}>
+              共 {total} 条
+            </Typography>
+          ) : (
+            <TablePagination
+              component="div"
+              count={total}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={pageSize}
+              onRowsPerPageChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+              rowsPerPageOptions={[10, 20, 50, 100]}
+              labelRowsPerPage="每页条数"
+              labelDisplayedRows={({ from, to, count }) => `${from}–${to} / 共 ${count} 条`}
+              getItemAriaLabel={(type) => ({ first: '第一页', last: '最后一页', next: '下一页', previous: '上一页' }[type])}
+              sx={{
+                borderTop: 1, borderColor: 'divider',
+                '& .MuiTablePagination-toolbar': { flexWrap: 'wrap', px: 1 },
+                '& .MuiTablePagination-input, & .MuiTablePagination-actions': { mx: { xs: 0.5, sm: 1.5 } },
+              }}
+            />
+          )
+        )}
       </Card>
 
       {/* 新建/编辑弹窗 */}
-      <Dialog open={editing !== null} onClose={() => !busy && setEditing(null)} maxWidth="sm" fullWidth>
+      <Dialog open={canWrite && editing !== null} onClose={() => !formBusy && setEditing(null)} maxWidth="sm" fullWidth>
         <DialogTitle>{editing && editing[idField] !== undefined ? `编辑 · #${editing[idField]}` : '新建'}</DialogTitle>
         <DialogContent sx={{ mt: 1 }}>
-          {(editing ? fields : createFields).map((f) => {
-            const isCreate = !(editing && editing[idField] !== undefined);
+          {formFields.map((f) => {
             // 多语言字段 · 新建态：渲染 5 语言输入框（强制必填）；编辑态退化为单 zh（走下方既有逻辑）
             if (f.multilingual && isCreate) {
               return (
@@ -492,13 +575,13 @@ export default function CrudPage({
               );
             }
             const common = {
-              key: f.name,
               fullWidth: true,
               margin: 'normal' as const,
-              label: f.label + (f.required ? ' *' : ''),
+              label: f.label,
+              required: f.required,
               value: form[f.name] ?? '',
               onChange: (e: any) => setForm((prev) => ({ ...prev, [f.name]: e.target.value })),
-              disabled: busy,
+              disabled: busy || (uploading && !!f.upload),
             };
             if (f.type === 'image') {
               const url = (form[f.name] as string) || '';
@@ -533,40 +616,21 @@ export default function CrudPage({
                       </Box>
                     )}
                     {f.upload && (
-                      <Button variant="outlined" component="label" disabled={busy || uploading}>
+                      <Button variant="outlined" component="label" disabled={formBusy}>
                         {uploading ? '上传中…' : '上传图片'}
                         <input
                           hidden
                           type="file"
                           accept="image/png,image/webp,image/jpeg"
-                          onChange={async (e: any) => {
-                            const file: File | undefined = e.target.files?.[0];
-                            if (!file) return;
-                            setUploading(true);
-                            try {
-                              const u = await f.upload!(file);
-                              setForm((prev) => ({ ...prev, [f.name]: u }));
-                              show('上传成功', 'success');
-                            } catch (err) {
-                              show(extractError(err), 'error');
-                            } finally {
-                              setUploading(false);
-                              e.target.value = '';
-                            }
-                          }}
+                          onChange={(e) => uploadField(f, e.currentTarget)}
                         />
                       </Button>
                     )}
                   </Box>
-                  {!f.upload && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                      （由行内「卡面管理 / 图标管理」维护）
-                    </Typography>
-                  )}
                 </Box>
               );
             }
-            if (f.type === 'textarea') return <TextField {...common} multiline minRows={3} />;
+            if (f.type === 'textarea') return <TextField key={f.name} {...common} multiline minRows={3} />;
             // 文本/数字字段也可挂载「上传文件」按钮（如 APK 上传回填 URL），由 f.upload 提供
             if ((f.type === 'text' || f.type === 'number') && f.upload) {
               return (
@@ -576,27 +640,13 @@ export default function CrudPage({
                     variant="outlined"
                     component="label"
                     sx={{ mt: 1 }}
-                    disabled={busy || uploading}
+                    disabled={formBusy}
                   >
                     {uploading ? '上传中…' : '上传文件'}
                     <input
                       hidden
                       type="file"
-                      onChange={async (e: any) => {
-                        const file: File | undefined = e.target.files?.[0];
-                        if (!file) return;
-                        setUploading(true);
-                        try {
-                          const u = await f.upload!(file);
-                          setForm((prev) => ({ ...prev, [f.name]: u }));
-                          show('上传成功', 'success');
-                        } catch (err) {
-                          show(extractError(err), 'error');
-                        } finally {
-                          setUploading(false);
-                          e.target.value = '';
-                        }
-                      }}
+                      onChange={(e) => uploadField(f, e.currentTarget)}
                     />
                   </Button>
                 </Box>
@@ -604,7 +654,7 @@ export default function CrudPage({
             }
             if (f.type === 'select')
               return (
-                <TextField {...common} select SelectProps={{ native: true }}>
+                <TextField key={f.name} {...common} select SelectProps={{ native: true }}>
                   {f.options?.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -612,19 +662,19 @@ export default function CrudPage({
                   ))}
                 </TextField>
               );
-            return <TextField {...common} type={f.type === 'number' ? 'number' : 'text'} />;
+            return <TextField key={f.name} {...common} type={f.type === 'number' ? 'number' : 'text'} />;
           })}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEditing(null)} disabled={busy}>取消</Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={busy}>
+          <Button onClick={() => setEditing(null)} disabled={formBusy}>取消</Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={formBusy}>
             {busy ? <CircularProgress size={18} color="inherit" /> : '保存'}
           </Button>
         </DialogActions>
       </Dialog>
 
       {/* 删除确认 */}
-      <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
+      <Dialog open={canWrite && !!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
         <DialogTitle>确认删除</DialogTitle>
         <DialogContent>{getDeleteText()}</DialogContent>
         <DialogActions>

@@ -58,8 +58,8 @@ const ADMIN_ROLES = ROLES.filter((r) => r.value !== 'user');
  * 路由：通常路径 `/users`。
  * 权限要求：
  * - 基础查看：已登录管理员即可。
- * - 用户写操作（积分/昵称/封禁/移除/资产）：需 `canWrite()`。
- * - 角色切换、新增管理员：仅超级管理员 `isSuper()` 可操作。
+ * - 用户写操作（积分/昵称/封禁/资产）：需 `canWrite()`。
+ * - 角色切换、新增管理员、移除普通玩家：仅超级管理员 `isSuper()` 可操作。
  *
  * 关键 State：
  * - `rows` / `total`：分页用户列表及总数（服务端分页）。
@@ -296,7 +296,7 @@ export default function Users() {
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           用户管理
         </Typography>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" sx={{ maxWidth: '100%' }}>
           <TextField
             select
             size="small"
@@ -341,19 +341,19 @@ export default function Users() {
                 <TableCell>角色</TableCell>
                 <TableCell>状态</TableCell>
                 <TableCell>注册时间</TableCell>
-                <TableCell align="right">操作</TableCell>
+                {canWrite && <TableCell align="right">操作</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={canWrite ? 7 : 6} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 5 }} color="text.secondary">
+                  <TableCell colSpan={canWrite ? 7 : 6} align="center" sx={{ py: 5 }} color="text.secondary">
                     暂无数据
                   </TableCell>
                 </TableRow>
@@ -398,35 +398,33 @@ export default function Users() {
                       )}
                     </TableCell>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : '-'}</TableCell>
-                    <TableCell align="right">
-                      <IconButton size="small" disabled={!canWrite} onClick={() => { setPointsTarget(r); setPointsAmount(''); setPointsReason(''); }} title="调整积分">
+                    {canWrite && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      <IconButton size="small" onClick={() => { setPointsTarget(r); setPointsAmount(''); setPointsReason(''); }} title="调整积分">
                         <Add fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" disabled={!canWrite} onClick={() => { setRenameTarget(r); setRenameValue(r.username); }} title="改昵称">
+                      <IconButton size="small" onClick={() => { setRenameTarget(r); setRenameValue(r.username); }} title="改昵称">
                         <Edit fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" disabled={!canWrite} onClick={() => handleOpenAssets(r)} title="道具与皮肤">
+                      <IconButton size="small" onClick={() => handleOpenAssets(r)} title="道具与皮肤">
                         <ShoppingBag fontSize="small" />
                       </IconButton>
                       <IconButton
                         size="small"
-                        disabled={!canWrite}
                         color={r.is_banned === 1 ? 'success' : 'error'}
                         onClick={() => handleBan(r, r.is_banned !== 1)}
                         title={r.is_banned === 1 ? '解封' : '封禁'}
                       >
                         {r.is_banned === 1 ? <CheckCircle fontSize="small" /> : <Block fontSize="small" />}
                       </IconButton>
-                      <IconButton
+                      {isSuper && r.role === 'user' && <IconButton
                         size="small"
-                        disabled={!canWrite}
                         color="error"
                         onClick={() => setRemoveTarget(r)}
                         title="移除用户"
                       >
                         <DeleteForever fontSize="small" />
-                      </IconButton>
-                    </TableCell>
+                      </IconButton>}
+                    </TableCell>}
                   </TableRow>
                 ))
               )}

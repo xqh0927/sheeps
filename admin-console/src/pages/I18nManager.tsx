@@ -293,9 +293,9 @@ export default function I18nManager() {
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           多语言管理
         </Typography>
-        <Button variant="contained" startIcon={<Add />} disabled={!canWrite} onClick={openCreate}>
+        {canWrite && <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
           新增键
-        </Button>
+        </Button>}
       </Stack>
 
       <Stack direction="row" spacing={1.5} sx={{ mb: 2 }} flexWrap="wrap">

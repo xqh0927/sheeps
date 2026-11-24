@@ -1,211 +1,147 @@
 import { useEffect, useState } from 'react';
-import { Grid, Card, CardContent, Typography, Box, CircularProgress, IconButton, Stack } from '@mui/material';
-import {
-  Refresh,
-  People,
-  PersonAdd,
-  Block,
-  Campaign,
-  Store,
-  Assignment,
-  GridView,
-  SwapHoriz,
-  Stars,
-  Timeline,
-  EmojiEvents,
-} from '@mui/icons-material';
+import { Alert, Button, Skeleton } from '@mui/material';
+import { RefreshRounded } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 import { getStats, Stats } from '../api/admin';
 import { extractError } from '../api/client';
-import { useFeedback } from '../components/feedback';
+import './Dashboard.css';
 
-interface StatCardDef {
-  key: keyof Stats;
-  label: string;
-  icon: JSX.Element;
-  color: string;
-}
+type Metric = { key: keyof Stats; label: string; unit: string };
 
-interface StatGroupDef {
-  title: string;
-  icon: JSX.Element;
-  cards: StatCardDef[];
-}
-
-// 按「用户 / 内容 / 经济 / 无尽模式」四组重排（均来自 Stats 既有字段，无新增后端字段）
-const GROUPS: StatGroupDef[] = [
-  {
-    title: '用户',
-    icon: <People />,
-    cards: [
-      { key: 'users_total', label: '用户总数', icon: <People />, color: '#6a4c93' },
-      { key: 'today_signup', label: '今日新增', icon: <PersonAdd />, color: '#2e7d32' },
-      { key: 'banned_count', label: '已封禁用户', icon: <Block />, color: '#b71c1c' },
-    ],
-  },
-  {
-    title: '内容',
-    icon: <Campaign />,
-    cards: [
-      { key: 'notice_count', label: '公告数', icon: <Campaign />, color: '#c2185b' },
-      { key: 'shop_item_count', label: '商品数', icon: <Store />, color: '#00838f' },
-      { key: 'task_count', label: '任务数', icon: <Assignment />, color: '#5e35b1' },
-      { key: 'level_count', label: '关卡数', icon: <GridView />, color: '#827717' },
-    ],
-  },
-  {
-    title: '经济',
-    icon: <Stars />,
-    cards: [
-      { key: 'exchange_total', label: '兑换次数', icon: <SwapHoriz />, color: '#1565c0' },
-      { key: 'points_total', label: '积分发放总量', icon: <Stars />, color: '#ef6c00' },
-    ],
-  },
-  {
-    title: '无尽模式',
-    icon: <Timeline />,
-    cards: [
-      { key: 'endless_play_count', label: '今日无尽挑战次数', icon: <Timeline />, color: '#00695c' },
-      { key: 'endless_max_score', label: '无尽模式历史最高分', icon: <EmojiEvents />, color: '#ad1457' },
-    ],
-  },
+const accountMetrics: Metric[] = [
+  { key: 'banned_count', label: '已封禁用户', unit: '人' },
+  { key: 'exchange_total', label: '累计兑换记录', unit: '笔' },
+  { key: 'points_total', label: '累计发放积分', unit: '分' },
 ];
 
-/**
- * 数据概览（Dashboard）页面组件。
- *
- * 路由：通常路径 `/dashboard`，登录后默认落地页。
- * 权限要求：任意已登录管理员均可访问（只读展示，无写入操作）。
- * 关键 State：
- * - `stats`：服务端聚合统计（Stats），初始 null 表示尚未加载。
- * - `loading`：首屏加载态（控制整体骨架/loading）。
- * - `refreshing`：手动刷新态（不影响已展示数据的占位，仅控制刷新按钮 loading）。
- *
- * 数据来源：依赖 `api/admin.getStats()` 拉取全站聚合指标，前端按 GROUPS 配置分组渲染。
- */
+const contentMetrics: Metric[] = [
+  { key: 'notice_count', label: '公告', unit: '条' },
+  { key: 'shop_item_count', label: '商品', unit: '种' },
+  { key: 'task_count', label: '任务', unit: '项' },
+  { key: 'level_count', label: '关卡', unit: '关' },
+];
+
+const dailyMetrics = [
+  {
+    key: 'today_signup', label: '新增用户', unit: '人',
+    context: { key: 'users_total', label: '用户总数', unit: '人' },
+  },
+  {
+    key: 'endless_play_count', label: '无尽成绩记录', unit: '条',
+    context: { key: 'endless_max_score', label: '无尽榜最高分', unit: '分' },
+  },
+] satisfies (Metric & { context: Metric })[];
+
+const numberFormat = new Intl.NumberFormat('zh-CN');
+const timeFormat = new Intl.DateTimeFormat('zh-CN', {
+  month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+});
+
+function MetricValue({ value, unit }: { value: number | undefined; unit: string }) {
+  return value === undefined ? (
+    <Skeleton className="ops-value-skeleton" aria-hidden="true" width="3ch" />
+  ) : (
+    <>{numberFormat.format(value)}<span className="ops-unit">{unit}</span></>
+  );
+}
+
 export default function Dashboard() {
-  // 服务端聚合统计结果；null 表示首屏尚未返回
   const [stats, setStats] = useState<Stats | null>(null);
-  // 首屏加载态（loading 且尚无数据时显示整页 loading）
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [request, setRequest] = useState(0);
   const [loading, setLoading] = useState(true);
-  // 手动刷新态（用于在右上角按钮展示刷新进度，区别于首屏 loading）
-  const [refreshing, setRefreshing] = useState(false);
-  // 全局反馈组件：show() 用于错误提示，Feedback 为挂载节点
-  const { show, Feedback } = useFeedback();
+  const [error, setError] = useState('');
 
-  // 首屏加载：组件挂载即拉取统计
-  // 依赖 [show]：仅 feedback 实例变化时重新执行；使用 alive 标志避免组件卸载后的 setState（防止内存泄漏）
-  // 清理函数将 alive 置 false，确保异步回调在卸载后不再更新已卸载组件
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    getStats()
-      .then((d) => {
-        if (alive) setStats(d);
-      })
-      .catch((e) => {
-        if (alive) show(extractError(e), 'error');
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [show]);
+    let active = true;
+    getStats().then((data) => {
+      if (!active) return;
+      setStats(data);
+      setUpdatedAt(new Date());
+    }).catch((reason) => {
+      if (active) setError(extractError(reason));
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [request]);
 
-  // 手动刷新：复用 getStats 拉取最新数据并替换 stats；刷新期间刷新按钮显示进度
-  const handleRefresh = () => {
-    setRefreshing(true);
-    getStats()
-      .then((d) => setStats(d))
-      .catch((e) => show(extractError(e), 'error'))
-      .finally(() => setRefreshing(false));
-  };
+  function refresh() {
+    setLoading(true);
+    setError('');
+    setRequest((previous) => previous + 1);
+  }
 
   return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          数据概览
-        </Typography>
-        <IconButton onClick={handleRefresh} disabled={refreshing || loading} color="primary" title="刷新">
-          {refreshing ? <CircularProgress size={20} /> : <Refresh />}
-        </IconButton>
-      </Stack>
+    <div className="ops-dashboard">
+      <header className="ops-header">
+        <div>
+          <h1>运营概览</h1>
+          <div className="ops-update" role="status">
+            {loading ? (stats ? '正在刷新统计数据…' : '正在加载统计数据…') :
+              updatedAt ? <>上次更新 <time dateTime={updatedAt.toISOString()}>{timeFormat.format(updatedAt)}</time></> : '尚未取得统计数据'}
+          </div>
+        </div>
+        <Button className="ops-refresh" variant="outlined" startIcon={<RefreshRounded />} onClick={refresh} disabled={loading}>
+          {error && !stats ? '重新加载' : '刷新数据'}
+        </Button>
+      </header>
 
-      {loading && !stats ? (
-        <Box sx={{ textAlign: 'center', py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Box>
-          {GROUPS.map((group) => (
-            <Box key={group.title} sx={{ mb: 4 }}>
-              {/* 分区标题 + 图标徽标 */}
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 1.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    background: 'linear-gradient(135deg, #455a64, #78909c)',
-                  }}
-                >
-                  {group.icon}
-                </Box>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  {group.title}
-                </Typography>
-              </Stack>
-
-              <Grid container spacing={2.5}>
-                {group.cards.map((c) => (
-                  <Grid item xs={12} sm={6} md={4} key={c.key}>
-                    <Card
-                      elevation={2}
-                      sx={{
-                        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-                        '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 },
-                      }}
-                    >
-                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {/* 图标徽标（渐变） */}
-                        <Box
-                          sx={{
-                            width: 52,
-                            height: 52,
-                            borderRadius: 2,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#fff',
-                            background: `linear-gradient(135deg, ${c.color}, ${c.color}cc)`,
-                          }}
-                        >
-                          {c.icon}
-                        </Box>
-                        <Box>
-                          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                            {stats ? (stats[c.key] as number) : '-'}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {c.label}
-                          </Typography>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          ))}
-        </Box>
+      {error && (
+        <Alert severity="error">
+          {stats ? '刷新失败，当前显示上次取得的数据。' : '统计数据加载失败。'}{error}
+        </Alert>
       )}
-      {Feedback}
-    </Box>
+
+      {(stats || loading) && (
+        <div className="ops-sections" aria-busy={loading}>
+          <section className="ops-today" aria-labelledby="ops-today-title">
+            <header className="ops-today-header">
+              <h2 id="ops-today-title">今日动态</h2>
+              <span>按服务器自然日统计</span>
+            </header>
+            <div className="ops-today-metrics">
+              {dailyMetrics.map(({ key, label, unit, context }) => (
+                <dl className="ops-daily-metric" key={key}>
+                  <dt>{label}</dt>
+                  <dd className="ops-daily-value"><MetricValue value={stats?.[key]} unit={unit} /></dd>
+                  <dt className="ops-context-label">{context.label}</dt>
+                  <dd className="ops-context-value"><MetricValue value={stats?.[context.key]} unit={context.unit} /></dd>
+                </dl>
+              ))}
+            </div>
+          </section>
+
+          <div className="ops-detail-grid">
+            <section className="ops-panel" aria-labelledby="ops-content-title">
+              <h2 id="ops-content-title">内容配置</h2>
+              <dl className="ops-inventory">
+                {contentMetrics.map(({ key, label, unit }) => (
+                  <div key={key}>
+                    <dt>{label}</dt>
+                    <dd><MetricValue value={stats?.[key]} unit={unit} /></dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="ops-panel" aria-labelledby="ops-account-title">
+              <header className="ops-panel-header">
+                <h2 id="ops-account-title">用户与积分</h2>
+                <Link to="/users">用户管理 <span aria-hidden="true">→</span></Link>
+              </header>
+              <dl className="ops-ledger">
+                {accountMetrics.map(({ key, label, unit }) => (
+                  <div key={key}>
+                    <dt>{label}</dt>
+                    <dd><MetricValue value={stats?.[key]} unit={unit} /></dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

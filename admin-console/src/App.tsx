@@ -1,19 +1,21 @@
+import { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
-import Users from './pages/Users';
-import SkinProducts from './pages/SkinProducts';
-import PropProducts from './pages/PropProducts';
-import Notices from './pages/Notices';
-import Tasks from './pages/Tasks';
-import Levels from './pages/Levels';
-import Config from './pages/Config';
-import AuditLogs from './pages/AuditLogs';
-import AppVersions from './pages/AppVersions';
-import I18nManager from './pages/I18nManager';
-import LeaderboardManager from './pages/LeaderboardManager';
+
+const Users = lazy(() => import('./pages/Users'));
+const SkinProducts = lazy(() => import('./pages/SkinProducts'));
+const PropProducts = lazy(() => import('./pages/PropProducts'));
+const Notices = lazy(() => import('./pages/Notices'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const Levels = lazy(() => import('./pages/Levels'));
+const Config = lazy(() => import('./pages/Config'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const AppVersions = lazy(() => import('./pages/AppVersions'));
+const I18nManager = lazy(() => import('./pages/I18nManager'));
+const LeaderboardManager = lazy(() => import('./pages/LeaderboardManager'));
 
 /**
  * 应用根路由表（声明式路由）。
