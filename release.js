@@ -187,7 +187,7 @@ async function createAppVersionViaApi(token, payload) {
  * 失败直接抛错以中止发版（stdio 继承便于实时查看部署日志）。
  */
 function deployWorker() {
-    execSync('npx wrangler deploy', { cwd: serverDir, stdio: 'inherit', timeout: 300000 });
+    execSync('npm run deploy', { cwd: serverDir, stdio: 'inherit', timeout: 300000 });
 }
 
 /**

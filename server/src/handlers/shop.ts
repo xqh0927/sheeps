@@ -98,41 +98,58 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
-        const body: { shop_item_id: number; count: number } = await request.json();
-        // 参数校验：shop_item_id 必填且 count 必须为 ≥1 的正整数，否则返回 400
-        if (body.shop_item_id === undefined || !body.count || body.count < 1) return new Response(JSON.stringify({ error: 'Invalid parameters' }), { status: 400, headers: corsHeaders });
+        const body: { shop_item_id: number; count: number; operation_id?: string } = await request.json();
+        if (!Number.isSafeInteger(body.shop_item_id) || !Number.isSafeInteger(body.count) || body.count < 1 ||
+            (body.operation_id !== undefined && (typeof body.operation_id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(body.operation_id)))) {
+            return new Response(JSON.stringify({error: 'Invalid parameters'}), {status: 400, headers: corsHeaders});
+        }
 
-        // DB：单 batch 读取 shop_items 商品（名称/类型/单价/库存）与 users 当前积分，作为扣减前置校验
-        const [shopItemResult, userResult] = await env.DB.batch([
-            env.DB.prepare('SELECT name, item_type, points_price, stock FROM shop_items WHERE id = ?').bind(body.shop_item_id),
-            env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        const attempt = crypto.randomUUID();
+        const operation = body.operation_id ?? attempt;
+        const now = Date.now();
+        // Only the transaction that inserts its unique attempt_id may apply this receipt.
+        // Eligibility, balance and inventory are read inside the same D1 write transaction.
+        const results = await env.DB.batch<Record<string, number | string>>([
+            env.DB.prepare(`INSERT INTO shop_exchange_receipts
+                (user_id, operation_id, attempt_id, shop_item_id, item_type, quantity, points_cost, remaining_points, new_count)
+                SELECT u.id, ?1, ?2, s.id, s.item_type, ?3, s.points_price * ?3, u.points - s.points_price * ?3,
+                       COALESCE(i.count, 0) + ?3
+                FROM shop_items s JOIN users u ON u.id = ?4
+                LEFT JOIN user_items i ON i.user_id = u.id AND i.item_type = s.item_type
+                WHERE s.id = ?5 AND s.stock >= ?3 AND u.points >= s.points_price * ?3
+                ON CONFLICT(user_id, operation_id) DO NOTHING`)
+                .bind(operation, attempt, body.count, authUser.userId, body.shop_item_id),
+            env.DB.prepare(`UPDATE users SET points = r.remaining_points FROM shop_exchange_receipts r
+                WHERE r.attempt_id = ? AND users.id = r.user_id`).bind(attempt),
+            env.DB.prepare(`UPDATE shop_items SET stock = stock - r.quantity FROM shop_exchange_receipts r
+                WHERE r.attempt_id = ? AND shop_items.id = r.shop_item_id`).bind(attempt),
+            env.DB.prepare(`INSERT INTO user_items (user_id, item_type, count)
+                SELECT user_id, item_type, new_count FROM shop_exchange_receipts WHERE attempt_id = ?
+                ON CONFLICT(user_id, item_type) DO UPDATE SET count = excluded.count`).bind(attempt),
+            env.DB.prepare(`INSERT INTO exchange_record (user_id, shop_item_id, item_type, count, points_cost, created_at)
+                SELECT user_id, shop_item_id, item_type, quantity, points_cost, ? FROM shop_exchange_receipts
+                WHERE attempt_id = ?`).bind(now, attempt),
+            env.DB.prepare(`INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at)
+                SELECT user_id, 'OUT', points_cost, 'SHOP_REDEEM_' || item_type, remaining_points, ?
+                FROM shop_exchange_receipts WHERE attempt_id = ?`).bind(now, attempt),
+            env.DB.prepare(`SELECT shop_item_id, item_type, quantity, new_count, remaining_points FROM shop_exchange_receipts
+                WHERE user_id = ? AND operation_id = ?`).bind(authUser.userId, operation),
+            env.DB.prepare('SELECT stock FROM shop_items WHERE id = ?').bind(body.shop_item_id)
         ]);
+        const receipt = results[6].results[0];
+        if (!receipt) {
+            const stock = Number(results[7].results[0]?.stock ?? 0);
+            return new Response(JSON.stringify({error: stock < body.count ? 'Item out of stock' : 'Insufficient points'}),
+                {status: 400, headers: corsHeaders});
+        }
+        if (receipt.shop_item_id !== body.shop_item_id || receipt.quantity !== body.count) {
+            return new Response(JSON.stringify({error: 'Operation already used for a different order'}), {status: 409, headers: corsHeaders});
+        }
+        await Promise.all(['', 'en', 'tw', 'ja', 'ko'].map(l => env.SHEEPS_CACHE.delete(`shop_items_${l}`)))
+            .catch(error => console.error('Failed to invalidate shop inventory cache', error));
 
-        const shopItem = shopItemResult.results[0] as any;
-        // 参数校验（库存）：商品必须存在且库存 stock ≥ 兑换数量 count，否则返回 400（缺货）
-        if (!shopItem || shopItem.stock < body.count) return new Response(JSON.stringify({ error: 'Item out of stock' }), { status: 400, headers: corsHeaders });
-
-        const totalCost = shopItem.points_price * body.count;
-        const userRow = userResult.results[0] as any;
-        // 参数校验（积分余额）：用户总积分需 ≥ 总花费（单价 × 数量），否则返回 400（积分不足）
-        if (!userRow || userRow.points < totalCost) return new Response(JSON.stringify({ error: 'Insufficient points' }), { status: 400, headers: corsHeaders });
-
-        const remainingPoints = userRow.points - totalCost;
-
-        // 事务边界：以下 6 条写入合并为单 D1 batch 原子提交（要么全成，要么不写），涵盖：扣 users.points、减 shop_items.stock、叠加 user_items 背包（ON CONFLICT 累加）、写 exchange_record 与 point_record 流水、回查新背包数量
-        const writeResults = await env.DB.batch([
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),
-            env.DB.prepare('UPDATE shop_items SET stock = stock - ? WHERE id = ?').bind(body.count, body.shop_item_id),
-            env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?').bind(authUser.userId, shopItem.item_type, body.count, body.count),
-            env.DB.prepare('INSERT INTO exchange_record (user_id, shop_item_id, item_type, count, points_cost, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, body.shop_item_id, shopItem.item_type, body.count, totalCost, Date.now()),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'OUT', totalCost, `SHOP_REDEEM_${shopItem.item_type}`, remainingPoints, Date.now()),
-            env.DB.prepare('SELECT count FROM user_items WHERE user_id = ? AND item_type = ?').bind(authUser.userId, shopItem.item_type)
-        ]);
-
-        // 由于库存及数据发生变化，主动清除全部多语言商城的 KV 缓存，确保下一次查询数据最新
-        for (const l of ['', 'en', 'tw', 'ja', 'ko']) await env.SHEEPS_CACHE.delete(`shop_items_${l}`);
-
-        return new Response(JSON.stringify({ success: true, item_type: shopItem.item_type, new_count: (writeResults[5].results[0] as any)?.count || 0, remaining_points: remainingPoints }), { headers: corsHeaders });
+        return new Response(JSON.stringify({success: true, item_type: receipt.item_type, new_count: receipt.new_count,
+            remaining_points: receipt.remaining_points}), {headers: corsHeaders});
     }
 
     return null;

@@ -185,10 +185,10 @@
         "tags": ["user"],
         "summary": "端云数据同步（上传本地存档/拉取云端）",
         "requestBody": {
-          "content": { "application/json": { "example": { "localData": {}, "lastSyncAt": 0 } } }
+          "content": { "application/json": { "example": { "points": 0, "unlocked_levels": [1], "consumptions": [{ "operation_id": "example-use-1", "item_type": "UNDO", "quantity": 1 }] } } }
         },
         "responses": {
-          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "serverData": {} } } } }
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "user": { "id": "uuid", "points": 80 }, "items": [{ "item_type": "UNDO", "count": 1 }], "unlocked_levels": [1], "acknowledged_consumptions": ["example-use-1"] } } } }
         }
       }
     },
@@ -284,11 +284,12 @@
       "post": {
         "tags": ["shop"],
         "summary": "积分兑换道具/皮肤",
+        "description": "每次购买生成一个 operation_id，网络重试时复用原值，服务端返回原订单回执。",
         "requestBody": {
-          "content": { "application/json": { "example": { "itemId": "SKIN_xxx", "count": 1 } } }
+          "content": { "application/json": { "example": { "shop_item_id": 1, "count": 1, "operation_id": "example-order-1" } } }
         },
         "responses": {
-          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "points": 80 } } } }
+          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "remaining_points": 80, "item_type": "UNDO", "new_count": 2 } } } }
         }
       }
     },

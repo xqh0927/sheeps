@@ -59,7 +59,7 @@ app.get('/doc/openapi.json', (c) => c.json(openapiSpec as Record<string, unknown
  * Cloudflare Workers 全局入口 fetch 事件处理器
  */
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // 0. 注入生产密钥（Worker Secrets）；开发环境保留 fallback 常量
     configureSecrets(env);
 
@@ -69,7 +69,7 @@ export default {
     // 变更表结构请手动执行 SQL（见 schema.sql），勿在请求路径里跑迁移（会导致首请求超时）。
     // 处理 OPTIONS 预检请求以允许跨域
     if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
+      return new Response(null, { headers: { ...corsHeaders, 'Access-Control-Max-Age': '600' } });
     }
 
     const url = new URL(request.url);
@@ -91,7 +91,7 @@ export default {
       const [client, server] = Object.values(new WebSocketPair());
       // 后端服务器接受连接，启动多人局内状态机监听
       server.accept();
-      handleWebSocketSession(server, gameId, playerId, env);
+      await handleWebSocketSession(server, gameId, playerId, env, ctx);
       // 返回 101 Switching Protocols 升级应答，握手成功
       return new Response(null, { status: 101, webSocket: client, headers: corsHeaders });
     }

@@ -6,8 +6,8 @@ import { verifyPassword, hashPassword } from '../auth-utils';
 import { writeAuditChanges, reassembleAuditSnapshots } from '../lib/audit';
 import { writeLevelTiles, readLevelTilesByLevels, assembleLayoutData, parseLayoutData } from '../lib/level-tiles';
 import {
-  seedI18nForEntity,
-  localeValuesFromBody,
+  I18N_LOCALES,
+  insertLocalizedEntity,
   stripLocaleSuffixedKeys,
 } from '../i18n';
 
@@ -280,12 +280,7 @@ interface CrudConfig {
   snapshotCols?: string[];
   /** 搜索关键字时匹配的列名列表（为空则不支持关键字搜索） */
   searchCols?: string[];
-  /**
-   * 创建成功后的回调，用于 i18n 播种等后处理。
-   * entityId: 新记录的 ID（auto-increment 则为 lastRowId，TEXT PK 则为 body 中的 id 字段）
-   * body: 原始请求体
-   */
-  onCreated?: (entityId: string, body: Record<string, any>) => Promise<void>;
+  localizedFields?: string[];
 }
 
 /**
@@ -314,9 +309,9 @@ async function genericList(request: Request, env: Env, cfg: CrudConfig, url: URL
 
 /**
  * 通用创建（写操作，需 assertCanWrite）。
- * 业务：剔除 locale 后缀键 → 动态拼 INSERT（双引号包裹列名兼容关键字列）→ 取 lastRowId 作为新 ID；
- * DB 写入成功后落 CREATE_${action} 审计，再异步回调 cfg.onCreated（如 i18n 播种，失败不阻塞响应）。
- * 涉及表：cfg.table。非批量：单条 INSERT，成功后审计。
+ * 业务：剔除 locale 后缀键 → 动态拼 INSERT（双引号包裹列名兼容关键字列）→ 在同一 D1 事务中写入翻译；
+ * 用实际业务主键记录 CREATE 审计。
+ * 涉及表：cfg.table、i18n_strings、admin_audit_log。
  */
 async function genericCreate(request: Request, env: Env, admin: AdminPayload, cfg: CrudConfig): Promise<Response> {
   const guard = assertCanWrite(admin);
@@ -324,6 +319,8 @@ async function genericCreate(request: Request, env: Env, admin: AdminPayload, cf
   const body = (await request.json().catch(() => null)) as Record<string, any> | null;
   if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
   // 业务表 INSERT 前剔除仅用于 i18n 传输的 locale 后缀键（宽列已 DROP，否则会引用不存在的列）
+  if (cfg.table === 'notice') body.created_at ??= Date.now();
+  if (cfg.table === 'task' && !body.id) return jsonError('缺少任务 ID', 400, env);
   const insertBody = stripLocaleSuffixedKeys(body);
   const cols = Object.keys(insertBody).filter((k) => insertBody[k] !== undefined);
   if (cols.length === 0) return jsonError('无有效字段', 400, env);
@@ -331,17 +328,17 @@ async function genericCreate(request: Request, env: Env, admin: AdminPayload, cf
   // 列名统一用双引号包裹，兼容 SQL 关键字列（如 shop_items 的 "group"）
   const quotedCols = cols.map((c) => `"${c}"`).join(', ');
   const sql = `INSERT INTO ${cfg.table} (${quotedCols}) VALUES (${placeholders})`;
-  const info = await env.DB.prepare(sql).bind(...cols.map((c) => insertBody[c])).run();
-  const newId = (info as any).lastRowId?.toString() || null;
+  const insert = env.DB.prepare(sql).bind(...cols.map((c) => insertBody[c]));
+  const taskId = cfg.table === 'task' ? String(body.id) : null;
+  const newId = await insertLocalizedEntity(env, insert, cfg.table, taskId, body, cfg.localizedFields ?? []);
   await writeAudit(env, request, admin, `CREATE_${cfg.action}`, { type: cfg.table, id: newId, after: pick(body, cfg.snapshotCols) });
 
-  // 创建后回调：i18n 播种等（失败不阻塞主流程响应）。
-  // 注意：传入**完整 body**（含后缀键），供 onCreated 通过 localeValuesFromBody 读取多语言值。
-  if (cfg.onCreated) {
-    const entityId = newId || '';
-    cfg.onCreated(entityId, body).catch((e) => console.error(`onCreated failed for ${cfg.table}:`, e));
+  if (cfg.table === 'shop_items') await purgeShopCache(env);
+  if (cfg.table === 'notice') {
+    await Promise.all(I18N_LOCALES.map(locale =>
+      env.SHEEPS_CACHE.delete(locale === 'zh' ? 'notices_v2' : `notices_${locale}_v2`).catch(() => {})
+    ));
   }
-
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
 
@@ -792,23 +789,19 @@ async function createAppVersion(request: Request, env: Env, admin: AdminPayload)
   if (body.status === 1 && (body.release_time === undefined || body.release_time === null)) {
     body.release_time = Date.now();
   }
-  if (body.created_at === undefined) body.created_at = Date.now();
+  body.created_at ??= Date.now();
+  body.apk_url ||= body.download_url || '';
   // 业务表 INSERT 前剔除仅用于 i18n 传输的 locale 后缀键（宽列已 DROP）
   const writeBody = stripLocaleSuffixedKeys(body);
   const cols = Object.keys(writeBody).filter((k) => writeBody[k] !== undefined);
   const placeholders = cols.map(() => '?').join(', ');
   // 列名统一双引号包裹，兼容 SQL 关键字列
   const quoted = cols.map((c) => `"${c}"`).join(', ');
-  const info = await env.DB.prepare(`INSERT INTO app_version (${quoted}) VALUES (${placeholders})`)
-    .bind(...cols.map((c) => writeBody[c]))
-    .run();
-  const newId = String(body.version_code);
+  const insert = env.DB.prepare(`INSERT INTO app_version (${quoted}) VALUES (${placeholders})`)
+    .bind(...cols.map((c) => writeBody[c]));
+  const newId = await insertLocalizedEntity(env, insert, 'app_version', null, body,
+    body.update_log == null ? [] : ['update_log']);
   await writeAudit(env, request, admin, 'CREATE_APP_VERSION', { type: 'app_version', id: newId, after: pick(body, ['version_name', 'status', 'apk_url', 'download_url']) });
-
-  // 自动播种 i18n 多语言行（update_log 字段，5 种语言真实落库）
-  if (body.update_log !== undefined && body.update_log !== null) {
-    seedI18nForEntity(env, 'app_version', newId, { update_log: localeValuesFromBody(body, 'update_log') }).catch((e) => console.error('seedI18nForEntity failed for app_version:', e));
-  }
 
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
@@ -937,7 +930,7 @@ async function createI18n(request: Request, env: Env, admin: AdminPayload): Prom
   const info = await env.DB.prepare(`INSERT INTO i18n_strings (${quoted}) VALUES (${placeholders})`)
     .bind(...cols.map((c) => body[c]))
     .run();
-  const newId = (info as any).lastRowId?.toString() || null;
+  const newId = String(info.meta.last_row_id);
   await writeAudit(env, request, admin, 'CREATE_I18N', { type: 'i18n_strings', id: newId, after: pick(body, ['str_key', 'locale', 'module', 'value']) });
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
@@ -1407,10 +1400,10 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (path === '/api/admin/shop-items' && method === 'GET') return genericList(request, env, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], searchCols: ['name', 'item_type'] }, url);
   /**
    * POST /api/admin/shop-items —— 新建商品
-   * 用途：genericCreate 写 shop_items；创建后回调 seedI18nForEntity 播种 name/description 多语言。
+   * 用途：genericCreate 写 shop_items；同步写入 name/description 多语言。
    * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
    */
-  if (path === '/api/admin/shop-items' && method === 'POST') return genericCreate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], onCreated: (id, body) => seedI18nForEntity(env, 'shop_items', id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
+  if (path === '/api/admin/shop-items' && method === 'POST') return genericCreate(request, env, admin, { table: 'shop_items', action: 'SHOP_ITEM', snapshotCols: ['item_type', 'points_price', 'stock'], localizedFields: ['name', 'description'] });
   m = path.match(/^\/api\/admin\/shop-items\/([^/]+)$/);
   /**
    * PUT /api/admin/shop-items/:id —— 编辑商品
@@ -1473,10 +1466,10 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (path === '/api/admin/notices' && method === 'GET') return genericList(request, env, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], searchCols: ['title', 'content'] }, url);
   /**
    * POST /api/admin/notices —— 新建公告
-   * 用途：genericCreate 写 notice；回调播种 title/content 多语言。
+   * 用途：genericCreate 写 notice；同步写入 title/content 多语言。
    * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
    */
-  if (path === '/api/admin/notices' && method === 'POST') return genericCreate(request, env, admin, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], onCreated: (id, body) => seedI18nForEntity(env, 'notice', id, { title: localeValuesFromBody(body, 'title'), content: localeValuesFromBody(body, 'content') }) });
+  if (path === '/api/admin/notices' && method === 'POST') return genericCreate(request, env, admin, { table: 'notice', action: 'NOTICE', snapshotCols: ['title', 'content', 'type'], localizedFields: ['title', 'content'] });
   m = path.match(/^\/api\/admin\/notices\/([^/]+)$/);
   /**
    * PUT /api/admin/notices/:id —— 编辑公告
@@ -1498,10 +1491,10 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
   if (path === '/api/admin/tasks' && method === 'GET') return genericList(request, env, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], searchCols: ['name', 'id'] }, url);
   /**
    * POST /api/admin/tasks —— 新建任务
-   * 用途：genericCreate 写 task；回调播种 name/description 多语言（key=body.id）。
+   * 用途：genericCreate 写 task；同步写入 name/description 多语言（key=body.id）。
    * 鉴权：requireAdmin + assertCanWrite。响应：{ success, id }。
    */
-  if (path === '/api/admin/tasks' && method === 'POST') return genericCreate(request, env, admin, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], onCreated: (_rowid, body) => seedI18nForEntity(env, 'task', body.id, { name: localeValuesFromBody(body, 'name'), description: localeValuesFromBody(body, 'description') }) });
+  if (path === '/api/admin/tasks' && method === 'POST') return genericCreate(request, env, admin, { table: 'task', action: 'TASK', snapshotCols: ['target_count', 'points_reward'], localizedFields: ['name', 'description'] });
   m = path.match(/^\/api\/admin\/tasks\/([^/]+)$/);
   /**
    * PUT /api/admin/tasks/:id —— 编辑任务
@@ -1584,7 +1577,7 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
     return genericList(request, env, { table: 'app_version', action: 'APP_VERSION', idColumn: 'version_code', snapshotCols: ['version_name', 'status'], searchCols: ['version_name'] }, url);
   /**
    * POST /api/admin/app-versions —— 新建版本（自动播种 update_log 多语言）
-   * 用途：写 app_version；status=1 且无 release_time 时补写；回调播种 update_log。鉴权：requireAdmin + assertCanWrite。
+   * 用途：写 app_version；status=1 且无 release_time 时补写；同步写入 update_log。鉴权：requireAdmin + assertCanWrite。
    */
   if (path === '/api/admin/app-versions' && method === 'POST') return createAppVersion(request, env, admin);
   m = path.match(/^\/api\/admin\/app-versions\/([^/]+)$/);

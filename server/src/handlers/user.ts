@@ -22,15 +22,22 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
      * 请求体 (JSON):
      *   @param {number} [points] — 客户端当前积分
      *   @param {number[]} [unlocked_levels] — 已解锁关卡ID列表
-     *   @param {Array<{item_type: string, count: number}>} [items] — 道具背包
+     *   @param {Array<{operation_id: string, item_type: string, quantity: number}>} [consumptions] — 本账号待确认的道具消耗，最多 40 笔
      *
-     * 响应: { success, user, unlocked_levels, items }
+     * 响应: { success, user, unlocked_levels, items, acknowledged_consumptions }
      */
     if (path === '/api/user/sync' && request.method === 'POST') {
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
         const body: any = await request.json();
+        const consumptions: { operation_id: string; item_type: string; quantity: number }[] = body.consumptions ?? [];
+        if (!Array.isArray(consumptions) || consumptions.length > 40 || consumptions.some(op =>
+            !op || typeof op.operation_id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(op.operation_id) ||
+            typeof op.item_type !== 'string' || !op.item_type || op.item_type.length > 100 ||
+            !Number.isSafeInteger(op.quantity) || op.quantity < 1)) {
+            return new Response(JSON.stringify({error: 'Invalid consumptions'}), {status: 400, headers: corsHeaders});
+        }
         // 第一步：备份用户的旧数据，避免同步过程中由于异常导致数据彻底丢失；读取 users / level_unlock / user_items 三表当前值作为回滚基线
         const backupQueries = [
             env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId),
@@ -73,12 +80,22 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
 
         const mutationStatements = [];
 
-        // 第二步：合并客户端传上来的积分数据（取本地和云端极大值，body.points>0 才合并），合并关卡解锁进度，以及叠加或更新背包道具
+        // 第二步：合并客户端传上来的积分数据（取本地和云端极大值，body.points>0 才合并），合并关卡解锁进度
         if (body.points !== undefined && body.points > 0) mutationStatements.push(env.DB.prepare('UPDATE users SET points = MAX(points, ?) WHERE id = ?').bind(body.points, authUser.userId));
         if (body.unlocked_levels) for (const lvl of body.unlocked_levels) mutationStatements.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, lvl, Date.now()));
-        if (body.items) for (const item of body.items) mutationStatements.push(env.DB.prepare('INSERT OR REPLACE INTO user_items (user_id, item_type, count) VALUES (?, ?, COALESCE((SELECT MAX(count) FROM user_items WHERE user_id = ? AND item_type = ?), ?))').bind(authUser.userId, item.item_type, authUser.userId, item.item_type, item.count));
+        // Absolute inventory snapshots from older clients have no revision and cannot prove a purchase or use.
+        // Apply each debit against current stock and persist its receipt in the same D1 transaction.
+        for (const op of consumptions) {
+            mutationStatements.push(
+                env.DB.prepare(`UPDATE user_items SET count = MAX(0, count - ?) WHERE user_id = ? AND item_type = ?
+                    AND NOT EXISTS (SELECT 1 FROM item_consumptions WHERE user_id = ? AND operation_id = ?)`)
+                    .bind(op.quantity, authUser.userId, op.item_type, authUser.userId, op.operation_id),
+                env.DB.prepare('INSERT OR IGNORE INTO item_consumptions (user_id, operation_id) VALUES (?, ?)')
+                    .bind(authUser.userId, op.operation_id)
+            );
+        }
 
-        // 事务边界：将合并后的积分 / 关卡 / 道具变更一次性原子写入 D1（UPDATE users + INSERT OR IGNORE level_unlock + INSERT OR REPLACE user_items）
+        // 事务边界：将合并后的积分 / 关卡 / 道具变更一次性原子写入 D1及消费凭据
         if (mutationStatements.length > 0) await env.DB.batch(mutationStatements);
 
         // 第三步：返回用户最新同步完的最终权威云端数据，供端侧刷新本地 Room 状态
@@ -88,7 +105,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId)
         ]);
 
-        return new Response(JSON.stringify({ success: true, user: updatedUserResult.results[0], unlocked_levels: updatedLevelsResult.results.map((r: any) => r.level_id), items: updatedItemsResult.results }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, acknowledged_consumptions: consumptions.map(op => op.operation_id), user: updatedUserResult.results[0], unlocked_levels: updatedLevelsResult.results.map((r: any) => r.level_id), items: updatedItemsResult.results }), { headers: corsHeaders });
     }
 
     /**
@@ -111,7 +128,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
             env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(authUser.userId),
-            env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ?').bind(authUser.userId)
+            env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ? AND is_win = 1 AND game_mode = 0').bind(authUser.userId)
         ]);
 
         const userData = userResult.results[0] as any;
@@ -135,7 +152,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const authUser = await getAuthenticatedUser(request, env);
         if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         // DB：查询 point_record 积分流水表，按时间倒序取最近 50 条（type=IN/OUT、来源、变动额、变动后余额）
-        const records = await env.DB.prepare('SELECT type, amount, source, remaining_points, created_at FROM point_record WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(authUser.userId).all();
+        const records = await env.DB.prepare('SELECT type, amount, source, remaining_points, created_at FROM point_record WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT 50').bind(authUser.userId).all();
         return new Response(JSON.stringify(records.results), { headers: corsHeaders });
     }
 
@@ -279,13 +296,9 @@ export async function handleAvatarProxy(request: Request, env: Env, path: string
         return new Response(JSON.stringify({ error: 'Avatar file not found' }), { status: 404, headers: corsHeaders });
     }
 
-    const headers = new Headers();
+    const headers = new Headers(corsHeaders);
     object.writeHttpMetadata(headers);
     headers.set('Cache-Control', 'public, max-age=86400'); // 缓存24小时
     headers.set('etag', object.httpEtag);
-    // 合并 CORS 头
-    for (const [key, value] of Object.entries(corsHeaders)) {
-        headers.set(key, value);
-    }
     return new Response(object.body, { headers });
 }

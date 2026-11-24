@@ -1,320 +1,170 @@
-/**
- * websocket.ts 回归测试 —— 重点覆盖 Bug 2 的修复路径：
- *   对手断线 → 我方（对手客户端）收到 GAME_OVER_DISCONNECT_WIN → 对局判负结束。
- *
- * 通过 mock 出 D1 的 game_commands 表（内存实现）与可控时钟（覆写 setInterval / Date.now），
- * 在无需真实 Cloudflare Worker 环境的情况下验证 handleDisconnect 的写入与轮询转发逻辑。
- *
- * 运行方式（见 README/QA 报告）：
- *   1) 编译源码： npx tsc src/websocket.ts src/types.ts --outDir .tmp-test --target ES2022 \
- *        --module commonjs --moduleResolution node --types @cloudflare/workers-types \
- *        --skipLibCheck --esModuleInterop --strict false
- *   2) 运行测试： node --test test/websocket.test.js
- *
- * 注意：本测试仅覆盖【服务端】行为（事件写入 + 轮询转发）。
- *       客户端 DuelCommandHandler 的守卫逻辑（targetPlayerId != state.playerId）属 Kotlin，
- *       在本环境无法编译，仅做静态审阅（见 QA 报告）。
- */
-const { test } = require('node:test');
-const assert = require('node:assert');
-const { handleWebSocketSession } = require('../.tmp-test/websocket.js');
+const { before, after, test } = require('node:test');
+const assert = require('node:assert/strict');
+const { once } = require('node:events');
+const { execFileSync } = require('node:child_process');
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+const { setTimeout: delay } = require('node:timers/promises');
+const { unstable_startWorker } = require('wrangler');
 
-// ---------------------------------------------------------------------------
-// 可控时钟：覆写全局 setInterval / clearInterval / Date.now，使其可在测试中手动驱动
-// ---------------------------------------------------------------------------
-let mockNow = 1_000_000;
-let intervals = [];
+const root = path.resolve(__dirname, '..');
+const wrangler = path.join(root, 'node_modules/wrangler/bin/wrangler.js');
+let storage;
+let worker;
+let base;
 
-function installClock() {
-  mockNow = 1_000_000;
-  intervals = [];
-  global.Date.now = () => mockNow;
-  global.setInterval = (cb) => {
-    const id = { cb };
-    intervals.push(id);
-    return id;
-  };
-  global.clearInterval = (id) => {
-    const i = intervals.indexOf(id);
-    if (i >= 0) intervals.splice(i, 1);
-  };
+function d1(...args) {
+  return execFileSync(process.execPath, [wrangler, 'd1', 'execute', 'DB', '--local',
+    '--persist-to', storage, ...args], { cwd: root, encoding: 'utf8' });
 }
 
-/** 驱动所有已注册的轮询回调各执行一次（await 其异步本体） */
-async function tick() {
-  for (const id of [...intervals]) {
-    await id.cb();
+before(async () => {
+  storage = mkdtempSync(path.join(tmpdir(), 'sheeps-duel-'));
+  d1('--file', 'schema.sql');
+  worker = await unstable_startWorker({
+    config: path.join(root, 'wrangler.jsonc'),
+    dev: {
+      server: { hostname: '127.0.0.1', port: Number(process.env.DUEL_TEST_PORT || 0) },
+      watch: false, inspector: false, persist: storage, logLevel: 'error',
+    },
+  });
+  base = (await worker.url).origin;
+});
+
+after(async () => {
+  try { await worker?.dispose(); }
+  finally { if (storage) rmSync(storage, { recursive: true, force: true }); }
+});
+
+async function match(a, b) {
+  const join = async playerId => {
+    const response = await fetch(base + '/api/match/join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId }),
+    });
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+  assert.equal((await join(a)).status, 'waiting');
+  const pair = await join(b);
+  assert.equal(pair.opponentId, a);
+  return pair.gameId;
+}
+
+async function connect(t, gameId, playerId) {
+  const url = new URL('/api/ws', base);
+  url.protocol = 'ws:';
+  url.search = new URLSearchParams({ gameId, playerId });
+  const socket = new WebSocket(url);
+  t.after(async () => {
+    if (socket.readyState === WebSocket.CLOSED) return;
+    const closed = once(socket, 'close', { signal: AbortSignal.timeout(4000) });
+    socket.close(1000);
+    await closed;
+  });
+  const messages = [];
+  socket.addEventListener('message', event => messages.push(JSON.parse(event.data)));
+  await once(socket, 'open', { signal: AbortSignal.timeout(5000) });
+  return { socket, messages };
+}
+
+async function waitForMessage(peer, name, target, timeout = 4000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const message = peer.messages.find(cmd => cmd.payload?.systemMessage === name && cmd.payload.targetPlayerId === target);
+    if (message) return message;
+    await delay(30);
   }
+  assert.fail('Timed out waiting for ' + name + ' for ' + target + '; received ' + JSON.stringify(peer.messages));
 }
 
-function advance(ms) {
-  mockNow += ms;
+function storedCommands(gameId) {
+  // gameId comes from the local matchmaking handler.
+  assert.match(gameId, /^duel_[\w]+$/);
+  const sql = `SELECT command_data FROM game_commands WHERE game_id='${gameId}' ORDER BY id`;
+  return JSON.parse(d1('--command', sql, '--json'))[0].results.map(row => JSON.parse(row.command_data));
 }
 
-const flush = () => new Promise((r) => setImmediate(r));
-
-// ---------------------------------------------------------------------------
-// Mock D1：内存版 game_commands 表，支持 INSERT / SELECT MAX(id) / SELECT 转发 / LIKE 重连查询 / DELETE
-// ---------------------------------------------------------------------------
-function makeDB() {
-  const rows = [];
-  let idCounter = 0;
-
-  function runInsert(params) {
-    // INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)
-    const [game_id, sender_id, command_data, created_at] = params;
-    const id = ++idCounter;
-    rows.push({ id, game_id, sender_id, command_data, created_at });
-    return { success: true, meta: { last_row_id: id } };
-  }
-
-  function query(sql, params) {
-    if (sql.includes('MAX(id)')) {
-      const game_id = params[0];
-      const max = rows
-        .filter((r) => r.game_id === game_id)
-        .reduce((m, r) => Math.max(m, r.id), 0);
-      return { results: [{ maxId: max || null }] };
-    }
-    if (sql.includes('DELETE')) {
-      const threshold = params[0];
-      const before = rows.length;
-      for (let i = rows.length - 1; i >= 0; i--) {
-        if (rows[i].created_at < threshold) rows.splice(i, 1);
-      }
-      return { success: true, changes: before - rows.length };
-    }
-    if (sql.includes('LIKE')) {
-      // 重连查询：game_id, created_at >= ?, command_data LIKE '%PLAYER_RECONNECTED%'
-      const game_id = params[0];
-      const createdAtThreshold = params[1];
-      return {
-        results: rows.filter(
-          (r) =>
-            r.game_id === game_id &&
-            r.sender_id === 'SYSTEM' &&
-            r.created_at >= createdAtThreshold &&
-            r.command_data.includes('PLAYER_RECONNECTED')
-        ),
-      };
-    }
-    // 转发查询：game_id, id > ?, sender_id != ?
-    const game_id = params[0];
-    const idThreshold = params[1];
-    const senderId = params[2];
-    const matched = rows
-      .filter((r) => r.game_id === game_id && r.id > idThreshold && r.sender_id !== senderId)
-      .sort((a, b) => a.id - b.id);
-    return { results: matched };
-  }
-
-  return {
-    rows,
-    prepare(sql) {
-      return {
-        bind(...params) {
-          return {
-            run() {
-              return runInsert(params);
-            },
-            all() {
-              return query(sql, params);
-            },
-            first() {
-              const res = query(sql, params);
-              return res.results[0] || null;
-            },
-          };
-        },
-      };
-    },
-    // 测试辅助：模拟一次新会话写入的 PLAYER_RECONNECTED 事件
-    insertReconnect(gameId, targetPlayerId, createdAt) {
-      const id = ++idCounter;
-      rows.push({
-        id,
-        game_id: gameId,
-        sender_id: 'SYSTEM',
-        command_data: JSON.stringify({
-          gameId,
-          seqId: 0,
-          timestamp: createdAt,
-          senderId: 'SYSTEM',
-          type: 'SYSTEM_EVENT',
-          payload: { systemMessage: 'PLAYER_RECONNECTED', targetPlayerId },
-        }),
-        created_at: createdAt,
-      });
-      return id;
-    },
-  };
+function countWins(gameId) {
+  return storedCommands(gameId).filter(cmd => cmd.payload?.systemMessage === 'GAME_OVER_DISCONNECT_WIN').length;
 }
 
-// ---------------------------------------------------------------------------
-// Mock WebSocket：记录 send 内容，可手动触发 close/error
-// ---------------------------------------------------------------------------
-function makeSocket() {
-  const listeners = {};
-  const sent = [];
-  return {
-    sent,
-    addEventListener(type, handler) {
-      (listeners[type] ||= []).push(handler);
-    },
-    send(data) {
-      sent.push(data);
-    },
-    emit(type, event) {
-      (listeners[type] || []).forEach((h) => h(event));
-    },
-  };
-}
-
-function parseAll(socket) {
-  return socket.sent.map((s) => JSON.parse(s));
-}
-
-function findSystem(socket, systemMessage) {
-  return parseAll(socket).find(
-    (c) => c.payload && c.payload.systemMessage === systemMessage
-  );
-}
-
-// ===========================================================================
-// 测试用例
-// ===========================================================================
-
-test('Bug2-1: 玩家断线时 handleDisconnect 写入 PLAYER_DISCONNECTED 通知对手', async () => {
-  installClock();
-  const db = makeDB();
-  const env = { DB: db };
-  const socketA = makeSocket();
-
-  await handleWebSocketSession(socketA, 'game1', 'A', env);
-  socketA.emit('close', {});
-  await flush();
-
-  const disc = db.rows.find((r) => r.command_data.includes('PLAYER_DISCONNECTED'));
-  assert.ok(disc, '应写入 PLAYER_DISCONNECTED 事件');
-  const payload = JSON.parse(disc.command_data).payload;
-  assert.strictEqual(payload.systemMessage, 'PLAYER_DISCONNECTED');
-  assert.strictEqual(payload.targetPlayerId, 'A', 'targetPlayerId 应为断线方 A');
-  assert.strictEqual(disc.sender_id, 'SYSTEM');
+test('remaining player receives one disconnect victory after 15 seconds', async t => {
+  const gameId = await match('A', 'B');
+  const b = await connect(t, gameId, 'B');
+  const a = await connect(t, gameId, 'A');
+  await waitForMessage(b, 'PLAYER_RECONNECTED', 'A');
+  a.socket.close(1000);
+  const disconnected = await waitForMessage(b, 'PLAYER_DISCONNECTED', 'A');
+  const otherObserver = await connect(t, gameId, 'B');
+  const win = await waitForMessage(b, 'GAME_OVER_DISCONNECT_WIN', 'A', 18500);
+  assert.deepEqual(await waitForMessage(otherObserver, 'GAME_OVER_DISCONNECT_WIN', 'A'), win);
+  assert.equal(win.senderId, 'SYSTEM');
+  assert.equal(win.type, 'SYSTEM_EVENT');
+  assert.ok(win.timestamp - disconnected.timestamp >= 15000);
+  await delay(600);
+  assert.equal(b.messages.filter(cmd => cmd.payload?.systemMessage === 'GAME_OVER_DISCONNECT_WIN').length, 1);
+  const reopened = await connect(t, gameId, 'B');
+  assert.deepEqual(await waitForMessage(reopened, 'GAME_OVER_DISCONNECT_WIN', 'A'), win);
+  assert.equal(countWins(gameId), 1);
 });
 
-test('Bug2-2: 对手断线且超 15s 宽限期未重连 → 我方(对手)收到 GAME_OVER_DISCONNECT_WIN 判负', async () => {
-  installClock();
-  const db = makeDB();
-  const env = { DB: db };
-  const socketA = makeSocket(); // 断线方
-  const socketB = makeSocket(); // 我方（应收到判负）
-
-  await handleWebSocketSession(socketA, 'game1', 'A', env);
-  await handleWebSocketSession(socketB, 'game1', 'B', env);
-
-  // 对局进行一段时间后 A 断线
-  advance(5000);
-  socketA.emit('close', {});
-  await flush();
-
-  // 超过 15s 宽限期
-  advance(16000);
-  await tick();
-
-  // 我方(B)应收到 GAME_OVER_DISCONNECT_WIN，且 targetPlayerId = 断线方 A
-  const got = findSystem(socketB, 'GAME_OVER_DISCONNECT_WIN');
-  assert.ok(got, '我方(B)应收到 GAME_OVER_DISCONNECT_WIN');
-  assert.strictEqual(got.payload.targetPlayerId, 'A');
-
-  // 数据库中也应存在该事件
-  const go = db.rows.find((r) => r.command_data.includes('GAME_OVER_DISCONNECT_WIN'));
-  assert.ok(go, '数据库应写入 GAME_OVER_DISCONNECT_WIN');
-  assert.strictEqual(JSON.parse(go.command_data).payload.targetPlayerId, 'A');
+test('reconnecting within the grace period cancels the pending victory and keeps the relay usable', async t => {
+  const gameId = await match('C', 'D');
+  const d = await connect(t, gameId, 'D');
+  const c = await connect(t, gameId, 'C');
+  await waitForMessage(d, 'PLAYER_RECONNECTED', 'C');
+  c.socket.close(1000);
+  await waitForMessage(d, 'PLAYER_DISCONNECTED', 'C');
+  d.messages.length = 0;
+  const replacement = await connect(t, gameId, 'C');
+  await waitForMessage(d, 'PLAYER_RECONNECTED', 'C');
+  await delay(15500);
+  const command = { gameId, senderId: 'C', type: 'ELIMINATE', seqId: 1, timestamp: Date.now(), payload: { comboCount: 2 } };
+  const arrived = once(d.socket, 'message', { signal: AbortSignal.timeout(4000) });
+  replacement.socket.send(JSON.stringify(command));
+  assert.deepEqual(JSON.parse((await arrived)[0].data), command);
+  assert.equal(countWins(gameId), 0);
 });
 
-test('Bug2-3: 断线方在宽限期内重连 → 不写入 GAME_OVER_DISCONNECT_WIN（重连取消判负）', async () => {
-  installClock();
-  const db = makeDB();
-  const env = { DB: db };
-  const socketA = makeSocket();
-
-  await handleWebSocketSession(socketA, 'game1', 'A', env);
-  advance(5000);
-  socketA.emit('close', {});
-  await flush();
-
-  // 模拟 A 在宽限期内重连（新会话写入 PLAYER_RECONNECTED，时间戳 > disconnectTime）
-  db.insertReconnect('game1', 'A', mockNow + 1000);
-
-  advance(16000);
-  await tick();
-
-  const go = db.rows.find((r) => r.command_data.includes('GAME_OVER_DISCONNECT_WIN'));
-  assert.strictEqual(go, undefined, '宽限期内重连后不应判负');
+test('closing an older socket after replacement keeps the player online', async t => {
+  const gameId = await match('E', 'F');
+  const f = await connect(t, gameId, 'F');
+  const old = await connect(t, gameId, 'E');
+  await waitForMessage(f, 'PLAYER_RECONNECTED', 'E');
+  f.messages.length = 0;
+  const current = await connect(t, gameId, 'E');
+  await waitForMessage(f, 'PLAYER_RECONNECTED', 'E');
+  old.socket.close(1000);
+  await delay(700);
+  assert.ok(!f.messages.some(cmd => cmd.payload?.systemMessage === 'PLAYER_DISCONNECTED'));
+  current.socket.close(1000);
+  await waitForMessage(f, 'PLAYER_DISCONNECTED', 'E');
 });
 
-test('Bug2-4: 双方都断线 → 各自写入 GAME_OVER_DISCONNECT_WIN，且轮询不再向已断线方转发', async () => {
-  installClock();
-  const db = makeDB();
-  const env = { DB: db };
-  const socketA = makeSocket();
-  const socketB = makeSocket();
-
-  await handleWebSocketSession(socketA, 'game1', 'A', env);
-  await handleWebSocketSession(socketB, 'game1', 'B', env);
-  advance(5000);
-  socketA.emit('close', {});
-  socketB.emit('close', {});
-  await flush();
-
-  advance(16000);
-  await tick();
-
-  const goA = db.rows.find(
-    (r) =>
-      r.command_data.includes('GAME_OVER_DISCONNECT_WIN') &&
-      JSON.parse(r.command_data).payload.targetPlayerId === 'A'
-  );
-  const goB = db.rows.find(
-    (r) =>
-      r.command_data.includes('GAME_OVER_DISCONNECT_WIN') &&
-      JSON.parse(r.command_data).payload.targetPlayerId === 'B'
-  );
-  assert.ok(goA, 'A 断线应判 A 负');
-  assert.ok(goB, 'B 断线应判 B 负');
-
-  // 双方均已 closed，轮询处于“仅判负检查”分支，不再向 socket 转发指令
-  assert.strictEqual(
-    findSystem(socketA, 'GAME_OVER_DISCONNECT_WIN'),
-    undefined,
-    '已断线方 A 不应再收到转发'
-  );
-  assert.strictEqual(
-    findSystem(socketB, 'GAME_OVER_DISCONNECT_WIN'),
-    undefined,
-    '已断线方 B 不应再收到转发'
-  );
+test('both players closing releases the duel without awarding either one a win', async t => {
+  const gameId = await match('G', 'H');
+  const h = await connect(t, gameId, 'H');
+  const g = await connect(t, gameId, 'G');
+  await waitForMessage(h, 'PLAYER_RECONNECTED', 'G');
+  g.socket.close(1000);
+  await waitForMessage(h, 'PLAYER_DISCONNECTED', 'G');
+  h.socket.close(1000);
+  await delay(15750);
+  assert.equal(countWins(gameId), 0);
 });
 
-test('Bug2-5: GAME_OVER_DISCONNECT_WIN 的 targetPlayerId 指向断线方而非我方', async () => {
-  // 校验事件语义正确：对手(B)收到事件后，客户端守卫用 targetPlayerId != state.playerId 判定，
-  // 因此 targetPlayerId 必须是「断线方 A」，B 才不会误判自己获胜。
-  installClock();
-  const db = makeDB();
-  const env = { DB: db };
-  const socketA = makeSocket();
-  const socketB = makeSocket();
-
-  await handleWebSocketSession(socketA, 'game1', 'A', env);
-  await handleWebSocketSession(socketB, 'game1', 'B', env);
-  advance(5000);
-  socketA.emit('close', {});
-  await flush();
-  advance(16000);
-  await tick();
-
-  const got = findSystem(socketB, 'GAME_OVER_DISCONNECT_WIN');
-  assert.ok(got);
-  assert.strictEqual(got.payload.targetPlayerId, 'A');
-  assert.notStrictEqual(got.payload.targetPlayerId, 'B', 'targetPlayerId 不应是我方 B');
+test('closing after a normal victory preserves the completed result', async t => {
+  const gameId = await match('I', 'J');
+  const j = await connect(t, gameId, 'J');
+  const i = await connect(t, gameId, 'I');
+  await waitForMessage(j, 'PLAYER_RECONNECTED', 'I');
+  i.socket.send(JSON.stringify({
+    gameId, seqId: 1, timestamp: Date.now(), senderId: 'I', type: 'SYSTEM_EVENT', payload: { systemMessage: 'WIN' },
+  }));
+  await waitForMessage(j, 'WIN', undefined);
+  i.socket.close(1000);
+  await delay(600);
+  assert.ok(!j.messages.some(cmd => cmd.payload?.systemMessage === 'PLAYER_DISCONNECTED'));
+  assert.ok(!storedCommands(gameId).some(cmd => cmd.payload?.systemMessage === 'PLAYER_DISCONNECTED'));
 });

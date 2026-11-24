@@ -538,7 +538,7 @@ npm test
    - KV 命名空间：`SHEEPS_CACHE`
    - R2 存储桶：`sheeps-apk`
 4. 将 `wrangler.jsonc` 中的 `database_id`、`kv_namespaces[].id` 替换为创建生成的 UUID（R2 仅需 bucket 名，已在配置中）。
-5. 初始化数据库表结构：
+5. 仅在全新空库上初始化表和种子数据。已有数据库跳到下一步，执行全量 `schema.sql` 会删除现有数据。
    ```bash
    npx wrangler d1 execute my-app-db --remote --file=./schema.sql
    ```
@@ -548,9 +548,9 @@ npm test
    npx wrangler secret put AES_KEY_HEX
    npx wrangler secret put ADMIN_WEB_ORIGIN   # 管理后台域名，如 https://your-pages.pages.dev
    ```
-7. 部署到 Cloudflare 全球网络：
+7. 应用尚未执行的 D1 增量迁移，然后发布 Worker。
    ```bash
-   npx wrangler deploy
+   npm run deploy
    ```
 8. （可选）创建首个超级管理员：
    ```bash
@@ -757,7 +757,7 @@ sequenceDiagram
 ## 🛠️ 故障排查 / FAQ
 
 **Q1：D1 初始化 / 接口 500**
-- 首次请求会自动 `migrateSchema` 加列建表（幂等）。若仍报缺表/缺列，请确认已执行 `npx wrangler d1 execute my-app-db --remote --file=./schema.sql`，且 `wrangler.jsonc` 的 `database_id` 与线上 D1 一致。
+- 已有数据库出现缺表时，在 `server/` 核对 `wrangler.jsonc` 的 `database_id`，用 `npx wrangler d1 migrations list my-app-db --remote` 检查待执行迁移，再运行 `npm run deploy`。
 
 **Q2：Token 过期 / 频繁跳登录**
 - AccessToken 时效 2 小时、RefreshToken 30 天（管理员 7 天）。客户端 OkHttp 拦截器持排他锁静默刷新；若两端时间漂移或 `JWT_SECRET` 在生产被改而本地仍用 fallback，会导致签名校验失败 → 触发 `AuthEvent.Logout`。请保证 `wrangler secret put JWT_SECRET` 已设置且与客户端预期一致。

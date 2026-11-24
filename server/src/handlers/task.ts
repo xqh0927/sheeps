@@ -2,6 +2,22 @@ import { Env } from '../types';
 import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
 import { getI18nBatch, resolveI18n } from '../i18n';
 
+// Rebuild current-day stage progress from committed scores, including wins recorded before the first task fetch.
+export function refreshWinTasks(env: Env, userId: string, day: string) {
+    const start = Date.parse(day + 'T00:00:00+08:00');
+    return env.DB.prepare(`
+        INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded)
+        SELECT ?, t.id, ?, MIN(wins.n, t.target_count), wins.n >= t.target_count, 0
+        FROM task t CROSS JOIN (
+            SELECT COUNT(*) AS n FROM leaderboard
+            WHERE user_id = ? AND game_mode = 0 AND is_win = 1 AND achieved_at >= ? AND achieved_at < ?
+        ) AS wins WHERE t.id GLOB 'WIN_*' OR t.id GLOB 'PLAY_*'
+        ON CONFLICT(user_id, task_id, task_date) DO UPDATE SET
+            progress = excluded.progress, is_completed = excluded.is_completed
+        WHERE user_task.is_completed = 0 AND excluded.progress > user_task.progress
+    `).bind(userId, day, userId, start, start + 86400000);
+}
+
 /**
  * 处理玩家每日任务相关的 HTTP 路由请求
  * 包含查询每日任务列表及其当前进度（若无对应日期的条目则自动初始化写入）、以及领取已通关/已完成任务的积分奖励。
@@ -34,7 +50,8 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
 
         // DB：单 batch 查询 task 任务模板表 + user_task 当日进度表；方案 B 先取基列（zh 兜底），再经 i18n 解析多语言任务名/描述
-        const [allTasks, userTasks] = await env.DB.batch([
+        const [, allTasks, userTasks] = await env.DB.batch([
+            refreshWinTasks(env, authUser.userId, chinaToday),
             env.DB.prepare('SELECT id, name, description, target_count, points_reward FROM task'),
             env.DB.prepare('SELECT task_id, progress, is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_date = ?').bind(authUser.userId, chinaToday)
         ]);
@@ -48,7 +65,7 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         for (const task of taskList) {
             let ut = userTaskList.find(u => u.task_id === task.id);
             if (!ut) {
-                inserts.push(env.DB.prepare('INSERT INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 0, 0, 0)').bind(authUser.userId, task.id, chinaToday));
+                inserts.push(env.DB.prepare('INSERT OR IGNORE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, 0, 0, 0)').bind(authUser.userId, task.id, chinaToday));
                 ut = { task_id: task.id, progress: 0, is_completed: 0, is_rewarded: 0 };
             }
             list.push({

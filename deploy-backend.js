@@ -53,7 +53,7 @@ async function main() {
 
         // 2. 部署 Worker 后台
         console.log('[2/3] 正在部署后台 API 接口到 Cloudflare Workers...');
-        execSync('npx wrangler deploy', {
+        execSync('npm run deploy', {
             cwd: path.join(__dirname, 'server'),
             stdio: 'inherit'
         });

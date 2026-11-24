@@ -35,14 +35,6 @@ export const LOCALE_SUFFIX: Record<LocaleCode, string> = {
 /** 多语言字段值：按语言给出的映射（缺失语言视为空占位） */
 export type LocaleValues = Partial<Record<LocaleCode, string | null>>;
 
-/**
- * 字段值（用于 seedI18nForEntity 的入参）：
- *  - 传 `string`      → 仅 zh（旧调用 / 向后兼容），其余语言空占位；
- *  - 传 `LocaleValues` → 按语言给值；
- *  - `null` / `undefined` → 整体当作空（zh=''），其余空占位。
- */
-export type I18nFieldValue = string | LocaleValues | null | undefined;
-
 /** 单语言结果的 key→value 映射 */
 export type I18nMap = Map<string, string>;
 
@@ -128,55 +120,37 @@ export function resolveI18n(
 
 // ============ i18n 自动播种（创建实体时自动补全多语言行）============
 
-/**
- * 为指定实体的字段在所有 5 种语言下自动创建 i18n_strings 行（幂等）。
- *
- * - module: 业务模块名（notice / task / shop_items / app_version）
- * - entityId: 实体主键（notice.id / task.id / shop_items.id / app_version.version_code）
- * - fields: 字段名 → 值的映射。
- *     · 传 `string`      → 仅落 zh（旧调用 / 向后兼容），en/tw/ja/ko 空占位；
- *     · 传 `LocaleValues` → 按语言给值，缺失语言 → 空占位（绝不报错/拒绝）；
- *     · `null` / `undefined` → 整体当作空（zh=''），其余空占位。
- *
- * 使用 INSERT OR IGNORE 保证重复调用幂等（已存在的 str_key+locale 组合不会覆盖）。
- *
- * 向后兼容说明：旧调用方（如 Android）只发 zh 一个基列值，
- * 此处仍只落 zh，其余语言空占位，行为与改造前完全一致，不会拒绝请求。
- */
-export async function seedI18nForEntity(
+/** 实体与翻译同批提交。对自增主键，先固定上一条 INSERT 的 rowid，再写全部语言。 */
+export async function insertLocalizedEntity(
   env: Env,
+  insert: D1PreparedStatement,
   module: string,
-  entityId: string | number,
-  fields: Record<string, I18nFieldValue>
-): Promise<void> {
-  const now = Date.now();
-  const statements: D1PreparedStatement[] = [];
-
-  for (const [field, raw] of Object.entries(fields)) {
-    // 旧调用传 string（或 null/undefined）→ 仅 zh；新调用传 LocaleValues → 按语言
-    const values: LocaleValues =
-      typeof raw === 'string' || raw == null ? { zh: raw ?? '' } : raw;
-
-    const strKey = `${module}.${entityId}.${field}`;
-    for (const locale of I18N_LOCALES) {
-      // 缺失语言 → 空占位（不报错）
-      const value = values[locale] ?? '';
-      statements.push(
-        env.DB.prepare(
-          `INSERT OR IGNORE INTO i18n_strings (str_key, locale, module, value, updated_at) VALUES (?, ?, ?, ?, ?)`
-        ).bind(strKey, locale, module, value, now)
-      );
-    }
+  explicitId: string | null,
+  body: Record<string, any>,
+  fields: string[]
+): Promise<string> {
+  const statements = [insert];
+  if (fields.length > 0) {
+    const rows = fields.flatMap(field => {
+      const values = localeValuesFromBody(body, field);
+      return I18N_LOCALES.map(locale => [field, locale, values[locale]]);
+    });
+    statements.push(env.DB.prepare(`
+      WITH entity(id) AS MATERIALIZED (SELECT COALESCE(?, last_insert_rowid())),
+           translations(field, locale, value) AS (VALUES ${rows.map(() => '(?, ?, ?)').join(', ')})
+      INSERT INTO i18n_strings (str_key, locale, module, value, updated_at)
+      SELECT ? || '.' || entity.id || '.' || field, locale, ?, value, ?
+      FROM entity CROSS JOIN translations
+    `).bind(explicitId, ...rows.flat(), module, module, Date.now()));
   }
-
-  if (statements.length > 0) {
-    try {
-      // DB.batch 在单个事务中原子执行全部 INSERT OR IGNORE，失败整体回滚（不影响主流程）
-      await env.DB.batch(statements);
-    } catch (e) {
-      console.error(`seedI18nForEntity failed for ${module}.${entityId}:`, e);
-    }
+  const [result] = await env.DB.batch(statements);
+  // 已缓存的翻译映射缺少刚创建的键。
+  if (fields.length > 0) {
+    await Promise.all(I18N_LOCALES.filter(locale => locale !== 'zh').map(locale =>
+      env.SHEEPS_CACHE.delete(i18nCacheKey(module, locale)).catch(() => {})
+    ));
   }
+  return String(explicitId ?? result.meta.last_row_id);
 }
 
 /**

@@ -1,109 +1,115 @@
 import { Env } from './types';
 
-/**
- * 处理 WebSocket 联机对战的会话逻辑
- * 核心原理：由于 Serverless 无状态，这里通过 D1 数据库轮询来实现双端消息同步
- */
-export async function handleWebSocketSession(socket: WebSocket, gameId: string, playerId: string, env: Env) {
+const GRACE_MS = 15_000;
+const INSERT_EVENT = 'INSERT INTO game_commands (game_id, sender_id, command_data, created_at)';
+const EVENT_NAME = "json_extract(command_data, '$.payload.systemMessage')";
+const EVENT_TARGET = "json_extract(command_data, '$.payload.targetPlayerId')";
+// Android sends these events when play ends before a disconnect deadline.
+const NORMAL_RESULTS = ['WIN', 'LOST', 'OPPONENT_QUIT'];
+const RESULT_FOR_GAME = `FROM game_commands WHERE game_id = ? AND (
+  (sender_id = 'SYSTEM' AND ${EVENT_NAME} = 'GAME_OVER_DISCONNECT_WIN') OR
+  (json_extract(command_data, '$.type') = 'SYSTEM_EVENT' AND ${EVENT_NAME} IN ('WIN', 'LOST', 'OPPONENT_QUIT')))`;
+const HAS_RESULT = `SELECT 1 ${RESULT_FOR_GAME}`;
+const NEWER_CONNECTION = `SELECT 1 FROM game_commands WHERE game_id = ? AND sender_id = 'SYSTEM'
+  AND id > ? AND ${EVENT_NAME} = 'PLAYER_RECONNECTED' AND ${EVENT_TARGET} = ?`;
+
+type RelayRow = { id: number; sender_id: string; command_data: string; created_at: number };
+
+function systemEvent(gameId: string, systemMessage: string, targetPlayerId: string, timestamp: number) {
+  return JSON.stringify({
+    gameId, seqId: 0, timestamp, senderId: 'SYSTEM', type: 'SYSTEM_EVENT',
+    payload: { systemMessage, targetPlayerId },
+  });
+}
+
+/** Each live socket relays D1 commands and observes its opponent's reconnect deadline. */
+export async function handleWebSocketSession(
+  socket: WebSocket, gameId: string, playerId: string, env: Env, ctx: ExecutionContext,
+) {
   const now = Date.now();
-
-  // 1. 玩家上线：写入重连事件到 D1 数据库，通知对手
-  try {
-    await env.DB.prepare(
-      'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
-    ).bind(
-      gameId, 'SYSTEM',
-      JSON.stringify({
-        gameId, seqId: 0, timestamp: now, senderId: 'SYSTEM', type: 'SYSTEM_EVENT',
-        payload: { systemMessage: 'PLAYER_RECONNECTED', targetPlayerId: playerId }
-      }),
-      now
-    ).run();
-  } catch (err) {
-    console.error('写入重连事件失败:', err);
+  const joined = await env.DB.prepare(`${INSERT_EVENT} SELECT ?, 'SYSTEM', ?, ? WHERE NOT EXISTS (${HAS_RESULT})`)
+    .bind(gameId, systemEvent(gameId, 'PLAYER_RECONNECTED', playerId, now), now, gameId).run();
+  if (!joined.meta.changes) {
+    const result = await env.DB.prepare(`SELECT command_data ${RESULT_FOR_GAME} AND sender_id != ? ORDER BY id LIMIT 1`)
+      .bind(gameId, playerId).first<{ command_data: string }>();
+    if (result) socket.send(result.command_data);
+    return;
   }
 
-  // 2. 初始化游标：获取当前数据库的最大指令 ID，防止读取历史旧消息
-  let lastReadId = 0;
-  try {
-    const maxRow = await env.DB.prepare('SELECT MAX(id) as maxId FROM game_commands WHERE game_id = ?').bind(gameId).first<{ maxId: number | null }>();
-    lastReadId = maxRow?.maxId || 0;
-  } catch (err) {
-    console.error('游标初始化失败:', err);
-  }
+  const connectionId = joined.meta.last_row_id;
+  let lastReadId = connectionId;
+  let stopped = false;
+  let polling = false;
+  let pending: { id: number; player: string; deadline: number } | undefined;
 
-  // 3. 开启轮询引擎 (250ms 间隔)
-  let isClosed = false;
-  // 断线时间戳：用于 15 秒宽限期内判定本方是否已重连，避免误判胜负
-  let disconnectTime = 0;
-  const GRACE_MS = 15000;
-  const intervalId = setInterval(async () => {
-    // 掉线宽限期内：仅做超时判负检查，不再向已关闭的 socket 推送指令
-    if (isClosed) {
-      if (Date.now() - disconnectTime >= GRACE_MS) {
-        try {
-          // 检查宽限期内本方是否已重连（PLAYER_RECONNECTED 事件的 targetPlayerId 指向本方）
-          const rows = await env.DB.prepare(
-            "SELECT command_data FROM game_commands WHERE game_id = ? AND sender_id = 'SYSTEM' AND created_at >= ? AND command_data LIKE ?"
-          ).bind(gameId, disconnectTime, '%PLAYER_RECONNECTED%').all<{ command_data: string }>();
-          let reconnected = false;
-          for (const r of rows.results) {
-            try {
-              const cmd = JSON.parse(r.command_data);
-              if (cmd?.payload?.targetPlayerId === playerId) { reconnected = true; break; }
-            } catch { /* 解析失败忽略 */ }
-          }
-          if (!reconnected) {
-            // 本方在宽限期内未重连：判本方负、对手胜，对手客户端收到后同步结束对局
-            const t = Date.now();
-            await env.DB.prepare(
-              'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
-            ).bind(
-              gameId, 'SYSTEM',
-              JSON.stringify({
-                gameId, seqId: 0, timestamp: t, senderId: 'SYSTEM', type: 'SYSTEM_EVENT',
-                payload: { systemMessage: 'GAME_OVER_DISCONNECT_WIN', targetPlayerId: playerId }
-              }),
-              t
-            ).run();
-          }
-        } catch (e) {
-          console.error('掉线超时判负失败:', e);
-        }
-        clearInterval(intervalId);
+  function observeSystemEvent(row: RelayRow) {
+    const cmd = JSON.parse(row.command_data);
+    if (cmd?.type !== 'SYSTEM_EVENT' || !cmd.payload) return false;
+    const { systemMessage, targetPlayerId } = cmd.payload;
+    if (NORMAL_RESULTS.includes(systemMessage)) return true;
+    if (row.sender_id !== 'SYSTEM') return false;
+    if (systemMessage === 'GAME_OVER_DISCONNECT_WIN') return true;
+    if (targetPlayerId !== playerId) {
+      if (systemMessage === 'PLAYER_DISCONNECTED' && !pending) {
+        pending = { id: row.id, player: targetPlayerId, deadline: row.created_at + GRACE_MS };
+      } else if (systemMessage === 'PLAYER_RECONNECTED' && pending && pending.player === targetPlayerId
+          && row.created_at <= pending.deadline) {
+        pending = undefined;
       }
-      return;
     }
-    try {
-      // 增量拉取对手发送的新指令
-      const rows = await env.DB.prepare(
-        'SELECT id, command_data FROM game_commands WHERE game_id = ? AND id > ? AND sender_id != ? ORDER BY id ASC'
-      ).bind(gameId, lastReadId, playerId).all<{ id: number; command_data: string }>();
+    return false;
+  }
 
-      // 推送给当前连接的客户端并更新游标
+  // A reconnecting observer may have missed the other player's disconnect.
+  const previous = await env.DB.prepare(`SELECT id, sender_id, command_data, created_at FROM game_commands
+    WHERE game_id = ? AND id < ? AND sender_id = 'SYSTEM' AND ${EVENT_TARGET} != ?
+    ORDER BY id DESC LIMIT 1`).bind(gameId, connectionId, playerId).first<RelayRow>();
+  if (previous && previous.created_at + GRACE_MS >= now) {
+    observeSystemEvent(previous);
+  }
+
+  const intervalId = setInterval(async () => {
+    if (polling || stopped) return;
+    polling = true;
+    try {
+      const rows = await env.DB.prepare(
+        'SELECT id, sender_id, command_data, created_at FROM game_commands WHERE game_id = ? AND id > ? AND sender_id != ? ORDER BY id ASC'
+      ).bind(gameId, lastReadId, playerId).all<RelayRow>();
       for (const row of rows.results) {
-        try {
-          socket.send(row.command_data);
-        } catch {
-          // socket 已关闭：跳过推送，掉线判负由 handleDisconnect / 宽限期逻辑接管
+        if (stopped) return;
+        socket.send(row.command_data);
+        lastReadId = row.id;
+        if (observeSystemEvent(row)) {
+          stopPolling();
+          return;
         }
-        lastReadId = Math.max(lastReadId, row.id);
       }
 
-      // 清理过期的中继指令（1 小时前的对局必然已结束），避免 game_commands 表无限膨胀
-      try {
-        await env.DB.prepare('DELETE FROM game_commands WHERE created_at < ?').bind(Date.now() - 3600_000).run();
-      } catch (e) {
-        console.error('清理过期 game_commands 失败:', e);
+      const t = Date.now();
+      if (!stopped && pending && t >= pending.deadline) {
+        // The write checks both conditions atomically, including a reconnect racing this poll.
+        await env.DB.prepare(`${INSERT_EVENT} SELECT ?, 'SYSTEM', ?, ?
+          WHERE NOT EXISTS (${HAS_RESULT}) AND NOT EXISTS (${NEWER_CONNECTION} AND created_at <= ?)`)
+          .bind(gameId, systemEvent(gameId, 'GAME_OVER_DISCONNECT_WIN', pending.player, t), t,
+            gameId, gameId, pending.id, pending.player, pending.deadline).run();
+        pending = undefined;
       }
     } catch (err) {
-      console.error('轮询指令出错:', err);
+      if (!stopped) console.error('轮询指令出错:', err);
+    } finally {
+      polling = false;
     }
   }, 250);
 
-  // 4. 处理客户端发来的操作指令
+  function stopPolling() {
+    stopped = true;
+    clearInterval(intervalId);
+  }
+
+  // 处理客户端发来的操作指令
   let lastActionTime = 0;
   socket.addEventListener('message', async (event) => {
+    if (stopped) return;
     try {
       const text = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data);
       const command = JSON.parse(text);
@@ -127,38 +133,39 @@ export async function handleWebSocketSession(socket: WebSocket, gameId: string, 
       }
 
       // 写入指令到 D1，对手的轮询引擎会自动拉取
-      await env.DB.prepare(
-        'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
-      ).bind(gameId, playerId, JSON.stringify(command), currentTime).run();
+      const args = [gameId, playerId, JSON.stringify(command), currentTime];
+      if (command.type === 'SYSTEM_EVENT' && NORMAL_RESULTS.includes(command.payload?.systemMessage)) {
+        const result = await env.DB.prepare(`${INSERT_EVENT} SELECT ?, ?, ?, ? WHERE NOT EXISTS (${HAS_RESULT})`)
+          .bind(...args, gameId).run();
+        if (result.meta.changes) stopPolling();
+      } else {
+        await env.DB.prepare(`${INSERT_EVENT} VALUES (?, ?, ?, ?)`).bind(...args).run();
+      }
 
     } catch (e) {
       console.error('WebSocket 消息处理错误', e);
     }
   });
 
-  // 5. 优雅断线与掉线判负逻辑 (15秒宽限期)
-  // 本方断开连接时：立即写入 PLAYER_DISCONNECTED 通知对手进入“等待重连”；
-  // 15 秒宽限期内若本方未重连，则由轮询引擎写入 GAME_OVER_DISCONNECT_WIN 判本方负、对手胜，
-  // 使对手客户端同步结束对局（见客户端 DuelCommandHandler.handleSystemEvent）。
-  const handleDisconnect = async () => {
-    if (isClosed) return;
-    isClosed = true;
-    disconnectTime = Date.now();
-    try {
-      await env.DB.prepare(
-        'INSERT INTO game_commands (game_id, sender_id, command_data, created_at) VALUES (?, ?, ?, ?)'
-      ).bind(
-        gameId, 'SYSTEM',
-        JSON.stringify({
-          gameId, seqId: 0, timestamp: disconnectTime, senderId: 'SYSTEM', type: 'SYSTEM_EVENT',
-          payload: { systemMessage: 'PLAYER_DISCONNECTED', targetPlayerId: playerId }
-        }),
-        disconnectTime
-      ).run();
-    } catch (err) {
-      console.error('写入掉线事件失败:', err);
-    }
+  const handleDisconnect = () => {
+    if (stopped) return;
+    stopPolling();
+    const t = Date.now();
+    // Finish the presence write even when the HTTP upgrade request is being released.
+    // A delayed close from a superseded socket must not disconnect its replacement.
+    ctx.waitUntil(env.DB.prepare(`${INSERT_EVENT} SELECT ?, 'SYSTEM', ?, ?
+      WHERE NOT EXISTS (${NEWER_CONNECTION}) AND NOT EXISTS (${HAS_RESULT})`)
+      .bind(gameId, systemEvent(gameId, 'PLAYER_DISCONNECTED', playerId, t), t,
+        gameId, connectionId, playerId, gameId).run()
+      .catch(err => console.error('写入掉线事件失败:', err)));
   };
   socket.addEventListener('close', handleDisconnect);
   socket.addEventListener('error', handleDisconnect);
+
+  // Prune when a session opens instead of scanning the whole table on every relay poll.
+  try {
+    await env.DB.prepare('DELETE FROM game_commands WHERE created_at < ?').bind(now - 3600_000).run();
+  } catch (err) {
+    console.error('清理过期 game_commands 失败:', err);
+  }
 }

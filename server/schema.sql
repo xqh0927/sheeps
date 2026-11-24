@@ -12,6 +12,8 @@ DROP TABLE IF EXISTS notice;
 DROP TABLE IF EXISTS config;
 DROP TABLE IF EXISTS leaderboard;
 DROP TABLE IF EXISTS backup_save_log;
+DROP TABLE IF EXISTS shop_exchange_receipts;
+DROP TABLE IF EXISTS item_consumptions;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS app_version;
 DROP TABLE IF EXISTS matchmaking_queue;
@@ -56,6 +58,13 @@ CREATE TABLE user_items (
     FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
+-- Retried offline operations retain the same receipt for the lifetime of the account.
+CREATE TABLE IF NOT EXISTS item_consumptions (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    operation_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, operation_id)
+);
+
 CREATE TABLE shop_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -65,6 +74,19 @@ CREATE TABLE shop_items (
     item_type TEXT NOT NULL,
     points_price INTEGER NOT NULL,
     stock INTEGER DEFAULT 100
+);
+
+CREATE TABLE IF NOT EXISTS shop_exchange_receipts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    operation_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL UNIQUE,
+    shop_item_id INTEGER NOT NULL,
+    item_type TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    points_cost INTEGER NOT NULL,
+    remaining_points INTEGER NOT NULL,
+    new_count INTEGER NOT NULL,
+    PRIMARY KEY (user_id, operation_id)
 );
 
 CREATE TABLE exchange_record (
@@ -251,7 +273,7 @@ INSERT INTO task (id, name, description, target_count, points_reward) VALUES
 ('SIGN_IN_ONCE', '每日晨曦', '完成一次签到', 1, 10);
 
 INSERT INTO notice (title, content, type, created_at) VALUES 
-('消了个爽1.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000),
+('消了个爽1.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000);
 
 INSERT INTO shop_items (name, description, item_type, points_price, stock) VALUES 
 ('乾坤符 (Undo)', '撤销上一步操作', 'UNDO', 20, 100),
