@@ -100,6 +100,7 @@ object NetworkModule {
             var lastException: IOException? = null
 
             while (attempt <= 3) {
+                if (chain.call().isCanceled()) throw IOException("Canceled")
                 try {
                     response = chain.proceed(request)
                     if (response.isSuccessful) {
@@ -113,6 +114,7 @@ object NetworkModule {
                         return@Interceptor response
                     }
                 } catch (e: IOException) {
+                    if (chain.call().isCanceled()) throw e
                     lastException = e
                 }
 

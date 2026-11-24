@@ -140,6 +140,10 @@ class GameActivity : BaseActivity() {
         // 在生命周期范围内收集 ViewModel 发出的副作用
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
+                is com.example.sheeps.game.state.GameViewEffect.LevelLoadFailed -> {
+                    Toaster.show(effect.message)
+                    finish()
+                }
                 is com.example.sheeps.game.state.GameViewEffect.ShowToast -> {
                     Toaster.show(effect.message)
                 }

@@ -183,6 +183,7 @@ sealed interface GameViewIntent {
  * 描述了由 ViewModel 触发的、不需要持久化到状态流中的一次性事件。
  */
 sealed interface GameViewEffect {
+    data class LevelLoadFailed(val message: String) : GameViewEffect
     /** 显示吐司提示 */
     data class ShowToast(val message: String) : GameViewEffect
     /** 播放指定音效 */

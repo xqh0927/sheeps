@@ -6,6 +6,7 @@ import com.example.sheeps.data.utils.NetworkMonitor
 import com.example.sheeps.data.local.*
 import com.example.sheeps.data.model.*
 import com.example.sheeps.data.network.ApiService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,6 +61,8 @@ class SyncRepository @Inject constructor(
                     dirtyProfiles.forEach { localDao.clearProfileDirty(it.userId) }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             LogUtils.e("端云数据同步失败: ${e.message}")
         }

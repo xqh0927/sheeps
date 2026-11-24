@@ -23,10 +23,14 @@ import com.example.sheeps.game.viewmodel.delegates.GameToolDelegate
 import com.example.sheeps.game.viewmodel.delegates.ScoreDelegate
 import com.example.sheeps.game.viewmodel.helpers.GameLevelGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -53,8 +57,14 @@ class GameViewModel @Inject constructor(
     private val scoreDelegate: ScoreDelegate
 ) : BaseMviViewModel<GameViewState, GameViewIntent, GameViewEffect>(GameViewState()) {
 
+    private companion object {
+        const val LEVEL_REQUEST_BUDGET_MS = 2_000L
+    }
+
     private var levelStartTime: Long = 0
     private val runs = LevelRuns(savedState)
+    private var levelLoad: Job? = null
+    private var restartPicker: Job? = null
     private var itemsUsedCount: Int = 0
     private var tickJob: kotlinx.coroutines.Job? = null
     private var hasSubmittedThisRun: Boolean = false
@@ -71,7 +81,7 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.InitUser -> handleInitUser()
             is GameViewIntent.AgreePrivacy -> handleAgreePrivacy()
             is GameViewIntent.ChangeUsername -> handleChangeUsername(intent.newName)
-            is GameViewIntent.LoadLevel -> if (!currentState.isLoading) {
+            is GameViewIntent.LoadLevel -> if (!currentState.isLoading || currentState.currentLevelId != intent.levelId) {
                 handleLoadLevel(runs.start(intent.levelId, intent.carryItemsJson))
             }
             is GameViewIntent.ClickTile -> viewModelScope.launch {
@@ -151,10 +161,13 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.DismissCarrySelection -> updateState { copy(showCarrySelection = false) }
 
             is GameViewIntent.GoBackToMenu -> {
+                levelLoad?.cancel()
+                restartPicker?.cancel()
+                tickJob?.cancel()
                 submitFailureRecordIfNeeded()
                 updateState {
                     copy(
-                        gameStatus = GameStatus.MENU,
+                        gameStatus = GameStatus.MENU, isLoading = false, showCarrySelection = false,
                         unlockedLevel = prefs.getUnlockedLevel()
                     )
                 }
@@ -243,50 +256,70 @@ class GameViewModel @Inject constructor(
      * 线程边界：
      * - 计时已解耦到 UI 本地（[com.example.sheeps.game.ui.components.GameStatusBar] 基于 `levelStartTimestamp` 自增）；
      *   [viewModelScope] 的计时协程仅作占位、不写全局状态，避免整树每秒重组；
-     * - 道具库存扣减与关卡网络请求运行在 [Dispatchers.IO]（`apiService.getLevel` / `localDao`）；
-     * - 离线回退时改由本地生成器生成可解关卡，避免阻塞 UI。
+     * - Retrofit/Room 挂起调用不阻塞主线程；生成和遮挡计算在 [Dispatchers.Default] 完成。
+     * - 服务端布局超过预算时沿用本局种子回退本地，棋盘可用后独立上传待同步记录。
      *
      * @param run 已保存的开局信息；明确重玩或进入下一关时使用新的开局 ID。
      */
     private fun handleLoadLevel(run: LevelRun) {
-        val levelId = run.level
-        val carryItemsJson = run.carryJson
-        updateState { copy(isLoading = true, currentLevelId = levelId) }
+        levelLoad?.cancel()
+        restartPicker?.cancel()
+        tickJob?.cancel()
+        updateState { copy(isLoading = true, currentLevelId = run.level, showCarrySelection = false) }
         historyStack.clear()
         itemsUsedCount = 0
-
-        val requested = try {
-            if (!carryItemsJson.isNullOrEmpty()) json.decodeFromString<Map<String, Int>>(
-                carryItemsJson
-            ) else emptyMap()
-        } catch (e: Exception) {
-            emptyMap()
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val owner = prefs.accountId()
-            val allocated = localDao.consumeForRun(run.id, owner, requested, prefs.getUserId())
-            val carryMap = run.remaining?.let { remaining ->
-                allocated.mapValues { (type, count) -> minOf(count, remaining[type] ?: 0) }
-            } ?: allocated
-            syncRepository.syncDirtyData()
-
-            // ===== 关卡数据获取与棋盘装载逻辑（网络优先 + 离线兜底） =====
+        // Stable after process recreation. Keep the LCG seed in the Worker's positive seed range.
+        val seed = Math.floorMod(run.id.hashCode(), 1_000_000) + 1
+        val owner = prefs.accountId()
+        val deviceId = prefs.getUserId()
+        levelLoad = viewModelScope.launch {
             try {
-                // 1. 网络模式（优先）：向远程服务器拉取关卡卡牌布局
-                // 每次进入关卡随机生成种子，保证同关卡不同局图案不同
-                val gameSeed = (System.currentTimeMillis() % 1000000).toInt()
-                val finalTiles = calculateBlockedStates(
-                    apiService.getLevel(levelId, seed = gameSeed).map { it.copy(state = TileState.NORMAL) })
-
-                updateBoardState(finalTiles, carryMap, false)
-            } catch (e: Exception) {
-                // 2. 离线模式（兜底）：网络请求失败（无网/超时/服务端异常）时自动进入 catch 块
-                // 离线回退：使用当前真实用户ID和系统随机种子在本地生成卡牌，与服务端后端 level.ts 逻辑完全对齐（等距均匀抽取）
-                val numericUserId = prefs.getUserId().toIntOrNull() ?: 0
-                val finalTiles =
-                    calculateBlockedStates(levelGenerator.generateSolvableLevelLocal(levelId, System.currentTimeMillis(), numericUserId))
-                updateBoardState(finalTiles, carryMap, true)
+                val remote = try {
+                    withTimeoutOrNull(LEVEL_REQUEST_BUDGET_MS) { apiService.getLevel(run.level, seed) }
+                        ?.takeIf { it.isNotEmpty() }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                val tiles = withContext(Dispatchers.Default) {
+                    val layout = remote?.map { it.copy(state = TileState.NORMAL) }
+                        ?: levelGenerator.generateSolvableLevelLocal(run.level, seed.toLong(), deviceId.toIntOrNull() ?: 0)
+                    check(layout.isNotEmpty())
+                    calculateBlockedStates(layout)
+                }
+                val requested = try {
+                    run.carryJson?.let { json.decodeFromString<Map<String, Int>>(it) }.orEmpty()
+                } catch (_: IllegalArgumentException) {
+                    emptyMap()
+                }
+                check(prefs.accountId() == owner)
+                val allocated = localDao.consumeForRun(run.id, owner, requested, deviceId)
+                ensureActive()
+                val carry = run.remaining?.let { remaining ->
+                    allocated.mapValues { (type, count) -> minOf(count, remaining[type] ?: 0) }
+                } ?: allocated
+                updateBoardState(tiles, carry, remote == null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                updateState { copy(isLoading = false, gameStatus = GameStatus.MENU) }
+                setEffect(GameViewEffect.LevelLoadFailed(getLocalizedString(
+                    "关卡加载失败，请返回后重试", "Couldn’t open this level. Please try again.",
+                    "關卡載入失敗，請返回後重試", "ステージを読み込めませんでした。もう一度お試しください。",
+                    "스테이지를 열지 못했습니다. 다시 시도해 주세요."
+                )))
+                return@launch
+            }
+            // Room already recorded this run's allocation. Network acknowledgement can finish independently.
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    syncRepository.syncDirtyData()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    com.apkfuns.logutils.LogUtils.w("道具同步延后重试: ${error.message}")
+                }
             }
         }
     }
@@ -514,7 +547,8 @@ class GameViewModel @Inject constructor(
 
     /** 触发重开流程：在 [Dispatchers.IO] 读取背包库存并打开携带道具选择弹窗。运行于 [viewModelScope]。 */
     private fun handleTriggerRestartFlow() {
-        viewModelScope.launch(Dispatchers.IO) {
+        restartPicker?.cancel()
+        restartPicker = viewModelScope.launch {
             val list = localDao.getAllItems()
             val stocks = list.associate { it.itemType to it.count }
             updateState {
@@ -546,7 +580,7 @@ class GameViewModel @Inject constructor(
 
     /** 确认重开：将临时携带道具序列化为 JSON 并重新 [handleLoadLevel]。运行于主线程。 */
     private fun handleConfirmRestartWithCarry() {
-        if (!currentState.showCarrySelection || currentState.isLoading) return
+        if (!currentState.showCarrySelection) return
         val carryJson = json.encodeToString<Map<String, Int>>(currentState.tempCarryItems)
         updateState {
             copy(showCarrySelection = false)
@@ -555,7 +589,7 @@ class GameViewModel @Inject constructor(
     }
 
     private fun submitFailureRecordIfNeeded() {
-        if (hasSubmittedThisRun) return
+        if (hasSubmittedThisRun || currentState.isLoading) return
         val status = currentState.gameStatus
         if (status != GameStatus.PLAYING && status != GameStatus.LOST) return
         hasSubmittedThisRun = true
