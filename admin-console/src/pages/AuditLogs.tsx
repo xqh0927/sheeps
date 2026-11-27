@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -47,6 +47,7 @@ const ACTION_LABELS: Record<string, string> = {
   'ADJUST_POINTS': '调整积分',
   'BAN_USER': '封禁用户',
   'UNBAN_USER': '解封用户',
+  'RESET_USER_PASSWORD': '重置账号密码',
   'RENAME_USER': '重命名用户',
   'DELETE_USER': '删除用户',
   'UPDATE_USER_ITEMS': '更新用户资产',
@@ -106,6 +107,7 @@ export default function AuditLogs() {
   const { show, Feedback } = useFeedback();
 
   // 当前页审计记录
+  const latestLoad = useRef(0);
   const [rows, setRows] = useState<AuditRow[]>([]);
   // 服务端返回的总记录数（驱动分页器）
   const [total, setTotal] = useState(0);
@@ -130,17 +132,21 @@ export default function AuditLogs() {
 
   // 拉取审计日志（服务端分页）：合并各筛选条件；from/to 为时间区间（含当天），action 经中文→英文映射
   const load = useCallback(() => {
+    const request = ++latestLoad.current;
     setLoading(true);
-    const from = fromDate ? new Date(fromDate).getTime() : undefined;
-    const to = toDate ? new Date(toDate).getTime() + 86400000 : undefined;
+    const from = fromDate ? new Date(fromDate + 'T00:00:00').getTime() : undefined;
+    // The API's upper bound is inclusive. Advance by one local calendar day across DST.
+    const end = toDate ? new Date(toDate + 'T00:00:00') : null;
+    const to = end ? end.setDate(end.getDate() + 1) - 1 : undefined;
     const resolvedAction = resolveActionInput(action);
     listAuditLogs({ page: page + 1, pageSize, action: resolvedAction || undefined, admin_id: adminId.trim() || undefined, from, to })
       .then((d) => {
+        if (request !== latestLoad.current) return;
         setRows(d.list);
         setTotal(d.total);
       })
-      .catch((e) => show(extractError(e), 'error'))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (request === latestLoad.current) show(extractError(e), 'error'); })
+      .finally(() => { if (request === latestLoad.current) setLoading(false); });
   }, [page, pageSize, action, adminId, fromDate, toDate, show]);
 
   // 仅超管加载数据；依赖 load / isSuper

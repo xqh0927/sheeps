@@ -223,9 +223,18 @@ class MenuViewModel @Inject constructor(
                 ::setEffect
             )
 
-            is MenuViewIntent.UnlockLevelWithPoints -> socialActionDelegate.handleUnlockLevelWithPoints(
-                viewModelScope, intent.levelId, { refreshProfile(); refreshAccountActivity() }, ::setEffect
-            )
+            is MenuViewIntent.UnlockLevelWithPoints -> if (!currentState.unlockInFlight) {
+                updateState { copy(unlockInFlight = true) }
+                viewModelScope.launch {
+                    try {
+                        socialActionDelegate.unlockLevel(intent.levelId, intent.expectedCost, ::setEffect)
+                        refreshProfile()
+                        refreshAccountActivity()
+                    } finally {
+                        updateState { copy(unlockInFlight = false, unlockQuoteRevision = unlockQuoteRevision + 1) }
+                    }
+                }
+            }
 
             is MenuViewIntent.JoinMatch -> matchmakingDelegate.handleJoinMatch(
                 viewModelScope,
@@ -330,6 +339,9 @@ class MenuViewModel @Inject constructor(
     }
 
     // Sign-in and level unlock do not change the avatar. Their result already updated local preferences.
+    suspend fun unlockQuote(levelId: Int): com.example.sheeps.data.model.UnlockQuote? =
+        (userRepository.unlockQuote(levelId) as? ApiResult.Success)?.data
+
     private fun refreshProfile() {
         updateState {
             copy(
@@ -423,7 +435,7 @@ class MenuViewModel @Inject constructor(
             updateState { copy(isLoading = true) }
             try {
                 val response = apiService.loginPassword(
-                    com.example.sheeps.data.model.PasswordLoginRequest(phone, password)
+                    com.example.sheeps.data.model.PasswordLoginRequest(phone, password, device_uuid = prefs.getUserId())
                 )
                 if (response.success) {
                     saveLoginData(response)
@@ -465,7 +477,7 @@ class MenuViewModel @Inject constructor(
             updateState { copy(isLoading = true) }
             try {
                 val response = apiService.registerAuth(
-                    com.example.sheeps.data.model.RegisterAuthRequest(phone, password, code)
+                    com.example.sheeps.data.model.RegisterAuthRequest(phone, password, code, device_uuid = prefs.getUserId())
                 )
                 if (response.success) {
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_register_success))

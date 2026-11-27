@@ -23,11 +23,12 @@ import {
   FormControlLabel,
   Switch,
   Grid,
+  Alert,
   FormLabel,
   MenuItem,
 } from '@mui/material';
-import { Search, Add, Block, CheckCircle, Edit, ShoppingBag, DeleteForever } from '@mui/icons-material';
-import { listUsers, adjustPoints, banUser, renameUser, deleteUser, setAccountRole, createAccount, AdminUserRow, listUserItems, updateUserItems, listShopItems } from '../api/admin';
+import { Search, Add, Block, CheckCircle, Edit, ShoppingBag, DeleteForever, LockReset } from '@mui/icons-material';
+import { listUsers, adjustPoints, banUser, renameUser, resetUserPassword, deleteUser, setAccountRole, createAccount, AdminUserRow, listUserItems, updateUserItems, listShopItems } from '../api/admin';
 import { extractError } from '../api/client';
 import { useAuth } from '../store/auth';
 import { useFeedback } from '../components/feedback';
@@ -97,6 +98,9 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
 
   // 资产（道具/皮肤）弹窗目标用户
+  const assetRequest = useRef(0);
+  const [assetStatus, setAssetStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [assetError, setAssetError] = useState('');
   const [assetTarget, setAssetTarget] = useState<AdminUserRow | null>(null);
   // 资产表单：item_type -> 数量/拥有状态映射
   const [assetForm, setAssetForm] = useState<Record<string, number>>({});
@@ -113,10 +117,12 @@ export default function Users() {
   const [renameValue, setRenameValue] = useState('');
   // 移除用户二次确认弹窗目标
   const [removeTarget, setRemoveTarget] = useState<AdminUserRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<AdminUserRow | null>(null);
   // 提交中态：统一禁用所有写操作按钮，防止重复提交
   const [busy, setBusy] = useState(false);
 
   // 新增管理员弹窗开关
+  const [generatedPassword, setGeneratedPassword] = useState('');
   const [newAdminOpen, setNewAdminOpen] = useState(false);
   // 新增管理员表单：手机号
   const [newAdminPhone, setNewAdminPhone] = useState('');
@@ -205,6 +211,20 @@ export default function Users() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetTarget || busy) return;
+    setBusy(true);
+    try {
+      await resetUserPassword(resetTarget.id);
+      setResetTarget(null);
+      show('已重置为默认密码', 'success');
+    } catch (e) {
+      show(extractError(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 移除用户：二次确认后调用 deleteUser（硬删除，不可恢复），成功后刷新
   const handleRemove = async () => {
     if (!removeTarget) return;
@@ -245,9 +265,13 @@ export default function Users() {
 
   // 打开资产弹窗：拉取用户当前背包，并以 PROPS_DEFINITIONS + skinDefs 为骨架初始化表单（默认 0）
   const handleOpenAssets = async (user: AdminUserRow) => {
+    const request = ++assetRequest.current;
     setAssetTarget(user);
+    setAssetForm({});
+    setAssetStatus('loading');
     try {
       const resp = await listUserItems(user.id);
+      if (request !== assetRequest.current) return;
       const initialForm: Record<string, number> = {};
       PROPS_DEFINITIONS.forEach(p => initialForm[p.type] = 0);
       skinDefs.forEach(s => initialForm[s.type] = 0);
@@ -256,14 +280,17 @@ export default function Users() {
         initialForm[row.item_type] = row.count;
       });
       setAssetForm(initialForm);
+      setAssetStatus('ready');
     } catch (e) {
-      show(extractError(e), 'error');
+      if (request !== assetRequest.current) return;
+      setAssetError(extractError(e));
+      setAssetStatus('error');
     }
   };
 
   // 保存资产：将表单转为 item_type/count 列表调用 updateUserItems（全量覆盖背包），成功后刷新
   const handleSaveAssets = async () => {
-    if (!assetTarget) return;
+    if (!assetTarget || assetStatus !== 'ready' || busy) return;
     setBusy(true);
     try {
       const itemsPayload = Object.entries(assetForm).map(([item_type, count]) => ({
@@ -286,8 +313,9 @@ export default function Users() {
     if (!newAdminPhone.trim()) return;
     setBusy(true);
     try {
-      await createAccount(newAdminPhone.trim(), newAdminRole, newAdminPwd.trim() || undefined);
-      show('管理员已创建', 'success');
+      const account = await createAccount(newAdminPhone.trim(), newAdminRole, newAdminPwd.trim() || undefined);
+      if (account.initialPassword) setGeneratedPassword(account.initialPassword);
+      else show('管理员已创建', 'success');
       setNewAdminOpen(false);
       setNewAdminPhone('');
       setNewAdminPwd('');
@@ -428,6 +456,12 @@ export default function Users() {
                       <IconButton size="small" onClick={() => handleOpenAssets(r)} title="道具与皮肤">
                         <ShoppingBag fontSize="small" />
                       </IconButton>
+                      {isSuper && r.phone && r.id && (
+                        <IconButton size="small" title="重置为默认密码" aria-label="重置为默认密码"
+                          onClick={() => setResetTarget(r)}>
+                          <LockReset fontSize="small" />
+                        </IconButton>
+                      )}
                       <IconButton
                         size="small"
                         color={r.is_banned === 1 ? 'success' : 'error'}
@@ -460,6 +494,18 @@ export default function Users() {
           rowsPerPageOptions={[10, 20, 50, 100]}
         />
       </Card>
+
+      <Dialog open={!!resetTarget} onClose={() => { if (!busy) setResetTarget(null); }} aria-labelledby="reset-password-title">
+        <DialogTitle id="reset-password-title">重置为默认密码？</DialogTitle>
+        <DialogContent>
+          <Typography>{resetTarget?.username} · {resetTarget?.phone} · {resetTarget && ROLE_LABEL[resetTarget.role]}</Typography>
+          <Typography sx={{ mt: 1 }}>该账号下次密码登录时需使用系统默认密码。</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={busy} onClick={() => setResetTarget(null)}>取消</Button>
+          <Button color="warning" variant="contained" disabled={busy} onClick={handleResetPassword}>确认重置</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 积分调整弹窗 */}
       <Dialog open={!!pointsTarget} onClose={() => setPointsTarget(null)}>
@@ -512,10 +558,14 @@ export default function Users() {
       </Dialog>
 
       {/* 道具与皮肤资产管理 Dialog */}
-      <Dialog open={!!assetTarget} onClose={() => setAssetTarget(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!assetTarget} onClose={() => { if (!busy) setAssetTarget(null); }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>管理用户背包 · {assetTarget?.username || assetTarget?.phone}</DialogTitle>
         <DialogContent dividers>
-          <Grid container spacing={2}>
+          {assetStatus === 'loading' && <CircularProgress size={24} aria-label="正在读取背包" />}
+          {assetStatus === 'error' && <Alert severity="error" action={
+            <Button onClick={() => assetTarget && handleOpenAssets(assetTarget)}>重试</Button>
+          }>{assetError}</Alert>}
+          {assetStatus === 'ready' && <Grid container spacing={2}>
             <Grid item xs={12}>
               <FormLabel component="legend" sx={{ fontWeight: 'bold', mb: 1, color: 'text.primary' }}>法宝道具 (张)</FormLabel>
             </Grid>
@@ -558,11 +608,11 @@ export default function Users() {
                 </Grid>
               ))
             )}
-          </Grid>
+          </Grid>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAssetTarget(null)} disabled={busy}>取消</Button>
-          <Button variant="contained" onClick={handleSaveAssets} disabled={busy}>
+          <Button variant="contained" onClick={handleSaveAssets} disabled={busy || assetStatus !== 'ready'}>
             {busy ? <CircularProgress size={18} color="inherit" /> : '保存'}
           </Button>
         </DialogActions>
@@ -630,6 +680,14 @@ export default function Users() {
         </DialogActions>
       </Dialog>
 
+      <Dialog open={Boolean(generatedPassword)} onClose={() => setGeneratedPassword('')}>
+        <DialogTitle>管理员已创建</DialogTitle>
+        <DialogContent>
+          <Typography>请保存本次生成的初始密码。关闭后无法再次查看。</Typography>
+          <Typography component="code" sx={{ userSelect: 'all' }}>{generatedPassword}</Typography>
+        </DialogContent>
+        <DialogActions><Button onClick={() => setGeneratedPassword('')}>完成</Button></DialogActions>
+      </Dialog>
       {Feedback}
     </Box>
   );

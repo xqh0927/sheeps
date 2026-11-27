@@ -1,6 +1,7 @@
 import { Env } from '../types';
 import { getCorsHeaders } from '../helpers';
 import { generateJWT, verifyJWT } from '../crypto';
+import { finishPlayerLogin, newPlayer } from '../lib/player-login';
 import { hashPassword, verifyPassword } from '../auth-utils';
 
 // Consume only the same issuance that was checked, including when a resend races verification.
@@ -51,7 +52,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             const headers = new Headers({ 'Content-Type': 'application/json' });
             if (!gateway) headers.set('Authorization', 'Bearer ' + env.SMS_DELIVERY_TOKEN);
             const deliveryRequest = new Request(endpoint, {
-                method: 'POST', headers, redirect: 'error',
+                method: 'POST', headers, redirect: 'manual',
                 body: JSON.stringify({ phone: body.phone, code }), signal: AbortSignal.timeout(8000)
             });
             const receipt = gateway ? await gateway.fetch(deliveryRequest) : await fetch(deliveryRequest);
@@ -82,22 +83,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         // 参数校验：手机号与验证码必须同时存在，缺失返回 400
         if (!body.phone || !body.code) return new Response(JSON.stringify({ error: '请填写手机号和验证码' }), { status: 400, headers: corsHeaders });
 
-        // 业务上下文：以 UTC+8（东八区）计算「今日」日期，用于判断当日是否已签到 / 连续签到天数
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-
-        // ─── 合并查询：一次 D1 batch 完成所有读操作 ───
-        // 事务/并发：6 条 SELECT 合并为单次 batch 读取，减少往返；读快照用于后续「验证码校验 / 用户资料 / 关卡 / 道具 / 今日签到 / 历史连续天数」判断
-        const [codeRecord, userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
-            env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
-            env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
-            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
-            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) ORDER BY sign_date DESC LIMIT 1').bind(body.phone)
-        ]);
-
-        // 参数校验：验证码需「存在且与用户输入一致」且「签发后 5 分钟内」，否则分别返回 400（验证码错误 / 已过期）
-        const tokenRecord = codeRecord.results[0] as { code: string; created_at: number } | undefined;
+        const tokenRecord = await env.DB.prepare('SELECT code, created_at FROM login_token WHERE phone=?').bind(body.phone)
+            .first<{code:string;created_at:number}>();
         if (!tokenRecord || tokenRecord.code !== body.code)
             return new Response(JSON.stringify({ error: '验证码错误' }), { status: 400, headers: corsHeaders });
         if (Date.now() - tokenRecord.created_at > 5 * 60 * 1000)
@@ -107,89 +94,9 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (!await consumeCode(env, body.phone, body.code, tokenRecord.created_at))
             return Response.json({ error: '验证码已失效，请重新获取' }, { status: 400, headers: corsHeaders });
 
-        let user = userRow.results[0] as any;
-        // 准备响应数据（默认使用预查询结果）
-        let finalLevels: number[] = unlockedResult.results.map((r: any) => r.level_id);
-        let finalItems: any[] = itemsResult.results;
-        let finalSigned = signTodayRow.results[0] !== null && signTodayRow.results[0] !== undefined;
-        let finalStreak: number = (lastSignResult.results[0] as any)?.streak || 0;
-
-        // 如果用户不存在，说明是新用户，自动执行注册逻辑
-        if (!user) {
-            const uuid = crypto.randomUUID();
-            const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
-            // 事务边界：新用户自动注册跨 users / level_unlock / user_items 三表写入，全部放入单 D1 batch 原子提交（要么全成，要么不写）
-            const insertQueries = [
-                // 插入用户主表
-                env.DB.prepare('INSERT INTO users (id, phone, username, role, points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(uuid, body.phone, defaultUsername, 'user', 0, Date.now()),
-                // 默认解锁第 1 关
-                env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
-            ];
-            // 新注册用户赠送初始道具：撤销、洗牌、置物架移出、复活（各 1 个）
-            for (const item of ['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE']) {
-                insertQueries.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?)').bind(uuid, item, 1));
-            }
-            await env.DB.batch(insertQueries);
-            user = { id: uuid, phone: body.phone, username: defaultUsername, avatar: null, points: 0 };
-            // 新用户响应数据：手动构建，避免额外查询
-            finalLevels = [1];
-            finalItems = [{ item_type: 'UNDO', count: 1 }, { item_type: 'SHUFFLE', count: 1 }, { item_type: 'MOVEOUT', count: 1 }, { item_type: 'REVIVE', count: 1 }];
-            finalSigned = false;
-            finalStreak = 0;
-        }
-
-        // 游客合并逻辑：如果登录时传入了设备的游客 device_uuid，且与当前注册用户的 id 不同，需要合并积分、关卡进度及道具
-        if (body.device_uuid && body.device_uuid !== user.id) {
-            const guestUser = await env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(body.device_uuid).first<{ points: number }>();
-            if (guestUser) {
-                // 读取游客的关卡解锁和道具记录
-                const [guestLevelsResult, guestItemsResult] = await env.DB.batch([
-                    env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(body.device_uuid),
-                    env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(body.device_uuid)
-                ]);
-                const mergedPoints = user.points + guestUser.points;
-                user.points = mergedPoints;
-
-                const mergeMutations = [env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(mergedPoints, user.id)];
-                // 合并关卡解锁记录（忽略重复的）
-                for (const row of guestLevelsResult.results as any[]) {
-                    mergeMutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(user.id, row.level_id, Date.now()));
-                    if (!finalLevels.includes(row.level_id)) finalLevels.push(row.level_id);
-                }
-                // 道具叠加更新：合并游客道具到响应数据
-                for (const row of guestItemsResult.results as any[]) {
-                    mergeMutations.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_type) DO UPDATE SET count = count + ?').bind(user.id, row.item_type, row.count, row.count));
-                    const existing = finalItems.find((i: any) => i.item_type === row.item_type);
-                    if (existing) existing.count += row.count;
-                    else finalItems.push({ item_type: row.item_type, count: row.count });
-                }
-
-                // 级联删除游客在各个业务表中的历史数据，防止外键冲突或脏数据残留
-                const userTables = ['level_unlock', 'user_items', 'leaderboard', 'point_record', 'exchange_record', 'sign_record', 'user_task', 'backup_save_log'];
-                for (const table of userTables) {
-                    mergeMutations.push(env.DB.prepare(`DELETE FROM ${table} WHERE user_id = ?`).bind(body.device_uuid));
-                }
-                // backup_save_log 子表无 user_id 列，用 IN 子查询按 backup_id 级联删除
-                mergeMutations.push(env.DB.prepare('DELETE FROM backup_unlocked_levels WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(body.device_uuid));
-                mergeMutations.push(env.DB.prepare('DELETE FROM backup_save_items WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(body.device_uuid));
-                mergeMutations.push(env.DB.prepare('DELETE FROM users WHERE id = ?').bind(body.device_uuid));
-                await env.DB.batch(mergeMutations);
-            }
-        }
-
-        // 签发双 Token：Access Token（2h，常规鉴权用）+ Refresh Token（30d，/refresh 静默续期用）；均经签名，payload 含 userId/phone/type/exp
-        const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
-        const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
-
-        // 直接使用已合并查询的结果（无需额外 D1 调用）
-        return new Response(JSON.stringify({
-            success: true, token, refreshToken, user,
-            unlocked_levels: finalLevels,
-            items: finalItems,
-            today_signed: finalSigned,
-            sign_streak: finalStreak,
-            hasPassword: !!(user?.password_hash)
-        }), { headers: corsHeaders });
+        const existing = await env.DB.prepare('SELECT id FROM users WHERE phone=?').bind(body.phone).first<{id:string}>();
+        const id = existing?.id ?? crypto.randomUUID();
+        return finishPlayerLogin(env, id, body.device_uuid, existing ? [] : newPlayer(env.DB, id, body.phone, null));
     }
 
     /**
@@ -228,7 +135,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      * 响应: { success: true, token, refreshToken, user, ... }
      */
     if (path === '/api/auth/register' && request.method === 'POST') {
-        const body: { phone: string; password: string; code: string } = await request.json();
+        const body: { phone: string; password: string; code: string; device_uuid?: string } = await request.json();
         // 参数校验：手机号、密码、验证码三者必填，缺失返回 400
         if (!body.phone || !body.password || !body.code)
             return new Response(JSON.stringify({ error: '请填写完整注册信息' }), { status: 400, headers: corsHeaders });
@@ -254,31 +161,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         // 密码安全：单向加盐哈希（hashPassword）后落库 password_hash，明文密码绝不在 DB 中持久化
         const pwHash = await hashPassword(body.password);
 
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const uuid = crypto.randomUUID();
-        const defaultUsername = `国风玩家_${body.phone.slice(-4)}`;
-
-        // 事务边界：密码注册写入 users（含 password_hash）/ level_unlock / user_items 三表，统一单 batch 原子提交
-        const insertQueries = [
-            env.DB.prepare('INSERT INTO users (id, phone, username, role, points, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-                .bind(uuid, body.phone, defaultUsername, 'user', 0, pwHash, Date.now()),
-            env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(uuid, Date.now())
-        ];
-        for (const item of ['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE']) {
-            insertQueries.push(env.DB.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, ?)').bind(uuid, item, 1));
-        }
-        await env.DB.batch(insertQueries);
-
-        const user = { id: uuid, phone: body.phone, username: defaultUsername, avatar: null, points: 0 };
-        const token = await generateJWT({ userId: uuid, phone: body.phone, type: 'access', exp: Date.now() + 7200000 });
-        const refreshToken = await generateJWT({ userId: uuid, phone: body.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
-
-        return new Response(JSON.stringify({
-            success: true, token, refreshToken, user,
-            unlocked_levels: [1],
-            items: [{ item_type: 'UNDO', count: 1 }, { item_type: 'SHUFFLE', count: 1 }, { item_type: 'MOVEOUT', count: 1 }, { item_type: 'REVIVE', count: 1 }],
-            today_signed: false, sign_streak: 0, hasPassword: true
-        }), { headers: corsHeaders });
+        const id = crypto.randomUUID();
+        return finishPlayerLogin(env, id, body.device_uuid, newPlayer(env.DB, id, body.phone, pwHash));
     }
 
     /**
@@ -291,22 +175,13 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      * 响应: { success, token, refreshToken, user, unlocked_levels, items, today_signed, sign_streak, hasPassword }
      */
     if (path === '/api/auth/login-password' && request.method === 'POST') {
-        const body: { phone: string; password: string } = await request.json();
+        const body: { phone: string; password: string; device_uuid?: string } = await request.json();
         // 参数校验：手机号与密码必填，缺失返回 400
         if (!body.phone || !body.password)
             return new Response(JSON.stringify({ error: '请填写手机号和密码' }), { status: 400, headers: corsHeaders });
 
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-
-        const [userRow, unlockedResult, itemsResult, signTodayRow, lastSignResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points, password_hash FROM users WHERE phone = ?').bind(body.phone),
-            env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
-            env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = (SELECT id FROM users WHERE phone = ?)').bind(body.phone),
-            env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) AND sign_date = ?').bind(body.phone, chinaToday),
-            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = (SELECT id FROM users WHERE phone = ?) ORDER BY sign_date DESC LIMIT 1').bind(body.phone)
-        ]);
-
-        const user = userRow.results[0] as any;
+        const user = await env.DB.prepare('SELECT id,password_hash FROM users WHERE phone=?').bind(body.phone)
+            .first<{id:string;password_hash:string|null}>();
         if (!user)
             return new Response(JSON.stringify({ error: '用户不存在' }), { status: 400, headers: corsHeaders });
 
@@ -318,17 +193,7 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (!pwValid)
             return new Response(JSON.stringify({ error: '密码错误' }), { status: 400, headers: corsHeaders });
 
-        const token = await generateJWT({ userId: user.id, phone: user.phone, type: 'access', exp: Date.now() + 7200000 });
-        const refreshToken = await generateJWT({ userId: user.id, phone: user.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
-
-        return new Response(JSON.stringify({
-            success: true, token, refreshToken, user,
-            unlocked_levels: unlockedResult.results.map((r: any) => r.level_id),
-            items: itemsResult.results,
-            today_signed: signTodayRow.results[0] !== null && signTodayRow.results[0] !== undefined,
-            sign_streak: (lastSignResult.results[0] as any)?.streak || 0,
-            hasPassword: true
-        }), { headers: corsHeaders });
+        return finishPlayerLogin(env, user.id, body.device_uuid);
     }
 
     /**

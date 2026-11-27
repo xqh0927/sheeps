@@ -36,6 +36,12 @@ npm run typecheck  # 仅类型检查
    ```
 3. **Cloudflare Pages Git 集成**：在 Pages 控制台连接本仓库，构建目录填 `admin-console/dist`，构建命令填 `cd admin-console && npm run build`，并配置环境变量 `VITE_API_BASE` = 线上 Worker 地址。
 
+## 重置账号密码
+
+在 `server/` 目录运行 `npx wrangler secret put ACCOUNT_RESET_DEFAULT_PASSWORD`，按提示输入默认密码（6–20 位，至少含一个英文字母和一个数字）。本地 Wrangler 可在 `.dev.vars` 配置同名变量。
+
+超级管理员在「用户管理」中点击目标账号的「重置为默认密码」，核对手机号、昵称和角色后确认。支持玩家和各级管理员的手机号登录账号。审计日志可按「重置账号密码」检索。此次操作替换登录密码，已有登录会话继续按原有效期管理。
+
 ## 权限模型
 
 | 角色 | 能力 |
@@ -54,3 +60,7 @@ npm run typecheck  # 仅类型检查
 - 部署：`wrangler secret put JWT_SECRET / AES_KEY_HEX / ADMIN_WEB_ORIGIN`；`ADMIN_PHONE`/`ADMIN_PASSWORD` 跑 seed；后端部署可在根目录执行 `npm run deploy-backend` 或在 `server/` 下执行 `npm run deploy`。
 
 详见 `docs/system_design.md` 与 `docs/admin-prd.md`。
+
+## 浏览器回归
+
+在本目录执行 `npm ci` 和 `npx playwright install chromium`，然后用 `npm run test:ui` 验证切换账号后的背包状态、排行榜记录归属与本地日期筛选。设置 `CHROME_BIN` 可以使用已安装的 Chrome。测试会启动本地 Vite 服务并使用独立的浏览器会话与测试数据。

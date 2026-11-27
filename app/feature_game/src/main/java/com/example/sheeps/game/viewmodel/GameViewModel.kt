@@ -493,7 +493,8 @@ class GameViewModel @Inject constructor(
                 slotTiles = currentState.slotTiles.map { it.copy() },
                 movedOutTiles = currentState.movedOutTiles.map { it.copy() },
                 sealedClearCount = currentState.sealedClearCount,
-                sealedUnlockedIds = currentState.sealedUnlockedIds
+                sealedUnlockedIds = currentState.sealedUnlockedIds,
+                score = currentState.score
             )
         )
     }

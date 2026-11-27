@@ -26,7 +26,7 @@ import com.example.sheeps.ui.R
 @Composable
 internal fun RankingBoard(
     rankings: List<RankingEntry>,
-    currentUser: String?,
+    currentUserId: String,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState()
 ) {
@@ -37,7 +37,7 @@ internal fun RankingBoard(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
     ) {
         itemsIndexed(rankings) { index, entry ->
-            val isCurrentUser = entry.username == currentUser
+            val isCurrentUser = entry.user_id == currentUserId
             if (index == 0) {
                 Row(
                     Modifier.fillMaxWidth().padding(bottom = 12.dp)

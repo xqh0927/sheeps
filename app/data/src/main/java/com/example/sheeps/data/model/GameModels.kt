@@ -88,7 +88,7 @@ data class ShopItem(
     val points_price: Int,
     val stock: Int,
     val group: String? = null,            // v2 新增：主题系列分组（可空，如 地域系列/萌系系列/数码系列/生活系列）
-    val tiles: List<String>? = null       // v2 新增：仅皮肤项 12 张卡面 URL，index 0..11 对应 tile 1..12
+    val tiles: List<String?>? = null       // v2 新增：仅皮肤项 12 张卡面 URL，index 0..11 对应 tile 1..12
 )
 
 /** 道具兑换历史记录（积分商城兑换明细）。 */
@@ -212,8 +212,12 @@ data class SyncResponse(
 /** 解锁关卡请求（目标关卡编号）。 */
 @Serializable
 data class UnlockLevelRequest(
-    val level_id: Int
+    val level_id: Int,
+    val expected_cost: Int
 )
+
+@Serializable
+data class UnlockQuote(val level_id: Int, val cost: Int, val current_points: Int)
 
 /** 解锁关卡响应（含当前剩余积分）。 */
 @Serializable
@@ -279,14 +283,16 @@ data class UserProfileResponse(
 data class RegisterAuthRequest(
     val phone: String,
     val password: String,
-    val code: String
+    val code: String,
+    val device_uuid: String? = null
 )
 
 /** 手机号 + 密码登录请求。 */
 @Serializable
 data class PasswordLoginRequest(
     val phone: String,
-    val password: String
+    val password: String,
+    val device_uuid: String? = null
 )
 
 /** 重置密码请求（手机号 + 验证码 + 新密码）。 */
@@ -357,7 +363,8 @@ data class RankingEntry(
     val avatar: String? = null,
     val clear_time_ms: Long,
     val score: Int,
-    val achieved_at: Long
+    val achieved_at: Long,
+    val user_id: String? = null
 )
 
 /** 排行榜响应（可能包含排行榜总开关 [disabled]）。 */

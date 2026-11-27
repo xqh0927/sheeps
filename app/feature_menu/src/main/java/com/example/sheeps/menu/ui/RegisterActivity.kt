@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.model.RegisterAuthRequest
+import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.ui.screens.RegisterScreen
 import com.example.sheeps.ui.R
@@ -35,6 +36,7 @@ import com.example.sheeps.lib_base.router.RouterPath
 class RegisterActivity : BaseActivity() {
 
     @Inject lateinit var apiService: ApiService
+    @Inject lateinit var prefs: UserPreferences
 
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
@@ -75,7 +77,7 @@ class RegisterActivity : BaseActivity() {
         lifecycleScope.launch {
             try {
                 val response = apiService.registerAuth(
-                    RegisterAuthRequest(phone, password, code)
+                    RegisterAuthRequest(phone, password, code, device_uuid = prefs.getUserId())
                 )
                 if (response.success) {
                     Toaster.show(getString(R.string.toast_register_success))

@@ -34,7 +34,8 @@ data class StagePosition(
     val slotTiles: List<Tile>,
     val movedOutTiles: List<Tile>,
     val sealedClearCount: Int,
-    val sealedUnlockedIds: Set<String>
+    val sealedUnlockedIds: Set<String>,
+    val score: Int? = null // Older history entries did not store the score.
 )
 
 @Serializable

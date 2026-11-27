@@ -247,7 +247,7 @@
     <string name="guide_sec2_title">2. Game Items</string>
     <string name="guide_sec2_desc">Move Out: Move first 3 tiles out of slots.\nShuffle: Shuffle all remaining tiles on board.\nUndo: Undo last tap.</string>
     <string name="guide_sec3_title">3. Getting Coins</string>
-    <string name="guide_sec3_desc">Get coins from daily sign-in and first-time level clears. Winning PvP matches also awards coins!</string>
+    <string name="guide_sec3_desc">Earn coins by checking in and completing daily tasks. Your coin history shows each reward.</string>
     <string name="guide_sec4_title">4. Store Exchange</string>
     <string name="guide_sec4_desc">Exchange coins for game items or custom tile skins in the Shop.</string>
     <string name="guide_sec5_title">5. PvP Rules</string>

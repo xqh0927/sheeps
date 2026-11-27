@@ -16,6 +16,17 @@
     { "name": "admin", "description": "管理后台（需管理员令牌）" }
   ],
   "paths": {
+    "/api/admin/users/{id}/reset-password": {
+      "post": {
+        "tags": ["admin"], "summary": "超级管理员将已注册玩家或管理员的登录密码重置为服务端默认值",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "重置完成并写入审计" }, "401": { "description": "未登录或账号已被封禁" },
+          "403": { "description": "需要超级管理员权限" }, "404": { "description": "目标登录账号不存在" },
+          "503": { "description": "默认密码尚未正确配置" }
+        }
+      }
+    },
     "/api/auth/send-code": {
       "post": {
         "tags": ["auth"],
@@ -48,6 +59,7 @@
         "tags": ["auth"],
         "summary": "验证码登录/注册（自动注册新用户）",
         "requestBody": {
+          "description": "可选 device_uuid 为当前设备的游客 ID。验证成功后将游客已提交的成绩、关卡进度和道具合并到该账号。",
           "content": {
             "application/json": {
               "example": { "phone": "13800000000", "code": "123456" }
@@ -75,6 +87,7 @@
         "tags": ["auth"],
         "summary": "密码登录",
         "requestBody": {
+          "description": "可选 device_uuid 为当前设备的游客 ID。验证成功后将游客已提交的成绩、关卡进度和道具合并到该账号。",
           "content": {
             "application/json": {
               "example": { "phone": "13800000000", "password": "yourPassword" }
@@ -94,6 +107,7 @@
         "tags": ["auth"],
         "summary": "注册账号",
         "requestBody": {
+          "description": "可选 device_uuid 为当前设备的游客 ID。验证成功后将游客已提交的成绩、关卡进度和道具合并到该账号。",
           "content": {
             "application/json": {
               "example": { "phone": "13800000000", "code": "123456", "password": "yourPassword" }
@@ -191,9 +205,9 @@
     "/api/user/sync": {
       "post": {
         "tags": ["user"],
-        "summary": "端云数据同步（上传本地存档/拉取云端）",
+        "summary": "确认道具消耗，返回云端余额和已解锁进度",
         "requestBody": {
-          "content": { "application/json": { "example": { "points": 0, "unlocked_levels": [1], "consumptions": [{ "operation_id": "example-use-1", "item_type": "UNDO", "quantity": 1 }] } } }
+          "content": { "application/json": { "example": { "consumptions": [{ "operation_id": "example-use-1", "item_type": "UNDO", "quantity": 1 }] } } }
         },
         "responses": {
           "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "user": { "id": "uuid", "points": 80 }, "items": [{ "item_type": "UNDO", "count": 1 }], "unlocked_levels": [1], "acknowledged_consumptions": ["example-use-1"] } } } }
@@ -345,15 +359,23 @@
         }
       }
     },
+    "/api/level/unlock-quote": {
+      "get": {
+        "tags": ["game"], "summary": "获取目标关卡解锁报价及当前余额",
+        "parameters": [{"name":"id","in":"query","required":true,"schema":{"type":"integer","minimum":1}}],
+        "responses": {
+          "200": {"description":"按目标关配置收费；已开放范围内为零金币。","content":{"application/json":{"example":{"level_id":3,"cost":100,"current_points":125}}}},
+          "401": {"description":"需要登录"}
+        }
+      }
+    },
     "/api/level/unlock": {
       "post": {
-        "tags": ["game"],
-        "summary": "积分解锁关卡",
-        "requestBody": {
-          "content": { "application/json": { "example": { "levelId": 3 } } }
-        },
+        "tags": ["game"], "summary": "确认报价并解锁至目标关",
+        "requestBody": {"required": true, "content":{"application/json":{"example":{"level_id":3,"expected_cost":100}}}},
         "responses": {
-          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } }
+          "200":{"description":"已解锁或已开放；返回实际余额。","content":{"application/json":{"example":{"success":true,"current_points":25}}}},
+          "400":{"description":"关号无效或金币不足"},"401":{"description":"需要登录"},"409":{"description":"报价已变化，重新获取报价后再确认"}
         }
       }
     },

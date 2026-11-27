@@ -25,7 +25,7 @@ import com.example.sheeps.data.model.ShopItem
 object TileIconProvider {
 
     /** skinKey(小写渲染键) -> 12 张卡面 URL（index 0..11 对应 tile 1..12，缺失为 null） */
-    private var skinTileUrls by mutableStateOf<Map<String, List<String>>>(emptyMap())
+    private var skinTileUrls by mutableStateOf<Map<String, List<String?>>>(emptyMap())
 
     /** item_type(大写) -> 道具图标 URL */
     private val itemIconUrls = mutableMapOf<String, String?>()
@@ -42,7 +42,7 @@ object TileIconProvider {
      */
     fun setShopItems(items: List<ShopItem>) {
         allItems = items
-        val newTiles = mutableMapOf<String, List<String>>()
+        val newTiles = mutableMapOf<String, List<String?>>()
         itemIconUrls.clear()
         groups.clear()
         for (item in items) {

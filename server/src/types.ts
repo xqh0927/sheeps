@@ -3,6 +3,7 @@
  * 在 Wrangler.toml 中配置的绑定项都需要在这里声明类型
  */
 export interface Env {
+  ACCOUNT_RESET_DEFAULT_PASSWORD?: string; // Worker Secret used only for administrator-initiated resets.
   SMS_DELIVERY_URL?: string;
   SMS_DELIVERY_TOKEN?: string;
   SMS_DELIVERY?: Fetcher;    // Private service binding to the configured SMS gateway.

@@ -102,9 +102,8 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
 
         const mutationStatements = [];
 
-        // 第二步：合并客户端传上来的积分数据（取本地和云端极大值，body.points>0 才合并），合并关卡解锁进度
-        if (body.points !== undefined && body.points > 0) mutationStatements.push(env.DB.prepare('UPDATE users SET points = MAX(points, ?) WHERE id = ?').bind(body.points, authUser.userId));
-        if (body.unlocked_levels) for (const lvl of body.unlocked_levels) mutationStatements.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, lvl, Date.now()));
+        // Balances and unlocks come from receipted server transactions. A legacy client
+        // may still send a stale absolute snapshot after a rejected purchase.
         // Absolute inventory snapshots from older clients have no revision and cannot prove a purchase or use.
         // Apply each debit against current stock and persist its receipt in the same D1 transaction.
         for (const op of consumptions) {
@@ -149,7 +148,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
-            env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? ORDER BY sign_date DESC LIMIT 1').bind(authUser.userId),
+            env.DB.prepare("SELECT streak FROM sign_record WHERE user_id = ? AND sign_date BETWEEN date(?, '-1 day') AND ? ORDER BY sign_date DESC LIMIT 1").bind(authUser.userId, chinaToday, chinaToday),
             env.DB.prepare('SELECT MAX(level_id) as highest FROM leaderboard WHERE user_id = ? AND is_win = 1 AND game_mode = 0').bind(authUser.userId)
         ]);
 

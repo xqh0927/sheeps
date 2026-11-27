@@ -379,17 +379,18 @@ async function genericUpdate(request: Request, env: Env, admin: AdminPayload, cf
   const sets = cols.map((c) => `"${c}" = ?`).join(', ');
   const sql = `UPDATE ${cfg.table} SET ${sets} WHERE "${idCol}" = ?`;
   const changes = [env.DB.prepare(sql).bind(...cols.map(c => writeBody[c]), id)];
-  if (cfg.table === 'notice') {
-    for (const field of ['title', 'content']) {
+  if (cfg.table === 'notice' || cfg.table === 'task') {
+    const fields = cfg.table === 'notice' ? ['title', 'content'] : ['name', 'description'];
+    for (const field of fields) {
       if (writeBody[field] === undefined) continue;
-      const key = `notice.${id}.${field}`;
+      const key = `${cfg.table}.${id}.${field}`;
       changes.push(
-        env.DB.prepare("UPDATE i18n_strings SET value = ?, updated_at = ? WHERE module = 'notice' AND locale = 'zh' AND str_key = ?")
-          .bind(writeBody[field], Date.now(), key),
+        env.DB.prepare("UPDATE i18n_strings SET value = ?, updated_at = ? WHERE module = ? AND locale = 'zh' AND str_key = ?")
+          .bind(writeBody[field], Date.now(), cfg.table, key),
         env.DB.prepare(`INSERT INTO i18n_strings (module, locale, str_key, value, updated_at)
-          SELECT 'notice', 'zh', ?, ?, ? WHERE NOT EXISTS (
-            SELECT 1 FROM i18n_strings WHERE module = 'notice' AND locale = 'zh' AND str_key = ?
-          )`).bind(key, writeBody[field], Date.now(), key)
+          SELECT ?, 'zh', ?, ?, ? WHERE NOT EXISTS (
+            SELECT 1 FROM i18n_strings WHERE module = ? AND locale = 'zh' AND str_key = ?
+          )`).bind(cfg.table, key, writeBody[field], Date.now(), cfg.table, key)
       );
     }
   }
@@ -411,8 +412,9 @@ async function genericDelete(request: Request, env: Env, admin: AdminPayload, cf
   const before = await env.DB.prepare(`SELECT * FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id).first();
   if (!before) return jsonError('记录不存在', 404, env);
   const changes = [env.DB.prepare(`DELETE FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id)];
-  if (cfg.table === 'notice' || cfg.table === 'app_version') {
-    const fields = cfg.table === 'notice' ? ['title', 'content'] : ['update_log'];
+  const localizedFields: Record<string, string[]> = { notice: ['title', 'content'], task: ['name', 'description'], app_version: ['update_log'] };
+  if (localizedFields[cfg.table]) {
+    const fields = localizedFields[cfg.table];
     for (const field of fields) {
       changes.push(env.DB.prepare('DELETE FROM i18n_strings WHERE module = ? AND str_key = ?')
         .bind(cfg.table, `${cfg.table}.${id}.${field}`));
@@ -547,14 +549,43 @@ async function createAccount(request: Request, env: Env, admin: AdminPayload): P
   if (!['super', 'operator', 'readonly'].includes(body.role)) return jsonError('角色非法', 400, env);
   const existed = await env.DB.prepare('SELECT id FROM users WHERE phone = ?').bind(body.phone).first();
   if (existed) return jsonError('该手机号已注册', 409, env);
-  const pwd = body.password || Math.random().toString(36).slice(-8) + 'A1!';
+  const pwd = body.password || crypto.randomUUID();
   const hash = await hashPassword(pwd);
-  const info = await env.DB.prepare('INSERT INTO users (phone, username, role, password_hash, points) VALUES (?, ?, ?, ?, 0)')
-    .bind(body.phone, body.phone, body.role, hash)
+  const newId = crypto.randomUUID();
+  await env.DB.prepare('INSERT INTO users (id, phone, username, role, password_hash, points, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)')
+    .bind(newId, body.phone, body.phone, body.role, hash, Date.now())
     .run();
-  const newId = (info as any).lastRowId?.toString();
   await writeAudit(env, request, admin, 'CREATE_ADMIN', { type: 'admin', id: newId, after: { phone: body.phone, role: body.role } });
   return new Response(JSON.stringify({ success: true, id: newId, initialPassword: body.password ? undefined : pwd }), { headers: getCorsHeaders(env) });
+}
+
+/** 重置已注册账号的密码，并在同一事务内记录操作者和目标账号。 */
+async function resetAccountPassword(request: Request, env: Env, admin: AdminPayload, targetId: string): Promise<Response> {
+  const guard = assertSuper(admin);
+  if (guard) return guard;
+  const password = env.ACCOUNT_RESET_DEFAULT_PASSWORD;
+  if (!password || password.length < 6 || password.length > 20 || !/[a-z]/i.test(password) || !/\d/.test(password)) {
+    return jsonError('账号默认密码未正确配置，请联系维护人员', 503, env);
+  }
+  const hash = await hashPassword(password);
+  // Check live authority in the write itself: the actor might be demoted during password hashing.
+  const [updated] = await env.DB.batch([
+    env.DB.prepare(`UPDATE users SET password_hash = ?
+      WHERE id = ? AND phone IS NOT NULL AND phone != ''
+        AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'super' AND is_banned = 0)`)
+      .bind(hash, targetId, admin.userId),
+    env.DB.prepare(`INSERT INTO admin_audit_log
+      (admin_id, admin_phone, admin_role, action, target_type, target_id, source_ip, user_agent, created_at)
+      SELECT ?, ?, 'super', 'RESET_USER_PASSWORD', 'users', id, ?, ?, ?
+      FROM users WHERE id = ? AND password_hash = ?`)
+      .bind(admin.userId, admin.phone, getClientIp(request), request.headers.get('User-Agent') || 'unknown', Date.now(), targetId, hash),
+  ]);
+  if (!updated.meta.changes) {
+    const authorized = await env.DB.prepare("SELECT 1 FROM users WHERE id=? AND role='super' AND is_banned=0")
+      .bind(admin.userId).first();
+    return authorized ? jsonError('目标登录账号不存在', 404, env) : jsonError('仅超级管理员可执行此操作', 403, env);
+  }
+  return Response.json({ success: true }, { headers: getCorsHeaders(env) });
 }
 
 /**
@@ -905,18 +936,18 @@ async function enrichEntityLabels(env: Env, list: any[]): Promise<void> {
     const refs = [...new Set(list.filter((r) => r.module === m).map((r) => parseEntityRef(r.str_key, m)))].filter((x) => x !== null);
     if (refs.length === 0) continue;
     let labelMap: Record<string, string> = {};
-    const placeholders = refs.map(() => '?').join(', ');
+    const references = JSON.stringify(refs);
     if (m === 'shop_items') {
-      const r = await env.DB.prepare(`SELECT id, name FROM shop_items WHERE id IN (${placeholders})`).bind(...refs).all();
+      const r = await env.DB.prepare(`SELECT id, name FROM shop_items WHERE id IN (SELECT value FROM json_each(?))`).bind(references).all();
       for (const row of r.results as any[]) labelMap[String(row.id)] = row.name;
     } else if (m === 'task') {
-      const r = await env.DB.prepare(`SELECT id, name FROM task WHERE id IN (${placeholders})`).bind(...refs).all();
+      const r = await env.DB.prepare(`SELECT id, name FROM task WHERE id IN (SELECT value FROM json_each(?))`).bind(references).all();
       for (const row of r.results as any[]) labelMap[String(row.id)] = row.name;
     } else if (m === 'notice') {
-      const r = await env.DB.prepare(`SELECT id, title FROM notice WHERE id IN (${placeholders})`).bind(...refs).all();
+      const r = await env.DB.prepare(`SELECT id, title FROM notice WHERE id IN (SELECT value FROM json_each(?))`).bind(references).all();
       for (const row of r.results as any[]) labelMap[String(row.id)] = row.title;
     } else if (m === 'app_version') {
-      const r = await env.DB.prepare(`SELECT version_code, version_name FROM app_version WHERE version_code IN (${placeholders})`).bind(...refs).all();
+      const r = await env.DB.prepare(`SELECT version_code, version_name FROM app_version WHERE version_code IN (SELECT value FROM json_each(?))`).bind(references).all();
       for (const row of r.results as any[]) labelMap[String(row.version_code)] = row.version_name;
     }
     for (const row of list) {
@@ -943,22 +974,32 @@ async function listI18n(request: Request, env: Env, url: URL): Promise<Response>
   if (keyword) { wheres.push('(str_key LIKE ? OR value LIKE ?)'); binds.push(`%${keyword}%`, `%${keyword}%`); }
   const whereSql = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
 
-  // 不分页，返回全部匹配行（当前数据量约235条，每个str_key最多5个locale），
-  // 前端按 str_key 聚合后做客户端分页，避免按单行分页导致聚合后条目骤减的问题。
-  const rows = await env.DB.prepare(`SELECT * FROM i18n_strings ${whereSql} ORDER BY module, str_key, locale LIMIT 2000`)
-    .bind(...binds)
-    .all();
+  // Match whole keys before joining their translations; a value search must not hide sibling locales.
+  const rows = await env.DB.prepare(`
+    WITH matched AS (
+      SELECT DISTINCT module, str_key FROM i18n_strings ${whereSql}
+      ORDER BY module, str_key LIMIT 2000
+    )
+    SELECT i.* FROM i18n_strings i JOIN matched USING (module, str_key)
+    ${locale ? 'WHERE i.locale = ?' : ''} ORDER BY i.module, i.str_key, i.locale, i.id
+  `).bind(...binds, ...(locale ? [locale] : [])).all();
   const list = rows.results as any[];
   await enrichEntityLabels(env, list);
   return new Response(JSON.stringify({ success: true, list, total: list.length }), { headers: getCorsHeaders(env) });
 }
 
-// The simplified Chinese notice is also the fallback for locales without a translation.
-function noticeBaseChange(env: Env, module: string, locale: string, key: string, value: unknown): D1PreparedStatement[] {
-  if (module !== 'notice' || locale !== 'zh' || typeof value !== 'string') return [];
-  const match = /^notice\.(\d+)\.(title|content)$/.exec(key);
-  if (!match) return [];
-  return [env.DB.prepare(`UPDATE notice SET ${match[2]} = ? WHERE id = ?`).bind(value, match[1])];
+// Simplified Chinese text is also the base row used by player endpoints.
+function localizedBaseChange(env: Env, module: string, locale: string, key: string, value: unknown): D1PreparedStatement[] {
+  if (locale !== 'zh' || typeof value !== 'string') return [];
+  if (module === 'task') {
+    const match = /^task\.(.+)\.(name|description)$/.exec(key);
+    return match ? [env.DB.prepare(`UPDATE task SET ${match[2]} = ? WHERE id = ?`).bind(value, match[1])] : [];
+  }
+  if (module === 'notice') {
+    const match = /^notice\.(\d+)\.(title|content)$/.exec(key);
+    return match ? [env.DB.prepare(`UPDATE notice SET ${match[2]} = ? WHERE id = ?`).bind(value, match[1])] : [];
+  }
+  return [];
 }
 
 /**
@@ -976,7 +1017,7 @@ async function createI18n(request: Request, env: Env, admin: AdminPayload): Prom
   const quoted = cols.map((c) => `"${c}"`).join(', ');
   const [info] = await env.DB.batch([
     env.DB.prepare(`INSERT INTO i18n_strings (${quoted}) VALUES (${placeholders})`).bind(...cols.map(c => body[c])),
-    ...noticeBaseChange(env, body.module, body.locale, body.str_key, body.value),
+    ...localizedBaseChange(env, body.module, body.locale, body.str_key, body.value),
   ]);
   const newId = String(info.meta.last_row_id);
   await writeAudit(env, request, admin, 'CREATE_I18N', { type: 'i18n_strings', id: newId, after: pick(body, ['str_key', 'locale', 'module', 'value']) });
@@ -1006,7 +1047,7 @@ async function updateI18n(request: Request, env: Env, admin: AdminPayload, id: s
   const sets = cols.map((c) => `"${c}" = ?`).join(', ');
   await env.DB.batch([
     env.DB.prepare(`UPDATE i18n_strings SET ${sets} WHERE id = ?`).bind(...cols.map(c => patch[c]), id),
-    ...noticeBaseChange(env, before.module, before.locale, before.str_key, body.value),
+    ...localizedBaseChange(env, before.module, before.locale, before.str_key, body.value),
   ]);
 
   await writeAudit(env, request, admin, 'UPDATE_I18N', {
@@ -1016,6 +1057,23 @@ async function updateI18n(request: Request, env: Env, admin: AdminPayload, id: s
     after: { value: body.value },
   });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+}
+
+async function deleteTranslationGroup(request: Request, env: Env, admin: AdminPayload, url: URL): Promise<Response> {
+  const guard = assertCanWrite(admin);
+  if (guard) return guard;
+  const module = url.searchParams.get('module');
+  const key = url.searchParams.get('str_key');
+  if (!module || !key) return jsonError('缺少 module/str_key', 400, env);
+  const removed = await env.DB.prepare(
+    'DELETE FROM i18n_strings WHERE module = ? AND str_key = ? RETURNING locale, value'
+  ).bind(module, key).all();
+  if (removed.results.length) {
+    await writeAudit(env, request, admin, 'DELETE_I18N', {
+      type: 'i18n_strings', id: key, before: { module, str_key: key, translations: removed.results },
+    });
+  }
+  return Response.json({ success: true, deleted: removed.results.length }, { headers: getCorsHeaders(env) });
 }
 
 // ============ APK 上传（R2）============
@@ -1438,6 +1496,8 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
    */
   let m = path.match(/^\/api\/admin\/users\/([^/]+)\/points$/);
   if (m && method === 'POST') return adjustPoints(request, env, admin, m[1]);
+  m = path.match(/^\/api\/admin\/users\/([^/]+)\/reset-password$/);
+  if (m && method === 'POST') return resetAccountPassword(request, env, admin, decodeURIComponent(m[1]));
   // 封禁 / 解封用户（写操作，需 assertCanWrite）
   /**
    * POST /api/admin/users/:id/ban
@@ -1726,6 +1786,7 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
    * 用途：写 i18n_strings。鉴权：requireAdmin + assertCanWrite。请求参数(body)：str_key, locale, module, value。
    */
   if (path === '/api/admin/i18n' && method === 'POST') return createI18n(request, env, admin);
+  if (path === '/api/admin/i18n' && method === 'DELETE') return deleteTranslationGroup(request, env, admin, url);
   m = path.match(/^\/api\/admin\/i18n\/([^/]+)$/);
   /**
    * PUT /api/admin/i18n/:id —— 编辑 i18n 值

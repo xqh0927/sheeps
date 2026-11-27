@@ -364,7 +364,8 @@ Gradle 模块（见 [settings.gradle.kts](app/settings.gradle.kts)）：`:app`�
 | :--- | :--- | :--- | :--- |
 | GET | `/api/level` | 获取关卡布局（LCG 确定性可解 + 内存/KV 缓存） | 可选（带 Token 更准） |
 | POST | `/api/level/attempt` | 按开局 ID 记录关卡布局版本与开始时刻（供关卡体检统计） | 可选 |
-| POST | `/api/level/unlock` | 消耗积分解锁关卡（KV 读门槛） | 用户Token |
+| GET | `/api/level/unlock-quote?id=N` | 获取目标关配置价格及当前余额 | 用户Token |
+| POST | `/api/level/unlock` | 按确认的目标关价格收费并开放至该关；重复提交不重复扣币 | 用户Token |
 | POST | `/api/score/submit` | 提交通关成绩（加盐 SHA256 防作弊签名） | 可选 |
 | POST | `/api/score/submit-once` | 按开局 ID 幂等提交并确认离线通关成绩 | 用户Token |
 | POST | `/api/sign/today` | 每日签到领积分（连签 7 天循环奖励） | 用户Token |

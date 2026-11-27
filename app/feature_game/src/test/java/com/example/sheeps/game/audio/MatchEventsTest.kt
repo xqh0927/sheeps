@@ -70,7 +70,10 @@ class MatchEventsTest {
         assertTrue(played.isEmpty())
         assertEquals(1, state.jokerCount)
         state = state.copy(slotTiles = tray(6, 6, 9, 9, 1))
-        tools.handleUseJoker(state, text, { state = state.it() }, sound, {}, {}, {})
+        tools.handleUseJoker(state, text, { state = state.it() }, sound, {}, {}) {
+            GameLogicDelegate().processSlotMatchAndCheckEndGame(state, state.boardTiles, state.slotTiles,
+                state.movedOutTiles, state.score, state.isDoublePointsActive, { state = state.it() }, sound, {})
+        }
         assertEquals(listOf(9), played)
         assertEquals(listOf(6, 6, 1), state.slotTiles.map { it.type })
         tools.handleUseBomb(state, text, { state = state.it() }, sound, {}, {})

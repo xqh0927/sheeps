@@ -42,7 +42,7 @@ import com.example.sheeps.ui.components.ItemIcon
 import com.example.sheeps.ui.components.RemoteImage
 
 @Composable
-internal fun SkinFan(skinKey: String, modifier: Modifier = Modifier, tiles: List<String>? = null) {
+internal fun SkinFan(skinKey: String, modifier: Modifier = Modifier, tiles: List<String?>? = null) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {

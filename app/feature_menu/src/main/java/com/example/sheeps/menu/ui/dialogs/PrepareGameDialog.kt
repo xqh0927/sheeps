@@ -52,13 +52,20 @@ fun PrepareGameDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int, String) -> Unit,
     onUpdateItem: (String, Int) -> Unit,
-    onUnlock: (Int) -> Unit
+    loadUnlockQuote: suspend (Int) -> com.example.sheeps.data.model.UnlockQuote?,
+    onUnlock: (Int, Int) -> Unit
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
     val locked = levelId > state.unlockedLevel
-    val cost = ((state.unlockedLevel + 1)..levelId).fold(0) { total, stage ->
-        total + when (stage) { 2 -> 50; 3 -> 100; else -> 200 }
+    var retry by remember(levelId) { mutableStateOf(0) }
+    var quote by remember(levelId, state.unlockQuoteRevision, retry) { mutableStateOf<com.example.sheeps.data.model.UnlockQuote?>(null) }
+    var quoteFailed by remember(levelId, state.unlockQuoteRevision, retry) { mutableStateOf(false) }
+    LaunchedEffect(levelId, locked, state.unlockQuoteRevision, retry) {
+        if (locked) {
+            quote = loadUnlockQuote(levelId)
+            quoteFailed = quote == null
+        }
     }
     val selectedTypes = state.selectedCarryItems.count { it.value > 0 }
     val runId = rememberSaveable(levelId) { UUID.randomUUID().toString() }
@@ -85,9 +92,16 @@ fun PrepareGameDialog(
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 10.dp)) {
                     if (locked) {
-                        Text(stringResource(R.string.prepare_locked_desc, cost, state.points),
-                            color = colors.onSurface, style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(5.dp))
+                        val offer = quote
+                        when {
+                            offer != null -> Text(stringResource(R.string.prepare_locked_desc, offer.cost, offer.current_points),
+                                color = colors.onSurface, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(5.dp))
+                            quoteFailed -> Column {
+                                Text(stringResource(MenuR.string.personal_load_failed))
+                                TextButton(onClick = { retry++ }) { Text(stringResource(MenuR.string.personal_retry)) }
+                            }
+                            else -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                        }
                     } else {
                         if (replacedLevel != null) {
                             Text(stringResource(MenuR.string.stage_replaces_save, replacedLevel),
@@ -128,9 +142,11 @@ fun PrepareGameDialog(
                 }
                 Button(onClick = {
                     if (!locked) onConfirm(levelId, runId)
-                    else if (state.points >= cost) onUnlock(levelId)
-                    else Toaster.show(context.getString(R.string.prepare_locked_insufficient))
-                }, enabled = locked || board != null, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
+                    else quote?.let { offer ->
+                        if (offer.current_points >= offer.cost) onUnlock(levelId, offer.cost)
+                        else Toaster.show(context.getString(R.string.prepare_locked_insufficient))
+                    }
+                }, enabled = if (locked) quote != null && !state.unlockInFlight else board != null, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
                     .heightIn(min = 48.dp), shape = CircleShape) {
                     if (!locked && board == null) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

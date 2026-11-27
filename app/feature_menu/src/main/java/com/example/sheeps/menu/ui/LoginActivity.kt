@@ -149,7 +149,7 @@ class LoginActivity : BaseActivity() {
         setLoading(true)
         scope.launch {
             try {
-                val response = apiService.loginPassword(PasswordLoginRequest(phone, password))
+                val response = apiService.loginPassword(PasswordLoginRequest(phone, password, device_uuid = prefs.getUserId()))
                 if (response.success) {
                     saveLoginData(response, scope)
                 } else {

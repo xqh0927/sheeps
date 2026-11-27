@@ -226,3 +226,83 @@ test('receipted endpoint rejects missing or empty run IDs without creating a sco
   assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM leaderboard WHERE user_id = ?').bind(p.id).first()).n, 0);
   assert.deepEqual(await p.request('/api/score/submit', score), {success:true});
 });
+
+test('empty, partial, full and previously cached skin catalogs preserve face positions', async () => {
+  const p = await player();
+  const key = 'shop_items_';
+  async function readFaceLists() {
+    const catalog = await p.request('/api/shop/items');
+    return {
+      count: catalog.length,
+      faces: catalog.find(item => item.item_type === 'SKIN_HENAN').tiles
+    };
+  }
+  await env.SHEEPS_CACHE.delete(key);
+  const empty = await readFaceLists();
+  assert.deepEqual(empty.faces, []);
+
+  await env.DB.prepare('INSERT INTO skin_tiles (skin_type,tile_index,image_url) VALUES (?,?,?)')
+    .bind('henan', 7, 'https://example.com/face7.webp').run();
+  await env.SHEEPS_CACHE.delete(key);
+  const partial = await readFaceLists();
+  assert.equal(partial.count, empty.count);
+  assert.equal(partial.faces.length, 12);
+  assert.equal(partial.faces[6], 'https://example.com/face7.webp');
+  assert.ok(partial.faces.every(face => typeof face === 'string'));
+  assert.equal(partial.faces[0], '');
+
+  const oldCatalog = JSON.parse(await env.SHEEPS_CACHE.get(key));
+  const skin = oldCatalog.find(item => item.item_type === 'SKIN_HENAN');
+  skin.tiles = skin.tiles.map(url => url || null);
+  await env.SHEEPS_CACHE.put(key, JSON.stringify(oldCatalog));
+  assert.deepEqual(await readFaceLists(), partial);
+
+  const urls = Array.from({length:12}, (_, i) => 'https://example.com/face' + (i + 1) + '.webp');
+  await env.DB.batch(urls.map((url, i) => env.DB.prepare(
+    'INSERT OR REPLACE INTO skin_tiles (skin_type,tile_index,image_url) VALUES (?,?,?)'
+  ).bind('henan', i + 1, url)));
+  await env.SHEEPS_CACHE.delete(key);
+  assert.deepEqual(await readFaceLists(), {count: empty.count, faces: urls});
+});
+
+test('a rejected unlock and a stale sync cannot change progression or refund a purchase', async () => {
+  const p = await player();
+  await env.DB.prepare('UPDATE users SET points = 125 WHERE id = ?').bind(p.id).run();
+  await env.DB.prepare('INSERT INTO level_unlock VALUES (?,1,?)').bind(p.id, Date.now()).run();
+  const shop = await env.DB.prepare("SELECT id FROM shop_items WHERE item_type='UNDO'").first();
+  await p.request('/api/shop/exchange', {shop_item_id:shop.id, count:1, operation_id:crypto.randomUUID()});
+  await p.request('/api/level/unlock', {level_id:4}, 400);
+  const reconciled = await p.request('/api/user/sync', {points:125, unlocked_levels:[1,4]});
+  assert.equal(reconciled.user.points,105);
+  assert.deepEqual(reconciled.unlocked_levels,[1]);
+});
+
+test('unlock uses the quoted target price, protects against changes and charges concurrent retries once', async () => {
+  const p = await player();
+  await env.DB.prepare('UPDATE users SET points=125 WHERE id=?').bind(p.id).run();
+  await env.DB.prepare('INSERT INTO level_unlock VALUES (?,1,?)').bind(p.id,Date.now()).run();
+  const quote = () => p.request('/api/level/unlock-quote?id=3');
+  assert.equal((await quote()).cost,100);
+  await env.DB.prepare("UPDATE config SET value='1000' WHERE key='level_3_unlock_points'").run();
+  try {
+    await p.request('/api/level/unlock',{level_id:3,expected_cost:100},409);
+    assert.equal((await quote()).cost,1000);
+    await p.request('/api/level/unlock',{level_id:3,expected_cost:1000},400);
+    assert.equal((await p.request('/api/user/profile')).user.points,125);
+  } finally { await env.DB.prepare("UPDATE config SET value='100' WHERE key='level_3_unlock_points'").run(); }
+  const buy = () => p.request('/api/level/unlock',{level_id:3,expected_cost:100});
+  const bought=await Promise.all([buy(),buy()]);
+  assert.deepEqual(bought.map(r=>r.current_points),[25,25]);
+  await p.request('/api/level/unlock',{level_id:2,expected_cost:50});
+  assert.equal((await p.request('/api/user/profile')).user.points,25);
+  assert.equal((await p.request('/api/user/points-history')).filter(r=>r.type==='OUT').length,1);
+});
+
+test('all leaderboard variants return stable player ids for duplicate display names', async () => {
+  const a=await player(), b=await player();
+  for (const p of [a,b]) await p.score(31,1);
+  for (const mode of ['all','best']) {
+    const board=await a.request('/api/leaderboard?level_id=31&per_user='+mode);
+    assert.deepEqual(board.rankings.map(r=>r.user_id).sort(),[a.id,b.id].sort());
+  }
+});

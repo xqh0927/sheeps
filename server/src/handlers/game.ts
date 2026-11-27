@@ -136,50 +136,52 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(layoutJson, { headers: { ...corsHeaders, ...cacheHeaders } });
     }
 
-    /**
-     * POST /api/level/unlock — 消耗积分解锁关卡
-     *
-     * 请求头:
-     *   Authorization: Bearer <token>
-     *
-     * 请求体 (JSON):
-     *   @param {number} level_id — 目标关卡编号
-     *
-     * 响应: { success: true, current_points: <number> }
-     */
-    if (path === '/api/level/unlock' && request.method === 'POST') {
-        const authUser = await getAuthenticatedUser(request, env);
-        if (!authUser) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    const quotingUnlock = path === '/api/level/unlock-quote' && request.method === 'GET';
+    if (quotingUnlock || (path === '/api/level/unlock' && request.method === 'POST')) {
+        const auth = await getAuthenticatedUser(request, env);
+        if (!auth) return jsonError('Unauthorized', 401, env);
+        const order = quotingUnlock ? { level_id: Number(url.searchParams.get('id')) } : await request.json<{
+            level_id: number; expected_cost?: number;
+        }>();
+        if (!Number.isSafeInteger(order.level_id) || order.level_id < 1) return jsonError('Invalid level', 400, env);
 
-        const body: { level_id: number } = await request.json();
-        
-        // 从 KV 缓存读取解锁积分配置（避免 D1 查询）
-        const configKey = `level_${body.level_id}_unlock_points`;
-        const costStr = await getCachedConfig(env, configKey, body.level_id === 2 ? '50' : '200');
-        const cost = parseInt(costStr, 10);
-        
-        // 批量执行数据库事务（D1 batch 保证同批语句原子提交/回滚）：
-        // 并行查询「是否已解锁」与「用户当前积分」，避免读-改-写竞态下重复扣分
-        const [unlockCheckResult, userResult] = await env.DB.batch([
-            env.DB.prepare('SELECT 1 FROM level_unlock WHERE user_id = ? AND level_id = ?').bind(authUser.userId, body.level_id),
-            env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        const user = auth.userId, target = order.level_id;
+        const key = `level_${target}_unlock_points`;
+        const defaultPrice = String(target === 2 ? 50 : target === 3 ? 100 : 200);
+        // Target-level pricing matches the deployed economy. Earlier levels remain accessible
+        // through the highest unlocked level. Never charge twice for that range.
+        const highest = 'COALESCE((SELECT MAX(level_id) FROM level_unlock WHERE user_id = ?), 1)';
+        const configured = 'COALESCE((SELECT value FROM config WHERE key = ?), ?)';
+        const snapshot = () => env.DB.prepare(`SELECT points, ${highest} AS highest, ${configured} AS price
+            FROM users WHERE id = ?`).bind(user, key, defaultPrice, user);
+        const current = await snapshot().first<{points:number; highest:number; price:string}>();
+        if (!current) return jsonError('Player not found', 404, env);
+        const cost = Number(current.price);
+        if (!/^\d+$/.test(current.price) || !Number.isSafeInteger(cost) || cost > 2147483647) {
+            return jsonError('Invalid unlock price', 503, env);
+        }
+        const headers = { ...corsHeaders, 'Cache-Control': 'no-store' };
+        if (quotingUnlock) return Response.json({ level_id: target, cost: current.highest >= target ? 0 : cost,
+            current_points: current.points }, { headers });
+        if (current.highest >= target) return Response.json({success:true,current_points:current.points}, {headers});
+        if (order.expected_cost !== undefined && order.expected_cost !== cost) return jsonError('Unlock price changed', 409, env);
+
+        // D1 batches are serial transactions. Only a successful debit creates the ledger row
+        // and unlock; simultaneous retries see the resulting highest level without debiting.
+        const batch = await env.DB.batch([
+            env.DB.prepare(`UPDATE users SET points = points - ? WHERE id = ? AND points >= ?
+                AND ${highest} < ? AND ${configured} = ?`).bind(cost, user, cost, user, target, key, defaultPrice, current.price),
+            env.DB.prepare(`INSERT INTO point_record(user_id,type,amount,source,remaining_points,created_at)
+                SELECT id,'OUT',?,?,points,? FROM users WHERE id=? AND changes()=1`)
+                .bind(cost, `UNLOCK_LEVEL_${target}`, Date.now(), user),
+            env.DB.prepare(`INSERT INTO level_unlock(user_id,level_id,unlocked_at) SELECT ?,?,? WHERE changes()=1`)
+                .bind(user, target, Date.now()),
+            snapshot(),
         ]);
-
-        const userRow = userResult.results[0] as any;
-        // 如果已经解锁过了，直接返回成功，避免重复扣分
-        if (unlockCheckResult.results.length > 0) return new Response(JSON.stringify({ success: true, current_points: userRow?.points || 0 }), { headers: corsHeaders });
-
-        if (!userRow || userRow.points < cost) return new Response(JSON.stringify({ error: 'Insufficient points' }), { status: 400, headers: corsHeaders });
-
-        const newPoints = userRow.points - cost;
-        // 事务写入：扣除积分、写入解锁记录、写入流水账明细
-        await env.DB.batch([
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(newPoints, authUser.userId),
-            env.DB.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(authUser.userId, body.level_id, Date.now()),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'OUT', cost, `UNLOCK_LEVEL_${body.level_id}`, newPoints, Date.now())
-        ]);
-
-        return new Response(JSON.stringify({ success: true, current_points: newPoints }), { headers: corsHeaders });
+        const after = batch[3].results[0] as {points:number; highest:number; price:string};
+        if (after.highest >= target) return Response.json({success:true,current_points:after.points}, {headers});
+        if (after.price !== current.price) return jsonError('Unlock price changed', 409, env);
+        return jsonError('Insufficient points', 400, env);
     }
 
     if (path === '/api/level/attempt' && request.method === 'POST') {
@@ -302,7 +304,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 连续签到天数 + 1
         const newStreak = ((lastSignResult.results[0] as { streak: number } | undefined)?.streak || 0) + 1;
         // 连签 7 天循环奖励规则
-        const rewardPoints = rewards[Math.min(newStreak, 7) - 1] || 20;
+        const configured = rewards[(newStreak - 1) % 7];
+        const rewardPoints = Number.isFinite(configured) ? configured : 20;
 
         const task = taskResult.results[0] as {points_reward:number} | undefined;
         const taskReward = task?.points_reward ?? 0;
@@ -370,7 +373,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const perUser = url.searchParams.get('per_user') || 'best';
         const showAll = perUser === 'all';
 
-        const cacheKey = `leaderboard_${levelId}_${gameMode}_${type}_${perUser}_${page}_${limit}`;
+        const cacheKey = `leaderboard_v2_${levelId}_${gameMode}_${type}_${perUser}_${page}_${limit}`;
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
         if (cached) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
 
@@ -402,10 +405,10 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         let resultsSql: string;
         if (showAll) {
             // per_user=all：显示全部得分记录（用于无尽生存模式查看历史记录）
-            resultsSql = `SELECT l.id, u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause} ORDER BY l.score DESC, l.clear_time_ms ASC LIMIT ? OFFSET ?`;
+            resultsSql = `SELECT l.id, l.user_id, u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause} ORDER BY l.score DESC, l.clear_time_ms ASC LIMIT ? OFFSET ?`;
         } else {
             // per_user=best：每人只取最高分（防刷榜）
-            resultsSql = `SELECT username, avatar, clear_time_ms, score, achieved_at FROM (SELECT u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause}) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`;
+            resultsSql = `SELECT user_id, username, avatar, clear_time_ms, score, achieved_at FROM (SELECT l.user_id, u.username, u.avatar_url AS avatar, l.clear_time_ms, l.score, l.achieved_at, ROW_NUMBER() OVER (PARTITION BY l.user_id ORDER BY l.score DESC, l.clear_time_ms ASC) as rn FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE ${whereClause}) WHERE rn = 1 ORDER BY score DESC, clear_time_ms ASC LIMIT ? OFFSET ?`;
         }
 
         const results = await env.DB.prepare(resultsSql).bind(levelId, gameMode, timeFilter, limit, offset).all();
@@ -442,14 +445,14 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const yesterdayEnd1 = chinaToday1 - 1;
 
         // top3 可跨用户缓存
-        const top3CacheKey = 'daily_popup_top3_' + yesterdayStart1;
+        const top3CacheKey = 'daily_popup_top3_v2_' + yesterdayStart1;
         let top3Raw = await env.SHEEPS_CACHE.get(top3CacheKey);
         let top3: Array<{ username: string; points: number }>;
         if (top3Raw) {
             top3 = JSON.parse(top3Raw);
         } else {
             const top3Result = await env.DB.prepare(
-                'SELECT u.username, SUM(l.score) as points FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.achieved_at >= ?1 AND l.achieved_at <= ?2 GROUP BY l.user_id ORDER BY points DESC LIMIT 3'
+                'SELECT u.username, SUM(l.score) as points FROM leaderboard l JOIN users u ON l.user_id = u.id WHERE l.achieved_at >= ?1 AND l.achieved_at <= ?2 GROUP BY l.user_id ORDER BY points DESC, l.user_id ASC LIMIT 3'
             ).bind(yesterdayStart1, yesterdayEnd1).all();
             top3 = top3Result.results as any;
             await env.SHEEPS_CACHE.put(top3CacheKey, JSON.stringify(top3), { expirationTtl: 600 });
@@ -461,7 +464,7 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 缓存 miss 仍走原聚合查询，业务逻辑语义不变。需配合 idx_leaderboard_achieved 索引提速。
         let yesterdayRank = 0;
         if (authUser1) {
-            const rankCacheKey = `daily_popup_rank_${authUser1.userId}_${yesterdayStart1}`;
+            const rankCacheKey = `daily_popup_rank_v2_${authUser1.userId}_${yesterdayStart1}`;
             const cachedRankRaw = await env.SHEEPS_CACHE.get(rankCacheKey);
             if (cachedRankRaw !== null && cachedRankRaw !== undefined) {
                 yesterdayRank = parseInt(cachedRankRaw, 10) || 0;
@@ -470,10 +473,10 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
                     'SELECT SUM(score) as points FROM leaderboard WHERE user_id = ? AND achieved_at >= ? AND achieved_at <= ?'
                 ).bind(authUser1.userId, yesterdayStart1, yesterdayEnd1).first<{ points: number }>();
                 const points = userTotal?.points ?? 0;
-                if (points > 0) {
+                if (userTotal?.points != null) {
                     const higher = await env.DB.prepare(
-                        'SELECT COUNT(*) as cnt FROM (SELECT user_id, SUM(score) as points FROM leaderboard WHERE achieved_at >= ? AND achieved_at <= ? GROUP BY user_id HAVING points > ?)'
-                    ).bind(yesterdayStart1, yesterdayEnd1, points).first<{ cnt: number }>();
+                        'SELECT COUNT(*) as cnt FROM (SELECT user_id, SUM(score) as points FROM leaderboard WHERE achieved_at >= ? AND achieved_at <= ? GROUP BY user_id HAVING points > ?3 OR (points = ?3 AND user_id < ?4))'
+                    ).bind(yesterdayStart1, yesterdayEnd1, points, authUser1.userId).first<{ cnt: number }>();
                     yesterdayRank = (higher?.cnt ?? 0) + 1;
                 }
                 // 异步回填 KV（TTL 60s），不阻塞主流程；无成绩记为 0 也缓存，避免反复空查

@@ -69,6 +69,7 @@ class EndlessLeaderboardActivity : BaseActivity() {
 
     @Composable
     private fun EndlessLeaderboardContent() {
+        val currentPlayerId = remember { userPrefs.accountId() ?: userPrefs.getUserId() }
         var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
         var isDisabled by remember { mutableStateOf(false) }
@@ -106,7 +107,7 @@ class EndlessLeaderboardActivity : BaseActivity() {
         // 列表数据就绪后再滚动定位（避免 scrollToItem 在 LazyColumn 未组合时挂起导致永久转圈）
         LaunchedEffect(rankings) {
             if (rankings.isNotEmpty()) {
-                val myIndex = rankings.indexOfFirst { it.username == userPrefs.getUsername() }
+                val myIndex = rankings.indexOfFirst { it.user_id == currentPlayerId }
                 if (myIndex >= 0) {
                     try {
                         listState.scrollToItem(myIndex)
@@ -137,7 +138,7 @@ class EndlessLeaderboardActivity : BaseActivity() {
                 } else if (rankings.isEmpty()) {
                     RankingNotice(stringResource(R.string.leaderboard_empty), Modifier.weight(1f).fillMaxWidth())
                 } else {
-                    RankingBoard(rankings, userPrefs.getUsername(), Modifier.weight(1f).fillMaxWidth(), listState)
+                    RankingBoard(rankings, currentPlayerId, Modifier.weight(1f).fillMaxWidth(), listState)
                 }
             }
         }

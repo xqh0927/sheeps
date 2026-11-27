@@ -224,6 +224,9 @@ interface ApiService {
      * @param request 解锁请求体，包含目标关卡编号
      * @return UnlockLevelResponse 包含 success 状态及当前剩余积分
      */
+    @GET("/api/level/unlock-quote")
+    suspend fun unlockQuote(@Header("Authorization") auth: String, @Query("id") levelId: Int): com.example.sheeps.data.model.UnlockQuote
+
     @POST("/api/level/unlock")
     suspend fun unlockLevel(
         @Header("Authorization") auth: String,

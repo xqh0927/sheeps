@@ -40,6 +40,7 @@ fun GameDock(
         if (state.movedOutTiles.isNotEmpty()) {
             MovedOutTray(
                 tiles = state.movedOutTiles,
+                highlightedIds = state.highlightedTileIds,
                 currentSkin = state.currentSkin,
                 onTileClick = onTileClick
             )
@@ -62,6 +63,7 @@ fun GameDock(
 @Composable
 private fun MovedOutTray(
     tiles: List<Tile>,
+    highlightedIds: Set<String>,
     currentSkin: String,
     onTileClick: (Tile) -> Unit
 ) {
@@ -88,7 +90,8 @@ private fun MovedOutTray(
                         tile    = tile,
                         onClick = { onTileClick(tile) },
                         currentSkin = currentSkin,
-                        tileSize = 48.dp
+                        tileSize = 48.dp,
+                        isHighlighted = tile.id in highlightedIds
                     )
                 }
             }

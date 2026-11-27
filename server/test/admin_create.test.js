@@ -8,15 +8,17 @@ const { handleAdminRoutes } = require('../.tmp-test/handlers/admin');
 const { hashPassword } = require('../.tmp-test/auth-utils');
 
 let runtime, env, token;
-async function post(route, body) {
+async function adminRequest(method, route, body) {
   const url = new URL('/api/admin/' + route, 'http://localhost');
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = 'Bearer ' + token;
-  const request = new Request(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  const request = new Request(url, { method, headers, body: JSON.stringify(body) });
   const response = await handleAdminRoutes(request, env, url.pathname, url);
   assert.equal(response.status, 200);
   return response.json();
 }
+
+const post = (route, body) => adminRequest('POST', route, body);
 
 before(async () => {
   runtime = new Miniflare({
@@ -85,4 +87,64 @@ test('a failed translation write rolls back the new entity', async () => {
     name: 'rollback-fixture', item_type: 'HINT', points_price: 2,
   }), /fixture failure/);
   assert.equal(await env.DB.prepare("SELECT COUNT(*) FROM shop_items WHERE name = 'rollback-fixture'").first('COUNT(*)'), 0);
+});
+
+test('editing a task and its simplified Chinese translation publishes the same name and description', async () => {
+  const id = 'QA.TASK.ZH';
+  await post('tasks', { id, name: '原名', description: '原说明', name_en: 'English', target_count: 1, points_reward: 1 });
+  await adminRequest('PUT', 'tasks/' + id, { name: '新名', description: '新说明' });
+  for (const [field, value] of [['name', '新名'], ['description', '新说明']]) {
+    const key = 'task.' + id + '.' + field;
+    const { list } = await adminRequest('GET', 'i18n?keyword=' + encodeURIComponent(key));
+    const zh = list.find(row => row.locale === 'zh');
+    assert.equal(zh.value, value);
+    await adminRequest('PUT', 'i18n/' + zh.id, { value: value + '二' });
+    assert.equal(await env.DB.prepare('SELECT ' + field + ' FROM task WHERE id = ?').bind(id).first(field), value + '二');
+  }
+  assert.equal(await env.DB.prepare("SELECT value FROM i18n_strings WHERE str_key = ? AND locale = 'en'")
+    .bind('task.' + id + '.name').first('value'), 'English');
+});
+
+test('translation value searches return every locale of the matched key', async () => {
+  await post('tasks', { id: 'GROUP_KEY', name: '名称', name_en: 'unique-group-match', description: '说明', target_count: 1, points_reward: 1 });
+  const { list } = await adminRequest('GET', 'i18n?keyword=unique-group-match');
+  assert.deepEqual(list.map(r => r.locale).sort(), ['en', 'ja', 'ko', 'tw', 'zh']);
+  assert.ok(list.every(row => row.str_key === 'task.GROUP_KEY.name'));
+  const englishOnly = await adminRequest('GET', 'i18n?locale=en&keyword=unique-group-match');
+  assert.deepEqual(englishOnly.list.map(row => row.locale), ['en']);
+  const group = 'i18n?module=task&str_key=task.GROUP_KEY.name';
+  assert.equal((await adminRequest('DELETE', group)).deleted, 5);
+  assert.equal((await adminRequest('DELETE', group)).deleted, 0);
+  assert.equal((await adminRequest('GET', 'i18n?keyword=task.GROUP_KEY.description')).list.length, 5);
+});
+
+test('automatic and supplied administrator passwords both provision a working operator account', async () => {
+  for (const [phone, password] of [['19900009983', undefined], ['19900009984', 'local-explicit-secret']]) {
+    const account = await post('accounts', { phone, password, role: 'operator' });
+    assert.ok(account.id);
+    if (password) assert.equal(account.initialPassword, undefined);
+    else assert.ok(account.initialPassword);
+    const login = await post('login', { phone, password: password ?? account.initialPassword });
+    assert.equal(login.user.id, account.id);
+    assert.equal(login.user.role, 'operator');
+  }
+});
+
+test('historical task repair requires evidence of the last Chinese translation edit', async () => {
+  const id = 'HISTORY_TASK';
+  await post('tasks', { id, name: '原名称', description: '原说明', target_count: 1, points_reward: 5 });
+  const { list } = await adminRequest('GET', 'i18n?keyword=task.HISTORY_TASK.name&locale=zh');
+  await adminRequest('PUT', 'i18n/' + list[0].id, { value: '已确认的名称' });
+  // Recreate a pre-fix one-sided edit and a second disagreement without audit evidence.
+  await env.DB.prepare('UPDATE task SET name = ? WHERE id = ?').bind('原名称', id).run();
+  await env.DB.prepare("UPDATE i18n_strings SET value = ? WHERE locale = 'zh' AND str_key = ?")
+    .bind('未核实说明', 'task.HISTORY_TASK.description').run();
+  const migration = readFileSync(join(__dirname, '../migrations/0014_task_zh_publication.sql'), 'utf8');
+  for (let run = 0; run < 2; run++) {
+    await env.DB.batch(splitSql(migration).map(sql => env.DB.prepare(sql)));
+    const task = await env.DB.prepare('SELECT name, description FROM task WHERE id = ?').bind(id).first();
+    assert.deepEqual(task, { name: '已确认的名称', description: '原说明' });
+    assert.equal(await env.DB.prepare("SELECT value FROM i18n_strings WHERE locale = 'zh' AND str_key = ?")
+      .bind('task.HISTORY_TASK.description').first('value'), '未核实说明');
+  }
 });

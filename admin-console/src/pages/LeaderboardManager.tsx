@@ -310,12 +310,15 @@ export default function LeaderboardManager() {
         <DialogTitle>{dialog?.mode === 'edit' ? '编辑分数' : '手动新增排行榜行'}</DialogTitle>
         <DialogContent sx={{ mt: 1 }}>
           <Box sx={{ mb: 1 }}>
-            <UserPicker
+            {dialog?.mode === 'edit' ? (
+              <TextField fullWidth size="small" label="用户" value={form.username || form.user_id}
+                InputProps={{ readOnly: true }} />
+            ) : <UserPicker
               value={form.user_id}
               initialLabel={form.username}
               label="用户（手机号/昵称搜索）"
               onChange={(userId, username) => setForm((p) => ({ ...p, user_id: userId, username: username || '' }))}
-            />
+            />}
           </Box>
           <TextField
             fullWidth

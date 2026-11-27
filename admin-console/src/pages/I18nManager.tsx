@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -24,7 +24,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { Add, Edit, Delete, Search } from '@mui/icons-material';
-import { listI18n, createI18n, updateI18n, deleteI18n, I18nRow } from '../api/admin';
+import { listI18n, createI18n, updateI18n, deleteI18nGroup, I18nRow } from '../api/admin';
 import { extractError } from '../api/client';
 import { useAuth } from '../store/auth';
 import { useFeedback } from '../components/feedback';
@@ -75,7 +75,8 @@ interface I18nGroup {
 function groupRows(rows: I18nRow[]): I18nGroup[] {
   const map = new Map<string, I18nGroup>();
   for (const r of rows) {
-    let g = map.get(r.str_key);
+    const key = JSON.stringify([r.module, r.str_key]);
+    let g = map.get(key);
     if (!g) {
       g = {
         str_key: r.str_key,
@@ -85,7 +86,7 @@ function groupRows(rows: I18nRow[]): I18nGroup[] {
         values: {},
         latestUpdatedAt: r.updated_at,
       };
-      map.set(r.str_key, g);
+      map.set(key, g);
     }
     g.values[r.locale] = r;
     if (r.updated_at && (g.latestUpdatedAt === null || r.updated_at > g.latestUpdatedAt)) {
@@ -129,6 +130,7 @@ export default function I18nManager() {
   const { show, Feedback } = useFeedback();
 
   // 服务端返回的原始多语言行（按条存储，未聚合）
+  const latestLoad = useRef(0);
   const [rows, setRows] = useState<I18nRow[]>([]);
   // 服务端分页总数（按条计数；前端聚合后实际分页基于 groups 长度）
   const [total, setTotal] = useState(0);
@@ -173,19 +175,18 @@ export default function I18nManager() {
     [groups, page, pageSize]
   );
 
-  // 拉取多语言行（服务端按条分页）：依赖 module/keyword/show
-  // 注意：total 为按条计数，前端聚合后真正分页基于 groups 长度（见 paginatedGroups）
+  // 先在服务端匹配整个键，再在客户端按分组分页。
   const load = useCallback(() => {
+    const request = ++latestLoad.current;
     setLoading(true);
-    // 后端不再分页，返回全部匹配行；前端按 str_key 聚合后做客户端分页。
-    // 补充说明：listI18n 走服务端分页（PageResult），这里取回当前页行后，前端再按 str_key 聚合、对聚合后的分组做客户端切片分页。
     listI18n({ module: module || undefined, keyword: keyword || undefined })
       .then((d) => {
+        if (request !== latestLoad.current) return;
         setRows(d.list);
         setTotal(d.total);
       })
-      .catch((e) => show(extractError(e), 'error'))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (request === latestLoad.current) show(extractError(e), 'error'); })
+      .finally(() => { if (request === latestLoad.current) setLoading(false); });
   }, [module, keyword, show]);
 
   // 页面挂载及依赖变化时重新加载
@@ -267,13 +268,12 @@ export default function I18nManager() {
   };
 
   // ============ 删除（整行：组内所有语言） ============
-  // 删除：收集该 str_key 下所有语言记录 id，并发调用 deleteI18n 整行删除
+  // 服务端按模块与键一次删除所有语言。
   const handleDeleteGroup = async () => {
     if (!deleteGroup) return;
     setBusy(true);
     try {
-      const ids = Object.values(deleteGroup.values).map((r) => r.id);
-      await Promise.all(ids.map((id) => deleteI18n(id)));
+      await deleteI18nGroup(deleteGroup.module, deleteGroup.str_key);
       show('已删除', 'success');
       setDeleteGroup(null);
       load();
@@ -374,7 +374,7 @@ export default function I18nManager() {
                   const { entity, field } = parseStrKey(g.str_key, g.module);
                   const configured = LOCALES.filter((l) => g.values[l.value]).length;
                   return (
-                    <TableRow key={g.str_key}>
+                    <TableRow key={JSON.stringify([g.module, g.str_key])}>
                       <TableCell>{moduleLabel(g.module)}</TableCell>
                       <TableCell>{entity}</TableCell>
                       <TableCell>{field}</TableCell>

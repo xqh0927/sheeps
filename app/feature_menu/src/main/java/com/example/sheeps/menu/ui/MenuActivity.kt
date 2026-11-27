@@ -410,6 +410,7 @@ class MenuActivity : BaseActivity() {
                                     PrepareGameDialog(
                                         levelId = showPrepareDialog!!,
                                         stageBoards = stageBoards,
+                                        loadUnlockQuote = viewModel::unlockQuote,
                                         replacedLevel = savedStage?.level,
                                         userId = userPrefs.getUserId().toIntOrNull() ?: 0,
                                         state = state,
@@ -437,10 +438,10 @@ class MenuActivity : BaseActivity() {
                                                 )
                                             )
                                         },
-                                        onUnlock = { lvl ->
+                                        onUnlock = { lvl, quotedCost ->
                                             viewModel.sendIntent(
                                                 MenuViewIntent.UnlockLevelWithPoints(
-                                                    lvl
+                                                    lvl, quotedCost
                                                 )
                                             )
                                         }

@@ -84,6 +84,8 @@ class UserRepository @Inject constructor(
             .also { if (!it.success) throw BusinessException("任务领奖失败") }
     }
 
+    suspend fun unlockQuote(levelId: Int) = call { apiService.unlockQuote(auth(), levelId) }
+
     suspend fun unlockLevel(req: UnlockLevelRequest): ApiResult<UnlockLevelResponse> = call {
         apiService.unlockLevel(auth(), req)
             .also { if (!it.success) throw BusinessException("解锁关卡失败") }

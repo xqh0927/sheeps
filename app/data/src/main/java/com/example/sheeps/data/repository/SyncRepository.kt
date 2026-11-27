@@ -53,8 +53,8 @@ class SyncRepository @Inject constructor(
             val batches = pending.chunked(40).ifEmpty { listOf(emptyList()) }
             for ((index, ops) in batches.withIndex()) {
                 val request = SyncRequest(
-                    points = if (index == 0 && dirtyProfiles.isNotEmpty()) userPreferences.getPoints() else 0,
-                    unlocked_levels = if (index == 0) dirtyProgress.map { it.levelId } else emptyList(),
+                    points = 0,
+                    unlocked_levels = emptyList(),
                     consumptions = ops.map { ItemConsumption(it.operationId, it.itemType, it.quantity) }
                 )
                 val result = when (val call = tokenRefresher.authenticated(token) { auth -> apiService.syncData(auth, request) }) {
@@ -66,8 +66,13 @@ class SyncRepository @Inject constructor(
                 if (ops.isNotEmpty() && confirmed.isEmpty()) return@withLock // Older Worker: keep the durable operations.
                 localDao.replaceCloudInventory(owner, result.items, confirmed.toList())
                 if (index == 0) {
-                    dirtyProgress.forEach { localDao.clearProgressDirty(it.levelId) }
-                    dirtyProfiles.forEach { localDao.clearProfileDirty(it.userId) }
+                    val now = System.currentTimeMillis()
+                    localDao.setConfirmedPoints(owner, result.user.points, now)
+                    localDao.replaceCloudProgress(owner, result.unlocked_levels.map { UserProgressEntity(it, 0, 0, false, now) })
+                    if (userPreferences.accountId() == owner) {
+                        userPreferences.setPoints(result.user.points)
+                        userPreferences.setUnlockedLevel(localDao.getAllProgress().maxOfOrNull { it.levelId } ?: 1)
+                    }
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -120,6 +125,9 @@ class SyncRepository @Inject constructor(
                     )
                 }
                 localDao.replaceCloudProgress(owner, progressList)
+                if (userPreferences.accountId() == owner) {
+                    userPreferences.setUnlockedLevel(localDao.getAllProgress().maxOfOrNull { it.levelId } ?: 1)
+                }
 
                 // A missing acknowledgement may mean that D1 already applied the debit.
                 // Preserve the local view until sync retries the exact same operations.

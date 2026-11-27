@@ -258,7 +258,7 @@
     <string name="guide_sec2_title">二、辅助道具说明</string>
     <string name="guide_sec2_desc">移出道具：将槽位最左侧的三张卡牌移出到备用区。\n洗牌道具：随机重新打乱当前盘面上所有的卡牌。\n撤销道具：收回最近一次点击的卡牌，让其回到原位。</string>
     <string name="guide_sec3_title">三、金币获取途径</string>
-    <string name="guide_sec3_desc">每日完成签到可以稳步获得金币。首次通关主线关卡也会奖励大量金币。此外，参与在线对战并在胜局中击败对手是获得金币和积分的绝佳途径！</string>
+    <string name="guide_sec3_desc">每日签到和完成每日任务可以获得金币。你可以在「金币明细」查看每笔奖励。</string>
     <string name="guide_sec4_title">四、道具兑换商店</string>
     <string name="guide_sec4_desc">收集的金币可以在“商店”中兑换各种实用的关卡道具（如洗牌、撤销等），或者兑换包含丰富主题效果的定制卡牌皮肤。</string>
     <string name="guide_sec5_title">五、在线匹配对战规则</string>

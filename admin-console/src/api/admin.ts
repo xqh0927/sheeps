@@ -72,6 +72,10 @@ export const listUsers = (page = 1, pageSize = 20, keyword = '', role = '', pend
 export const adjustPoints = (id: string, amount: number, reason?: string) =>
   api.post(`/api/admin/users/${id}/points`, { amount, reason }).then((r) => r.data);
 
+/** 仅超级管理员：使用 Worker Secret 重置目标登录密码。 */
+export const resetUserPassword = (id: string) =>
+  api.post<{ success: boolean }>(`/api/admin/users/${encodeURIComponent(id)}/reset-password`).then((r) => r.data);
+
 /** POST /api/admin/users/:id/ban —— 封禁/解封用户（banned=true 封禁）。 */
 export const banUser = (id: string, banned: boolean) =>
   api.post(`/api/admin/users/${id}/ban`, { banned }).then((r) => r.data);
@@ -199,7 +203,7 @@ export const updateConfig = (key: string, value: string) =>
 // ============ 管理员账户（super） ============
 /** POST /api/admin/accounts —— 新建后台账号（仅 super 可用）。 */
 export const createAccount = (phone: string, role: string, password?: string) =>
-  api.post('/api/admin/accounts', { phone, role, password }).then((r) => r.data);
+  api.post<{ success: boolean; id: string; initialPassword?: string }>('/api/admin/accounts', { phone, role, password }).then((r) => r.data);
 
 /** PUT /api/admin/accounts/:id/role —— 修改账号角色（仅 super 可用）。 */
 export const setAccountRole = (id: string, role: string) =>
@@ -318,9 +322,13 @@ export const createI18n = (body: Record<string, any>) =>
 export const updateI18n = (id: number | string, body: Record<string, any>) =>
   api.put(`/api/admin/i18n/${id}`, body).then((r) => r.data);
 
-/** DELETE /api/admin/i18n/:id —— 删除文案条目。 */
+/** 删除单条语言记录。 */
 export const deleteI18n = (id: number | string) =>
   api.delete(`/api/admin/i18n/${id}`).then((r) => r.data);
+
+/** 删除指定模块下整个键的所有语言。 */
+export const deleteI18nGroup = (module: string, str_key: string) =>
+  api.delete(`/api/admin/i18n${buildQuery({ module, str_key })}`).then((r) => r.data);
 
 // ============ 排行榜管理 ============
 export interface LeaderboardRow {

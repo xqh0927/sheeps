@@ -221,7 +221,7 @@
     <string name="guide_sec2_title">2. お助けアイテム</string>
     <string name="guide_sec2_desc">一時退避：左側の3枚を一時的にスロット外に退避します。\nシャッフル：残りのカードをランダムに並び替えます。\n元に戻す：直前の操作を取り消します。</string>
     <string name="guide_sec3_title">3. コインの獲得</string>
-    <string name="guide_sec3_desc">毎日のログインボーナスや、ステージの初クリアでコインを獲得できます。対戦モードで勝利することでも大量 of コインを獲得できます！</string>
+    <string name="guide_sec3_desc">毎日のチェックインやデイリータスクの達成でコインを獲得できます。獲得した報酬はコイン履歴で確認できます。</string>
     <string name="item_skin_henan">河南グルメ</string>
     <string name="item_skin_sichuan">四川グルメ</string>
     <string name="item_skin_electronic">デジタルガジェット</string>

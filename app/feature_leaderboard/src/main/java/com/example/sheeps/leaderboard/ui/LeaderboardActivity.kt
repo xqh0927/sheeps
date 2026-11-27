@@ -80,6 +80,7 @@ class LeaderboardActivity : BaseActivity() {
         setContent {
             SheepsTheme {
                 var selectedTab by remember { mutableStateOf("history") }
+                val currentPlayerId = remember { userPrefs.accountId() ?: userPrefs.getUserId() }
                 var rankings by remember { mutableStateOf<List<RankingEntry>>(emptyList()) }
                 var isLoading by remember { mutableStateOf(false) }
                 var showRulesDialog by remember { mutableStateOf(false) }
@@ -153,7 +154,7 @@ class LeaderboardActivity : BaseActivity() {
                             if (rankings.isEmpty()) {
                                 RankingNotice(stringResource(R.string.leaderboard_empty), Modifier.weight(1f).fillMaxWidth())
                             } else {
-                                RankingBoard(rankings, userPrefs.getUsername(), Modifier.weight(1f).fillMaxWidth())
+                                RankingBoard(rankings, currentPlayerId, Modifier.weight(1f).fillMaxWidth())
                             }
                         }
                     }

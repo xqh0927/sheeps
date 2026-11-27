@@ -114,12 +114,16 @@ export async function requireAdmin(request: Request, env: Env): Promise<AdminPay
     return jsonError('无效的管理员凭证', 401, env);
   }
 
-  // 封禁状态可能晚于 token 签发发生变化，查库二次确认
-  const row = await env.DB.prepare('SELECT is_banned FROM users WHERE id = ?').bind(payload.userId).first<{ is_banned: number }>();
+  // 角色和封禁状态都可能在签发令牌后发生变更。
+  const row = await env.DB.prepare('SELECT is_banned, role FROM users WHERE id = ?')
+    .bind(payload.userId).first<{ is_banned: number; role: string }>();
   if (!row || row.is_banned === 1) {
     return jsonError('管理员账号已被封禁', 401, env);
   }
 
+  if (row.role !== payload.role) {
+    return jsonError('管理员角色已变更，请重新登录', 403, env);
+  }
   return payload as AdminPayload;
 }
 

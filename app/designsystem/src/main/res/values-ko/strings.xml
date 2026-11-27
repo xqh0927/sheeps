@@ -221,7 +221,7 @@
     <string name="guide_sec2_title">2. 보조 아이템</string>
     <string name="guide_sec2_desc">밖으로 빼기: 슬롯의 첫 3장을 임시 구역으로 뺍니다.\n셔플: 보드의 모든 남은 카드를 무작위로 섞습니다.\n되돌리기: 직전의 탭 작업을 취소합니다.</string>
     <string name="guide_sec3_title">3. 코인 획득</string>
-    <string name="guide_sec3_desc">일일 출석과 스테이지 첫 클리어를 통해 코인을 얻을 수 있습니다. 대전 모드에서 승리해도 코인을 지급받습니다!</string>
+    <string name="guide_sec3_desc">매일 출석하고 일일 과제를 완료하면 코인을 받을 수 있습니다. 코인 내역에서 각 보상을 확인하세요.</string>
     <string name="guide_sec4_title">4. 상점 교환</string>
     <string name="guide_sec4_desc">모은 코인은 상점에서 아이템이나 특별한 카드 스킨으로 교환할 수 있습니다.</string>
     <string name="guide_sec5_title">5. 대전 규칙</string>

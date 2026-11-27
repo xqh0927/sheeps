@@ -4,7 +4,6 @@ import com.example.sheeps.ui.R
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.local.UserProfileEntity
-import com.example.sheeps.data.local.UserProgressEntity
 import com.example.sheeps.data.model.ExchangeRequest
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.data.model.TaskClaimRequest
@@ -151,21 +150,19 @@ class SocialActionDelegate @Inject constructor(
                     onComplete()
                 }
                 is ApiResult.Error -> {
-                    setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
+                    // Each confirmation has a fresh operation ID. A skin conflict means another device already unlocked it.
+                    val message = if (item.item_type.startsWith("SKIN_") && result.code == 409) {
+                        R.string.skin_unlocked
+                    } else {
+                        ErrorMessageMapper.toResId(result.code)
+                    }
+                    setEffect(MenuViewEffect.ShowToast(resId = message))
                     onComplete()
                 }
             }
         }
     }
 
-    /**
-     * 处理任务领奖（本地先加分，再同步云端）。
-     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
-     * @param taskId 任务 ID。
-     * @param dailyTasks 当前任务列表（用于定位任务并校验已完成/未领奖）。
-     * @param onComplete 完成后的刷新回调。
-     * @param setEffect 派发领奖成功/失败 Toast。
-     */
     fun handleClaimTask(
         scope: CoroutineScope,
         taskId: String,
@@ -173,88 +170,35 @@ class SocialActionDelegate @Inject constructor(
         onComplete: () -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
+        val owner = prefs.accountId() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
         val task = dailyTasks.find { it.task_id == taskId } ?: return
-
         if (!task.is_completed || task.is_rewarded) return
-
         scope.launch {
-            // 本地积分入账（乐观更新，本地 IO）
-            val currentPoints = prefs.getPoints() + task.points_reward
-            prefs.setPoints(currentPoints)
-            updateLocalPoints(currentPoints, true)
-
-            // 同步云端（统一错误闸门）
             when (val result = userRepository.claimTaskReward(TaskClaimRequest(taskId))) {
-                is ApiResult.Success -> {
+                is ApiResult.Success -> if (prefs.accountId() == owner) {
+                    localDao.setConfirmedPoints(owner, result.data.current_points, System.currentTimeMillis())
+                    if (prefs.accountId() == owner) prefs.setPoints(result.data.current_points)
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_task_claim_success))
-                    localDao.clearProfileDirty(prefs.accountId() ?: prefs.getUserId())
-                    onComplete()
                 }
-                is ApiResult.Error -> {
-                    setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
-                    onComplete()
-                }
+                is ApiResult.Error -> setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
             }
+            onComplete()
         }
     }
 
-    /**
-     * 使用积分手动解锁关卡（本地先扣积分并解锁，再同步云端）。
-     * @param scope 协程作用域（MenuViewModel.viewModelScope）。
-     * @param levelId 目标关卡 ID，费用按 ID 阶梯计算（2→50，3→100，其余→200）。
-     * @param onComplete 云端失败时刷新回调。
-     * @param setEffect 派发解锁成功/失败/积分不足 Toast。
-     */
-    fun handleUnlockLevelWithPoints(
-        scope: CoroutineScope,
-        levelId: Int,
-        onComplete: () -> Unit,
-        setEffect: (MenuViewEffect) -> Unit
-    ) {
-        val token = prefs.getToken() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
-
-        val cost = when (levelId) {
-            2 -> 50
-            3 -> 100
-            else -> 200
-        }
-
-        if (prefs.getPoints() < cost) {
-            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_failed_insufficient))
-            return
-        }
-
-        scope.launch {
-            // 本地解锁（乐观更新，本地 IO）
-            val currentPoints = prefs.getPoints() - cost
-            prefs.setPoints(currentPoints)
-            prefs.setUnlockedLevel(max(prefs.getUnlockedLevel(), levelId))
-
-            val now = System.currentTimeMillis()
-            updateLocalPoints(currentPoints, true, now)
-            localDao.insertProgress(
-                UserProgressEntity(
-                    levelId = levelId,
-                    score = 0,
-                    clearTime = 0,
-                    isDirty = true,
-                    updateTimestamp = now
-                )
-            )
-
-            // 同步云端（统一错误闸门）
-            when (val result = userRepository.unlockLevel(UnlockLevelRequest(levelId))) {
-                is ApiResult.Success -> {
+    suspend fun unlockLevel(levelId: Int, expectedCost: Int, setEffect: (MenuViewEffect) -> Unit) {
+        val owner = prefs.accountId() ?: return setEffect(MenuViewEffect.ShowLoginActivity)
+        when (val result = userRepository.unlockLevel(UnlockLevelRequest(levelId, expectedCost))) {
+            is ApiResult.Success -> if (prefs.accountId() == owner) {
+                val points = result.data.current_points
+                localDao.applyUnlockReceipt(owner, levelId, points, System.currentTimeMillis())
+                if (prefs.accountId() == owner) {
+                    prefs.setPoints(points)
+                    prefs.setUnlockedLevel(max(prefs.getUnlockedLevel(), levelId))
                     setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_unlock_success_level, formatArgs = listOf(levelId)))
-                    localDao.clearProfileDirty(prefs.accountId() ?: prefs.getUserId())
-                    localDao.clearProgressDirty(levelId)
-                }
-                is ApiResult.Error -> {
-                    setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
-                    onComplete()
                 }
             }
+            is ApiResult.Error -> setEffect(MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code)))
         }
     }
 

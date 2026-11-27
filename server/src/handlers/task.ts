@@ -118,28 +118,21 @@ export async function handleTaskRoutes(request: Request, env: Env, path: string,
         if (!body.task_id) return new Response(JSON.stringify({ error: 'Missing task ID' }), { status: 400, headers: corsHeaders });
 
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        // DB：单 batch 读取 user_task 进度（是否完成/已领）、task 奖励积分、users 当前积分，作为领取前置校验
-        const [userTaskResult, taskResult, userResult] = await env.DB.batch([
-            env.DB.prepare('SELECT is_completed, is_rewarded FROM user_task WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
-            env.DB.prepare('SELECT points_reward FROM task WHERE id = ?').bind(body.task_id),
-            env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+        // changes() gates the following statement on this transaction actually claiming the task.
+        const id = authUser.userId;
+        const task = body.task_id;
+        const now = Date.now();
+        const [claim, balance] = await env.DB.batch<{points:number}>([
+            env.DB.prepare(`UPDATE user_task SET is_rewarded=1 WHERE user_id=? AND task_id=? AND task_date=?
+                AND is_completed=1 AND is_rewarded=0`).bind(id,task,chinaToday),
+            env.DB.prepare(`UPDATE users SET points=points+(SELECT points_reward FROM task WHERE id=?)
+                WHERE id=? AND changes()=1 RETURNING points`).bind(task,id),
+            env.DB.prepare(`INSERT INTO point_record (user_id,type,amount,source,remaining_points,created_at)
+                SELECT u.id,'IN',t.points_reward,'DAILY_TASK_'||t.id,u.points,? FROM users u, task t
+                WHERE u.id=? AND t.id=? AND changes()=1`).bind(now,id,task)
         ]);
-
-        const userTask = userTaskResult.results[0] as any;
-        // 参数校验（幂等防护）：任务必须「已完成且尚未领取」，否则返回 400；重复领取会被 is_rewarded 拦截，避免重复发奖
-        if (!userTask || userTask.is_completed === 0 || userTask.is_rewarded === 1) return new Response(JSON.stringify({ error: 'Task not completed or already rewarded' }), { status: 400, headers: corsHeaders });
-
-        const reward = (taskResult.results[0] as any)?.points_reward || 10;
-        const remainingPoints = ((userResult.results[0] as any)?.points || 0) + reward;
-
-        // 事务边界：标记 user_task.is_rewarded=1、累加 users.points、写 point_record 流水（source=DAILY_TASK_<id>），三写合并单 batch 原子提交，确保发奖与记账一致
-        await env.DB.batch([
-            env.DB.prepare('UPDATE user_task SET is_rewarded = 1 WHERE user_id = ? AND task_id = ? AND task_date = ?').bind(authUser.userId, body.task_id, chinaToday),
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(remainingPoints, authUser.userId),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', reward, `DAILY_TASK_${body.task_id}`, remainingPoints, Date.now())
-        ]);
-
-        return new Response(JSON.stringify({ success: true, current_points: remainingPoints }), { headers: corsHeaders });
+        if (!claim.meta.changes) return new Response(JSON.stringify({error:'Task not completed or already rewarded'}), {status:400, headers:corsHeaders});
+        return new Response(JSON.stringify({success:true, current_points:balance.results[0].points}), {headers:corsHeaders});
     }
 
     return null;

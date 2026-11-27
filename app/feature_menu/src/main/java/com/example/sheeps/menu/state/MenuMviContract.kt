@@ -15,6 +15,8 @@ data class MenuViewState(
     val isLoading: Boolean = false,
     /** 首次商城请求尚未完成，加载提示只显示在商城页。 */
     val isShopLoading: Boolean = true,
+    val unlockInFlight: Boolean = false,
+    val unlockQuoteRevision: Int = 0,
     /** 当前用户是否已登录 */
     val isLoggedIn: Boolean = false,
     /** 用户昵称 */
@@ -122,7 +124,7 @@ sealed interface MenuViewIntent {
     /** 领取已完成任务的积分奖励 */
     data class ClaimTask(val taskId: String) : MenuViewIntent
     /** 使用积分强行解锁指定关卡 */
-    data class UnlockLevelWithPoints(val levelId: Int) : MenuViewIntent
+    data class UnlockLevelWithPoints(val levelId: Int, val expectedCost: Int) : MenuViewIntent
     /** 备战阶段更新携带道具的数量 */
     data class UpdateCarryItem(val itemType: String, val change: Int) : MenuViewIntent
     /** 清空当前选择的携带道具 */

@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:ui": "node --test test/admin-workflows.test.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
@@ -24,6 +25,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "playwright": "1.62.1",
     "typescript": "^5.4.5",
     "vite": "^5.4.21"
   }

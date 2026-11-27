@@ -208,6 +208,16 @@ interface LocalDao {
     @Query("SELECT * FROM user_profile WHERE userId = :userId")
     suspend fun profileById(userId: String): UserProfileEntity?
 
+    @Query("UPDATE user_profile SET points = :points, isDirty = 0, updateTimestamp = :now WHERE userId = :owner")
+    suspend fun setConfirmedPoints(owner: String, points: Int, now: Long): Int
+
+    @Transaction
+    suspend fun applyUnlockReceipt(owner: String, level: Int, points: Int, now: Long) {
+        if (setConfirmedPoints(owner, points, now) == 1) {
+            unlockIfMissing(UserProgressEntity(level, 0, 0, false, now))
+        }
+    }
+
     @Query("UPDATE user_profile SET username = :name WHERE userId = :userId")
     suspend fun renameProfile(userId: String, name: String)
 

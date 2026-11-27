@@ -6,7 +6,6 @@ import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.GameViewEffect
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.game.state.GameHistoryState
-import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.SoundType
 import javax.inject.Inject
 
@@ -38,10 +37,28 @@ class GameToolDelegate @Inject constructor() {
                 movedOutTiles = prev.movedOutTiles,
                 sealedClearCount = prev.sealedClearCount,
                 sealedUnlockedIds = prev.sealedUnlockedIds,
+                score = prev.score ?: scoreBeforeLegacyUndo(state, prev),
+                highlightedTileIds = emptySet(),
                 undoCount = state.undoCount - 1
             )
         }
         setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
+    }
+
+    // Older snapshots persisted the score only for the live board. Normal triples
+    // advanced the seal counter; legacy jokers removed a pair without advancing it.
+    private fun scoreBeforeLegacyUndo(state: GameViewState, previous: GameHistoryState): Int {
+        val matches = state.sealedClearCount / 3
+        val undoneMatches = (matches - previous.sealedClearCount / 3).coerceAtLeast(0)
+        val extraHundreds = (state.score / 100 - matches).coerceAtLeast(0)
+        if (undoneMatches > 0) {
+            val doubles = if (state.isDoublePointsActive) minOf(extraHundreds, undoneMatches) else 0
+            return (state.score - 100 * (undoneMatches + doubles)).coerceAtLeast(0)
+        }
+        val removed = previous.slotTiles.filter { old -> state.slotTiles.none { it.id == old.id } }
+        val removedPair = state.slotTiles.size == previous.slotTiles.size - 2 &&
+            removed.size == 2 && removed[0].type == removed[1].type
+        return if (extraHundreds > 0 && removedPair) state.score - 100 else state.score
     }
 
     /**
@@ -118,72 +135,31 @@ class GameToolDelegate @Inject constructor() {
     ) {
         if (state.hintCount <= 0) return
 
-        val active = state.boardTiles.filter { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
-        if (active.isEmpty()) {
-            setEffect(GameViewEffect.ShowToast(getLocalizedString("棋盘上已无成组之卡牌！", "No more matching groups on board!", "棋盤上已無成組之卡牌！", "ボード上に一致するグループはありません！", "보드에 일치하는 그룹이 없습니다!")))
-            return
-        }
-
-        // 1. 优先从已有卡槽（slotTiles）中的牌寻找匹配
-        var targetIds = emptySet<String>()
-        val slotCounts = state.slotTiles.groupBy { it.type }.mapValues { it.value.size }
-        val sortedSlotTypes = slotCounts.entries.sortedByDescending { it.value }
-
-        for (entry in sortedSlotTypes) {
-            val type = entry.key
-            val needed = 3 - entry.value
-            if (needed <= 0) continue
-
-            // 寻找棋盘上该图案的卡牌
-            val boardTilesOfType = active.filter { it.type == type }
-            if (boardTilesOfType.size >= needed) {
-                // 优先选择 NORMAL（未遮挡）的卡牌，其次选择 BLOCKED（遮挡）的
-                val sortedBoardTiles = boardTilesOfType.sortedWith(compareBy {
-                    if (it.state == TileState.NORMAL) 0 else 1
-                })
-                targetIds = sortedBoardTiles.take(needed).map { it.id }.toSet()
-                break
+        val available = state.boardTiles.filter { it.state == TileState.NORMAL && it.sealedCount == 0 } +
+            state.movedOutTiles
+        val slotCounts = state.slotTiles.groupingBy { it.type }.eachCount()
+        val freeSlots = 7 - state.slotTiles.size
+        val match = available.groupBy { it.type }.entries
+            .sortedByDescending { slotCounts[it.key] ?: 0 }
+            .firstNotNullOfOrNull { (type, tiles) ->
+                val needed = 3 - (slotCounts[type] ?: 0)
+                if (needed in 1..freeSlots && tiles.size >= needed) tiles.take(needed) else null
             }
-        }
-
-        // 2. 如果卡槽中没有可匹配的牌，或者卡槽为空，则寻找棋盘上能凑成 3 张的组合
-        if (targetIds.isEmpty()) {
-            val groups = active.groupBy { it.type }.values.filter { it.size >= 3 }
-            if (groups.isNotEmpty()) {
-                // 评分机制：计算每组 3 张牌中，有多少张是处于 NORMAL (可直接点击) 状态的
-                // 优先高亮最容易点击、被遮挡最少的组合
-                val bestGroup = groups.maxByOrNull { group ->
-                    val sorted = group.sortedWith(compareBy {
-                        if (it.state == TileState.NORMAL) 0 else 1
-                    }).take(3)
-                    sorted.count { it.state == TileState.NORMAL }
-                }
-                if (bestGroup != null) {
-                    val sortedGroup = bestGroup.sortedWith(compareBy {
-                        if (it.state == TileState.NORMAL) 0 else 1
-                    })
-                    targetIds = sortedGroup.take(3).map { it.id }.toSet()
-                }
-            }
-        }
-
-        // 3. 兜底寻找：任意一组 3 张的卡牌
-        if (targetIds.isEmpty()) {
-            val fallbackGroup = active.groupBy { it.type }.values.find { it.size >= 3 }
-            if (fallbackGroup != null) {
-                targetIds = fallbackGroup.take(3).map { it.id }.toSet()
-            }
-        }
-
-        if (targetIds.isEmpty()) {
-            setEffect(GameViewEffect.ShowToast(getLocalizedString("棋盘上已无成组之卡牌！", "No more matching groups on board!", "棋盤上已無成組之卡牌！", "ボード上に一致するグループはありません！", "보드에 일치하는 그룹이 없습니다!")))
+        if (match == null) {
+            setEffect(GameViewEffect.ShowToast(getLocalizedString(
+                "当前没有可以立即消除的组合，提示次数已保留。",
+                "No immediate match is available. Your hint was saved.",
+                "目前沒有可立即消除的組合，提示次數已保留。",
+                "今すぐ消せる組み合わせがありません。ヒントは消費されません。",
+                "지금 맞출 수 있는 조합이 없습니다. 힌트는 소모되지 않았습니다."
+            )))
             return
         }
 
         onToolUsed()
         updateState {
             copy(
-                highlightedTileIds = targetIds,
+                highlightedTileIds = match.map { it.id }.toSet(),
                 hintCount = state.hintCount - 1
             )
         }
@@ -255,59 +231,23 @@ class GameToolDelegate @Inject constructor() {
         onAddHistory()
         val targetType = targetEntry.key
 
-        // 2. 准备棋盘与置物架数据
-        val newMovedOutTiles = state.movedOutTiles.toMutableList()
-        val newBoardTiles = state.boardTiles.map { it.copy() }
-        var eliminatedFromOutside = false
-
-        // 优先从移出置物架（movedOutTiles）中寻找 1 张并移除
-        val movedOutMatching = newMovedOutTiles.firstOrNull { it.type == targetType }
-        if (movedOutMatching != null) {
-            newMovedOutTiles.remove(movedOutMatching)
-            eliminatedFromOutside = true
-        }
-
-        // 如果移出置物架中没有，则从棋盘中找一张（优先找 NORMAL/BLOCKED 状态的）
-        if (!eliminatedFromOutside) {
-            val boardMatching = newBoardTiles.firstOrNull {
-                it.type == targetType && (it.state == TileState.NORMAL || it.state == TileState.BLOCKED)
-            }
-            if (boardMatching != null) {
-                newBoardTiles.find { it.id == boardMatching.id }?.state = TileState.IN_SLOT
-                eliminatedFromOutside = true
-            }
-        }
-
-        // 3. 将卡槽中该图案的 2 张卡牌移除
-        val newSlotTiles = state.slotTiles.filter { it.type != targetType }
-
+        val shelfTile = state.movedOutTiles.firstOrNull { it.type == targetType }
+        val boardTile = if (shelfTile == null) state.boardTiles.firstOrNull {
+            it.type == targetType && (it.state == TileState.NORMAL || it.state == TileState.BLOCKED)
+        } else null
+        // If bombs removed the last copy, the joker itself supplies the missing face.
+        val third = (shelfTile ?: boardTile ?: targetEntry.value.first().copy(id = "wildcard"))
+            .copy(state = TileState.IN_SLOT, isBlind = false)
         onToolUsed()
-
-        // 4. 计算剩余遮挡状态并统计分数与状态
-        val finalBoard = calculateBlockedStates(newBoardTiles)
-        val remainingOnBoard = finalBoard.count { it.state == TileState.NORMAL || it.state == TileState.BLOCKED }
-        val remainingInMovedOut = newMovedOutTiles.size
-
-        val newStatus = when {
-            remainingOnBoard == 0 && remainingInMovedOut == 0 -> GameStatus.WON
-            newSlotTiles.size >= 7 -> GameStatus.LOST
-            else -> GameStatus.PLAYING
-        }
-
-        val totalScore = state.score + 100
-
         updateState {
             copy(
-                jokerCount = state.jokerCount - 1,
-                slotTiles = newSlotTiles,
-                movedOutTiles = newMovedOutTiles,
-                boardTiles = finalBoard,
-                score = totalScore,
-                gameStatus = newStatus
+                jokerCount = jokerCount - 1,
+                slotTiles = slotTiles + third,
+                movedOutTiles = movedOutTiles.filterNot { it.id == shelfTile?.id },
+                boardTiles = boardTiles.map { if (it.id == boardTile?.id) third else it },
+                highlightedTileIds = emptySet()
             )
         }
-
-        setEffect(GameViewEffect.TileMatch(targetType))
         setEffect(GameViewEffect.ShowToast(getLocalizedString(
             "太极牌显灵！与卡槽卡牌凑成消除！",
             "Joker activated! Completed match and eliminated!",

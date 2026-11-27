@@ -28,7 +28,14 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
         const cacheKey = `shop_items_${lang}`;
         // DB/缓存：优先读 KV（SHEEPS_CACHE）热点缓存，TTL 10 分钟，命中直接返回，降低 D1 读压力
         const cached = await env.SHEEPS_CACHE.get(cacheKey);
-        if (cached) return new Response(cached, { headers: { ...corsHeaders, ...cacheHeaders } });
+        if (cached) {
+            // Cached catalogs from the previous release may contain sparse faces.
+            const items = JSON.parse(cached);
+            for (const item of items) {
+                if (Array.isArray(item.tiles)) item.tiles = item.tiles.map((url: string | null) => url ?? '');
+            }
+            return new Response(JSON.stringify(items), { headers: { ...corsHeaders, ...cacheHeaders } });
+        }
 
         // 方案 B：先取基列（zh 兜底），再用 i18n_strings 解析本地化文案
         // DB：查询 shop_items 商品表，过滤掉非兑换类（CLASSIC 及各类 SKIN_* 皮肤），仅返回可消耗积分兑换的法宝道具
@@ -38,11 +45,11 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
              WHERE item_type NOT IN ('CLASSIC', 'SKIN_INK', 'SKIN_CYBER', 'SKIN_KEAI', 'SKIN_DAIMENG')`
         ).all();
 
-        // 为皮肤项批量装配 tiles[]（12 张卡面，按 tile_index 1..12 排序，缺失项为 null）
+        // 为皮肤项批量装配 tiles[]（12 张卡面，按 tile_index 1..12 排序，缺失项为空字符串，保留位置以兼容旧客户端）
         const skinItems = items.results.filter(
             (i: any) => typeof i.item_type === 'string' && i.item_type.startsWith('SKIN_')
         );
-        const tilesBySkin: Record<string, (string | null)[]> = {};
+        const tilesBySkin: Record<string, string[]> = {};
         if (skinItems.length > 0) {
             const skinTypes = skinItems.map((i: any) => i.item_type.replace('SKIN_', '').toLowerCase());
             const placeholders = skinTypes.map(() => '?').join(', ');
@@ -50,7 +57,7 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
                 `SELECT skin_type, tile_index, image_url FROM skin_tiles WHERE skin_type IN (${placeholders})`
             ).bind(...skinTypes).all();
             for (const r of rows.results as any[]) {
-                const arr = (tilesBySkin[r.skin_type] = tilesBySkin[r.skin_type] || new Array(12).fill(null));
+                const arr = (tilesBySkin[r.skin_type] = tilesBySkin[r.skin_type] || new Array(12).fill(''));
                 if (r.tile_index >= 1 && r.tile_index <= 12) arr[r.tile_index - 1] = r.image_url;
             }
         }
@@ -117,6 +124,7 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
                 FROM shop_items s JOIN users u ON u.id = ?4
                 LEFT JOIN user_items i ON i.user_id = u.id AND i.item_type = s.item_type
                 WHERE s.id = ?5 AND s.stock >= ?3 AND u.points >= s.points_price * ?3
+                  AND (s.item_type NOT GLOB 'SKIN_*' OR (?3 = 1 AND COALESCE(i.count, 0) = 0))
                 ON CONFLICT(user_id, operation_id) DO NOTHING`)
                 .bind(operation, attempt, body.count, authUser.userId, body.shop_item_id),
             env.DB.prepare(`UPDATE users SET points = r.remaining_points FROM shop_exchange_receipts r
@@ -134,11 +142,18 @@ export async function handleShopRoutes(request: Request, env: Env, path: string,
                 FROM shop_exchange_receipts WHERE attempt_id = ?`).bind(now, attempt),
             env.DB.prepare(`SELECT shop_item_id, item_type, quantity, new_count, remaining_points FROM shop_exchange_receipts
                 WHERE user_id = ? AND operation_id = ?`).bind(authUser.userId, operation),
-            env.DB.prepare('SELECT stock FROM shop_items WHERE id = ?').bind(body.shop_item_id)
+            env.DB.prepare(`SELECT s.stock, s.item_type, COALESCE(i.count, 0) AS owned
+                FROM shop_items s LEFT JOIN user_items i ON i.item_type=s.item_type AND i.user_id=? WHERE s.id=?`)
+                .bind(authUser.userId, body.shop_item_id)
         ]);
         const receipt = results[6].results[0];
         if (!receipt) {
-            const stock = Number(results[7].results[0]?.stock ?? 0);
+            const item = results[7].results[0];
+            if (String(item?.item_type).startsWith('SKIN_')) {
+                if (body.count !== 1) return Response.json({error:'Invalid parameters'}, {status:400, headers:corsHeaders});
+                if (Number(item.owned) > 0) return Response.json({error:'Skin already owned'}, {status:409, headers:corsHeaders});
+            }
+            const stock = Number(item?.stock ?? 0);
             return new Response(JSON.stringify({error: stock < body.count ? 'Item out of stock' : 'Insufficient points'}),
                 {status: 400, headers: corsHeaders});
         }
