@@ -9,25 +9,30 @@
 
 ## 2. 物理组件化架构设计
 
-为了实现“高内聚、弱耦合”的编译提效与业务隔离，项目采用了三层物理组件化拓扑架构。在最近的重构中，原公共底座 `:core` 被成功重组剥离出独立的 `:lib_base` 技术基建底座与 `:lib_network` 无状态网络底座，使得物理依赖关系更加清晰健壮：
+为了实现“高内聚、弱耦合”的编译提效与业务隔离，项目采用了多层物理组件化拓扑架构（共 **11 个 Gradle 模块**，详见 `settings.gradle.kts`）。原公共底座 `:core` 已逐步剥离出 `:lib_base`（无状态基建）、`:lib_network`（网络层）、`:data`（数据与同步层）和 `:designsystem`（设计系统与主题），并配套 `:baselineprofile` 性能基线模块：
 
 ### 2.1 架构拓扑依赖图 (Mermaid)
 
 ```mermaid
 graph TD
-    %% 壳工程层
+    %% 壳工程与性能基线
     App[":app (壳入口)"]
-    
+    BP[":baselineprofile (性能基线)"]
+
     %% 业务功能组件层
     feature_splash[":feature_splash (启动页)"]
     feature_menu[":feature_menu (大厅/商城/个人中心)"]
     feature_game[":feature_game (闯关/无尽/对决游戏引擎)"]
     feature_leaderboard[":feature_leaderboard (排行榜)"]
 
-    %% 核心中间件与基底层
-    core[":core (业务数据与资源)"]
-    lib_network[":lib_network (无状态网络组件)"]
-    lib_base[":lib_base (技术基建底座)"]
+    %% 中间公共层
+    core[":core (业务公共与事件总线)"]
+    data[":data (Room/Repository/同步/网络状态)"]
+    designsystem[":designsystem (主题与公共 UI 组件)"]
+
+    %% 底层技术基建
+    lib_network[":lib_network (AppConfig/Retrofit/加解密拦截器)"]
+    lib_base[":lib_base (MVI 基类/MMKV/AES-GCM/服务契约)"]
 
     %% 壳依赖
     App --> feature_splash
@@ -35,33 +40,52 @@ graph TD
     App --> feature_game
     App --> feature_leaderboard
     App --> core
-    
-    %% 功能模块对数据的单向依赖
-    feature_splash --> core
-    feature_menu --> core
-    feature_game --> core
-    feature_leaderboard --> core
+    App --> data
+    App --> designsystem
+    App --> lib_base
+    App -.-> |baselineProfile| BP
 
-    %% 数据层对底层技术底座的 api 传递依赖
-    core -.-> |api 依赖传递| lib_base
-    core -.-> |api 依赖传递| lib_network
-    
-    %% 网络底座依赖最底层基础库
-    lib_network --> lib_base
+    %% 功能模块依赖
+    feature_splash --> core
+    feature_splash --> data
+    feature_splash --> designsystem
+    feature_splash --> lib_network
+    feature_menu --> core
+    feature_menu --> data
+    feature_menu --> designsystem
+    feature_menu --> lib_network
+    feature_game --> core
+    feature_game --> data
+    feature_game --> designsystem
+    feature_leaderboard --> core
+    feature_leaderboard --> data
+    feature_leaderboard --> designsystem
+
+    %% 公共与数据层依赖
+    core --> data
+    core --> designsystem
+    core --> lib_network
+    data --> lib_network
+    data --> lib_base
+    designsystem -.-> |api| lib_base
+    lib_network -.-> |api| lib_base
 ```
 
 ### 2.2 模块功能职责划分
 
 | 模块名称 | 物理层次 | 职能描述 | 核心内容 |
 | :--- | :--- | :--- | :--- |
-| **`:app`** | 壳层 | 应用总入口。 | 关联全部子模块依赖、集成 Application 主类并进行 SDK 初始化。 |
+| **`:app`** | 壳层 | 应用总入口。 | 关联全部子模块依赖、集成 Application 主类、Hilt/TheRouter 组装与 Release 签名。 |
+| **`:baselineprofile`** | 性能基线层 | AOT 编译优化。 | 生成启动与关键场景的 Baseline Profile，Release 构建时自动合入 APK。 |
 | **`:feature_splash`** | 业务层 | 启动与跳转分发。 | 亮色白金背景启动动画、网络与合规性校验、进入主页的路由分发。 |
-| **`:feature_menu`** | 业务层 | 游戏大厅与外围。 | 包含主菜单、积分商城、个人中心（更换皮肤）、每日签到、日常任务。 |
-| **`:feature_game`** | 业务层 | 游戏玩法核心引擎。 | 包含层叠金字塔网格棋盘、无尽之渊下坠棋盘、联机 WebSocket 天命对决赛场。 |
-| **`:feature_leaderboard`** | 业务层 | 竞技排行数据。 | 展示日榜、总榜，利用 RecyclerView 及 BRVAH 适配器实现高速渲染。 |
-| **`:core`** | 数据与资源层 | 业务数据中心。 | 封装 Room 本地数据库、LocalDao、SyncRepository 同步数据流以及公共资源实体。 |
-| **`:lib_network`** | 技术基础层 | 纯净网络底座。 | 配置 OkHttpClient、加解密拦截器 `EncryptionInterceptor` 与 Retrofit。 |
-| **`:lib_base`** | 技术基础层 | 无状态技术基建。 | 包含 MVI 通用 ViewModel 基类、BaseActivity 基类、MMKV 及 AesGcmCipher 底层算法。 |
+| **`:feature_menu`** | 业务层 | 游戏大厅与外围。 | 包含主菜单、积分商城、个人中心（更换皮肤/账号注销）、设置页、每日签到、日常任务、公告。 |
+| **`:feature_game`** | 业务层 | 游戏玩法核心引擎。 | 包含层叠金字塔网格棋盘、中途续局快照、无尽之渊下坠棋盘、联机 WebSocket 天命对决及 BGM/音效引擎。 |
+| **`:feature_leaderboard`** | 业务层 | 竞技排行数据。 | 展示日榜、周榜、总榜及每日弹窗排行。 |
+| **`:core`** | 公共业务层 | 业务公共能力。 | 封装 `AuthEventBus`、通用业务模型与跨模块共享资源。 |
+| **`:data`** | 数据层 | 本地与云端数据中心。 | 封装 Room 本地数据库、`StageSaveDao` 中途续局、离线成绩补传、`SyncRepository` 同步与 `NetworkMonitor`。 |
+| **`:designsystem`** | 设计系统层 | 统一视觉与主题。 | 封装多套国风/水墨/霓虹主题、通用 Compose 组件与矢量绘制能力。 |
+| **`:lib_network`** | 技术基础层 | 纯净网络底座。 | 包含 `AppConfig`、OkHttpClient、双 Token/重试/加解密拦截器与 Retrofit 配置。 |
+| **`:lib_base`** | 技术基础层 | 无状态技术基建。 | 包含 `BaseMviViewModel`、`BaseActivity`、MMKV、AES-GCM 底层算法与 `IGameService` 契约。 |
 
 ---
 
@@ -113,20 +137,26 @@ graph TD
 ## 5. 项目结构导航
 
 ```text
-com.example.sheeps
-├── lib_base        # 最底层无状态基础公共库（MVI ViewModel/BaseActivity/Aes加解密）
-├── lib_network     # 基础网络连接与加解密拦截器库
-├── core            # 业务数据资产层（本地 Room 数据库、UserPreferences、模型实体类）
-├── feature_splash  # 启动分发模块
-├── feature_menu    # 大厅、商城、背包与个人中心模块
-└── feature_game    # 闯关游戏棋盘、无尽之渊下坠棋盘、联机多人对战赛场
+app/ (Gradle 11 模块)
+├── app                  # 壳工程（Application、签名与模块组装）
+├── baselineprofile      # Baseline Profile 性能基线模块
+├── lib_base             # 最底层无状态基础公共库（BaseMviViewModel/BaseActivity/AES-GCM/契约）
+├── lib_network          # 基础网络连接与加解密拦截器库（AppConfig/Retrofit/OkHttp）
+├── data                 # 数据层（Room 本地数据库、Repository、SyncRepository、NetworkMonitor）
+├── designsystem         # 设计系统与公共 Compose 组件/主题
+├── core                 # 公共业务与事件总线层（AuthEventBus 等）
+├── feature_splash       # 启动分发模块
+├── feature_menu         # 大厅、商城、背包与个人中心模块
+├── feature_game         # 闯关游戏棋盘、无尽之渊下坠棋盘、联机多人对战赛场
+└── feature_leaderboard  # 排行榜模块
 ```
 
 ---
 
 ## 6. 开发与构建
 
-*   **环境要求**：Android Studio Jellyfish+ / AGP 8.0+。
+*   **环境要求**：JDK 17 · AGP 9.2+（当前 `9.2.1`）· Kotlin `2.4.10` · compileSdk 37 / minSdk 24 / targetSdk 36。
 *   **Gradle 构建命令**：
     *   `./gradlew :app:assembleDebug`：构建并打包调试版 APK。
+    *   `./gradlew test`：运行各模块本地单元测试。
     *   `./gradlew :baselineprofile:generateBaselineProfile`：在连接设备时运行性能基线轮廓分析，自动输出优化文件并在构建 Release 包时自动装载提速。

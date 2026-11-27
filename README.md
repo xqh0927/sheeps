@@ -6,14 +6,16 @@
 
 ## 🌟 项目亮点与核心功能
 
-1. **端云协同的关关生成机制**：
+1. **端云协同的关卡生成与中途续局机制**：
    - 关卡布局数据基于特定种子在后端（Cloudflare Workers）进行确定性且必定有解（Solvable）的算法生成，包含 X/Y 轴半格对齐和多层 Z 轴层叠。
-   - 网络异常时，Android 客户端会自动无缝降级为**本地离线模式**（Local-First），通过相同的 LCG 随机数生成算法在本地生成关卡，保证极致的游玩连贯性。
+   - 网络异常时，Android 客户端会自动无缝降级为**本地离线模式**（Local-First），通过相同的 LCG 随机数生成算法在本地生成关卡，离线通关成绩通过 `ScoreUploadWorker` 与 `/api/score/submit-once` 幂等补传。
+   - 支持**中途续局（Stage Saves）**：通过 Room 事务持久化保存局内棋盘与槽位快照，退出后重新进入可无缝续玩。
 
-2. **丰富的关卡机制**：
+2. **多模式与丰富的关卡机制**：
+   - **三大核心玩法**：支持单机闯关模式（金字塔叠层）、**无尽生存模式（Endless）**以及 WebSocket 实时多人对决（天命对决）。
    - **普通牌**：标准的可点击消除的图案牌。
-   - **封印牌 (Sealed)**：表面贴有金黄色“封印符纸”的卡牌，其层叠封印符的透明度为 0.65，使玩家能够看清底部的图案，只有在周边卡牌被消除、触发解封时方可点击。
-   - **神秘牌 (Blind)**：背面显示为“神秘问号”状态的暗牌，只有被揭开（最上层无遮挡）时才能显示真容。
+   - **封印牌 (Sealed)**：表面贴有金黄色“封印符纸”的卡牌，其层叠封印符的透明度为 0.65，使玩家能够看清底部的图案，需解除封印后方可正常消除。
+   - **神秘牌 (Blind)**：棋盘上背面显示为“神秘问号”状态的暗牌，需点击进入槽位或触发解密消除后才能揭示真容。
 
 3. **趣味道具与背包系统**：
    - 支持移出置物架（Move Out）、撤销（Undo）、洗牌（Shuffle）、提示（Hint）、炸弹（Bomb）、小丑牌（Joker）、双倍积分（Double Points）等多种法宝道具。
@@ -22,8 +24,8 @@
 4. **全球实时排行榜**：
    - 关卡结算后，客户端通过带有加盐校验签名的防作弊算法，安全地将通关用时和得分上传至云端数据库，生成实时的日榜与总榜。
 
-5. **社交与日常功能**：
-   - 支持手机号验证码注册/登录、用户中心、每日签到（连签奖励）、每日任务、公告系统。
+5. **社交、账号安全与日常功能**：
+   - 支持手机号验证码/密码注册登录、账号注销申请与撤销、设置中心、用户中心、每日签到（连签奖励）、每日任务、公告系统，以及局内 BGM 与多档消除音效引擎。
 
 6. **多主题皮肤自绘系统**：
    - 包含经典国风、水墨江山、赛博霓虹三种独特界面主题。根据首选项自动切换，卡牌底色及 12 种游戏图案全部在 Compose Canvas 中通过图形学计算重绘（水墨黑灰写意色、霓虹特制电子荧光色）。
@@ -61,7 +63,7 @@
 * **网络请求与日志拦截 (Retrofit 2 & OkHttp 3 & LogUtils)**：
    - 采用行业标准的 `Retrofit 2` 作为网络访问接口层，结合 `Kotlinx.serialization` 进行类型安全的 JSON 数据解析。
    - 底层使用 `OkHttp 3` 客户端进行连接管理、超时配置。同时配置了四大拦截器：语言国际化拦截器、Bearer Token 身份认证拦截器、带锁防并发的双 Token 静默刷新拦截器、以及弱网自动指数退避重试拦截器。
-   - **网络与系统日志分析**：集成流行日志库 `pengwei1024/LogUtils` (`com.apkfuns.logutils:library`)，配合 `HttpLoggingInterceptor` 拦截网络请求，整包聚聚合以无 Tag（利用其自动调用类名堆栈追踪定位机制）的方式输出结构化调试日志，极大地方便了端云联合调试。
+   - **网络与系统日志分析**：集成流行日志库 `pengwei1024/LogUtils` (`com.apkfuns.logutils:library`)，配合 `HttpLoggingInterceptor` 拦截网络请求，整包聚合以无 Tag（利用其自动调用类名堆栈追踪定位机制）的方式输出结构化调试日志，极大地方便了端云联合调试。
 * **Canvas 纯矢量高清自绘与微交互动画**：
   - 局内卡牌渲染与 8 种道具卡全部基于 Compose Canvas 矢量图形学绘制，彻底摆脱传统位图占用，并结合 `InfiniteTransition` 实现自转、漂浮、呼吸闪烁动效。
 * **自定义 Q弹 Spring 物理动效 (Compose Transition)**：
@@ -101,8 +103,8 @@
 
 ## ⚙️ 全局统一配置规范
 
-为了避免多处散落、硬编码相同全局信息（如服务器接口根地址 `BASE_URL`），项目在 `:core` 模块根包名 `com.example.sheeps.core` 下建立并封装了 **`AppConfig`** 对象：
-- **`AppConfig`** ([AppConfig.kt](app/core/src/main/java/com/example/sheeps/core/AppConfig.kt))：作为应用唯一的全局配置入口，所有的环境常量、协议配置以及未来的功能开关都会统一收拢到该对象中。
+为了避免多处散落、硬编码相同全局信息（如服务器接口根地址 `BASE_URL`），项目在 `:lib_network` 模块包名 `com.example.sheeps.lib_network` 下建立并封装了 **`AppConfig`** 对象：
+- **`AppConfig`** ([AppConfig.kt](app/lib_network/src/main/java/com/example/sheeps/lib_network/AppConfig.kt))：作为应用唯一的全局配置入口，所有的环境常量、协议配置以及未来的功能开关都会统一收拢到该对象中。
   - `BASE_URL = "https://api.xqh.cc.cd/"`：后端服务接口的基础请求地址。
   - `WS_URL = "wss://api.xqh.cc.cd/api/ws"`：多人实时对决 WebSocket 地址。
 - 移除了原有的 `ApiService.Companion.create` 冗余代码，使整个网络的配置点实现一处声明、全局消费。
@@ -111,32 +113,36 @@
 
 ## 🧰 封装的常用核心工具类说明
 
-在 `:core` 基础库中的 `com.example.sheeps.core.utils` 包下，项目针对通用系统级功能进行了二次封装，提供了极简且防错的接口：
+项目在 `:data`、`:core` 与 `:lib_base` 中针对通用系统级功能进行了二次封装，提供了极简且防错的接口：
 
-1. **`NetworkMonitor` (实时网络状态监听类)**：
+1. **`NetworkMonitor` (实时网络状态监听类)**（位于 `:data` 模块 `com.example.sheeps.data.utils`）：
    - **实现机制**：内部利用 Android `ConnectivityManager` 的 `registerNetworkCallback` 机制主动监听系统网络变化。
-   - **功能作用**：实时维护一个公开的 `StateFlow<NetworkStatus>`。当网络发生“可用 (onAvailable)”和“丢失 (onLost)”状态转换时自动更新。对外提供极其便利的同步判断接口 `isOnline(): Boolean`，业务 ViewModel 在发起关卡加载前会据此自动判断应从云端 API 获取关卡还是降级到本地 LCG 生成算法。
+   - **功能作用**：实时维护一个公开的 `StateFlow<NetworkStatus>`。当网络发生“可用 (onAvailable)”和“丢失 (onLost)”状态转换时自动更新。对外提供同步判断接口 `isOnline(): Boolean`，业务 ViewModel 在发起关卡加载前会据此自动判断应从云端 API 获取关卡还是降级到本地 LCG 生成算法。
 
-2. **`AuthEventBus` (全局认证事件总线)**：
+2. **`AuthEventBus` (全局认证事件总线)**（位于 `:core` 模块 `com.example.sheeps.core.utils`）：
    - **实现机制**：基于 `MutableSharedFlow` 封装的单例事件总线，采用 `extraBufferCapacity = 1` 确保即使在协程挂起时事件也不会丢失。
-   - **功能作用**：主要用于处理 App 生命周期内的全局鉴权敏感事件（如 `AuthEvent.Logout`）。当网络层拦截器检测到 HTTP 401 凭证过期或服务器提示令牌失效时，会通过 `AuthEventBus.post(AuthEvent.Logout)` 发送事件，主界面监听到后会自动清除 Preference 凭证并一键切回登录页。
+   - **功能作用**：主要用于处理 App 生命周期内的全局鉴权敏感事件（如 `AuthEvent.Logout`）。当网络层拦截器检测到 HTTP 401 凭证过期或服务器提示令牌失效时，会通过 `AuthEventBus.post(AuthEvent.Logout)` 发送事件，主界面监听到后会自动清除凭证并一键切回登录页。
 
-3. **`GsonUtil` (JSON 数据高阶序列化工具)**：
-   - **实现机制**：基于 Google `Gson` 库进行二次封装，内部维护全局共享的 Gson 实例。
-   - **功能作用**：提供统一的 `toJson(src)`、`fromJson(json, classOfT)` 和支持泛型反射 Type 的 `fromJson(json, typeOfT)`。主要用于背包道具复杂 JSON 字符串在 Room 数据库文本字段与 Kotlin 数据类之间的便捷映射。
+3. **JSON 序列化支持 (`kotlinx-serialization-json` & `Gson`)**：
+   - 网络请求/响应统一使用 `Retrofit + kotlinx-serialization-json` 进行类型安全的反序列化；本地 Room/偏好缓存中的复杂结构体支持使用 `Gson` 与 `kotlinx-serialization` 完成文本与实体类之间的映射。
 
 ---
 
 ## 📂 项目目录结构
 
 ```text
-├── app/                        # Android 客户端代码（Gradle 多模块工程）
+├── app/                        # Android 客户端代码（Gradle 11 模块组件化工程）
 │   ├── app/                    # 壳 Module (namespace com.example.sheeps)，主程序入口、Application、Release 签名
-│   ├── core/                   # 核心基础 Module (com.example.sheeps.core：网络/Room/主题/工具/全局配置)
+│   ├── lib_base/               # 无状态技术基建底座（BaseMviViewModel、BaseActivity、MMKV、AES-GCM 等）
+│   ├── lib_network/            # 纯净网络底座（AppConfig、OkHttp 拦截器、加解密拦截器、Retrofit）
+│   ├── data/                   # 数据层 Module（Room 数据库、Repository、SyncRepository、NetworkMonitor）
+│   ├── designsystem/           # 设计系统 Module（多套主题、公共 Compose UI 组件与矢量绘制）
+│   ├── core/                   # 核心业务公共 Module（游戏公共模型、事件总线、跨模块契约与资源聚合）
 │   ├── feature_splash/         # 启动模块 (com.example.sheeps.splash)：启动图、初始化校验、路由分发
 │   ├── feature_menu/           # 主菜单与商店 Module (com.example.sheeps.menu)：大厅/签到/任务/公告/商城
-│   ├── feature_game/           # 游戏局内 Module (com.example.sheeps.game)：单机闯关 + 多人对决渲染与逻辑
+│   ├── feature_game/           # 游戏局内 Module (com.example.sheeps.game)：单机闯关 + 无尽模式 + 多人对决
 │   ├── feature_leaderboard/    # 排行榜独立 Module (com.example.sheeps.leaderboard)
+│   ├── baselineprofile/        # Baseline Profile 性能基线模块（启动与关键路径 AOT 预编译优化）
 │   ├── gradle/                 # Gradle Wrapper + libs.versions.toml 版本目录
 │   ├── build.gradle.kts        # 根构建文件（buildscript classpath、插件别名）
 │   ├── settings.gradle.kts     # 模块声明与仓库解析
@@ -146,37 +152,44 @@
 ├── admin-console/              # React 管理后台项目
 │   ├── src/
 │   │   ├── api/                # 后台 API 请求层 (client.ts Axios 封装与鉴权拦截 / admin.ts 接口封装)
-│   │   ├── components/         # 公共组件 (CrudPage 通用表格、Layout 导航、feedback 提示、ProtectedRoute 守卫)
-│   │   ├── pages/              # 业务页面 (Login/Dashboard/Users/Accounts/AuditLogs/Config/ShopItems/Notices/Tasks/Levels)
+│   │   ├── components/         # 公共组件 (CrudPage、Layout、ProtectedRoute、MultilingualField、SkinTilesManager、ItemIconManager 等)
+│   │   ├── constants/          # 语言与商品类型常量 (locales.ts / shopItemTypes.ts)
+│   │   ├── pages/              # 业务页面 (Login/Dashboard/Users/SkinProducts/PropProducts/Notices/Tasks/Levels/LevelHealth/AppVersions/I18nManager/LeaderboardManager/Config/AuditLogs)
 │   │   ├── store/              # Zustand 状态管理 (auth 管理员会话)
-│   │   ├── App.tsx / main.tsx
-│   ├── .env                    # 本地调试配置 (指向 localhost API)
-│   ├── .env.production         # 线上生产配置 (指向 api.xqh.cc.cd API)
-│   └── package.json
+│   │   ├── utils/              # 工具函数 (filteredShopItemsFetcher.ts)
+│   │   └── App.tsx / main.tsx / theme.ts
+│   └── package.json            # 本地/生产 VITE_API_BASE 通过 .env / .env.production 或 Pages 环境变量注入
 │
 ├── server/                     # 后端服务代码 (Cloudflare Worker, TypeScript)
 │   ├── src/
-│   │   ├── index.ts            # Workers 路由入口（分发 + D1 自动迁移 + 加密中间件 + WebSocket 升级）
+│   │   ├── index.ts            # Workers 路由入口（分发 + 加密中间件 + WebSocket 升级 + Swagger /doc）
 │   │   ├── types.ts            # Env 绑定类型与 JWT/AdminPayload 类型
 │   │   ├── crypto.ts           # JWT(HMAC-SHA256) 签发校验 + PBKDF2 + SHA256 + AES-256-GCM 加解密
 │   │   ├── auth-utils.ts       # 密码哈希/校验 (PBKDF2-SHA256)
 │   │   ├── helpers.ts          # CORS、玩家鉴权、管理员三级鉴权、KV 配置缓存、国际化
+│   │   ├── i18n.ts             # 多语言文案与错误翻译
 │   │   ├── middleware.ts       # 请求解密 / 响应加密 (AES-256-GCM)
 │   │   ├── level.ts            # LCG 确定性可解关卡生成算法
 │   │   ├── difficulty.ts       # 100 级难度系数系统
 │   │   ├── update.ts           # App 版本更新检测 (D1 + R2 HEAD 探测)
 │   │   ├── websocket.ts        # 多人对决 WebSocket 状态机 (基于 D1 game_commands 轮询同步)
-│   │   ├── public/                 # 隐私政策/用户协议/收集清单/共享清单 静态 HTML（由 generate-legal-html.js 生成）
+│   │   ├── openapi.json        # OpenAPI 规范文件（供 /doc Swagger UI 渲染）
+│   │   ├── lib/                # 内部公共库 (audit.ts 审计 / level-tiles.ts 关卡块 / r2.ts 对象存储 / account-avatars.ts 头像清理)
 │   │   └── handlers/           # 业务路由 (auth/match/user/shop/task/game/system/admin)
-│   ├── test/                   # 后端单元测试 (level/difficulty/update/admin_assets)
+│   ├── public/                 # 静态法律页 (privacy/agreement/personal-info-collection/third-party-sharing.html)
+│   ├── migrations/             # D1 增量迁移脚本 (0001 ~ 0008，含道具/兑换/成绩回执、账号注销、头像清理、关卡体检等)
+│   ├── test/                   # 后端单元测试 (account_deletion/admin_create/admin_player_workflows/player/schema/sms_delivery/websocket)
 │   ├── scripts/                # 辅助脚本 (seed-admin.mjs 种子管理员 / generate-legal-html.js 生成法律页)
-│   ├── wrangler.jsonc          # Cloudflare Wrangler 配置 (Worker + D1 + KV + R2)
-│   ├── schema.sql              # D1 数据库初始化建表脚本
+│   ├── wrangler.jsonc          # Cloudflare Wrangler 配置 (Worker + D1 + KV + R2 + Assets)
+│   ├── schema.sql              # D1 数据库全量初始化建表脚本
 │   └── package.json
 │
 ├── docs/                       # 项目配套文档（详见文末「项目文档索引」）
+├── package.json                # 根目录快捷脚本 (npm run deploy-backend / deploy-admin)
 ├── release.js                  # 一键发版脚本（版本升级 + D1/KV 写入 + 推送 main）
-├── diagnose_blocking.py        # 关卡遮挡诊断脚本（模拟生成与遮挡判定）
+├── rollback.js                 # 一键回滚脚本（版本状态/公告/KV 缓存安全回滚）
+├── deploy-backend.js           # 后端接口与 D1 数据库部署脚本
+├── deploy-admin.js             # 管理后台构建与 Cloudflare Pages 部署脚本
 └── .github/workflows/          # GitHub Actions (release.yml 构建 APK 并上传 R2)
 ```
 
@@ -229,12 +242,12 @@ flowchart TB
 
 | 端 | 维度 | 选型 |
 | :--- | :--- | :--- |
-| **Android 客户端** | 语言/构建 | Kotlin 2.2.21 · AGP 9.0.1 · Gradle 版本目录 (libs.versions.toml) · compileSdk 37 / minSdk 24 / targetSdk 36 |
-| | UI | Jetpack Compose (BOM 2026.03.01) · Material 3 · Navigation3 · Lottie · BRVAH · SmartRefreshLayout |
-| | 架构/异步 | MVI 单向数据流 · Coroutines 1.10.2 · Flow/StateFlow/SharedFlow · WorkManager 2.9.1 |
-| | 依赖注入 | Hilt 2.59.2（KSP 代码生成） |
-| | 网络/存储 | Retrofit 2.11.0 · OkHttp 4.12.0 · kotlinx-serialization-json 1.7.3 · Room 2.6.1 · MMKV 2.4.0 · Gson 2.10.1 · Coil 2.6.0 |
-| | 模块路由/安全 | TheRouter 1.3.2 · androidx.security:crypto · LogUtils (pengwei) |
+| **Android 客户端** | 语言/构建 | Kotlin 2.4.10 · AGP 9.2.1 · Gradle 版本目录 (libs.versions.toml) · compileSdk 37 / minSdk 24 / targetSdk 36 |
+| | UI | Jetpack Compose (BOM 2026.06.01) · Material 3 · Navigation3 · Lottie 6.7.1 · BRVAH 4.0.3 · SmartRefreshLayout 2.1.1 |
+| | 架构/异步 | MVI 单向数据流 · Coroutines 1.11.0 · Flow/StateFlow/SharedFlow · WorkManager 2.11.2 · Baseline Profile 1.4.1 |
+| | 依赖注入 | Hilt 2.60.1（KSP / KAPT 代码生成） |
+| | 网络/存储 | Retrofit 3.0.0 · OkHttp 5.4.0 · kotlinx-serialization-json 1.11.0 · Room 2.8.4 · MMKV 2.4.0 · Gson 2.14.0 · Coil 2.7.0 |
+| | 模块路由/安全 | TheRouter 1.3.2 · androidx.security:crypto 1.1.0 · LogUtils (pengwei) 1.7.5 |
 | **后端 (Cloudflare Workers)** | 语言/运行时 | TypeScript · Workers compatibility_date 2026-06-27 · placement=smart |
 | | Web 框架 | Hono 4.12 + @hono/zod-openapi + @hono/swagger-ui（仅 /doc 挂载 OpenAPI） |
 | | 存储/缓存 | D1 (SQLite, binding `DB`) · Workers KV (binding `SHEEPS_CACHE`) · R2 (binding `AVATAR_BUCKET`) |
@@ -249,69 +262,43 @@ flowchart TB
 
 ## 📦 各模块详细说明
 
-### 1. app/（Android 多模块工程）
+### 1. app/（Android 11 模块组件化工程）
 
-Gradle 模块（见 `settings.gradle.kts`）：`:app`、`:core`、`:feature_splash`、`:feature_menu`、`:feature_game`、`:feature_leaderboard`。依赖统一收口在 `gradle/libs.versions.toml` 版本目录。
+Gradle 模块（见 [settings.gradle.kts](app/settings.gradle.kts)）：`:app`、`:lib_base`、`:lib_network`、`:data`、`:designsystem`、`:core`、`:feature_splash`、`:feature_menu`、`:feature_game`、`:feature_leaderboard`、`:baselineprofile`。依赖统一收口在 [gradle/libs.versions.toml](app/gradle/libs.versions.toml) 版本目录。
 
-实际源码包结构（`src/main/java/com/example/sheeps/`）：
-
-```text
-core/                         # 核心公共库
-  base/                       # Activity/ViewModel/Application 基类
-  crypto/                     # 端侧加解密辅助
-  di/                         # Hilt 全局依赖注入模块
-  game/                       # 游戏核心算法引擎（遮挡/求解）
-  multiplayer/                # WebSocket 管理与对战协议
-    model/                    # 对战数据模型
-  network/                    # Retrofit 接口定义与 OkHttp 拦截器
-  preference/                 # MMKV / DataStore 偏好封装
-  startup/                    # App Startup 初始化器
-  update/                     # 版本更新检测
-  utils/                      # NetworkMonitor / AuthEventBus / GsonUtil 等
-  AppConfig.kt                # 全局配置入口
-data/                         # 数据层
-  local/                      # Room 数据库与 DAO
-  model/                      # 统一业务数据模型
-  network/                    # 网络实体
-  repository/                 # 数据仓库与云端同步 (SyncRepository)
-theme/                        # 仙侠/国风主题管理
-ui/components/                # 通用 Compose 组件
-app/worker/                   # 壳 Module 内的 Worker（WorkManager 同步任务）
-feature_splash/  → splash/            # 启动图、初始化校验、路由分发
-feature_menu/     → menu/              # 大厅/商城/签到/任务/公告（ui/components/dialogs/screens + viewmodel/delegates）
-feature_game/     → game/              # 单机闯关 + 多人对决（state/ui/animations/components/dialogs/screens + viewmodel/delegates/helpers）
-feature_leaderboard/ → leaderboard/   # 排行榜展示
-```
+模块分层职责：
+- **壳与性能基线**：`:app`（主入口、Hilt/TheRouter 组装、Release 签名、APK 命名 `sheeps_<versionName>.apk`）、`:baselineprofile`（启动与关键路径 AOT 基线配置）。
+- **业务功能层**：`:feature_splash`（启动分发）、`:feature_menu`（大厅/商城/签到/任务/公告/个人中心）、`:feature_game`（单机闯关 + 无尽生存 + 多人对决）、`:feature_leaderboard`（排行榜）。
+- **公共与数据层**：`:core`（业务公共模型、事件总线与资源聚合）、`:data`（Room 数据库、Repository、SyncRepository、NetworkMonitor）、`:designsystem`（主题与通用 Compose 组件）。
+- **底层技术基建**：`:lib_network`（`AppConfig`、OkHttp 拦截器、加解密拦截器、Retrofit）、`:lib_base`（`BaseMviViewModel`、`BaseActivity`、MMKV、AES-GCM 与 `IGameService` 跨模块契约）。
 
 关键约定：
-- 壳 `:app` 只负责组装各 `:feature_*` 模块、`Hilt`/`TheRouter` 注解处理器引入、Release 签名与 APK 文件名（`sheeps_<versionName>.apk`）。
-- `:core` 以 `api(...)` 方式对外暴露基础能力，业务模块仅 `implementation(project(":core"))` 即可复用。
-- 模块间页面跳转全部走 TheRouter URI（如 `/game/play`、`/menu/main`），互不依赖。
+- 模块间页面跳转统一走 TheRouter URI（如 `/game/play`、`/menu/main`），跨模块业务调用通过 `IGameService` 接口 + Hilt 绑定解耦，避免业务模块互相物理依赖。
+- 详细组件化拓扑图见 [app/README.md](app/README.md)。
 
 ### 2. server/（Cloudflare Worker 后端）
 
-入口 `src/index.ts` 在 `fetch` 中完成：注入密钥 → D1 Schema 自动迁移（幂等加列建表）→ CORS/OPTIONS → 静态法律页 → WebSocket 升级 → 解密请求体 → 按 `path` 分发到各 `handlers/*` → 错误国际化 → 加密响应体。
+入口 `src/index.ts` 在 `fetch` 中完成：注入密钥 → CORS/OPTIONS → WebSocket 升级 → `/doc` Swagger 短路 → 解密请求体 → 按 `path` 分发到各 `handlers/*` → 错误国际化 → 加密响应体（D1 Schema 迁移已移除出请求链路，改由 `server/migrations/` 配合 `wrangler d1 migrations apply` 管理）。
 
 `handlers/` 各文件职责：
 - `auth.ts`：验证码/密码登录注册、双 Token 刷新、密码设置/重置。
 - `match.ts`：匹配队列（加入/轮询/离开，30s 超时清理，含并发锁竞争防护）。
 - `user.ts`：端云数据同步、Profile、积分/兑换流水、改名、头像上传（R2）、头像代理。
-- `shop.ts`：积分商城商品列表（多语言 + KV 缓存）、积分兑换（事务原子）。
+- `shop.ts`：积分商城商品列表（多语言 + KV 缓存）、积分兑换（事务原子 + 防重复兑换凭据）。
 - `task.ts`：每日任务列表（懒加载初始化 + 签到修复）与奖励领取。
 - `game.ts`：关卡布局获取（确定性可解 + KV 缓存）、积分解锁、成绩提交（加盐 SHA256 防作弊）、每日签到、排行榜（分页/日/周/总）、每日弹窗 TOP3。
 - `system.ts`：公告列表（多语言 + KV 缓存）、App 版本更新检测。
-- `admin.ts`：**三级角色**（`super`/`operator`/`readonly`）鉴权 + 写守卫（`assertCanWrite`）+ 超管守卫（`assertSuper`）+ 全量后台 CRUD + 审计落库（`admin_audit_log` 仅 INSERT，无改/删接口）。
+- `admin.ts`：**三级角色**（`super`/`operator`/`readonly`）鉴权 + 写守卫（`assertCanWrite`）+ 超管守卫（`assertSuper`）+ 全量后台 CRUD（含皮肤/道具图标、版本管理、APK/图片上传、国际化、排行榜、KV 缓存清理）+ 审计落库（`admin_audit_log` 仅 INSERT，无改/删接口）。
 
-支撑模块：`crypto.ts`（JWT/PBKDF2/SHA256/AES-GCM）、`auth-utils.ts`（密码哈希）、`helpers.ts`（CORS、鉴权、KV 配置缓存、国际化）、`middleware.ts`（链路加解密）、`level.ts`（LCG 关卡生成）、`difficulty.ts`（难度系数）、`update.ts`（版本探测）、`websocket.ts`（对决同步），法律页由 `server/public`（静态法律页）直接服务。
+支撑模块：`crypto.ts`（JWT/PBKDF2/SHA256/AES-GCM）、`auth-utils.ts`（密码哈希）、`helpers.ts`（CORS、鉴权、KV 配置缓存、国际化）、`i18n.ts`（错误翻译）、`middleware.ts`（链路加解密）、`level.ts`（LCG 关卡生成）、`difficulty.ts`（难度系数）、`update.ts`（版本探测）、`websocket.ts`（对决同步）、`lib/`（`audit.ts`/`level-tiles.ts`/`r2.ts`），静态法律页由 `server/public/` 通过 Workers Assets 直接托管。
 
 ### 3. admin-console/（React 管理后台）
 
 - `src/api/client.ts`：Axios 实例 + 拦截器（自动附加 `Authorization: Bearer`、401 清空 session 退登）。
 - `src/api/admin.ts`：封装全部 `/api/admin/*` 接口。
-- `src/components/CrudPage.tsx`：通用表格 CRUD 组件（分页、增删改查、确认弹窗）。
-- `src/components/ProtectedRoute.tsx`：基于 Zustand 会话的路由守卫（未登录跳 Login）。
+- `src/components/`：`CrudPage.tsx`（通用表格 CRUD）、`ProtectedRoute.tsx`（路由守卫）、`Layout.tsx`（导航框架）、`MultilingualField.tsx`（多语言字段输入）、`SkinTilesManager.tsx`（皮肤卡面管理）、`ItemIconManager.tsx`（道具图标管理）、`GameModeSwitch.tsx`、`UserPicker.tsx`、`feedback.tsx`。
 - `src/store/auth.ts`：Zustand 管理员会话，持久化到 localStorage（含 `isSuper()/canWrite()` 派生）。
-- `src/pages/`：Login、Dashboard（运营统计 `GET /api/admin/stats`）、Users、Accounts（超管）、AuditLogs（超管）、Config、ShopItems、Notices、Tasks、Levels。
+- `src/pages/`：Login、Dashboard（运营统计）、Users、SkinProducts（皮肤商品）、PropProducts（道具商品）、Notices、Tasks、Levels、AppVersions（版本管理）、I18nManager（国际化文案）、LeaderboardManager（排行榜管理）、Config、AuditLogs（超管）。
 
 权限模型（前端禁用仅为体验，后端 `requireAdmin`/`assertCanWrite`/`assertSuper` 为最终防线）：
 
@@ -357,6 +344,7 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 | GET | `/api/user/exchange-history` | 道具兑换历史（近 50 条） | 用户Token |
 | POST | `/api/user/rename` | 修改昵称 | 用户Token |
 | POST | `/api/user/avatar` | 上传头像（multipart，R2，≤512KB） | 用户Token |
+| GET / POST / DELETE | `/api/user/deletion-request` | 查询/提交/撤销账号注销申请 | 用户Token |
 | GET | `/api/avatar/:userId` | 头像代理读取（R2 直出二进制） | 公开 |
 
 ### 商城 shop
@@ -375,8 +363,10 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 | 方法 | 路径 | 功能描述 | 鉴权 |
 | :--- | :--- | :--- | :--- |
 | GET | `/api/level` | 获取关卡布局（LCG 确定性可解 + 内存/KV 缓存） | 可选（带 Token 更准） |
+| POST | `/api/level/attempt` | 按开局 ID 记录关卡布局版本与开始时刻（供关卡体检统计） | 可选 |
 | POST | `/api/level/unlock` | 消耗积分解锁关卡（KV 读门槛） | 用户Token |
 | POST | `/api/score/submit` | 提交通关成绩（加盐 SHA256 防作弊签名） | 可选 |
+| POST | `/api/score/submit-once` | 按开局 ID 幂等提交并确认离线通关成绩 | 用户Token |
 | POST | `/api/sign/today` | 每日签到领积分（连签 7 天循环奖励） | 用户Token |
 | GET | `/api/leaderboard` | 排行榜查询（日/周/总，分页，KV 缓存 300s） | 公开 |
 | GET | `/api/leaderboard/daily-popup` | 每日弹窗（昨日 TOP3 + 当前用户排名） | 可选 |
@@ -414,6 +404,7 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 | PUT | `/api/admin/tasks/:id` | 编辑任务 | 管理员(可写) |
 | DELETE | `/api/admin/tasks/:id` | 删除任务 | 管理员(可写) |
 | GET | `/api/admin/levels` | 关卡管理列表 | 管理员 |
+| GET | `/api/admin/levels/health` | 关卡体检统计（开局/通关/异常率等） | 管理员 |
 | POST | `/api/admin/levels` | 新建关卡 | 管理员(可写) |
 | PUT | `/api/admin/levels/:id` | 编辑关卡 | 管理员(可写) |
 | DELETE | `/api/admin/levels/:id` | 删除关卡 | 管理员(可写) |
@@ -421,6 +412,15 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 | POST | `/api/admin/accounts` | 新建管理员账户 | 超级管理员 |
 | PUT | `/api/admin/accounts/:id/role` | 设置账户角色 | 超级管理员 |
 | POST | `/api/admin/accounts/:id/disable` | 禁用/启用账户 | 超级管理员 |
+| GET | `/api/admin/users/search` | 按关键字搜索用户 | 管理员 |
+| POST | `/api/admin/upload-image` | 上传图片素材至 R2 | 管理员(可写) |
+| GET / PUT | `/api/admin/skin-tiles/:id` | 读取/更新皮肤卡面素材 | 管理员 / 管理员(可写) |
+| GET / PUT | `/api/admin/item-icons/:id` | 读取/更新道具图标素材 | 管理员 / 管理员(可写) |
+| GET / POST / PUT / DELETE | `/api/admin/app-versions(/:id)` | App 版本记录管理 | 管理员 / 管理员(可写) |
+| POST | `/api/admin/upload-apk` | 上传 APK 安装包至 R2 | 管理员(可写) |
+| GET / POST / PUT / DELETE | `/api/admin/i18n(/:id)` | 多语言文案（`i18n_strings`）管理 | 管理员 / 管理员(可写) |
+| GET / POST / PUT / DELETE | `/api/admin/leaderboard(/:id)` | 排行榜数据查询与校分管理 | 管理员 / 管理员(可写) |
+| POST | `/api/admin/cache/clear` | 全量清理 KV 边缘缓存 | 超级管理员 |
 | GET | `/api/admin/audit-logs` | 审计日志查询 | 超级管理员 |
 
 ### 实时对决 WebSocket
@@ -431,9 +431,8 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 ### 静态页 / 文档
 | 方法 | 路径 | 功能描述 | 鉴权 |
 | :--- | :--- | :--- | :--- |
-| GET | `/privacy.html` · `/api/legal/privacy` | 隐私政策 HTML（.html 由 assets 静态服务，/api/legal/* 为 308 重定向） | 公开 |
-| GET | `/agreement.html` · `/api/legal/agreement` | 用户协议 HTML（.html 由 assets 静态服务，/api/legal/* 为 308 重定向） | 公开 |
-| GET | `/doc` | Swagger UI（OpenAPI 文档） | 公开 |
+| GET | `/privacy.html` · `/agreement.html` · `/personal-info-collection.html` · `/third-party-sharing.html` | 隐私政策、用户协议、个人信息收集清单与第三方共享清单（由 `server/public/` Workers Assets 静态托管） | 公开 |
+| GET | `/doc` · `/doc/openapi.json` | Swagger UI 与 OpenAPI JSON 规范 | 公开 |
 
 ---
 
@@ -451,7 +450,8 @@ feature_leaderboard/ → leaderboard/   # 排行榜展示
 | `kv_namespaces` | binding `SHEEPS_CACHE`，id `784104ac67eb4f3c83a92e9dcc91b673` |
 | `r2_buckets` | binding `AVATAR_BUCKET`，bucket 名 `sheeps-apk`（头像/APK 共用桶，前缀区分） |
 | `vars.R2_PUBLIC_URL` | `https://file.xqh.cc.cd`（R2 公开访问根域名） |
-| **Worker Secrets**（不在文件中，需 `wrangler secret put`） | `JWT_SECRET`（JWT HMAC 密钥）、`AES_KEY_HEX`（AES-256-GCM 密钥）、`ADMIN_WEB_ORIGIN`（管理后台精确 CORS 源，缺省回退 `*`） |
+| `triggers.crons` | `["17 * * * *"]`（每小时第 17 分触发 `scheduled`，清理待删除账号的 R2 头像） |
+| **Worker Secrets / 绑定**（不在文件中，需 `wrangler secret put` 或绑定配置） | `JWT_SECRET`（JWT HMAC 密钥）、`AES_KEY_HEX`（AES-256-GCM 密钥）、`ADMIN_WEB_ORIGIN`（管理后台精确 CORS 源，缺省回退 `*`）、`SMS_DELIVERY` / `SMS_DELIVERY_URL` + `SMS_DELIVERY_TOKEN`（短信验证码投递网关） |
 | **CI Secrets**（GitHub Actions） | `R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`CF_ACCOUNT_ID`（S3 兼容 API 上传 APK）、`MY_PAT`（gh release 令牌） |
 
 ### 管理后台 `.env` / `.env.production`
@@ -481,17 +481,12 @@ npm test
 ```
 `npm test` 实际执行：
 1. `tsc src/index.ts --target ES2022 --module commonjs ... --outDir .tmp-test` 编译校验；
-2. `node --test` 依次运行：`test/update.test.js`、`test/level.test.js`、`test/difficulty.test.js`、`test/admin_assets.test.js`（覆盖版本探测、LCG 可解性、100 级难度系数、管理员资产等核心逻辑）。
-
-> 注：`server/test/` 下另含 `level.test.ts`（源码级），与 `.js` 版并存；当前 `npm test` 以 `.js` 版本为准。新增用例建议保持 `.js` + `node --test` 形态以匹配 CI。
+2. `node --test test/*.test.js` 运行全部单元测试，当前覆盖 7 个测试套件：`account_deletion`、`admin_create`、`admin_player_workflows`、`player`、`schema`、`sms_delivery`、`websocket`。
 
 类型检查（可选）：`npx tsc --noEmit`。
 
-### 前端关卡遮挡诊断（Python）
-`diagnose_blocking.py` 用于离线验证“哪些 tile 应被标记为 BLOCKED”：它复刻 `server/src/level.ts` 的网格生成与 `server/src/../` 的 10% 面积重叠判定（`TILE=48`、`SPACING=46`、`OVERLAP_MARGIN=0.25`），对 6 种形状（正方/金字塔/十字/菱形/圆环/X 字）打印 BLOCKED/NORMAL 比例与“视觉疑似遮挡但实际 NORMAL”的可疑 tile，便于在端云遮挡逻辑对齐时定位偏差。
-
 ### Android 客户端
-- 客户端以手动/设备验证为主；`:core`、`:feature_*` 模块均配置 `androidx.test` 与 `kotlinx-coroutines-test` 依赖，可编写 ViewModel/Repository 单元测试（置于各模块 `src/test`）。
+- 客户端各模块（`:core`、`:designsystem`、`:feature_game`、`:feature_menu` 等）包含单元测试（`src/test`），`:data`、`:feature_game` 等模块包含 Instrumentation 测试（`src/androidTest`），可通过 `./gradlew test` 运行本地单测。
 - 真机/模拟器联调：`./gradlew :app:assembleDebug` 后 `adb install`。
 
 ---
@@ -501,11 +496,11 @@ npm test
 ### GitHub Actions（`.github/workflows/release.yml`）
 仓库仅含一条 `Auto Release` 工作流，触发条件为：**push 到 `main` 且提交信息包含 `chore(release):`**。流程：
 1. Checkout → 配置 JDK 17（Temurin，Gradle 缓存）。
-2. `./gradlew assembleRelease` 构建 Release APK（读 `app/app/build.gradle.kts` 的 `versionName`）。
-3. 用 AWS S3 兼容 CLI 将 APK 上传至 R2：`s3://sheeps-apk/sheeps_<versionName>.apk`（endpoint `https://<CF_ACCOUNT_ID>.r2.cloudflarestorage.com`），缓存 `immutable`。
+2. `./gradlew assembleRelease --no-daemon` 构建 Release APK（读 `app/app/build.gradle.kts` 的 `versionName`）。
+3. 用 AWS S3 兼容 CLI 将 APK 上传至 R2：`s3://sheeps-apk/sheeps_<versionName>.apk`（endpoint `https://<CF_ACCOUNT_ID>.r2.cloudflarestorage.com`），缓存控制头为 `no-cache, no-store, must-revalidate`。
 4. `gh release` 在 `xqh0927/sheeps-releases` 创建/更新 Tag `v<versionName>` 并上传 APK（若已存在以 `--clobber` 覆盖，规避版本冲突）。
 
-> 说明：现有仓库 `release.yml` 仅负责「构建 APK + 上传 R2 + 建 GitHub Release」。管理后台 `admin-console/README.md` 提及的 `deploy-pages.yml` 当前**尚未落地**，如需 Pages 自动部署请自行补充该工作流（所需 Secrets：`VITE_API_BASE`、`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）。
+> 说明：现有仓库 `release.yml` 仅负责「构建 APK + 上传 R2 + 建 GitHub Release」。后端与管理后台部署可使用根目录快捷脚本：`npm run deploy-backend`（[deploy-backend.js](deploy-backend.js)）与 `npm run deploy-admin`（[deploy-admin.js](deploy-admin.js)）；发布回滚可使用 `node rollback.js`（[rollback.js](rollback.js)）。
 
 ### 一键发版脚本 `release.js`（本地运行）
 在项目根目录执行 `node release.js`，交互式安全发版流程：
@@ -574,7 +569,7 @@ npm test
 在 `app` 目录下：
 
 1. 确认配置：
-   - 检查 `app/core/src/main/java/com/example/sheeps/core/AppConfig.kt` 中的 `BASE_URL` 指向您所部署的 Cloudflare Workers 域名（默认为：`https://api.xqh.cc.cd/`）。
+   - 检查 [AppConfig.kt](app/lib_network/src/main/java/com/example/sheeps/lib_network/AppConfig.kt) 中的 `BASE_URL` 指向您所部署的 Cloudflare Workers 域名（默认为：`https://api.xqh.cc.cd/`）。
 2. 构建 Debug 安装包：
    ```bash
    ./gradlew :app:assembleDebug
@@ -787,13 +782,18 @@ sequenceDiagram
 **顶层设计 / 产品文档**
 - [system_design.md](docs/system_design.md) — 管理后台架构设计 + 任务分解（v1.1），含三级角色模型、鉴权分层、审计日志、seed 脚本。
 - [admin-prd.md](docs/admin-prd.md) — 管理后台增量 PRD（v0.1），明确三级权限、审计、复用 `users` 表等运营后台业务规则。
+- [admin-console-features-design.md](docs/admin-console-features-design.md) — 管理后台功能扩展设计文档。
+- [admin-role-design.md](docs/admin-role-design.md) — 管理后台角色权限设计。
+- [endless-architecture.md](docs/endless-architecture.md) · [gdd-endless-survival-mode.md](docs/gdd-endless-survival-mode.md) — 无尽生存模式架构设计与 GDD 玩法设计。
+- [i18n-multilingual-creation-design.md](docs/i18n-multilingual-creation-design.md) — 多语言国际化与动态创建设计方案。
 - [prd-card-count-difficulty.md](docs/prd-card-count-difficulty.md) — 关卡卡牌数量-难度系数系统 PRD（v2.0），将卡牌数从线性公式改为难度系数曲线渐进。
-- [devops-optimization-report.md](docs/devops-optimization-report.md) — DevOps 性能优化分析报告，定位 Workers/D1/KV/R2 链路瓶颈与优化方案。
-- [six-bugs-root-cause-analysis.md](docs/six-bugs-root-cause-analysis.md) — 6 类典型问题根因分析（积分不一致、过关送金币无明细、计时器缺失、形状固化、快速点击消除失效等）。
+- [devops-optimization-report.md](docs/devops-optimization-report.md) · [api-performance-report-2026-07-13.md](docs/api-performance-report-2026-07-13.md) — DevOps 与 API 性能优化分析报告。
+- [six-bugs-root-cause-analysis.md](docs/six-bugs-root-cause-analysis.md) — 6 类典型问题根因分析。
+- [release-notes-v1.0.0.md](docs/release-notes-v1.0.0.md) — v1.0.0 版本发布说明。
 
 **UML 图（Mermaid 源码）**
-- [class-diagram.mermaid](docs/class-diagram.mermaid) — 管理后台领域类图（User / AdminAuditLog / JwtUtil / AdminAuthService / AdminApiHandler / AuthStore 及关系）。
-- [sequence-diagram.mermaid](docs/sequence-diagram.mermaid) — 管理员登录、readonly 写拦截、operator 改积分、super 专属接口的时序图。
+- [i18n-class-diagram.mermaid](docs/i18n-class-diagram.mermaid) — 国际化多语言模块领域类图。
+- [i18n-sequence-diagram.mermaid](docs/i18n-sequence-diagram.mermaid) — 国际化多语言模块交互时序图。
 
 **法律与合规**
 - [legal/隐私政策.md](docs/legal/隐私政策.md) — 隐私政策正文（PIPL 合规）。
