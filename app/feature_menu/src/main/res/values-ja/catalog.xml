@@ -28,4 +28,10 @@
     <string name="catalog_shop_exchange_item_desc">交換する数量を選んでください。</string>
     <string name="catalog_shop_exchange_skin_desc">コインを使ってこのスキンを解放します。</string>
     <string name="catalog_carry_stock_label">在庫 %1$d</string>
+    <string name="personal_load_failed">読み込めませんでした</string>
+    <string name="personal_retry">再試行</string>
+    <string name="personal_session_expired">ログインの有効期限が切れました</string>
+    <string name="personal_sign_in">再ログイン</string>
+    <string name="settings_game_music">ゲーム音楽</string>
+    <string name="settings_match_sound">タイル消去音</string>
 </resources>

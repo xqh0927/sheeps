@@ -13,6 +13,7 @@ import com.example.sheeps.data.result.ErrorMessageMapper
 import com.example.sheeps.menu.state.MenuViewEffect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import com.example.sheeps.menu.viewmodel.SmsCodeSender
 import javax.inject.Inject
 
 /**
@@ -34,7 +35,8 @@ import javax.inject.Inject
 class AuthDelegate @Inject constructor(
     private val userRepository: UserRepository,
     private val prefs: UserPreferences,
-    private val localDao: LocalDao
+    private val localDao: LocalDao,
+    private val sms: SmsCodeSender
 ) {
     /**
      * 发送短信验证码。
@@ -47,26 +49,8 @@ class AuthDelegate @Inject constructor(
         phone: String,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        if (phone.length != 11) {
-            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_phone_invalid))
-            return
-        }
         scope.launch {
-            when (val result = userRepository.sendCode(phone)) {
-                is ApiResult.Success -> {
-                    // 业务成功（Repository 已把 !success 转为 Error，故此处 data.success 恒为 true）
-                    val resp = result.data
-                    setEffect(
-                        MenuViewEffect.ShowToast(
-                            resId = R.string.toast_send_code_success,
-                            formatArgs = listOf(resp.code ?: "")
-                        )
-                    )
-                }
-                is ApiResult.Error -> setEffect(
-                    MenuViewEffect.ShowToast(resId = ErrorMessageMapper.toResId(result.code))
-                )
-            }
+            sms.send(phone)?.let { setEffect(MenuViewEffect.ShowToast(resId = it)) }
         }
     }
 

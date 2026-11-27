@@ -248,7 +248,7 @@ const privacyMd = fs.readFileSync(path.join(legalDir, '隐私政策.md'), 'utf8'
 const agreementMd = fs.readFileSync(path.join(legalDir, '用户协议.md'), 'utf8');
 
 const privacyHtml = wrapHtml('秘境消消乐 隐私政策', markdownToHtml(privacyMd));
-const agreementHtml = wrapHtml('秘境消境乐 用户协议', markdownToHtml(agreementMd));
+const agreementHtml = wrapHtml('秘境消消乐 用户协议', markdownToHtml(agreementMd));
 
 const publicDir = path.join(__dirname, '..', 'public');
 fs.mkdirSync(publicDir, { recursive: true });

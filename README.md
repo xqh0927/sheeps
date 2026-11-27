@@ -542,6 +542,7 @@ npm test
    ```bash
    npx wrangler d1 execute my-app-db --remote --file=./schema.sql
    ```
+   短信验证码通过 HTTP 接口投递。可配置 Worker 私有服务绑定 `SMS_DELIVERY`，或设置完整 HTTPS 地址 `SMS_DELIVERY_URL` 并通过 Worker secret 配置 Bearer 凭据 `SMS_DELIVERY_TOKEN`。两者均配置时优先使用私有服务绑定。未配置时发送接口返回 503，已有密码的用户可使用密码登录。接入服务商后，由绑定的网关接收 `POST /verification`（JSON 字段 `phone` 和 `code`）；仅在服务商接单成功后返回 HTTP 2xx 和 `{"accepted":true}`。供应商签名、模板和凭据由网关管理。启用前同步更新隐私政策的第三方服务清单。
 6. 注入生产密钥（否则使用 fallback 常量，存在安全风险）：
    ```bash
    npx wrangler secret put JWT_SECRET

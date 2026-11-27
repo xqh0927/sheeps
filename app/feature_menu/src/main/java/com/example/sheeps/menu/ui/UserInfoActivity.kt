@@ -18,7 +18,6 @@ import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
 import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.ResetPasswordRequest
-import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.dialogs.AvatarCropDialog
@@ -97,7 +96,6 @@ class UserInfoActivity : BaseActivity() {
                             userInfoState = userInfoState.copy(username = name)
                         }
                     },
-                    onSendCode = { phone -> handleSendCode(phone, scope) },
                     onChangePassword = { code, newPassword ->
                         handleChangePassword(code, newPassword, scope) { isLoading = it }
                     }
@@ -151,24 +149,6 @@ class UserInfoActivity : BaseActivity() {
 
     // -------- 业务逻辑 --------
 
-    private fun handleSendCode(phone: String, scope: CoroutineScope) {
-        if (phone.length != 11) {
-            Toaster.show(getString(R.string.err_invalid_phone))
-            return
-        }
-        scope.launch {
-            try {
-                val response = apiService.sendCode(SendCodeRequest(phone))
-                if (response.success) {
-                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
-                } else {
-                    Toaster.show(getString(R.string.toast_send_code_failed))
-                }
-            } catch (e: Exception) {
-                Toaster.show(getString(R.string.toast_send_code_network_error))
-            }
-        }
-    }
 
     /**
      * 上传头像：Luban 压缩后的字节数组以 multipart/form-data 上传至 R2

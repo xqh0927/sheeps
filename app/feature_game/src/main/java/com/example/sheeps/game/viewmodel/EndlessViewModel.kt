@@ -55,7 +55,9 @@ class EndlessViewModel @Inject constructor(
 
     override fun handleIntent(intent: EndlessViewIntent) {
         when (intent) {
-            is EndlessViewIntent.Init -> handleInit(intent.isDaily, intent.seed)
+            is EndlessViewIntent.Init -> if (currentState.status == EndlessStatus.READY) {
+                handleInit(intent.isDaily, intent.seed)
+            }
             is EndlessViewIntent.ClickColumn -> handleClickColumn(intent.col, intent.tileId)
             is EndlessViewIntent.UseFreeze -> handleUseFreeze()
             is EndlessViewIntent.Pause -> handlePause()
@@ -188,23 +190,23 @@ class EndlessViewModel @Inject constructor(
             delay(200.milliseconds)
             if (round !== dropClock || currentState.status == EndlessStatus.GAMEOVER) return@launch
 
-            var matchOccurred = false
-            var matchedIds = emptySet<String>()
+            var resolved: EndlessEngine.MatchResult? = null
             var deathReason: String? = null
 
             updateState {
                 val latestSlot = this.slotTiles
                 val tileStillInSlot = latestSlot.any { it.id == tileId }
                 if (!tileStillInSlot) {
+                    resolved = null
+                    deathReason = null
                     this
                 } else {
                     val matchResult = EndlessEngine.resolveMatch(latestSlot)
-                    val isMatched = matchResult.eliminatedIds.isNotEmpty()
+                    val isMatched = matchResult.tileType != null
                     val finalSlot = matchResult.newSlot
                     val eliminatedIds = matchResult.eliminatedIds
 
-                    matchOccurred = isMatched
-                    matchedIds = eliminatedIds
+                    resolved = matchResult
 
                     val (newScore, newCombo) = if (isMatched) {
                         val combo = this.combo + 1
@@ -226,9 +228,10 @@ class EndlessViewModel @Inject constructor(
                 }
             }
 
-            if (matchOccurred) {
-                eliminatedCount += matchedIds.size
-                setEffect(EndlessViewEffect.PlaySound(SoundType.MATCH))
+            val result = resolved ?: return@launch
+            result.tileType?.let { type ->
+                eliminatedCount += result.eliminatedIds.size
+                setEffect(EndlessViewEffect.TileMatch(type))
                 maybeAdvanceWave()
             }
 

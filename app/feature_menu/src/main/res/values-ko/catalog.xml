@@ -28,4 +28,10 @@
     <string name="catalog_shop_exchange_item_desc">교환할 수량을 선택하세요.</string>
     <string name="catalog_shop_exchange_skin_desc">코인을 사용해 이 타일 스킨을 잠금 해제하세요.</string>
     <string name="catalog_carry_stock_label">재고 %1$d</string>
+    <string name="personal_load_failed">불러오지 못했습니다</string>
+    <string name="personal_retry">다시 시도</string>
+    <string name="personal_session_expired">로그인이 만료되었습니다</string>
+    <string name="personal_sign_in">다시 로그인</string>
+    <string name="settings_game_music">게임 음악</string>
+    <string name="settings_match_sound">타일 제거 효과음</string>
 </resources>

@@ -28,8 +28,6 @@ enum class SoundType {
     CLICK,
     /** 封印解除声 */
     UNSEAL,
-    /** 成功消除声 */
-    MATCH,
     /** 胜利欢呼声 */
     WIN,
     /** 失败音效 */
@@ -99,9 +97,9 @@ data class GameViewState(
     val score: Int = 0,
     /** 当前游戏运行状态 */
     val gameStatus: GameStatus = GameStatus.INIT,
-    /** 本局已用时间（毫秒），仅在通关结算时由 ViewModel 写入一次（不再每秒更新，避免整树重组） */
+    /** 暂停、恢复或结算时的累计前台游戏时间（毫秒） */
     val elapsedMs: Long = 0,
-    /** 关卡开始时间戳（墙钟毫秒），由 ViewModel 在 startTimer 时写入一次；状态栏据此本地计时，避免每秒全局重组 */
+    /** 状态栏显示用的时间起点（墙钟毫秒），暂停时为零 */
     val levelStartTimestamp: Long = 0,
     /** 通关结算积分（排行榜提交值） */
     val finalScore: Int = 0,
@@ -128,8 +126,13 @@ data class GameViewState(
     /** 封印牌按 z 轴从大到小（自上而下）排序的解锁顺序 */
     val sealedOrder: List<String> = emptyList(),
     /** 用户当前是否已登录 */
-    val isLoggedIn: Boolean = false
+    val isLoggedIn: Boolean = false,
+    /** 本次前台计时段的单调时钟起点，暂停时为 null。 */
+    val activeSinceNanos: Long? = null
 )
+
+internal fun GameViewState.elapsedAt(nowNanos: Long): Long =
+    elapsedMs + (activeSinceNanos?.let { (nowNanos - it).coerceAtLeast(0L) / 1_000_000L } ?: 0L)
 
 /**
  * 游戏界面意图（MVI 中的 Intent）。
@@ -187,7 +190,8 @@ sealed interface GameViewEffect {
     /** 显示吐司提示 */
     data class ShowToast(val message: String) : GameViewEffect
     /** 播放指定音效 */
-    data class PlaySound(val soundType: SoundType) : GameViewEffect
+    data class TileMatch(val tileType: Int, val emittedAtNanos: Long = System.nanoTime()) : GameViewEffect
+    data class PlaySound(val soundType: SoundType, val emittedAtNanos: Long = System.nanoTime()) : GameViewEffect
     /** 触发触觉反馈（振动） */
     object Vibrate : GameViewEffect
 }
@@ -195,11 +199,4 @@ sealed interface GameViewEffect {
 /**
  * 历史状态快照，用于 Undo 撤销操作恢复数据
  */
-data class GameHistoryState(
-    val boardTiles: List<Tile>,
-    val slotTiles: List<Tile>,
-    val movedOutTiles: List<Tile>,
-    val sealedClearCount: Int,
-    val sealedUnlockedIds: Set<String>
-)
-
+typealias GameHistoryState = com.example.sheeps.data.repository.StagePosition

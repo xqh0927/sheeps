@@ -44,6 +44,7 @@
             android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
             tools:node="merge">
+            <meta-data android:name="androidx.work.WorkManagerInitializer" tools:node="remove" />
             <meta-data
                 android:name="com.example.sheeps.core.startup.MmkvInitializer"
                 android:value="androidx.startup" />

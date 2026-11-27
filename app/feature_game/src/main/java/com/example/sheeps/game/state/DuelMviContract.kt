@@ -97,7 +97,8 @@ sealed interface DuelViewEffect {
     /** 显示提示消息 */
     data class ShowToast(val message: String) : DuelViewEffect
     /** 播放音效 */
-    data class PlaySound(val soundType: SoundType) : DuelViewEffect
+    data class TileMatch(val tileType: Int, val emittedAtNanos: Long = System.nanoTime()) : DuelViewEffect
+    data class PlaySound(val soundType: SoundType, val emittedAtNanos: Long = System.nanoTime()) : DuelViewEffect
     /** 设备振动 */
     object Vibrate : DuelViewEffect
     /** 退出游戏界面返回主页 */

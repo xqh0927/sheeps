@@ -17,6 +17,7 @@ export interface AdminUserRow {
   is_banned: number;
   avatar_url?: string;
   created_at: number;
+  deletion_requested_at: number | null;
 }
 
 export interface AuditRow {
@@ -64,8 +65,8 @@ export const getStats = () => api.get<Stats>('/api/admin/stats').then((r) => r.d
 
 // ============ 用户管理 ============
 /** GET /api/admin/users —— 分页 + 关键字 + 角色筛选用户列表。参数含 page/pageSize/keyword/role。 */
-export const listUsers = (page = 1, pageSize = 20, keyword = '', role = '') =>
-  api.get<PageResult<AdminUserRow>>(`/api/admin/users${buildQuery({ page, pageSize, keyword, role })}`).then((r) => r.data);
+export const listUsers = (page = 1, pageSize = 20, keyword = '', role = '', pendingOnly = false) =>
+  api.get<PageResult<AdminUserRow>>(`/api/admin/users${buildQuery({ page, pageSize, keyword, role, deletion_pending: pendingOnly ? 1 : undefined })}`).then((r) => r.data);
 
 /** POST /api/admin/users/:id/points —— 调整用户积分（amount 可正可负，reason 为操作备注）。 */
 export const adjustPoints = (id: string, amount: number, reason?: string) =>
@@ -80,8 +81,8 @@ export const renameUser = (id: string, username: string) =>
   api.put(`/api/admin/users/${id}`, { username }).then((r) => r.data);
 
 /** DELETE /api/admin/users/:id —— 删除用户（高危写操作，需写权限）。 */
-export const deleteUser = (id: string) =>
-  api.delete(`/api/admin/users/${id}`).then((r) => r.data);
+export const deleteUser = (id: string, requestedAt?: number | null) =>
+  api.delete(`/api/admin/users/${id}${buildQuery({ expected_requested_at: requestedAt ?? undefined })}`).then((r) => r.data);
 
 export interface UserItem {
   item_type: string;
@@ -151,6 +152,29 @@ export const deleteTask = (id: string | number) =>
 /** GET /api/admin/levels —— 分页查询关卡列表。 */
 export const listLevels = (page = 1, pageSize = 20) =>
   api.get<PageResult<any>>(`/api/admin/levels${buildQuery({ page, pageSize })}`).then((r) => r.data);
+
+export interface LevelHealthRow {
+  level_id: number;
+  layout_version: string;
+  attempts: number;
+  settled_attempts: number;
+  failed_attempts: number;
+  first_settled_attempts: number;
+  first_wins: number;
+  retried_failures: number;
+  item_attempts: number;
+  first_win_rate: number | null;
+  retry_rate: number | null;
+  item_use_rate: number | null;
+}
+
+export const listLevelHealth = (params: {
+  page: number;
+  pageSize: number;
+  level_id?: number;
+  layout_version?: string;
+}, signal?: AbortSignal) =>
+  api.get<PageResult<LevelHealthRow>>(`/api/admin/levels/health${buildQuery(params)}`, { signal }).then((r) => r.data);
 
 /** POST /api/admin/levels —— 新建关卡。 */
 export const createLevel = (body: Record<string, any>) =>

@@ -1,0 +1,7 @@
+<resources>
+    <string name="account_security">Account and security</string>
+    <string name="deletion_submit">Request account deletion</string>
+    <string name="deletion_withdraw">Withdraw request</string>
+    <string name="deletion_explain">Deleting your account permanently removes access to your progress, coins and items. Submit a request below. You can withdraw it before it is processed.</string>
+    <string name="deletion_pending">Your deletion request is pending. You can withdraw it before it is processed.</string>
+</resources>

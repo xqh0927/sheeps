@@ -36,6 +36,8 @@ import com.example.sheeps.data.model.UnlockLevelResponse
 import com.example.sheeps.data.model.UserProfileResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import com.example.sheeps.data.model.DeletionRequestStatus
+import retrofit2.http.DELETE
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -45,6 +47,15 @@ import retrofit2.http.Part
 import retrofit2.http.Query
 
 interface ApiService {
+    @GET("/api/user/deletion-request")
+    suspend fun deletionStatus(@Header("Authorization") auth: String): DeletionRequestStatus
+
+    @POST("/api/user/deletion-request")
+    suspend fun requestDeletion(@Header("Authorization") auth: String): DeletionRequestStatus
+
+    @DELETE("/api/user/deletion-request")
+    suspend fun withdrawDeletion(@Header("Authorization") auth: String): DeletionRequestStatus
+
 
     /**
      * 用户改名 — 修改用户昵称
@@ -68,6 +79,12 @@ interface ApiService {
         @Query("seed") seed: Int? = null
     ): List<Tile>
 
+    @GET("/api/level")
+    suspend fun getStageBoard(
+        @Query("id") levelId: Int,
+        @Query("seed") seed: Int
+    ): retrofit2.Response<List<Tile>>
+
     /**
      * 提交通关成绩 — 将玩家通关耗时与分数提交至服务端校验并存档
      *
@@ -78,6 +95,19 @@ interface ApiService {
     @POST("/api/score/submit")
     suspend fun submitScore(
         @Header("Authorization") auth: String?,
+        @Body request: ScoreRequest
+    ): GenericResponse
+
+    @POST("/api/level/attempt")
+    suspend fun recordStageStart(
+        @Header("Authorization") auth: String,
+        @Body request: com.example.sheeps.data.model.StageStartRequest
+    ): GenericResponse
+
+    /** A queued result is retried only on the dedicated receipt endpoint, including after server rollback. */
+    @POST("/api/score/submit-once")
+    suspend fun submitScoreOnce(
+        @Header("Authorization") auth: String,
         @Body request: ScoreRequest
     ): GenericResponse
 

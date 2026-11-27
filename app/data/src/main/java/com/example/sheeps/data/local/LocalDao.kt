@@ -55,6 +55,49 @@ interface LocalDao {
         insertProgressList(progress)
     }
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun enqueueScore(result: PendingStageScore): Long
+
+    @Query("SELECT * FROM pending_stage_scores WHERE ownerId = :owner ORDER BY completedAt, rowid")
+    suspend fun pendingScores(owner: String): List<PendingStageScore>
+
+    @Query("SELECT ownerId FROM pending_stage_scores UNION SELECT ownerId FROM pending_stage_starts")
+    suspend fun pendingUploadOwners(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun enqueueStageStart(start: PendingStageStart)
+
+    @Query("SELECT * FROM pending_stage_starts WHERE ownerId = :owner ORDER BY startedAt, rowid")
+    suspend fun pendingStageStarts(owner: String): List<PendingStageStart>
+
+    @Query("DELETE FROM pending_stage_starts WHERE ownerId = :owner AND runId = :runId")
+    suspend fun acknowledgeStageStart(owner: String, runId: String)
+
+    @Query("DELETE FROM pending_stage_scores WHERE ownerId = :owner AND runId = :runId")
+    suspend fun acknowledgeScore(owner: String, runId: String)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun unlockIfMissing(progress: UserProgressEntity): Long
+
+    @Query("DELETE FROM stage_saves WHERE ownerId = :owner AND runId = :id")
+    suspend fun clearStageSave(owner: String, id: String)
+
+    @Transaction
+    suspend fun recordStageResult(result: PendingStageScore, updateLocal: Boolean) {
+        clearStageSave(result.ownerId, result.runId)
+        if (enqueueScore(result) == -1L || !result.won || !updateLocal) return
+        insertProgress(UserProgressEntity(result.levelId, result.score, result.clearTimeMs, true, result.completedAt))
+        unlockIfMissing(UserProgressEntity(result.levelId + 1, 0, 0, true, result.completedAt))
+    }
+
+    @Transaction
+    suspend fun replaceCloudProgress(owner: String, remote: List<UserProgressEntity>) {
+        val outstanding = pendingScores(owner).filter { it.won }
+            .flatMap { listOf(it.levelId, it.levelId + 1) }.toSet()
+        val local = getAllProgress().filter { it.levelId in outstanding }
+        replaceProgress(remote + local)
+    }
+
     // --- Backpack Items ---
     @Query("SELECT * FROM backpack_items")
     /** 以 Flow 持续观察全部道具背包。 */

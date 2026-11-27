@@ -108,6 +108,7 @@ export async function handleWebSocketSession(
 
   // 处理客户端发来的操作指令
   let lastActionTime = 0;
+  let resultPending = false;
   socket.addEventListener('message', async (event) => {
     if (stopped) return;
     try {
@@ -115,8 +116,11 @@ export async function handleWebSocketSession(
       const command = JSON.parse(text);
       const currentTime = Date.now();
 
-      // 滑动窗口限流防刷 (100ms 内只能操作一次)
-      if (currentTime - lastActionTime < 100) {
+      const normalResult = command.type === 'SYSTEM_EVENT' && NORMAL_RESULTS.includes(command.payload?.systemMessage);
+      // A terminal event may follow the last move immediately. Admit a single pending result per socket;
+      // the conditional insert below arbitrates results across both players.
+      if (normalResult && resultPending) return;
+      if (!normalResult && currentTime - lastActionTime < 100) {
         socket.send(JSON.stringify({
           gameId, seqId: command.seqId, timestamp: currentTime, senderId: 'SYSTEM',
           type: 'SYSTEM_EVENT', payload: { systemMessage: 'RATE_LIMIT_EXCEEDED' }
@@ -134,9 +138,13 @@ export async function handleWebSocketSession(
 
       // 写入指令到 D1，对手的轮询引擎会自动拉取
       const args = [gameId, playerId, JSON.stringify(command), currentTime];
-      if (command.type === 'SYSTEM_EVENT' && NORMAL_RESULTS.includes(command.payload?.systemMessage)) {
+      if (normalResult) {
+        resultPending = true;
         const result = await env.DB.prepare(`${INSERT_EVENT} SELECT ?, ?, ?, ? WHERE NOT EXISTS (${HAS_RESULT})`)
-          .bind(...args, gameId).run();
+          .bind(...args, gameId).run().catch(error => {
+            resultPending = false;
+            throw error;
+          });
         if (result.meta.changes) stopPolling();
       } else {
         await env.DB.prepare(`${INSERT_EVENT} VALUES (?, ?, ?, ?)`).bind(...args).run();

@@ -11,28 +11,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.ui.R
 
 @Composable
-fun ActionButtonsSection(
-    state: MenuViewState,
-    onShowPointHistory: () -> Unit,
-    onShowExchangeHistory: () -> Unit,
-    onLogoutClick: () -> Unit
-) {
-    if (!state.isLoggedIn) return
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
-            Column {
-                CatalogLink(Icons.Default.History, stringResource(R.string.points_history_title), onShowPointHistory)
-                CatalogDivider()
-                CatalogLink(Icons.Default.Receipt, stringResource(R.string.exchange_history_title), onShowExchangeHistory)
+fun ActionButtonsSection(onShowPointHistory: () -> Unit, onShowExchangeHistory: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        listOf(
+            Triple(Icons.Default.History, R.string.points_history_title, onShowPointHistory),
+            Triple(Icons.Default.Receipt, R.string.exchange_history_title, onShowExchangeHistory)
+        ).forEach { (icon, label, onClick) ->
+            Surface(onClick = onClick, modifier = Modifier.weight(1f), shape = RoundedCornerShape(16.dp)) {
+                Row(Modifier.heightIn(min = 52.dp).padding(10.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                    Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+                }
             }
-        }
-        TextButton(onLogoutClick, modifier = Modifier.padding(top = 16.dp).fillMaxWidth().heightIn(min = 50.dp),
-            shape = RoundedCornerShape(20.dp), colors = ButtonDefaults.textButtonColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Text(stringResource(R.string.btn_logout), color = MaterialTheme.colorScheme.error)
         }
     }
 }

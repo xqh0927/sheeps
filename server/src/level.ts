@@ -92,6 +92,26 @@ function randomSealLayer(rand: () => number, maxLayer: number): number {
   return 3;
 }
 
+function tutorialLevel(): TileData[] {
+  const tiles: TileData[] = [];
+  function row(type: number, y: number, z: number, ...columns: number[]) {
+    for (const x of columns) {
+      tiles.push({
+        id: `tile_${tiles.length}`, type, x, y, z,
+        isBlind: false, sealedCount: 0, sealUnlockThreshold: SEAL_UNLOCK_THRESHOLD,
+      });
+    }
+  }
+
+  // 自底向上，单独露出的 2 与首组三消后揭开的两张组成下一组。
+  row(1, 2.5, 0, 1, 3, 5);
+  row(2, 4.5, 0, 3);
+  row(3, 2.125, 1, 1, 3, 5);
+  row(2, 1.75, 2, 1, 3);
+  row(1, 1.375, 3, 1, 3, 5);
+  return tiles;
+}
+
 /**
  * 生成保证必定有解（Solvable）的关卡卡牌三维布局数据
  * 算法原理：自底向上（Z轴）根据轮廓形状生成可用网格坐标，之后利用 LCG 反向模拟玩家消除步骤（反向从槽位拿牌放到棋盘上暴露位置）以填充花色。
@@ -102,52 +122,39 @@ function randomSealLayer(rand: () => number, maxLayer: number): number {
  * @return 关卡所有卡牌的数据列表
  */
 export function generateSolvableLevel(userId: number, levelId: number, seed: number): TileData[] {
-  let coordinates: Point3D[] = [];
+  if (levelId === 1) return tutorialLevel();
 
-  // 第 1 关采用简单的新手引导固定布局
-  if (levelId === 1) {
-    coordinates = [
-      { x: 1.0, y: 1.0, z: 0 }, { x: 2.0, y: 1.0, z: 0 },
-      { x: 1.0, y: 2.0, z: 0 }, { x: 2.0, y: 2.0, z: 0 },
-      { x: 1.5, y: 1.5, z: 1 }, { x: 2.5, y: 1.5, z: 1 },
-      { x: 1.5, y: 2.5, z: 1 }, { x: 2.5, y: 2.5, z: 1 },
-      { x: 2.0, y: 2.0, z: 2 },
-      { x: 2.0, y: 1.0, z: 3 }, { x: 1.0, y: 2.0, z: 3 }, { x: 2.0, y: 2.0, z: 3 }
-    ];
-  } else {
-    // 后续关卡根据算法生成堆叠布局
-    // 与 Android 端对齐：maxCards 来自难度曲线，baseSize 按 levelId/2 增长
-    const { cardCount: maxCards } = calculateCardCount(userId, levelId);
-    const possible: Point3D[] = [];
+  // 后续关卡根据算法生成堆叠布局
+  // 与 Android 端对齐：maxCards 来自难度曲线，baseSize 按 levelId/2 增长
+  const { cardCount: maxCards } = calculateCardCount(userId, levelId);
+  const possible: Point3D[] = [];
 
-    const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
-    const baseSize = Math.min(20, 6 + Math.floor(levelId / 2));
+  const layersCount = Math.min(12, Math.floor(12 - 8 / Math.sqrt(levelId - 1)));
+  const baseSize = Math.min(20, 6 + Math.floor(levelId / 2));
 
-    for (let z = 0; z < layersCount; z++) {
-      const size = Math.max(3, baseSize - Math.floor(z / 3));
-      const colSize = Math.min(6, size);
-      const rowSize = Math.min(7, size);
-      const offset = z % 2 === 0 ? 0 : 0.5;
-      for (let r = 0; r < rowSize; r++) {
-        for (let c = 0; c < colSize; c++) {
-          // 第 1 关正方形 fallback，其余关卡用 shapeType 选择 18 种形状之一
-          possible.push({ x: c + offset + 1.0, y: r + offset + 1.0, z });
-        }
+  for (let z = 0; z < layersCount; z++) {
+    const size = Math.max(3, baseSize - Math.floor(z / 3));
+    const colSize = Math.min(6, size);
+    const rowSize = Math.min(7, size);
+    const offset = z % 2 === 0 ? 0 : 0.5;
+    for (let r = 0; r < rowSize; r++) {
+      for (let c = 0; c < colSize; c++) {
+        possible.push({ x: c + offset + 1.0, y: r + offset + 1.0, z });
       }
     }
-
-    // 引入种子和关卡影响布局，相同 levelId 不同 seed 产生不同排列
-    const layoutSeed = seed * 31 + levelId * 1000;
-    const rand = lcg(layoutSeed);
-    for (let i = possible.length - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      [possible[i], possible[j]] = [possible[j], possible[i]];
-    }
-
-    // 确保卡牌总数是 3 的倍数
-    const count = Math.min(possible.length, maxCards) - (Math.min(possible.length, maxCards) % 3);
-    coordinates = possible.slice(0, count);
   }
+
+  // 引入种子和关卡影响布局，相同 levelId 不同 seed 产生不同排列
+  const layoutSeed = seed * 31 + levelId * 1000;
+  const rand = lcg(layoutSeed);
+  for (let i = possible.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [possible[i], possible[j]] = [possible[j], possible[i]];
+  }
+
+  // 确保卡牌总数是 3 的倍数
+  const count = Math.min(possible.length, maxCards) - (Math.min(possible.length, maxCards) % 3);
+  const coordinates = possible.slice(0, count);
 
   coordinates.sort((a, b) => a.z - b.z);
 
@@ -155,7 +162,7 @@ export function generateSolvableLevel(userId: number, levelId: number, seed: num
   const nodes: Node[] = coordinates.map((coord, index) => ({ index, coord, assignedType: -1 }));
   const unassigned = new Set<Node>(nodes);
 
-  const numTypes = levelId === 1 ? 3 : Math.min(12, 3 + Math.floor(3 * Math.log(levelId)));
+  const numTypes = Math.min(12, 3 + Math.floor(3 * Math.log(levelId)));
   const randAssign = lcg(seed + 100);
 
   // 25% 覆盖面积遮挡算法：累计所有更高层卡牌的覆盖面积

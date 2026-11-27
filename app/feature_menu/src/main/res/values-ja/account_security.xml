@@ -1,0 +1,7 @@
+<resources>
+    <string name="account_security">アカウントとセキュリティ</string>
+    <string name="deletion_submit">アカウント削除を申請</string>
+    <string name="deletion_withdraw">申請を取り消す</string>
+    <string name="deletion_explain">削除が完了すると、アカウント、コイン、アイテム、進行状況を復元できません。下のボタンから申請できます。処理前は取り消せます。</string>
+    <string name="deletion_pending">アカウント削除を申請しました。処理前は申請を取り消せます。</string>
+</resources>

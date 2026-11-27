@@ -16,6 +16,10 @@ import com.example.sheeps.data.model.RenameRequest
 import com.example.sheeps.data.model.ShopItem
 import com.example.sheeps.data.model.UserItem
 import com.example.sheeps.data.network.ApiService
+import com.example.sheeps.data.repository.UserRepository
+import com.example.sheeps.data.result.ApiResult
+import com.example.sheeps.menu.state.PersonalSection
+import com.example.sheeps.menu.state.PersonalLoadState
 import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.menu.state.MenuViewEffect
 import com.example.sheeps.menu.state.MenuViewIntent
@@ -64,6 +68,7 @@ class MenuViewModel @Inject constructor(
     private val shopCache: ShopCache,
     private val localDao: LocalDao,
     private val syncRepository: SyncRepository,
+    private val userRepository: UserRepository,
     private val networkMonitor: NetworkMonitor,
     private val gameService: IGameService,
     // 业务委派
@@ -77,7 +82,7 @@ class MenuViewModel @Inject constructor(
 
     private var homeLoadJob: Job? = null
     private var shopRefreshJob: Job? = null
-    private var accountActivityJob: Job? = null
+    private val personalJobs = mutableMapOf<PersonalSection, Job>()
     private var displayedAccount: String? = prefs.accountId()
     private var lastGameModesRefreshMs = 0L
 
@@ -151,6 +156,7 @@ class MenuViewModel @Inject constructor(
     override fun handleIntent(intent: MenuViewIntent) {
         when (intent) {
             is MenuViewIntent.LoadData -> handleLoadData()
+            is MenuViewIntent.RetryPersonalSection -> refreshPersonalSection(intent.section)
             is MenuViewIntent.SendSmsCode -> authDelegate.handleSendSmsCode(
                 viewModelScope,
                 intent.phone,
@@ -242,7 +248,8 @@ class MenuViewModel @Inject constructor(
             is MenuViewIntent.GoToGame -> setEffect(
                 MenuViewEffect.NavigateToGame(
                     intent.levelId,
-                    intent.carryItemsJson
+                    intent.carryItemsJson,
+                    intent.preparedRunId
                 )
             )
 
@@ -258,7 +265,8 @@ class MenuViewModel @Inject constructor(
     private fun handleLoadData() {
         homeLoadJob?.cancel()
         shopRefreshJob?.cancel()
-        accountActivityJob?.cancel()
+        personalJobs.values.forEach { it.cancel() }
+        personalJobs.clear()
 
         val token = prefs.getToken()
         val owner = prefs.accountId(token)
@@ -278,11 +286,13 @@ class MenuViewModel @Inject constructor(
                 signStreak = if (token != null) prefs.getSignStreak() else 0,
                 highestLevelCleared = if (token != null) gameService.getHighestLevelCleared() else 0,
                 avatarUrl = if (token != null) prefs.getAvatarUrl() else "",
+                personalStatus = emptyMap(),
                 dailyTasks = if (changedAccount || token == null) emptyList() else dailyTasks,
                 pointsHistory = if (changedAccount || token == null) emptyList() else pointsHistory,
                 exchangeHistory = if (changedAccount || token == null) emptyList() else exchangeHistory
             )
         }
+        val confirmedBeforeRefresh = syncRepository.confirmedStageScores
         homeLoadJob = viewModelScope.launch {
             launch {
                 val items = fetchShopItems()
@@ -298,6 +308,7 @@ class MenuViewModel @Inject constructor(
                 fetchSection { syncRepository.syncDirtyData() }
                 currentCoroutineContext().ensureActive()
                 if (!current()) return@launch
+                if (syncRepository.confirmedStageScores != confirmedBeforeRefresh) refreshPersonalSection(PersonalSection.Tasks)
                 val profile = syncRepository.pullCloudProfile() ?: return@launch
                 currentCoroutineContext().ensureActive()
                 if (current()) {
@@ -306,12 +317,8 @@ class MenuViewModel @Inject constructor(
                     refreshProfile()
                 }
             }
-            launch {
-                val history = fetchSection { apiService.getExchangeHistory("Bearer $token") } ?: return@launch
-                if (current()) updateState { copy(exchangeHistory = history) }
-            }
         }
-        if (token != null && networkMonitor.isOnline()) refreshAccountActivity()
+        if (token != null) PersonalSection.entries.forEach(::refreshPersonalSection)
     }
 
     private suspend fun <T> fetchSection(block: suspend () -> T): T? = try {
@@ -344,20 +351,36 @@ class MenuViewModel @Inject constructor(
     }
 
     private fun refreshAccountActivity() {
-        accountActivityJob?.cancel()
+        refreshPersonalSection(PersonalSection.Tasks)
+        refreshPersonalSection(PersonalSection.Points)
+    }
+
+    private fun refreshPersonalSection(section: PersonalSection) {
+        personalJobs.remove(section)?.cancel()
         val token = prefs.getToken() ?: return
         val owner = prefs.accountId(token)
         val language = prefs.getLanguage()
-        if (!networkMonitor.isOnline()) return
-        accountActivityJob = viewModelScope.launch {
-            val auth = "Bearer $token"
-            launch {
-                val tasks = fetchSection { apiService.getDailyTasks(auth) } ?: return@launch
-                if (prefs.accountId() == owner && prefs.getLanguage() == language) updateState { copy(dailyTasks = tasks) }
+        fun setStatus(status: PersonalLoadState) = updateState { copy(personalStatus = personalStatus + (section to status)) }
+        if (!networkMonitor.isOnline()) {
+            setStatus(PersonalLoadState.Failed)
+            return
+        }
+        setStatus(PersonalLoadState.Loading)
+        personalJobs[section] = viewModelScope.launch {
+            suspend fun <T> receive(result: ApiResult<T>, setData: MenuViewState.(T) -> MenuViewState) {
+                currentCoroutineContext().ensureActive()
+                if (prefs.accountId() != owner || prefs.getLanguage() != language) return
+                when (result) {
+                    is ApiResult.Success -> updateState {
+                        setData(result.data).copy(personalStatus = personalStatus + (section to PersonalLoadState.Ready))
+                    }
+                    is ApiResult.Error -> setStatus(if (result.code == 401) PersonalLoadState.SignInRequired else PersonalLoadState.Failed)
+                }
             }
-            launch {
-                val history = fetchSection { apiService.getPointsHistory(auth) } ?: return@launch
-                if (prefs.accountId() == owner && prefs.getLanguage() == language) updateState { copy(pointsHistory = history) }
+            when (section) {
+                PersonalSection.Tasks -> receive(userRepository.dailyTasks(token)) { copy(dailyTasks = it) }
+                PersonalSection.Points -> receive(userRepository.pointsHistory(token)) { copy(pointsHistory = it) }
+                PersonalSection.Exchanges -> receive(userRepository.exchangeHistory(token)) { copy(exchangeHistory = it) }
             }
         }
     }

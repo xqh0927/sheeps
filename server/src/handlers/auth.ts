@@ -3,6 +3,13 @@ import { getCorsHeaders } from '../helpers';
 import { generateJWT, verifyJWT } from '../crypto';
 import { hashPassword, verifyPassword } from '../auth-utils';
 
+// Consume only the same issuance that was checked, including when a resend races verification.
+async function consumeCode(env: Env, phone: string, code: string, issuedAt: number): Promise<boolean> {
+    const result = await env.DB.prepare('DELETE FROM login_token WHERE phone=? AND code=? AND created_at=? AND created_at>=?')
+        .bind(phone, code, issuedAt, Date.now() - 5 * 60 * 1000).run();
+    return result.meta.changes === 1;
+}
+
 /**
  * 处理所有与身份认证相关的 HTTP 路由请求
  * 
@@ -20,18 +27,44 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
      * 请求体 (JSON):
      *   @param {string} phone — 手机号
      *
-     * 响应: { success: true, code: "123456" }
+     * 响应: { success: true, code: "" }（保留旧版兼容字段）
      */
     if (path === '/api/auth/send-code' && request.method === 'POST') {
         const body: { phone: string } = await request.json();
         // 参数校验：手机号必填，缺失返回 400 Bad Request
         if (!body.phone) return new Response(JSON.stringify({ error: '请填写手机号' }), { status: 400, headers: corsHeaders });
 
-        // 生成 6 位随机数字验证码
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        // DB：对 login_token 表执行 upsert（INSERT OR REPLACE），以最新验证码与时间戳覆盖该手机号旧记录，供后续登录做 5 分钟过期校验
-        await env.DB.prepare('INSERT OR REPLACE INTO login_token (phone, code, created_at) VALUES (?, ?, ?)').bind(body.phone, code, Date.now()).run();
-        return new Response(JSON.stringify({ success: true, code }), { headers: corsHeaders });
+        if (typeof body.phone !== 'string' || !/^1\d{10}$/.test(body.phone)) return Response.json({ error: '手机号格式错误' }, { status: 400, headers: corsHeaders });
+        const gateway = env.SMS_DELIVERY;
+        const endpoint = gateway ? 'https://sms.internal/verification' : env.SMS_DELIVERY_URL;
+        if (!endpoint || (!gateway && (!env.SMS_DELIVERY_TOKEN || !endpoint.startsWith('https://')))) return Response.json({ error: '短信服务暂不可用' }, { status: 503, headers: corsHeaders });
+
+        const issuedAt = Date.now();
+        const code = String(100000 + crypto.getRandomValues(new Uint32Array(1))[0] % 900000);
+        const reserved = await env.DB.prepare(`
+            INSERT INTO login_token(phone, code, created_at) VALUES(?, ?, ?)
+            ON CONFLICT(phone) DO UPDATE SET code=excluded.code, created_at=excluded.created_at
+            WHERE login_token.created_at <= excluded.created_at - 60000
+        `).bind(body.phone, code, issuedAt).run();
+        if (!reserved.meta.changes) return Response.json({ error: '请稍后再获取验证码' }, { status: 429, headers: corsHeaders });
+        try {
+            const headers = new Headers({ 'Content-Type': 'application/json' });
+            if (!gateway) headers.set('Authorization', 'Bearer ' + env.SMS_DELIVERY_TOKEN);
+            const deliveryRequest = new Request(endpoint, {
+                method: 'POST', headers, redirect: 'error',
+                body: JSON.stringify({ phone: body.phone, code }), signal: AbortSignal.timeout(8000)
+            });
+            const receipt = gateway ? await gateway.fetch(deliveryRequest) : await fetch(deliveryRequest);
+            if (!receipt.ok || (await receipt.json<{ accepted?: boolean }>()).accepted !== true) {
+                throw new Error('SMS delivery not accepted');
+            }
+        } catch {
+            await env.DB.prepare('DELETE FROM login_token WHERE phone=? AND code=? AND created_at=?')
+                .bind(body.phone, code, issuedAt).run();
+            return Response.json({ error: '验证码发送失败，请重试' }, { status: 502, headers: corsHeaders });
+        }
+        // Keep the string field for previously published APKs that require it.
+        return Response.json({ success: true, code: '' }, { headers: corsHeaders });
     }
 
     /**
@@ -70,8 +103,9 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (Date.now() - tokenRecord.created_at > 5 * 60 * 1000)
             return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
 
-        // 清除已用验证码：fire-and-forget 异步删除 login_token 记录，失败静默忽略（.catch 避免未处理异常），不阻塞主流程
-        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+        // 核销本次验证码，再执行账号操作
+        if (!await consumeCode(env, body.phone, body.code, tokenRecord.created_at))
+            return Response.json({ error: '验证码已失效，请重新获取' }, { status: 400, headers: corsHeaders });
 
         let user = userRow.results[0] as any;
         // 准备响应数据（默认使用预查询结果）
@@ -175,6 +209,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
         if (!payload || payload.type !== 'refresh') return new Response(JSON.stringify({ error: '登录凭证已过期，请重新登录' }), { status: 401, headers: corsHeaders });
 
         // 重新签发一组新的双 Token
+        const account = await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(payload.userId).first();
+        if (!account) return Response.json({ error: '登录凭证已失效，请重新登录' }, { status: 401, headers: corsHeaders });
         const newAccessToken = await generateJWT({ userId: payload.userId, phone: payload.phone, type: 'access', exp: Date.now() + 7200000 });
         const newRefreshToken = await generateJWT({ userId: payload.userId, phone: payload.phone, type: 'refresh', exp: Date.now() + 30 * 86400000 });
 
@@ -212,7 +248,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             return new Response(JSON.stringify({ error: '该手机号已注册' }), { status: 400, headers: corsHeaders });
 
         // 清除验证码
-        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+        if (!await consumeCode(env, body.phone, body.code, codeRecord.created_at))
+            return Response.json({ error: '验证码已失效，请重新获取' }, { status: 400, headers: corsHeaders });
 
         // 密码安全：单向加盐哈希（hashPassword）后落库 password_hash，明文密码绝不在 DB 中持久化
         const pwHash = await hashPassword(body.password);
@@ -319,7 +356,8 @@ export async function handleAuthRoutes(request: Request, env: Env, path: string)
             return new Response(JSON.stringify({ error: '验证码已过期' }), { status: 400, headers: corsHeaders });
 
         // 清除验证码
-        env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(body.phone).run().catch(() => {});
+        if (!await consumeCode(env, body.phone, body.code, codeRecord.created_at))
+            return Response.json({ error: '验证码已失效，请重新获取' }, { status: 400, headers: corsHeaders });
 
         // 密码安全：单向加盐哈希后更新 users.password_hash（按手机号定位），明文密码不入 DB
         const pwHash = await hashPassword(body.newPassword);

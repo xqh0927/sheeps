@@ -3,6 +3,9 @@ package com.example.sheeps.menu.state
 import com.example.sheeps.data.game.SkinConstants
 import com.example.sheeps.data.model.*
 
+enum class PersonalSection { Tasks, Points, Exchanges }
+enum class PersonalLoadState { Loading, Ready, Failed, SignInRequired }
+
 /**
  * 菜单主界面状态模型。
  * 包含了商城、个人中心、对战大厅及全局 App 状态所需的数据。
@@ -40,6 +43,7 @@ data class MenuViewState(
     val notices: List<Notice> = emptyList(),
     /** 每日任务进度列表 */
     val dailyTasks: List<DailyTask> = emptyList(),
+    val personalStatus: Map<PersonalSection, PersonalLoadState> = emptyMap(),
     
     // --- 历史日志 ---
     /** 积分变动记录 */
@@ -94,6 +98,7 @@ data class ConflictInfo(
 sealed interface MenuViewIntent {
     /** 强制重新从服务器加载所有数据 */
     object LoadData : MenuViewIntent
+    data class RetryPersonalSection(val section: PersonalSection) : MenuViewIntent
     /** 请求发送短信验证码 */
     data class SendSmsCode(val phone: String) : MenuViewIntent
     /** 执行手机号+验证码登录 */
@@ -123,7 +128,7 @@ sealed interface MenuViewIntent {
     /** 清空当前选择的携带道具 */
     object ClearCarryItems : MenuViewIntent
     /** 正式启动游戏界面 */
-    data class GoToGame(val levelId: Int, val carryItemsJson: String) : MenuViewIntent
+    data class GoToGame(val levelId: Int, val carryItemsJson: String, val preparedRunId: String) : MenuViewIntent
     /** 解决存档冲突：选择保留本地还是覆盖云端 */
     data class ResolveConflict(val useLocal: Boolean) : MenuViewIntent
     /** 更改应用显示语言 */
@@ -157,7 +162,7 @@ sealed interface MenuViewEffect {
         val formatArgs: List<Any> = emptyList()
     ) : MenuViewEffect
     /** 导航并跳转至游戏 Activity */
-    data class NavigateToGame(val levelId: Int, val carryItemsJson: String) : MenuViewEffect
+    data class NavigateToGame(val levelId: Int, val carryItemsJson: String, val preparedRunId: String) : MenuViewEffect
     /** 强制去登录界面 */
     object ShowLoginActivity : MenuViewEffect
     /** 显示存档冲突解决对话框 */

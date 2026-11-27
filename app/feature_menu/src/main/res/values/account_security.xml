@@ -1,0 +1,7 @@
+<resources>
+    <string name="account_security">账号与安全</string>
+    <string name="deletion_submit">申请注销账号</string>
+    <string name="deletion_withdraw">撤回申请</string>
+    <string name="deletion_explain">注销完成后将无法找回账号、金币、道具和进度。点击下方按钮提交申请，处理前可在此撤回。</string>
+    <string name="deletion_pending">注销申请已提交，等待处理。你可以在处理前撤回申请。</string>
+</resources>

@@ -1,6 +1,5 @@
-package com.example.sheeps.game.viewmodel.helpers
+package com.example.sheeps.data.game
 
-import com.example.sheeps.data.game.SkinConstants
 import com.example.sheeps.data.model.Tile
 import javax.inject.Inject
 import kotlin.math.abs
@@ -19,14 +18,33 @@ import kotlin.math.sqrt
  */
 class GameLevelGenerator @Inject constructor() {
 
+    private fun tutorialLevel(): List<Tile> {
+        val tiles = mutableListOf<Tile>()
+        fun row(type: Int, y: Float, z: Int, vararg columns: Int) {
+            for (x in columns) {
+                tiles += Tile(id = "tile_${tiles.size}", type = type, x = x.toFloat(), y = y, z = z)
+            }
+        }
+
+        // 自底向上，单独露出的 2 与首组三消后揭开的两张组成下一组。
+        row(1, 2.5f, 0, 1, 3, 5)
+        row(2, 4.5f, 0, 3)
+        row(3, 2.125f, 1, 1, 3, 5)
+        row(2, 1.75f, 2, 1, 3)
+        row(1, 1.375f, 3, 1, 3, 5)
+        return tiles
+    }
+
     /**
      * 生成一个保证有解的本地关卡
      * 采用反向生成算法：先生成布局，然后反向填充成对的卡牌类型
      * @param seed LCG 随机种子，默认使用 levelId 保持向后兼容
      */
     fun generateSolvableLevelLocal(levelId: Int, seed: Long = levelId * 1000L, userId: Int = 0): List<Tile> {
+        if (levelId == 1) return tutorialLevel()
+
         // 根据关卡ID计算难度（卡牌种类数），受限于美术资源总量
-        val numTypes = if (levelId == 1) 3 else minOf(
+        val numTypes = minOf(
             SkinConstants.MAX_TILE_TYPES,
             (3 + 3 * Math.log(levelId.toDouble())).toInt()
         )
@@ -34,62 +52,39 @@ class GameLevelGenerator @Inject constructor() {
         // 使用难度系数系统计算卡牌总数
         val maxCards = calculateCardCount(userId, levelId)
 
-        val coordinates = mutableListOf<Point3D>()
-        if (levelId == 1) {
-            // 第一关采用固定简单的布局（12张牌）
-            coordinates.addAll(
-                listOf(
-                    Point3D(0.0f, 0.0f, 0),
-                    Point3D(0.0f, 2.5f, 0),
-                    Point3D(2.5f, 0.0f, 0),
-                    Point3D(2.5f, 2.5f, 0),
+        // 后续关卡根据算法生成堆叠布局
+        // 与后端 server/src/level.ts 完全对齐：maxCards 来自难度曲线、baseSize 按 levelId/2 增长
+        val possible = mutableListOf<Point3D>()
+        val layersCount = minOf(12, (12 - 8 / sqrt((levelId - 1).toDouble())).toInt())
 
-                    Point3D(0.4f, 0.4f, 1),
-                    Point3D(0.4f, 2.9f, 1),
-                    Point3D(2.9f, 0.4f, 1),
-                    Point3D(2.9f, 2.9f, 1),
-
-                    Point3D(0.8f, 0.8f, 2),
-                    Point3D(0.8f, 3.3f, 2),
-                    Point3D(3.3f, 0.8f, 2),
-                    Point3D(3.3f, 3.3f, 2)
-                )
-            )
-        } else {
-            // 后续关卡根据算法生成堆叠布局
-            // 与后端 server/src/level.ts 完全对齐：maxCards 来自难度曲线、baseSize 按 levelId/2 增长
-            val possible = mutableListOf<Point3D>()
-            val layersCount = minOf(12, (12 - 8 / sqrt((levelId - 1).toDouble())).toInt())
-
-            val baseSize = minOf(20, 6 + levelId / 2)
-            for (z in 0 until layersCount) {
-                val size = maxOf(3, baseSize - z / 3)
-                val colSize = minOf(6, size)
-                val rowSize = minOf(7, size)
-                val offset = if (z % 2 == 0) 0f else 0.5f
-                for (r in 0 until rowSize) {
-                    for (c in 0 until colSize) {
-                        // 本地 fallback：使用正方形 shape（与后端 shape=0 一致）
-                        // 后端默认从 18 种异形中随机选一种，本地仅 fallback 时使用正方形保证可解
-                        possible.add(Point3D(c + offset + 1.0f, r + offset + 1.0f, z))
-                    }
+        val baseSize = minOf(20, 6 + levelId / 2)
+        for (z in 0 until layersCount) {
+            val size = maxOf(3, baseSize - z / 3)
+            val colSize = minOf(6, size)
+            val rowSize = minOf(7, size)
+            val offset = if (z % 2 == 0) 0f else 0.5f
+            for (r in 0 until rowSize) {
+                for (c in 0 until colSize) {
+                    // 本地 fallback：使用正方形 shape（与后端 shape=0 一致）
+                    // 后端默认从 18 种异形中随机选一种，本地仅 fallback 时使用正方形保证可解
+                    possible.add(Point3D(c + offset + 1.0f, r + offset + 1.0f, z))
                 }
             }
-
-            // 引入种子影响布局，相同 levelId 不同 seed 产生不同排列
-            val layoutSeed = seed + levelId * 1000L
-            val rand = lcg(layoutSeed)
-            for (i in possible.indices.reversed()) {
-                val j = (rand() * (i + 1)).toInt()
-                val temp = possible[i]
-                possible[i] = possible[j]
-                possible[j] = temp
-            }
-
-            // 确保卡牌总数是3的倍数
-            val count = minOf(possible.size, maxCards) - (minOf(possible.size, maxCards) % 3)
-            coordinates.addAll(possible.take(count))
         }
+
+        // 引入种子影响布局，相同 levelId 不同 seed 产生不同排列
+        val layoutSeed = seed + levelId * 1000L
+        val rand = lcg(layoutSeed)
+        for (i in possible.indices.reversed()) {
+            val j = (rand() * (i + 1)).toInt()
+            val temp = possible[i]
+            possible[i] = possible[j]
+            possible[j] = temp
+        }
+
+        // 确保卡牌总数是3的倍数
+        val count = minOf(possible.size, maxCards) - (minOf(possible.size, maxCards) % 3)
+        val coordinates = possible.take(count).toMutableList()
 
         coordinates.sortBy { it.z }
 

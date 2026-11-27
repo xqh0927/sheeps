@@ -35,11 +35,11 @@ async function player() {
     assert.equal(res.status, expectedStatus);
     return res.json();
   }
-  async function score(level, win, mode = 0) {
+  async function score(level, win, mode = 0, extra = {}) {
     const clearTime = 25000;
     const sign = await sha256([id, level, clearTime, 'folklore'].join('_'));
-    return request('/api/score/submit', { user_id:id, level_id:level, score:50,
-      clear_time_ms:clearTime, game_mode:mode, is_win:win, sign });
+    return request(extra.run_id === undefined ? '/api/score/submit' : '/api/score/submit-once', { user_id:id, level_id:level, score:50,
+      clear_time_ms:clearTime, game_mode:mode, is_win:win, sign, ...extra });
   }
   return { id, request, score };
 }
@@ -139,4 +139,90 @@ test('shop rejects unavailable orders without recording a charge or consuming in
   assert.equal((await p.request('/api/user/exchange-history')).length,0);
   assert.equal((await p.request('/api/user/points-history')).length,0);
   assert.equal((await p.request('/api/user/profile')).user.points,100);
+});
+
+test('stage rankings count winning runs only while endless rankings count every run', async () => {
+  const winner = await player(), other = await player();
+  await winner.score(9, 1);
+  await winner.score(9, 0);
+  await other.score(9, 0);
+  for (const type of ['daily', 'weekly', 'history']) {
+    for (const perUser of ['best', 'all']) {
+      const list = await winner.request(`/api/leaderboard?level_id=9&type=${type}&per_user=${perUser}`);
+      assert.equal(list.total, 1);
+      assert.equal(list.rankings.length, 1);
+    }
+  }
+  await env.SHEEPS_CACHE.put('config_gamemode_endless', 'on');
+  try {
+    await winner.score(0, 0, 1);
+    const endless = await winner.request('/api/leaderboard?level_id=0&game_mode=1');
+    assert.equal(endless.total, 1);
+    assert.equal(endless.rankings.length, 1);
+  } finally {
+    await env.SHEEPS_CACHE.delete('config_gamemode_endless');
+  }
+});
+
+test('reconnected stages and a lost receipt yield three rankings, unlocks and one task reward', async () => {
+  const p = await player();
+  await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind('Offline winner', p.id).run();
+  const runs = [1, 2, 3].map(() => crypto.randomUUID());
+  const finished = Date.now() - 1000;
+  const submit = i => p.score(i + 1, 1, 0, {run_id:runs[i], completed_at:finished});
+  assert.equal((await submit(0)).run_id, runs[0]);
+  await Promise.all([submit(0), submit(1), submit(2)]);
+  const records = await env.DB.prepare('SELECT achieved_at FROM leaderboard WHERE user_id = ?').bind(p.id).all();
+  assert.deepEqual(records.results.map(r => r.achieved_at), [finished, finished, finished]);
+  for (const level of [1, 2, 3]) {
+    const standings = await p.request('/api/leaderboard?type=history&per_user=all&limit=49&level_id=' + level);
+    assert.equal(standings.rankings.filter(row => row.username === 'Offline winner').length, 1);
+  }
+  const profile = await p.request('/api/user/profile');
+  assert.equal(profile.highest_level_cleared, 3);
+  assert.ok(profile.unlocked_levels.includes(4));
+  const tasks = () => p.request('/api/task/daily');
+  assert.equal((await tasks()).find(t => t.task_id === 'WIN_3_GAMES').progress, 3);
+  await p.request('/api/task/claim', {task_id:'WIN_3_GAMES'});
+  await submit(2);
+  await p.request('/api/task/claim', {task_id:'WIN_3_GAMES'}, 400);
+  assert.equal((await p.request('/api/user/points-history')).length, 1);
+});
+
+test('auto-credited sign-in task uses its configured reward including zero', async () => {
+  try {
+    for (const amount of [25, 0]) {
+      await env.DB.prepare("UPDATE task SET points_reward = ? WHERE id = 'SIGN_IN_ONCE'").bind(amount).run();
+      const p = await player();
+      const sign = await p.request('/api/sign/today', {});
+      assert.equal(sign.reward_points, 20 + amount);
+      assert.equal(sign.current_points, 20 + amount);
+      await p.request('/api/sign/today', {}, 400);
+      await p.request('/api/task/claim', {task_id:'SIGN_IN_ONCE'}, 400);
+      assert.equal((await p.request('/api/user/profile')).user.points, 20 + amount);
+      assert.equal((await p.request('/api/user/points-history')).find(r => r.source === 'SIGN_IN_ONCE').amount, amount);
+    }
+  } finally {
+    await env.DB.prepare("UPDATE task SET points_reward = 10 WHERE id = 'SIGN_IN_ONCE'").run();
+  }
+});
+
+test('an old client submitting after account deletion cannot recreate its player as a guest', async () => {
+  const p = await player();
+  await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(p.id).run();
+  const time = 25000;
+  const sign = await sha256([p.id, 1, time, 'folklore'].join('_'));
+  await p.request('/api/score/submit', {user_id:p.id, level_id:1, clear_time_ms:time, score:50, sign}, 401);
+  assert.equal(await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(p.id).first(), null);
+});
+
+test('receipted endpoint rejects missing or empty run IDs without creating a score; legacy posts still work', async () => {
+  const p = await player();
+  const time = 17000;
+  const sign = await sha256([p.id, 1, time, 'folklore'].join('_'));
+  const score = {user_id:p.id, level_id:1, clear_time_ms:time, score:50, sign};
+  await p.request('/api/score/submit-once', score, 400);
+  await p.request('/api/score/submit-once', {...score, run_id:''}, 400);
+  assert.equal((await env.DB.prepare('SELECT COUNT(*) AS n FROM leaderboard WHERE user_id = ?').bind(p.id).first()).n, 0);
+  assert.deepEqual(await p.request('/api/score/submit', score), {success:true});
 });

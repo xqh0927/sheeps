@@ -6,6 +6,7 @@
     "directory": "./public",
     "html_handling": "none"
   },
+  "triggers": { "crons": ["17 * * * *"] },
   "placement": {
     "mode": "smart"
   },

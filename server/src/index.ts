@@ -21,6 +21,7 @@
  * 才能在第 7 步被各 handler 正确识别与分发。
  */
 import { Env } from './types';
+import { retryAvatarCleanup } from './lib/account-avatars';
 import { getCorsHeaders, getLangSuffix, translateErrorMessage } from './helpers';
 import { configureSecrets } from './crypto';
 import { handleWebSocketSession } from './websocket';
@@ -59,6 +60,9 @@ app.get('/doc/openapi.json', (c) => c.json(openapiSpec as Record<string, unknown
  * Cloudflare Workers 全局入口 fetch 事件处理器
  */
 export default {
+  async scheduled(_event: ScheduledController, env: Env): Promise<void> {
+    await retryAvatarCleanup(env);
+  },
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // 0. 注入生产密钥（Worker Secrets）；开发环境保留 fallback 常量
     configureSecrets(env);
@@ -189,8 +193,10 @@ export default {
         /**
          * 游戏模块 — 覆盖接口:
          *   GET  /api/level — 获取关卡布局
+         *   POST /api/level/attempt — 按开局 ID 记录布局版本与开始时刻
          *   POST /api/level/unlock — 积分解锁关卡
          *   POST /api/score/submit — 提交通关成绩
+         *   POST /api/score/submit-once — 按开局 ID 提交并确认离线成绩
          *   POST /api/sign/today — 每日签到
          *   GET  /api/leaderboard — 排行榜查询
          *   GET  /api/leaderboard/daily-popup — 每日弹窗

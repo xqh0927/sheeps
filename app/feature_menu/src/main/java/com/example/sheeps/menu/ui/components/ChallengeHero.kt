@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.sp
 import com.example.sheeps.ui.R
 
 @Composable
-internal fun ChallengeHero(level: Int, onClick: () -> Unit) {
+internal fun ChallengeHero(level: Int, resumable: Boolean, onClick: () -> Unit) {
     val ink = Color(0xFF17274D)
-    val action = stringResource(R.string.prepare_btn_start)
+    val action = stringResource(if (resumable) com.example.sheeps.menu.R.string.stage_resume else R.string.prepare_btn_start)
     var hasEntered by rememberSaveable { mutableStateOf(false) }
     val arrival = remember { Animatable(if (hasEntered) 1f else 0f) }
     LaunchedEffect(Unit) {
@@ -66,7 +66,7 @@ internal fun ChallengeHero(level: Int, onClick: () -> Unit) {
                 .padding(start = 19.dp, end = 2.dp, top = 18.dp, bottom = 18.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text(stringResource(R.string.current_challenge), color = ink,
+            Text(stringResource(if (resumable) com.example.sheeps.menu.R.string.stage_unfinished else R.string.current_challenge), color = ink,
                 style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Text(level.toString().padStart(2, '0'), color = ink,
                 fontSize = 66.sp, lineHeight = 72.sp, fontWeight = FontWeight.SemiBold,

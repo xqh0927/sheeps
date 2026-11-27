@@ -12,18 +12,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.core.utils.getLocalizedTaskName
+import com.example.sheeps.menu.state.PersonalSection
 import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.ui.R
 
 @Composable
-fun DailyTasksCard(state: MenuViewState, onClaimTask: (String) -> Unit) {
+fun DailyTasksCard(state: MenuViewState, onClaimTask: (String) -> Unit, onRetry: () -> Unit, onLogin: () -> Unit) {
     if (!state.isLoggedIn) return
     val colors = MaterialTheme.colorScheme
     Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = colors.surface) {
         Column(Modifier.padding(horizontal = 15.dp)) {
-            if (state.dailyTasks.isEmpty()) {
-                Text(stringResource(R.string.tasks_empty), Modifier.padding(vertical = 16.dp), color = colors.onSurfaceVariant)
-            }
+            PersonalSectionFeedback(state.personalStatus[PersonalSection.Tasks], state.dailyTasks.isEmpty(),
+                R.string.tasks_empty, onRetry, onLogin)
             state.dailyTasks.forEachIndexed { index, task ->
                 if (index > 0) HorizontalDivider(color = colors.outlineVariant)
                 Column(Modifier.padding(vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

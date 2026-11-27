@@ -83,7 +83,8 @@ sealed interface EndlessViewIntent {
  */
 sealed interface EndlessViewEffect {
     data class ShowToast(val message: String) : EndlessViewEffect
-    data class PlaySound(val soundType: SoundType) : EndlessViewEffect
+    data class TileMatch(val tileType: Int, val emittedAtNanos: Long = System.nanoTime()) : EndlessViewEffect
+    data class PlaySound(val soundType: SoundType, val emittedAtNanos: Long = System.nanoTime()) : EndlessViewEffect
     object Vibrate : EndlessViewEffect
     object ExitGame : EndlessViewEffect
 }

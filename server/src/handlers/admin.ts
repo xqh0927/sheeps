@@ -1,12 +1,12 @@
 import { Env, TileData } from '../types';
+import { completeAvatarCleanup, enqueueAvatarCleanup } from '../lib/account-avatars';
 import { getCorsHeaders, jsonError, requireAdmin, assertCanWrite, assertSuper, AdminPayload, getGameModeStatus } from '../helpers';
 import { generateJWT, verifyJWT, sha256 } from '../crypto';
 import { putR2Image, validateImage, purgeShopCache, putR2Object } from '../lib/r2';
 import { verifyPassword, hashPassword } from '../auth-utils';
 import { writeAuditChanges, reassembleAuditSnapshots } from '../lib/audit';
-import { writeLevelTiles, readLevelTilesByLevels, assembleLayoutData, parseLayoutData } from '../lib/level-tiles';
+import { replaceLevelTileStatements, readLevelTilesByLevels, assembleLayoutData, parseLayoutData, levelPublicationError } from '../lib/level-tiles';
 import {
-  I18N_LOCALES,
   insertLocalizedEntity,
   stripLocaleSuffixedKeys,
 } from '../i18n';
@@ -165,15 +165,18 @@ async function listUsers(request: Request, env: Env, admin: AdminPayload, url: U
     wheres.push('role = ?');
     binds.push(role);
   }
+  const pendingOnly = url.searchParams.get('deletion_pending') === '1';
+  if (pendingOnly) wheres.push('r.requested_at IS NOT NULL');
   const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : '';
-  const totalRow = await env.DB.prepare(`SELECT COUNT(*) as c FROM users ${where}`).bind(...binds).first<{ c: number }>();
-  const rows = await env.DB.prepare(
-    `SELECT id, phone, username, points, role, is_banned, avatar_url, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-  )
-    .bind(...binds, pageSize, offset)
-    .all();
+  const from = `FROM users u LEFT JOIN account_deletion_requests r ON r.user_id = u.id ${where}`;
+  const order = pendingOnly ? 'r.requested_at ASC, u.id' : 'u.created_at DESC, u.id';
+  const [count, rows] = await env.DB.batch([
+    env.DB.prepare(`SELECT COUNT(*) AS c ${from}`).bind(...binds),
+    env.DB.prepare(`SELECT u.id, u.phone, u.username, u.points, u.role, u.is_banned, u.avatar_url, u.created_at,
+      r.requested_at AS deletion_requested_at ${from} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...binds, pageSize, offset),
+  ]);
   return new Response(
-    JSON.stringify({ success: true, list: rows.results, total: totalRow?.c || 0, page, pageSize }),
+    JSON.stringify({ success: true, list: rows.results, total: (count.results[0] as { c: number }).c, page, pageSize }),
     { headers: getCorsHeaders(env) }
   );
 }
@@ -252,23 +255,41 @@ async function deleteUser(request: Request, env: Env, admin: AdminPayload, id: s
   if (['super', 'operator', 'readonly'].includes(user.role)) return jsonError('不能移除管理员账户', 403, env);
   // 安全护栏：禁止移除当前登录账户
   if (admin.userId === id) return jsonError('不能移除当前登录账户', 403, env);
-  // 级联删除该用户在相关表中的全部数据（同一原子事务）
-  await env.DB.batch([
-    env.DB.prepare('DELETE FROM level_unlock WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM user_items WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM exchange_record WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM point_record WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM sign_record WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM user_task WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM leaderboard WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM backup_unlocked_levels WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(id),
-    env.DB.prepare('DELETE FROM backup_save_items WHERE backup_id IN (SELECT id FROM backup_save_log WHERE user_id = ?)').bind(id),
-    env.DB.prepare('DELETE FROM backup_save_log WHERE user_id = ?').bind(id),
-    env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id),
-    env.DB.prepare('DELETE FROM login_token WHERE phone = ?').bind(user.phone),
-  ]);
-  await writeAudit(env, request, admin, 'DELETE_USER', { type: 'users', id, before: pick(user, ['phone', 'username', 'role']) });
-  return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
+  const expected = new URL(request.url).searchParams.get('expected_requested_at');
+  const stamp = expected === null ? null : Number(expected);
+  if (stamp !== null && (!Number.isSafeInteger(stamp) || stamp <= 0)) return jsonError('注销申请时间无效', 400, env);
+
+  // Each delete checks the same live account and request inside a single transaction. A stale
+  // confirmation cannot remove child rows, even if the player withdrew after the initial read.
+  const params: (string | number)[] = [id];
+  let eligible = "SELECT u.id FROM users u WHERE u.id = ? AND COALESCE(u.role, 'user') NOT IN ('super','operator','readonly')";
+  if (stamp !== null) {
+    eligible += ' AND EXISTS (SELECT 1 FROM account_deletion_requests r WHERE r.user_id = u.id AND r.requested_at = ?)';
+    params.push(stamp);
+  }
+  const owned = `user_id IN (${eligible})`;
+  const remove = (sql: string) => env.DB.prepare(sql).bind(...params);
+  const deletedAt = Date.now();
+  const changes = [
+    ...(stamp === null ? [] : [enqueueAvatarCleanup(env, eligible, params, deletedAt)]),
+    ...['level_unlock', 'user_items', 'exchange_record', 'point_record', 'sign_record', 'user_task', 'leaderboard']
+      .map(table => remove(`DELETE FROM ${table} WHERE ${owned}`)),
+    ...['backup_unlocked_levels', 'backup_save_items']
+      .map(table => remove(`DELETE FROM ${table} WHERE backup_id IN (SELECT id FROM backup_save_log WHERE ${owned})`)),
+    remove(`DELETE FROM backup_save_log WHERE ${owned}`),
+    remove(`DELETE FROM login_token WHERE phone IN (SELECT phone FROM users WHERE id IN (${eligible}))`),
+    remove(`DELETE FROM users WHERE id IN (${eligible})`),
+  ];
+  const results = await env.DB.batch(changes);
+  if (!results[results.length - 1].meta.changes) {
+    return jsonError(stamp === null ? '账号状态已变更，请刷新列表' : '注销申请已撤回或变更，请重新核对', 409, env);
+  }
+  await writeAudit(env, request, admin, 'DELETE_USER', {
+    type: 'users', id, before: stamp === null ? pick(user, ['phone', 'username', 'role']) : undefined,
+    after: stamp === null ? undefined : { deletion_requested_at: stamp },
+  });
+  const pending = stamp !== null && !await completeAvatarCleanup(env, id);
+  return new Response(JSON.stringify({ success: true, avatar_cleanup_pending: pending }), { headers: getCorsHeaders(env) });
 }
 
 // ============ 通用 CRUD 辅助 ============
@@ -334,11 +355,6 @@ async function genericCreate(request: Request, env: Env, admin: AdminPayload, cf
   await writeAudit(env, request, admin, `CREATE_${cfg.action}`, { type: cfg.table, id: newId, after: pick(body, cfg.snapshotCols) });
 
   if (cfg.table === 'shop_items') await purgeShopCache(env);
-  if (cfg.table === 'notice') {
-    await Promise.all(I18N_LOCALES.map(locale =>
-      env.SHEEPS_CACHE.delete(locale === 'zh' ? 'notices_v2' : `notices_${locale}_v2`).catch(() => {})
-    ));
-  }
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
 }
 
@@ -362,7 +378,22 @@ async function genericUpdate(request: Request, env: Env, admin: AdminPayload, cf
   // 列名统一用双引号包裹，兼容 SQL 关键字列（如 shop_items 的 "group"）
   const sets = cols.map((c) => `"${c}" = ?`).join(', ');
   const sql = `UPDATE ${cfg.table} SET ${sets} WHERE "${idCol}" = ?`;
-  await env.DB.prepare(sql).bind(...cols.map((c) => writeBody[c]), id).run();
+  const changes = [env.DB.prepare(sql).bind(...cols.map(c => writeBody[c]), id)];
+  if (cfg.table === 'notice') {
+    for (const field of ['title', 'content']) {
+      if (writeBody[field] === undefined) continue;
+      const key = `notice.${id}.${field}`;
+      changes.push(
+        env.DB.prepare("UPDATE i18n_strings SET value = ?, updated_at = ? WHERE module = 'notice' AND locale = 'zh' AND str_key = ?")
+          .bind(writeBody[field], Date.now(), key),
+        env.DB.prepare(`INSERT INTO i18n_strings (module, locale, str_key, value, updated_at)
+          SELECT 'notice', 'zh', ?, ?, ? WHERE NOT EXISTS (
+            SELECT 1 FROM i18n_strings WHERE module = 'notice' AND locale = 'zh' AND str_key = ?
+          )`).bind(key, writeBody[field], Date.now(), key)
+      );
+    }
+  }
+  await env.DB.batch(changes);
   const after = await env.DB.prepare(`SELECT * FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id).first();
   await writeAudit(env, request, admin, `UPDATE_${cfg.action}`, { type: cfg.table, id, before: pick(before, cfg.snapshotCols), after: pick(after, cfg.snapshotCols) });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
@@ -379,7 +410,15 @@ async function genericDelete(request: Request, env: Env, admin: AdminPayload, cf
   const idCol = cfg.idColumn || 'id';
   const before = await env.DB.prepare(`SELECT * FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id).first();
   if (!before) return jsonError('记录不存在', 404, env);
-  await env.DB.prepare(`DELETE FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id).run();
+  const changes = [env.DB.prepare(`DELETE FROM ${cfg.table} WHERE ${idCol} = ?`).bind(id)];
+  if (cfg.table === 'notice' || cfg.table === 'app_version') {
+    const fields = cfg.table === 'notice' ? ['title', 'content'] : ['update_log'];
+    for (const field of fields) {
+      changes.push(env.DB.prepare('DELETE FROM i18n_strings WHERE module = ? AND str_key = ?')
+        .bind(cfg.table, `${cfg.table}.${id}.${field}`));
+    }
+  }
+  await env.DB.batch(changes);
   await writeAudit(env, request, admin, `DELETE_${cfg.action}`, { type: cfg.table, id, before: pick(before, cfg.snapshotCols) });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
 }
@@ -914,6 +953,14 @@ async function listI18n(request: Request, env: Env, url: URL): Promise<Response>
   return new Response(JSON.stringify({ success: true, list, total: list.length }), { headers: getCorsHeaders(env) });
 }
 
+// The simplified Chinese notice is also the fallback for locales without a translation.
+function noticeBaseChange(env: Env, module: string, locale: string, key: string, value: unknown): D1PreparedStatement[] {
+  if (module !== 'notice' || locale !== 'zh' || typeof value !== 'string') return [];
+  const match = /^notice\.(\d+)\.(title|content)$/.exec(key);
+  if (!match) return [];
+  return [env.DB.prepare(`UPDATE notice SET ${match[2]} = ? WHERE id = ?`).bind(value, match[1])];
+}
+
 /**
  * 新增 i18n 键：写入 i18n_strings（含 updated_at）；业务 key 模式双写基列。
  */
@@ -927,9 +974,10 @@ async function createI18n(request: Request, env: Env, admin: AdminPayload): Prom
   const cols = Object.keys(body).filter((k) => body[k] !== undefined);
   const placeholders = cols.map(() => '?').join(', ');
   const quoted = cols.map((c) => `"${c}"`).join(', ');
-  const info = await env.DB.prepare(`INSERT INTO i18n_strings (${quoted}) VALUES (${placeholders})`)
-    .bind(...cols.map((c) => body[c]))
-    .run();
+  const [info] = await env.DB.batch([
+    env.DB.prepare(`INSERT INTO i18n_strings (${quoted}) VALUES (${placeholders})`).bind(...cols.map(c => body[c])),
+    ...noticeBaseChange(env, body.module, body.locale, body.str_key, body.value),
+  ]);
   const newId = String(info.meta.last_row_id);
   await writeAudit(env, request, admin, 'CREATE_I18N', { type: 'i18n_strings', id: newId, after: pick(body, ['str_key', 'locale', 'module', 'value']) });
   return new Response(JSON.stringify({ success: true, id: newId }), { headers: getCorsHeaders(env) });
@@ -956,7 +1004,10 @@ async function updateI18n(request: Request, env: Env, admin: AdminPayload, id: s
   patch.updated_at = Date.now();
   const cols = Object.keys(patch);
   const sets = cols.map((c) => `"${c}" = ?`).join(', ');
-  await env.DB.prepare(`UPDATE i18n_strings SET ${sets} WHERE id = ?`).bind(...cols.map((c) => patch[c]), id).run();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE i18n_strings SET ${sets} WHERE id = ?`).bind(...cols.map(c => patch[c]), id),
+    ...noticeBaseChange(env, before.module, before.locale, before.str_key, body.value),
+  ]);
 
   await writeAudit(env, request, admin, 'UPDATE_I18N', {
     type: 'i18n_strings',
@@ -1109,6 +1160,68 @@ async function searchUsers(request: Request, env: Env, url: URL): Promise<Respon
 
 // ============ 关卡（layout_data 拆表：主表 levels + 子表 level_tiles） ============
 
+async function listLevelHealth(env: Env, url: URL): Promise<Response> {
+  const { page, pageSize, offset } = parsePaging(url);
+  const level = url.searchParams.get('level_id');
+  const version = url.searchParams.get('layout_version');
+  const filters = ["layout_version <> 'unknown'"];
+  const values: (string | number)[] = [];
+  if (level) {
+    if (!/^\d+$/.test(level) || !Number.isSafeInteger(Number(level)) || Number(level) < 1) {
+      return jsonError('关号无效', 400, env);
+    }
+    filters.push('level_id = ?');
+    values.push(Number(level));
+  }
+  if (version) {
+    if (version.length > 128) return jsonError('布局版本过长', 400, env);
+    filters.push('layout_version = ?');
+    values.push(version);
+  }
+  const versions = `SELECT DISTINCT level_id, layout_version FROM stage_attempts WHERE ${filters.join(' AND ')}`;
+  // Limit the cohort before joining scores. Retry lookup considers every version of the same level.
+  const [total, data] = await env.DB.batch<Record<string, unknown>>([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM (${versions})`).bind(...values),
+    env.DB.prepare(`
+      WITH page_versions AS (
+        ${versions} ORDER BY level_id, layout_version LIMIT ? OFFSET ?
+      ), runs AS (
+        SELECT a.*, s.is_win, s.items_used, r.abandoned,
+          ROW_NUMBER() OVER (
+            PARTITION BY a.level_id, a.layout_version, a.user_id ORDER BY a.started_at, a.run_id
+          ) AS attempt_number,
+          CASE WHEN s.is_win = 0 AND r.abandoned = 0 AND EXISTS (
+            SELECT 1 FROM stage_attempts next
+            WHERE next.user_id = a.user_id AND next.level_id = a.level_id
+              AND next.started_at >= s.achieved_at
+              AND (next.started_at, next.run_id) > (a.started_at, a.run_id)
+          ) THEN 1 ELSE 0 END AS retried
+        FROM page_versions p
+        JOIN stage_attempts a USING (level_id, layout_version)
+        LEFT JOIN stage_run_scores r ON r.user_id = a.user_id AND r.run_id = a.run_id
+        LEFT JOIN leaderboard s ON s.id = r.score_id AND s.level_id = a.level_id AND s.game_mode = 0
+      ), metrics AS (
+        SELECT level_id, layout_version, COUNT(*) AS attempts, COUNT(is_win) AS settled_attempts,
+          COUNT(*) FILTER (WHERE is_win = 0 AND abandoned = 0) AS failed_attempts,
+          COUNT(is_win) FILTER (WHERE attempt_number = 1) AS first_settled_attempts,
+          COUNT(*) FILTER (WHERE attempt_number = 1 AND is_win = 1) AS first_wins,
+          SUM(retried) AS retried_failures,
+          COUNT(*) FILTER (WHERE items_used > 0) AS item_attempts
+        FROM runs GROUP BY level_id, layout_version
+      )
+      SELECT metrics.*,
+        1.0 * first_wins / first_settled_attempts AS first_win_rate,
+        1.0 * retried_failures / failed_attempts AS retry_rate,
+        1.0 * item_attempts / settled_attempts AS item_use_rate
+      FROM metrics ORDER BY level_id, layout_version
+    `).bind(...values, pageSize, offset),
+  ]);
+  return new Response(
+    JSON.stringify({ success: true, list: data.results, total: total.results[0].n, page, pageSize }),
+    { headers: getCorsHeaders(env) }
+  );
+}
+
 /**
  * 关卡列表：分页读取 levels，再按本页 level_id 批量读取 level_tiles 重组 layout_data 字符串。
  * 未回填的存量数据回退使用 levels.layout_data 旧列（deprecated），保证前端契约不变。
@@ -1147,15 +1260,7 @@ async function listLevels(request: Request, env: Env, url: URL): Promise<Respons
   const tileMap = await readLevelTilesByLevels(env, ids);
   for (const row of list) {
     const tiles = tileMap.get(row.level_id);
-    if (tiles && tiles.length) {
-      // 已回填：由子表规范化数据重组
-      row.layout_data = assembleLayoutData(tiles);
-    } else if (row.layout_data != null) {
-      // 存量数据尚未回填，直接复用旧 JSON 列
-      row.layout_data = row.layout_data;
-    } else {
-      row.layout_data = '[]';
-    }
+    row.layout_data = assembleLayoutData(tiles ?? []);
   }
   return new Response(
     JSON.stringify({ success: true, list, total: totalRow?.c || 0, page, pageSize }),
@@ -1183,25 +1288,25 @@ async function createLevel(request: Request, env: Env, admin: AdminPayload): Pro
     } catch {
       return jsonError('layout_data 不是合法的 JSON 数组', 400, env);
     }
+    const error = levelPublicationError(tiles);
+    if (error) return jsonError(error, 400, env);
   }
   const levelId = Number(body.level_id);
   const difficulty = body.difficulty !== undefined ? Number(body.difficulty) : null;
+  const writeTiles = replaceLevelTileStatements(env, levelId, tiles);
   try {
-    await env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at) VALUES (?, ?, ?)')
-      .bind(levelId, difficulty, Date.now())
-      .run();
-  } catch (e: any) {
-    // 兜底：旧库 layout_data 仍为 NOT NULL 时，回退写入旧列，避免创建失败
-    const msg = String(e?.message || '');
-    if (msg.includes('NOT NULL') || msg.includes('constraint')) {
-      await env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at, layout_data) VALUES (?, ?, ?, ?)')
-        .bind(levelId, difficulty, Date.now(), assembleLayoutData(tiles))
-        .run();
-    } else {
-      throw e;
-    }
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at) VALUES (?, ?, ?)').bind(levelId, difficulty, Date.now()),
+      ...writeTiles,
+    ]);
+  } catch (error) {
+    if (!String(error).includes('NOT NULL constraint failed: levels.layout_data')) throw error;
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO levels (level_id, difficulty, created_at, layout_data) VALUES (?, ?, ?, ?)')
+        .bind(levelId, difficulty, Date.now(), assembleLayoutData(tiles)),
+      ...writeTiles,
+    ]);
   }
-  await writeLevelTiles(env, levelId, tiles);
   const layoutStr = assembleLayoutData(tiles);
   const layoutSummary = tiles.length
     ? { layout_length: layoutStr.length, layout_hash: await sha256(layoutStr) }
@@ -1217,27 +1322,33 @@ async function updateLevel(request: Request, env: Env, admin: AdminPayload, leve
   const guard = assertCanWrite(admin);
   if (guard) return guard;
   const levelId = levelIdStr;
-  const beforeRow = await env.DB.prepare('SELECT 1 FROM levels WHERE level_id = ?').bind(levelId).first();
+  const beforeRow = await env.DB.prepare('SELECT * FROM levels WHERE level_id = ?').bind(levelId).first();
   if (!beforeRow) return jsonError('关卡不存在', 404, env);
   const beforeTiles = await readLevelTilesByLevels(env, [Number(levelId)]);
   const beforeLayout = beforeTiles.get(Number(levelId));
   const body = (await request.json().catch(() => null)) as Record<string, any> | null;
   if (!body || typeof body !== 'object') return jsonError('请求体无效', 400, env);
 
+  const statements: D1PreparedStatement[] = [];
   if (body.difficulty !== undefined) {
-    await env.DB.prepare('UPDATE levels SET difficulty = ? WHERE level_id = ?').bind(Number(body.difficulty), levelId).run();
+    statements.push(env.DB.prepare('UPDATE levels SET difficulty = ? WHERE level_id = ?').bind(body.difficulty, levelId));
   }
   let afterLayout = beforeLayout;
-  if (body.layout_data !== undefined && body.layout_data !== null) {
-    let tiles: TileData[];
+  if (body.layout_data != null) {
     try {
-      tiles = parseLayoutData(body.layout_data);
+      afterLayout = parseLayoutData(body.layout_data);
     } catch {
-      return jsonError('layout_data 不是合法的 JSON 数组', 400, env);
+      return jsonError('布局数据不是有效的卡牌数组', 400, env);
     }
-    await writeLevelTiles(env, Number(levelId), tiles);
-    afterLayout = tiles;
+    const error = levelPublicationError(afterLayout);
+    if (error) return jsonError(error, 400, env);
+    if ('layout_data' in beforeRow) {
+      statements.push(env.DB.prepare('UPDATE levels SET layout_data = ? WHERE level_id = ?')
+        .bind(assembleLayoutData(afterLayout), levelId));
+    }
+    statements.push(...replaceLevelTileStatements(env, Number(levelId), afterLayout));
   }
+  if (statements.length) await env.DB.batch(statements);
   const beforeSummary = beforeLayout
     ? { layout_length: assembleLayoutData(beforeLayout).length, layout_hash: await sha256(assembleLayoutData(beforeLayout)) }
     : null;
@@ -1259,8 +1370,10 @@ async function deleteLevel(request: Request, env: Env, admin: AdminPayload, leve
   if (!beforeRow) return jsonError('关卡不存在', 404, env);
   const beforeTiles = await readLevelTilesByLevels(env, [Number(levelId)]);
   const beforeLayout = beforeTiles.get(Number(levelId));
-  await env.DB.prepare('DELETE FROM level_tiles WHERE level_id = ?').bind(Number(levelId)).run();
-  await env.DB.prepare('DELETE FROM levels WHERE level_id = ?').bind(levelId).run();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM level_tiles WHERE level_id = ?').bind(Number(levelId)),
+    env.DB.prepare('DELETE FROM levels WHERE level_id = ?').bind(levelId),
+  ]);
   const beforeSummary = beforeLayout ? { layout_length: assembleLayoutData(beforeLayout).length } : null;
   await writeAudit(env, request, admin, 'DELETE_LEVEL', { type: 'levels', id: levelId, before: beforeSummary });
   return new Response(JSON.stringify({ success: true }), { headers: getCorsHeaders(env) });
@@ -1513,6 +1626,7 @@ export async function handleAdminRoutes(request: Request, env: Env, path: string
    * 用途：分页读 levels，按本页 level_id 批量读 level_tiles 重组 layout_data（存量回退旧列）。
    * 鉴权：requireAdmin。响应：{ success, list:[level_id,difficulty,created_at,layout_data], total, page, pageSize }。
    */
+  if (path === '/api/admin/levels/health' && method === 'GET') return listLevelHealth(env, url);
   if (path === '/api/admin/levels' && method === 'GET') return listLevels(request, env, url);
   /**
    * POST /api/admin/levels —— 新建关卡

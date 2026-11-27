@@ -76,3 +76,27 @@ data class CarryRunReceipt(
     val userId: String?,
     val carriedJson: String
 )
+
+/** First playable opening, held locally until the server acknowledges this run. */
+@Entity(tableName = "pending_stage_starts", primaryKeys = ["ownerId", "runId"])
+data class PendingStageStart(
+    val ownerId: String,
+    val runId: String,
+    val levelId: Int,
+    val layoutVersion: String,
+    val startedAt: Long
+)
+
+/** One completed stage, owned by its account (or guest device) until that run is acknowledged. */
+@Entity(tableName = "pending_stage_scores", primaryKeys = ["ownerId", "runId"])
+data class PendingStageScore(
+    val ownerId: String,
+    val runId: String,
+    val levelId: Int,
+    val score: Int,
+    val clearTimeMs: Long,
+    val itemsUsed: Int,
+    val won: Boolean,
+    val completedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "0") val abandoned: Boolean = false
+)

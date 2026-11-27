@@ -269,7 +269,7 @@
     <string name="prepare_title_locked">关卡锁定</string>
     <string name="prepare_title_unlocked">挑战准备 (第 %1$d 关)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒关卡！部分卡牌图案隐藏，放入槽位后才显现。</string>
-    <string name="prepare_sealed_warning">🔒 封印关卡！部分卡牌被封印（1~3层）。需先消除 3 张正常卡牌才能解封 1 张封印牌；点击逐层解封，完全解封时触发“碎冰”，相邻封印牌自动减1层。</string>
+    <string name="prepare_sealed_warning">🔒 封印关卡！每消除三张同花色的牌，就会解锁一张封印牌。</string>
     <string name="sealed_gate_progress">已消除 %1$d / %2$d 张 · 已解锁 %3$d / %4$d 张封印</string>
     <string name="sealed_gate_need_more">还需消除 %1$d 张正常卡牌</string>
     <string name="sealed_gate_unlocked">封印解锁！已解锁 %1$d 张封印牌</string>
@@ -405,7 +405,9 @@
     <string name="toast_unlock_failed_cloud">解锁失败，云端同步拒绝</string>
     <string name="toast_unlock_offline">连接不畅，已扣减积分本地解锁，后续有网自动同步</string>
     <string name="toast_phone_invalid">请输入正确的11位手机号</string>
-    <string name="toast_send_code_success">验证码已发送！测试码为：%1$s</string>
+    <string name="toast_send_code_success">验证码已发送，请查看短信。</string>
+    <string name="sms_service_unavailable">短信服务暂不可用，请稍后再试。</string>
+    <string name="sms_rate_limited">发送过于频繁，请稍后重试。</string>
     <string name="toast_send_code_failed">验证码发送失败</string>
     <string name="toast_send_code_network_error">网络错误，发送失败</string>
     <string name="toast_phone_code_invalid">请输入正确的手机号和6位验证码</string>

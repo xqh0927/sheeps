@@ -14,6 +14,8 @@ import androidx.work.Configuration
 import com.example.sheeps.lib_base.base.BaseActivityThemeDelegate
 import com.example.sheeps.data.utils.NetworkMonitor
 import com.example.sheeps.ui.theme.ThemeManager
+import com.example.sheeps.data.local.LocalDao
+import com.example.sheeps.worker.ScoreUploadWorker
 import com.example.sheeps.data.repository.SyncRepository
 import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp
@@ -34,6 +36,8 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
 
     @Inject
     lateinit var syncRepository: SyncRepository
+
+    @Inject lateinit var localDao: LocalDao
 
     @Inject
     lateinit var networkMonitor: NetworkMonitor
@@ -117,6 +121,9 @@ class MyApplication : Application(), Configuration.Provider, ImageLoaderFactory 
                 logcat("AppLifecycle") { "App moved to FOREGROUND" }
                 // 回到前台，检查是否有未同步的成绩或道具
                 owner.lifecycleScope.launch(Dispatchers.IO) {
+                    for (ownerId in localDao.pendingUploadOwners()) {
+                        ScoreUploadWorker.schedule(this@MyApplication, ownerId, "recovery")
+                    }
                     syncRepository.syncDirtyData()
                 }
             }

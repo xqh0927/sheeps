@@ -168,3 +168,25 @@ test('closing after a normal victory preserves the completed result', async t =>
   assert.ok(!j.messages.some(cmd => cmd.payload?.systemMessage === 'PLAYER_DISCONNECTED'));
   assert.ok(!storedCommands(gameId).some(cmd => cmd.payload?.systemMessage === 'PLAYER_DISCONNECTED'));
 });
+
+for (const outcome of ['WIN', 'LOST']) {
+  test(outcome + ' immediately after the last move settles the match exactly once', async t => {
+    const sender = 'sender-' + outcome;
+    const receiver = 'peer-' + outcome;
+    const gameId = await match(sender, receiver);
+    const peer = await connect(t, gameId, receiver);
+    const player = await connect(t, gameId, sender);
+    await waitForMessage(peer, 'PLAYER_RECONNECTED', sender);
+    function send(seqId, type, payload) {
+      player.socket.send(JSON.stringify({ gameId, seqId, timestamp: Date.now(), senderId: sender, type, payload }));
+    }
+    send(1, 'ELIMINATE', { tilesEliminated: ['one', 'two', 'three'] });
+    send(2, 'ELIMINATE', { tilesEliminated: ['four', 'five', 'six'] });
+    send(3, 'SYSTEM_EVENT', { systemMessage: outcome });
+    send(4, 'SYSTEM_EVENT', { systemMessage: outcome });
+    assert.equal((await waitForMessage(peer, outcome, undefined)).senderId, sender);
+    const commands = storedCommands(gameId);
+    assert.equal(commands.filter(c => c.type === 'ELIMINATE').length, 1);
+    assert.equal(commands.filter(c => c.payload?.systemMessage === outcome).length, 1);
+  });
+}

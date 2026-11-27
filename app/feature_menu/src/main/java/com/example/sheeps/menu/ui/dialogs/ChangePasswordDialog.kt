@@ -13,26 +13,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.ui.R
-import kotlinx.coroutines.delay
+import com.example.sheeps.menu.ui.screens.VerificationCodeButton
 
 @Composable
 fun ChangePasswordDialog(
     currentPhone: String,
     onDismiss: () -> Unit,
-    onSendCode: (String) -> Unit,
     onChangePassword: (String, String) -> Unit
 ) {
     var code by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<Int?>(null) }
-    var seconds by remember { mutableIntStateOf(0) }
-    LaunchedEffect(seconds) {
-        if (seconds > 0) {
-            delay(1_000)
-            seconds--
-        }
-    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_title_change_password), fontWeight = FontWeight.Bold) },
@@ -44,9 +36,7 @@ fun ChangePasswordDialog(
                     label = { Text(stringResource(R.string.hint_code)) }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     trailingIcon = {
-                        TextButton(onClick = { onSendCode(currentPhone); seconds = 60 }, enabled = seconds == 0) {
-                            Text(if (seconds == 0) stringResource(R.string.btn_get_code) else "${seconds}s")
-                        }
+                        VerificationCodeButton(currentPhone)
                     }
                 )
                 OutlinedTextField(

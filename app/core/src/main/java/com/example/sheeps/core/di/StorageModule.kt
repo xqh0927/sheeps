@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.AppDatabase
+import com.example.sheeps.data.local.StageSaveDao
 import com.example.sheeps.data.local.LocalDao
 import com.tencent.mmkv.MMKV
 import dagger.Module
@@ -42,9 +43,12 @@ object StorageModule {
             AppDatabase::class.java,
             "sheeps_local.db"
         )
-        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4)
         .build()
     }
+
+    @Provides
+    fun provideStageSaveDao(db: AppDatabase): StageSaveDao = db.stageSaveDao()
 
     /** 提供本地数据访问 DAO 单例。 */
     @Provides

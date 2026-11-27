@@ -89,6 +89,20 @@ export async function getI18nBatch(env: Env, module: string, locale: string): Pr
 }
 
 /**
+ * Read published copy and its base row in one D1 snapshot. The caller binds the locale as ?1.
+ * The identifiers are selected by the caller from these fixed publication fields.
+ */
+export function publishedTextSql(module: 'notice' | 'app_version', field: 'title' | 'content' | 'update_log'): string {
+  const id = module === 'notice' ? 'id' : 'version_code';
+  return `COALESCE(NULLIF((
+    SELECT i.value FROM i18n_strings AS i
+    WHERE i.module = '${module}' AND i.locale = ?1
+      AND i.str_key = '${module}.' || ${module}.${id} || '.${field}'
+    ORDER BY i.updated_at DESC, i.id DESC LIMIT 1
+  ), ''), ${module}.${field}) AS ${field}`;
+}
+
+/**
  * 单行读取：优先 i18n_strings，否则回退 fallback（基列宽列值）。
  */
 export async function getI18n(

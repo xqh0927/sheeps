@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun GameHomeScreen(
     state: MenuViewState,
+    savedLevel: Int?,
     onLevelClick: (Int) -> Unit,
     onShowLeaderboard: (Int) -> Unit,
     onNoticeClick: () -> Unit,
@@ -77,7 +78,7 @@ fun GameHomeScreen(
         .padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.widthIn(max = 620.dp).fillMaxWidth()) {
             LobbyMasthead(state.points)
-            ChallengeHero(level) { onLevelClick(level) }
+            ChallengeHero(savedLevel ?: level, savedLevel != null) { onLevelClick(savedLevel ?: level) }
             AnnouncementsBanner(state.notices, onNoticeClick)
             val battle = state.gameModes?.battle == true
             val endless = state.gameModes?.endless == true

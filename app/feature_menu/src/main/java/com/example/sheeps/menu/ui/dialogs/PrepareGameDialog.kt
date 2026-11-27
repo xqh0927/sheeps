@@ -13,6 +13,15 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.sheeps.data.repository.StageBoards
+import com.example.sheeps.data.repository.StageBoard
+import java.util.UUID
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,8 +46,11 @@ private val carryTypes = listOf("UNDO", "SHUFFLE", "MOVEOUT", "REVIVE", "HINT", 
 fun PrepareGameDialog(
     levelId: Int,
     state: MenuViewState,
+    stageBoards: StageBoards,
+    replacedLevel: Int?,
+    userId: Int,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
+    onConfirm: (Int, String) -> Unit,
     onUpdateItem: (String, Int) -> Unit,
     onUnlock: (Int) -> Unit
 ) {
@@ -49,11 +61,10 @@ fun PrepareGameDialog(
         total + when (stage) { 2 -> 50; 3 -> 100; else -> 200 }
     }
     val selectedTypes = state.selectedCarryItems.count { it.value > 0 }
-    val warning = when {
-        levelId % 5 == 0 -> null
-        levelId % 3 == 0 -> R.string.prepare_blind_warning
-        levelId % 2 == 0 -> R.string.prepare_sealed_warning
-        else -> null
+    val runId = rememberSaveable(levelId) { UUID.randomUUID().toString() }
+    var board by remember(runId) { mutableStateOf<StageBoard?>(null) }
+    LaunchedEffect(runId, locked) {
+        if (!locked) board = stageBoards.resolve(levelId, runId, userId)
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -78,7 +89,16 @@ fun PrepareGameDialog(
                             color = colors.onSurface, style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(5.dp))
                     } else {
-                        if (warning != null) {
+                        if (replacedLevel != null) {
+                            Text(stringResource(MenuR.string.stage_replaces_save, replacedLevel),
+                                color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.height(10.dp))
+                        }
+                        val warnings = buildList {
+                            if (board?.hasBlind == true) add(R.string.prepare_blind_warning)
+                            if (board?.hasSeals == true) add(R.string.prepare_sealed_warning)
+                        }
+                        for (warning in warnings) {
                             Text(stringResource(warning), color = colors.onSecondaryContainer,
                                 style = MaterialTheme.typography.bodySmall,
                                 modifier = Modifier.fillMaxWidth().background(colors.secondaryContainer, RoundedCornerShape(13.dp)).padding(10.dp))
@@ -107,12 +127,16 @@ fun PrepareGameDialog(
                     }
                 }
                 Button(onClick = {
-                    if (!locked) onConfirm(levelId)
+                    if (!locked) onConfirm(levelId, runId)
                     else if (state.points >= cost) onUnlock(levelId)
                     else Toaster.show(context.getString(R.string.prepare_locked_insufficient))
-                }, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
+                }, enabled = locked || board != null, modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)
                     .heightIn(min = 48.dp), shape = CircleShape) {
-                    Icon(if (locked) Icons.Outlined.Lock else Icons.Default.ArrowForward, null, Modifier.size(18.dp))
+                    if (!locked && board == null) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(if (locked) Icons.Outlined.Lock else Icons.Default.ArrowForward, null, Modifier.size(18.dp))
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(if (locked) R.string.dialog_prepare_unlock else R.string.prepare_btn_start))
                 }

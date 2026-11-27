@@ -6,33 +6,31 @@ import com.example.sheeps.lib_base.base.BaseMviViewModel
 import com.example.sheeps.core.game.GameEngine.calculateBlockedStates
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.local.LocalDao
+import com.example.sheeps.data.local.PendingStageStart
+import com.example.sheeps.data.local.PendingStageScore
 import com.example.sheeps.data.model.RenameRequest
-import com.example.sheeps.data.model.Tile
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.repository.SyncRepository
-import com.example.sheeps.game.state.BoardBounds
+import com.example.sheeps.data.repository.StageSaveSession
+import com.example.sheeps.data.repository.StageSaves
+import com.example.sheeps.data.repository.StageSnapshot
 import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.GameViewEffect
 import com.example.sheeps.game.state.GameHistoryState
 import com.example.sheeps.game.state.GameViewIntent
+import com.example.sheeps.game.state.elapsedAt
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.game.state.SoundType
 import com.example.sheeps.game.viewmodel.delegates.GameLogicDelegate
 import com.example.sheeps.game.viewmodel.delegates.GameToolDelegate
 import com.example.sheeps.game.viewmodel.delegates.ScoreDelegate
-import com.example.sheeps.game.viewmodel.helpers.GameLevelGenerator
+import com.example.sheeps.data.repository.StageBoards
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -51,22 +49,20 @@ class GameViewModel @Inject constructor(
     private val localDao: LocalDao,
     private val syncRepository: SyncRepository,
     // 逻辑拆分
-    private val levelGenerator: GameLevelGenerator,
+    private val stageBoards: StageBoards,
     private val logicDelegate: GameLogicDelegate,
     private val toolDelegate: GameToolDelegate,
-    private val scoreDelegate: ScoreDelegate
+    private val scoreDelegate: ScoreDelegate,
+    private val saves: StageSaves
 ) : BaseMviViewModel<GameViewState, GameViewIntent, GameViewEffect>(GameViewState()) {
 
-    private companion object {
-        const val LEVEL_REQUEST_BUDGET_MS = 2_000L
-    }
 
-    private var levelStartTime: Long = 0
+    private var foreground = true
+    private var session: StageSaveSession? = null
     private val runs = LevelRuns(savedState)
     private var levelLoad: Job? = null
     private var restartPicker: Job? = null
     private var itemsUsedCount: Int = 0
-    private var tickJob: kotlinx.coroutines.Job? = null
     private var hasSubmittedThisRun: Boolean = false
 
     // 历史状态栈（用于撤销功能）
@@ -77,6 +73,15 @@ class GameViewModel @Inject constructor(
     }
 
     override fun handleIntent(intent: GameViewIntent) {
+        val before = currentState
+        val isMove = when (intent) {
+            is GameViewIntent.ClickTile, GameViewIntent.UseUndo, GameViewIntent.UseMoveOut,
+            GameViewIntent.UseShuffle, GameViewIntent.UseHint, GameViewIntent.UseBomb,
+            GameViewIntent.UseJoker, GameViewIntent.UseDoublePoints, GameViewIntent.Revive -> true
+            else -> false
+        }
+        if (isMove && (before.isLoading || session?.current != true || session?.owner != (prefs.accountId() ?: prefs.getUserId()) ||
+            (before.gameStatus != GameStatus.PLAYING && intent != GameViewIntent.Revive))) return
         when (intent) {
             is GameViewIntent.InitUser -> handleInitUser()
             is GameViewIntent.AgreePrivacy -> handleAgreePrivacy()
@@ -84,9 +89,11 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.LoadLevel -> if (!currentState.isLoading || currentState.currentLevelId != intent.levelId) {
                 handleLoadLevel(runs.start(intent.levelId, intent.carryItemsJson))
             }
-            is GameViewIntent.ClickTile -> viewModelScope.launch {
+            is GameViewIntent.ClickTile -> {
+                val tile = (if (intent.tile.state == TileState.MOVED_OUT) before.movedOutTiles else before.boardTiles)
+                    .firstOrNull { it.id == intent.tile.id } ?: return
                 logicDelegate.handleClickTile(
-                    intent.tile,
+                    tile,
                     currentState,
                     ::saveHistoryState,
                     ::updateState,
@@ -132,7 +139,6 @@ class GameViewModel @Inject constructor(
             )
 
             is GameViewIntent.UseJoker -> toolDelegate.handleUseJoker(
-                viewModelScope,
                 currentState,
                 ::getLocalizedString,
                 ::updateState,
@@ -144,14 +150,7 @@ class GameViewModel @Inject constructor(
 
             is GameViewIntent.UseDoublePoints -> handleUseDoublePoints()
             is GameViewIntent.LoadLeaderboard -> handleLoadLeaderboard(intent.levelId)
-            is GameViewIntent.RestartLevel -> {
-                submitFailureRecordIfNeeded()
-                handleTriggerRestartFlow()
-            }
-            is GameViewIntent.TriggerRestartFlow -> {
-                submitFailureRecordIfNeeded()
-                handleTriggerRestartFlow()
-            }
+            GameViewIntent.RestartLevel, GameViewIntent.TriggerRestartFlow -> handleTriggerRestartFlow()
             is GameViewIntent.UpdateTempCarryItem -> handleUpdateTempCarryItem(
                 intent.itemType,
                 intent.change
@@ -163,8 +162,8 @@ class GameViewModel @Inject constructor(
             is GameViewIntent.GoBackToMenu -> {
                 levelLoad?.cancel()
                 restartPicker?.cancel()
-                tickJob?.cancel()
-                submitFailureRecordIfNeeded()
+                pausePlay()
+                session = null
                 updateState {
                     copy(
                         gameStatus = GameStatus.MENU, isLoading = false, showCarrySelection = false,
@@ -173,21 +172,56 @@ class GameViewModel @Inject constructor(
                 }
             }
         }
+        if (isMove && currentState !== before) checkpoint()
     }
 
-    fun openLevel(levelId: Int, carryJson: String?) {
-        runs.open(levelId, carryJson)?.let(::handleLoadLevel)
+    fun openLevel(levelId: Int, carryJson: String?, resumeId: String? = null) {
+        val run = if (resumeId == null) runs.open(levelId, carryJson) else runs.open(levelId, carryJson, resumeId)
+        run?.let(::handleLoadLevel)
     }
 
-    fun saveRemainingCarry() {
+    private fun elapsedMs() = currentState.elapsedAt(System.nanoTime())
+
+    private fun stopClock() {
+        updateState { copy(elapsedMs = elapsedAt(System.nanoTime()), activeSinceNanos = null) }
+    }
+
+    fun pausePlay() {
+        foreground = false
+        stopClock()
+        checkpoint()
+    }
+
+    fun resumePlay() {
+        foreground = true
+        val active = session ?: return
+        if (!active.current || active.owner != (prefs.accountId() ?: prefs.getUserId())) {
+            session = null
+            updateState { copy(gameStatus = GameStatus.MENU) }
+            setEffect(GameViewEffect.LevelLoadFailed(resumeUnavailable()))
+            return
+        }
+        if (currentState.gameStatus == GameStatus.PLAYING && currentState.activeSinceNanos == null) {
+            updateState { copy(activeSinceNanos = System.nanoTime()) }
+        }
+    }
+
+    private fun checkpoint() {
+        val active = session ?: return
         val state = currentState
-        if (state.isLoading || state.gameStatus == GameStatus.INIT || state.gameStatus == GameStatus.MENU) return
-        runs.saveRemaining(mapOf(
-            "UNDO" to state.undoCount, "MOVEOUT" to state.moveOutCount, "SHUFFLE" to state.shuffleCount,
-            "REVIVE" to state.reviveCount, "HINT" to state.hintCount, "BOMB" to state.bombCount,
-            "JOKER" to state.jokerCount, "DOUBLE_POINTS" to state.doublePointsCount,
-        ))
+        if (state.isLoading || hasSubmittedThisRun) return
+        if (state.gameStatus != GameStatus.PLAYING && !(state.gameStatus == GameStatus.LOST && state.reviveCount > 0)) return
+        saves.checkpoint(active, state.snapshot(historyStack, itemsUsedCount, elapsedMs())) {
+            setEffect(GameViewEffect.ShowToast(getLocalizedString("本次进度保存失败", "Could not save this move",
+                "本次進度儲存失敗", "進捗を保存できませんでした", "진행 상황을 저장하지 못했습니다")))
+        }
     }
+
+    private fun resumeUnavailable() = getLocalizedString(
+        "此对局已结束或存档不可用", "This game has ended or its save is unavailable",
+        "此對局已結束或存檔無法使用", "このゲームは終了したか、セーブを利用できません",
+        "게임이 끝났거나 저장된 게임을 열 수 없습니다"
+    )
 
     /** 初始化用户信息：读取隐私协议状态、昵称与已解锁关卡，并进入 MENU 或 INIT 状态。运行于主线程。 */
     private fun handleInitUser() {
@@ -254,8 +288,7 @@ class GameViewModel @Inject constructor(
      * 加载指定关卡数据并初始化本局状态（MVI Intent: [GameViewIntent.LoadLevel]）。
      *
      * 线程边界：
-     * - 计时已解耦到 UI 本地（[com.example.sheeps.game.ui.components.GameStatusBar] 基于 `levelStartTimestamp` 自增）；
-     *   [viewModelScope] 的计时协程仅作占位、不写全局状态，避免整树每秒重组；
+     * - 状态栏在前台自行刷新显示，存档与结算只累计前台游戏时间。
      * - Retrofit/Room 挂起调用不阻塞主线程；生成和遮挡计算在 [Dispatchers.Default] 完成。
      * - 服务端布局超过预算时沿用本局种子回退本地，棋盘可用后独立上传待同步记录。
      *
@@ -264,42 +297,58 @@ class GameViewModel @Inject constructor(
     private fun handleLoadLevel(run: LevelRun) {
         levelLoad?.cancel()
         restartPicker?.cancel()
-        tickJob?.cancel()
+        session = null
         updateState { copy(isLoading = true, currentLevelId = run.level, showCarrySelection = false) }
         historyStack.clear()
         itemsUsedCount = 0
-        // Stable after process recreation. Keep the LCG seed in the Worker's positive seed range.
-        val seed = Math.floorMod(run.id.hashCode(), 1_000_000) + 1
         val owner = prefs.accountId()
         val deviceId = prefs.getUserId()
         levelLoad = viewModelScope.launch {
+            val opening = StageSaveSession(owner ?: deviceId, run.id, run.level)
             try {
-                val remote = try {
-                    withTimeoutOrNull(LEVEL_REQUEST_BUDGET_MS) { apiService.getLevel(run.level, seed) }
-                        ?.takeIf { it.isNotEmpty() }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    null
+                val restored = saves.restore(opening)
+                if (restored != null) {
+                    check(prefs.accountId() == owner)
+                    install(opening, restored)
+                    return@launch
                 }
+                if (run.requiresSnapshot) {
+                    updateState { copy(isLoading = false, gameStatus = GameStatus.MENU) }
+                    setEffect(GameViewEffect.LevelLoadFailed(resumeUnavailable()))
+                    return@launch
+                }
+                val board = stageBoards.resolve(run.level, run.id, deviceId.toIntOrNull() ?: 0)
                 val tiles = withContext(Dispatchers.Default) {
-                    val layout = remote?.map { it.copy(state = TileState.NORMAL) }
-                        ?: levelGenerator.generateSolvableLevelLocal(run.level, seed.toLong(), deviceId.toIntOrNull() ?: 0)
-                    check(layout.isNotEmpty())
-                    calculateBlockedStates(layout)
+                    calculateBlockedStates(board.tiles.map { it.copy(state = TileState.NORMAL) })
                 }
                 val requested = try {
                     run.carryJson?.let { json.decodeFromString<Map<String, Int>>(it) }.orEmpty()
                 } catch (_: IllegalArgumentException) {
                     emptyMap()
                 }
+                val snapshot = saves.begin(opening, onReplace = { previous, old ->
+                    localDao.recordStageResult(PendingStageScore(
+                        ownerId = opening.owner, runId = previous.id, levelId = previous.level,
+                        score = 0, clearTimeMs = old.elapsedMs, itemsUsed = old.itemsUsed, won = false,
+                        completedAt = System.currentTimeMillis(), abandoned = !old.awaitingRevive
+                    ), true)
+                }) {
+                    check(prefs.accountId() == owner)
+                    val allocated = localDao.consumeForRun(run.id, owner, requested, deviceId)
+                    val carry = run.remaining?.let { remaining ->
+                        allocated.mapValues { (type, count) -> minOf(count, remaining[type] ?: 0) }
+                    } ?: allocated
+                    localDao.enqueueStageStart(PendingStageStart(opening.owner, run.id, run.level, board.healthVersion, System.currentTimeMillis()))
+                    check(prefs.accountId() == owner)
+                    initialSnapshot(tiles, carry)
+                }
+                scoreDelegate.scheduleUpload(opening.owner, "start-${run.id}")
                 check(prefs.accountId() == owner)
-                val allocated = localDao.consumeForRun(run.id, owner, requested, deviceId)
-                ensureActive()
-                val carry = run.remaining?.let { remaining ->
-                    allocated.mapValues { (type, count) -> minOf(count, remaining[type] ?: 0) }
-                } ?: allocated
-                updateBoardState(tiles, carry, remote == null)
+                install(opening, snapshot)
+                if (board.offline) setEffect(GameViewEffect.ShowToast(getLocalizedString(
+                    "网络连接失败，已切换至单机模式", "Offline mode active", "網絡連接失敗，已切換至單機模式",
+                    "オフラインモード", "오프라인 모드"
+                )))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -324,102 +373,24 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 启动计时器：仅在棋盘数据加载完毕、状态切换为 PLAYING 后调用。
-     * 记录关卡开始时间并写入一次 [GameViewState.levelStartTimestamp]（运行于 [viewModelScope] 主线程）；
-     * 不再按秒更新 [GameViewState.elapsedMs]，避免整棵 GameScreen 每秒重组。
-     * VM 销毁时由框架自动取消协程；先 cancel 旧 Job 防止并发计时器叠加。
-     */
-    private fun startTimer() {
-        levelStartTime = System.currentTimeMillis()
-        // 解耦计时：不再每秒写全局 elapsedMs（否则整棵 GameScreen 每秒重组、约 300 张 TileView 重绘 + 300 次 onGloballyPositioned）。
-        // 仅写入一次关卡起始时间戳，供 GameStatusBar 基于本地计时器自增显示；结算时仍用 levelStartTime 计算最终 elapsedMs。
-        updateState { copy(levelStartTimestamp = levelStartTime) }
-        // 保留可被取消的占位协程，使游戏结束时 tickJob?.cancel() 生命周期语义与原有保持一致；不执行任何周期性状态写入。
-        tickJob?.cancel()
-        tickJob = viewModelScope.launch {
-            awaitCancellation()
-        }
-    }
-
-    /** 将加载得到的卡牌写入 State：计算棋盘边界 [BoardBounds]、封印解锁顺序，并切换至 PLAYING 状态。运行于主线程。 */
-    private fun updateBoardState(
-        tiles: List<Tile>,
-        carryMap: Map<String, Int>,
-        isOffline: Boolean
-    ) {
-        val sanitizedTiles = tiles.map { tile ->
-            val t = tile.copy()
-            if (t.sealedCount > 0) {
-                t.sealedCount = 1
-            }
-            t
-        }
-        val bounds = if (sanitizedTiles.isEmpty()) {
-            BoardBounds()
-        } else {
-            BoardBounds(
-                minX = sanitizedTiles.minOf { it.x },
-                maxX = sanitizedTiles.maxOf { it.x },
-                minY = sanitizedTiles.minOf { it.y },
-                maxY = sanitizedTiles.maxOf { it.y }
-            )
-        }
-        val sealedOrder = sanitizedTiles
-            .filter { it.sealedCount > 0 }
-            .sortedByDescending { it.z }
-            .map { it.id }
-
+    private fun install(opening: StageSaveSession, snapshot: StageSnapshot) {
+        session = opening
+        runs.markInstalled()
         hasSubmittedThisRun = false
-        itemsUsedCount = 0
-
-        updateState {
-            copy(
-                isLoading = false,
-                boardTiles = sanitizedTiles,
-                boardBounds = bounds,
-                slotTiles = emptyList(),
-                movedOutTiles = emptyList(),
-                undoCount = carryMap["UNDO"] ?: 0,
-                shuffleCount = carryMap["SHUFFLE"] ?: 0,
-                moveOutCount = carryMap["MOVEOUT"] ?: 0,
-                reviveCount = carryMap["REVIVE"] ?: 0,
-                hintCount = carryMap["HINT"] ?: 0,
-                bombCount = carryMap["BOMB"] ?: 0,
-                jokerCount = carryMap["JOKER"] ?: 0,
-                doublePointsCount = carryMap["DOUBLE_POINTS"] ?: 0,
-                isDoublePointsActive = false,
-                score = 0,
-                gameStatus = GameStatus.PLAYING,
-                sealedClearCount = 0,
-                sealedUnlockThreshold = 3,
-                sealedUnlockedIds = emptySet(),
-                sealedOrder = sealedOrder,
-                currentSkin = prefs.getCurrentSkin()
-            )
-        }
-        if (isOffline) setEffect(
-            GameViewEffect.ShowToast(
-                getLocalizedString(
-                    "网络连接失败，已切换至单机模式",
-                    "Offline mode active",
-                    "網絡連接失敗，已切換至單機模式",
-                    "オフラインモード",
-                    "오프라인 모드"
-                )
-            )
-        )
-        // 棋盘加载完成、状态已切换为 PLAYING，此时用户方可点击卡牌，才开始计时
-        startTimer()
+        itemsUsedCount = snapshot.itemsUsed
+        historyStack.clear()
+        historyStack.addAll(snapshot.history)
+        updateState { restore(snapshot, opening.level, prefs.getCurrentSkin()) }
+        if (foreground) resumePlay()
     }
 
     /**
-     * 处理卡槽三消匹配与胜负判定（挂起函数）。
+     * 在同一次输入处理中完成三消和胜负判定。
      * 委托 [GameLogicDelegate.processSlotMatchAndCheckEndGame] 计算消除与门控解锁；
      * 胜利时计算通关结算积分（含双倍倍率与难度系数）并触发 [ScoreDelegate] 云端提交。
-     * 游戏结束（WON/LOST）时取消计时器 Job。
+     * 游戏结束时冻结有效游戏时间。
      */
-    private suspend fun processSlotMatchAndCheckEndGame() {
+    private fun processSlotMatchAndCheckEndGame() {
         val state = currentState
         logicDelegate.processSlotMatchAndCheckEndGame(
             state,
@@ -432,33 +403,23 @@ class GameViewModel @Inject constructor(
             ::setEffect
         ) {
             // 计算通关结算积分（与 ScoreDelegate 同样公式）
-            val elapsedMs = System.currentTimeMillis() - levelStartTime
+            val elapsedMs = elapsedMs()
             val timeInSeconds = elapsedMs / 1000L
             val difficultyCoeff = when (currentState.currentLevelId) {
                 1 -> 1; 2 -> 2; 3 -> 3; else -> 4
             }
             val baseScore = (maxOf(100L, (1000L - timeInSeconds * 2) - itemsUsedCount * 50L) * difficultyCoeff).toInt()
             val computedFinalScore = if (currentState.isDoublePointsActive) baseScore * 2 else baseScore
-            updateState { copy(finalScore = computedFinalScore, elapsedMs = elapsedMs) }
+            updateState { copy(finalScore = computedFinalScore, elapsedMs = elapsedMs, activeSinceNanos = null) }
 
-            hasSubmittedThisRun = true
-            scoreDelegate.submitScoreOnline(
-                CoroutineScope(Dispatchers.IO),
-                currentState.currentLevelId,
-                computedFinalScore,
-                elapsedMs,
-                itemsUsedCount,
-                1, // isWin = 1
-                ::getLocalizedString,
-                ::setEffect
-            )
+            submitResult(computedFinalScore, elapsedMs, won = true)
         }
         // 游戏结束时停止计时器
         val updatedState = currentState
         if (updatedState.gameStatus == GameStatus.WON || updatedState.gameStatus == GameStatus.LOST) {
-            tickJob?.cancel()
+            stopClock()
             if (updatedState.gameStatus == GameStatus.LOST && updatedState.reviveCount <= 0) {
-                submitFailureRecordIfNeeded()
+                submitResult(0, elapsedMs(), won = false)
             }
         }
     }
@@ -476,7 +437,8 @@ class GameViewModel @Inject constructor(
                 boardTiles = calculateBlockedStates(state.boardTiles)
             )
         }
-        viewModelScope.launch { setEffect(GameViewEffect.PlaySound(SoundType.CLICK)) }
+        if (foreground) resumePlay()
+        setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
     }
 
     private fun handleUseDoublePoints() {
@@ -522,6 +484,9 @@ class GameViewModel @Inject constructor(
 
     /** 将当前棋盘/卡槽/置物架与封印进度快照压入撤销栈（[historyStack]），供 Undo 回退。深拷贝避免引用泄漏。 */
     private fun saveHistoryState() {
+        val undo = currentState.undoCount
+        if (undo <= 0) return
+        while (historyStack.size >= undo) historyStack.removeAt(0)
         historyStack.add(
             GameHistoryState(
                 boardTiles = currentState.boardTiles.map { it.copy() },
@@ -581,6 +546,7 @@ class GameViewModel @Inject constructor(
     /** 确认重开：将临时携带道具序列化为 JSON 并重新 [handleLoadLevel]。运行于主线程。 */
     private fun handleConfirmRestartWithCarry() {
         if (!currentState.showCarrySelection) return
+        checkpoint()
         val carryJson = json.encodeToString<Map<String, Int>>(currentState.tempCarryItems)
         updateState {
             copy(showCarrySelection = false)
@@ -588,21 +554,34 @@ class GameViewModel @Inject constructor(
         handleLoadLevel(runs.start(currentState.currentLevelId, carryJson))
     }
 
-    private fun submitFailureRecordIfNeeded() {
-        if (hasSubmittedThisRun || currentState.isLoading) return
-        val status = currentState.gameStatus
-        if (status != GameStatus.PLAYING && status != GameStatus.LOST) return
+    private fun submitResult(score: Int, elapsed: Long, won: Boolean) {
+        val active = session ?: return
+        if (hasSubmittedThisRun || !active.current) return
         hasSubmittedThisRun = true
-        val elapsedMs = System.currentTimeMillis() - levelStartTime
-        scoreDelegate.submitScoreOnline(
-            CoroutineScope(Dispatchers.IO),
-            currentState.currentLevelId,
-            0,
-            elapsedMs,
-            itemsUsedCount,
-            0, // isWin = 0
-            ::getLocalizedString,
-            ::setEffect
-        )
+        val result = PendingStageScore(active.owner, active.id, active.level, score, elapsed,
+            itemsUsedCount, won, System.currentTimeMillis())
+        saves.settle(active, record = { scoreDelegate.record(result) }, onSaved = {
+            scoreDelegate.upload(result, ::getLocalizedString, ::setEffect)
+        }) { previous ->
+            viewModelScope.launch {
+                if (session !== active || !active.current || active.owner != (prefs.accountId() ?: prefs.getUserId())) return@launch
+                if (previous != null) {
+                    install(active, previous)
+                    setEffect(GameViewEffect.ShowToast(getLocalizedString(
+                        "成绩保存失败，已恢复上一步，可以继续游戏", "Result could not be saved. Continue from your previous move.",
+                        "成績儲存失敗，已恢復上一步，可以繼續遊戲", "結果を保存できませんでした。直前の手から続けられます。",
+                        "결과를 저장하지 못했습니다. 이전 수부터 이어서 플레이할 수 있습니다."
+                    )))
+                } else {
+                    session = null
+                    updateState { copy(gameStatus = GameStatus.MENU) }
+                    setEffect(GameViewEffect.LevelLoadFailed(getLocalizedString(
+                        "成绩保存失败，请返回首页重试续局", "Could not save the result. Return to the menu and retry your saved game.",
+                        "成績儲存失敗，請返回首頁重試續局", "結果を保存できませんでした。メニューから再開してください。",
+                        "결과를 저장하지 못했습니다. 메뉴에서 이어하기를 다시 시도해 주세요."
+                    )))
+                }
+            }
+        }
     }
 }

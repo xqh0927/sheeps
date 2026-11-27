@@ -96,6 +96,10 @@ class MenuActivity : BaseActivity() {
     @Inject
     lateinit var apiService: ApiService
 
+    @Inject lateinit var stageSaves: com.example.sheeps.data.repository.StageSaves
+
+    @Inject lateinit var stageBoards: com.example.sheeps.data.repository.StageBoards
+
     @Inject
     lateinit var userPrefs: UserPreferences
 
@@ -107,6 +111,11 @@ class MenuActivity : BaseActivity() {
     override fun initView(savedInstanceState: Bundle?) {
         setContent {
             val state by viewModel.viewState.collectAsState()
+
+            val saveOwner = userPrefs.accountId() ?: userPrefs.getUserId()
+            val savedStage = androidx.compose.runtime.key(saveOwner) {
+                remember(saveOwner) { stageSaves.observeLatest(saveOwner) }.collectAsState(initial = null).value
+            }
 
             // --- 多语言动态刷新逻辑 ---
             val currentLang = state.language
@@ -211,6 +220,7 @@ class MenuActivity : BaseActivity() {
                                     TheRouter.build(RouterPath.Game.PLAY)
                                         .withInt("levelId", effect.levelId)
                                         .withString("carryItemsJson", effect.carryItemsJson)
+                                        .withString("preparedRunId", effect.preparedRunId)
                                         .navigation()
                                 }
 
@@ -283,11 +293,17 @@ class MenuActivity : BaseActivity() {
                                             when (targetTab) {
                                                 "game" -> GameHomeScreen(
                                                     state = state,
+                                                    savedLevel = savedStage?.level,
                                                     onLevelClick = { lvl ->
                                                         if (lvl > 3 && !state.isLoggedIn) {
                                                             TheRouter.build(RouterPath.Auth.LOGIN)
                                                                 .navigation(this@MenuActivity)
                                                             Toaster.show(this@MenuActivity.getString(R.string.toast_login_required_level))
+                                                        } else if (savedStage != null && savedStage.level == lvl) {
+                                                            TheRouter.build(RouterPath.Game.PLAY)
+                                                                .withInt("levelId", lvl)
+                                                                .withString("resumeRunId", savedStage.id)
+                                                                .navigation(this@MenuActivity)
                                                         } else {
                                                             showPrepareDialog = lvl
                                                         }
@@ -359,6 +375,7 @@ class MenuActivity : BaseActivity() {
 
                                                 "me" -> PersonalScreen(
                                                     state = state,
+                                                    onRetry = { viewModel.sendIntent(MenuViewIntent.RetryPersonalSection(it)) },
                                                     onLoginClick = {
                                                         TheRouter.build(RouterPath.Auth.LOGIN)
                                                             .navigation(this@MenuActivity)
@@ -392,19 +409,23 @@ class MenuActivity : BaseActivity() {
                                 if (showPrepareDialog != null) {
                                     PrepareGameDialog(
                                         levelId = showPrepareDialog!!,
+                                        stageBoards = stageBoards,
+                                        replacedLevel = savedStage?.level,
+                                        userId = userPrefs.getUserId().toIntOrNull() ?: 0,
                                         state = state,
                                         onDismiss = {
                                             showPrepareDialog = null
                                             viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
                                         },
-                                        onConfirm = { lvl ->
+                                        onConfirm = { lvl, preparedRunId ->
                                             val carryJson =
                                                 json.encodeToString(state.selectedCarryItems)
                                             viewModel.sendIntent(MenuViewIntent.ClearCarryItems)
                                             viewModel.sendIntent(
                                                 MenuViewIntent.GoToGame(
                                                     lvl,
-                                                    carryJson
+                                                    carryJson,
+                                                    preparedRunId
                                                 )
                                             )
                                         },

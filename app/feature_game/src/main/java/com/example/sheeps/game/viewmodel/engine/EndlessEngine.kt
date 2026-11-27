@@ -32,7 +32,8 @@ object EndlessEngine {
     data class MatchResult(
         val newSlot: List<Tile>,
         val eliminatedIds: Set<String>,
-        val baseGain: Int
+        val baseGain: Int,
+        val tileType: Int?
     )
 
     /**
@@ -138,10 +139,10 @@ object EndlessEngine {
      */
     fun resolveMatch(slot: List<Tile>): MatchResult {
         val groups = slot.groupBy { it.type }
-        val matchType = groups.entries.firstOrNull { it.value.size >= 3 }?.key ?: return MatchResult(slot, emptySet(), 0)
+        val matchType = groups.entries.firstOrNull { it.value.size >= 3 }?.key ?: return MatchResult(slot, emptySet(), 0, null)
         val toRemove = groups[matchType]!!.take(3).map { it.id }.toSet()
         val newSlot = slot.filter { it.id !in toRemove }
-        return MatchResult(newSlot, toRemove, BASE_GAIN)
+        return MatchResult(newSlot, toRemove, BASE_GAIN, matchType)
     }
 
     /**

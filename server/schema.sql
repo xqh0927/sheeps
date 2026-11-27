@@ -10,10 +10,15 @@ DROP TABLE IF EXISTS level_unlock;
 DROP TABLE IF EXISTS login_token;
 DROP TABLE IF EXISTS notice;
 DROP TABLE IF EXISTS config;
+DROP TABLE IF EXISTS stage_run_scores;
+DROP TABLE IF EXISTS stage_attempts;
 DROP TABLE IF EXISTS leaderboard;
 DROP TABLE IF EXISTS backup_save_log;
 DROP TABLE IF EXISTS shop_exchange_receipts;
 DROP TABLE IF EXISTS item_consumptions;
+DROP TABLE IF EXISTS stage_score_receipts;
+DROP TABLE IF EXISTS account_deletion_requests;
+DROP TABLE IF EXISTS account_avatar_cleanup;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS app_version;
 DROP TABLE IF EXISTS matchmaking_queue;
@@ -34,6 +39,19 @@ CREATE TABLE users (
     created_at INTEGER NOT NULL,
     role TEXT DEFAULT 'user',
     is_banned INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+    user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_at INTEGER NOT NULL
+);
+
+-- The retry job must survive deletion of the corresponding users row.
+CREATE TABLE IF NOT EXISTS account_avatar_cleanup (
+    user_id TEXT PRIMARY KEY NOT NULL,
+    deleted_at INTEGER NOT NULL,
+    revision TEXT NOT NULL,
+    last_attempt_at INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE login_token (
@@ -171,6 +189,13 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_admin ON admin_audit_log(admin_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_log(created_at);
 
+CREATE TABLE IF NOT EXISTS stage_score_receipts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL UNIQUE,
+    PRIMARY KEY (user_id, run_id)
+);
+
 CREATE TABLE leaderboard (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
@@ -182,6 +207,28 @@ CREATE TABLE leaderboard (
     is_win INTEGER NOT NULL DEFAULT 1,
     achieved_at INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+-- Generated stages have no levels row. Only observed starts carry layout provenance.
+CREATE TABLE IF NOT EXISTS stage_attempts (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    run_id TEXT NOT NULL,
+    level_id INTEGER NOT NULL,
+    layout_version TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, run_id)
+);
+CREATE INDEX IF NOT EXISTS idx_stage_attempts_version ON stage_attempts(level_id, layout_version, user_id, started_at, run_id);
+CREATE INDEX IF NOT EXISTS idx_stage_attempts_retry ON stage_attempts(user_id, level_id, started_at, run_id);
+
+-- Older leaderboard entries have no run identity. Never infer one from a timestamp or score.
+CREATE TABLE IF NOT EXISTS stage_run_scores (
+    user_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    score_id INTEGER NOT NULL UNIQUE REFERENCES leaderboard(id) ON DELETE CASCADE,
+    abandoned INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, run_id),
+    FOREIGN KEY (user_id, run_id) REFERENCES stage_score_receipts(user_id, run_id) ON DELETE CASCADE
 );
 
 -- 按模式 + 关卡 + 分数建索引，加速分榜查询（无尽模式 game_mode=1 查询）
@@ -276,14 +323,14 @@ INSERT INTO notice (title, content, type, created_at) VALUES
 ('消了个爽1.0盛大开启', '喜迎全新水墨修真版本，多重福利送不停！', 'ACTIVITY', 1720000000000);
 
 INSERT INTO shop_items (name, description, item_type, points_price, stock) VALUES 
-('乾坤符 (Undo)', '撤销上一步操作', 'UNDO', 20, 100),
-('缩地咒 (MoveOut)', '从卡槽移出前三张卡牌', 'MOVEOUT', 30, 80),
-('流沙契 (Shuffle)', '重新打乱桌面剩余卡牌', 'SHUFFLE', 20, 99),
-('还魂丹 (Revive)', '消除失败时免除惩罚复活', 'REVIVE', 50, 20),
-('天眼符 (Hint)', '自动高亮出一组可消卡牌', 'HINT', 15, 150),
-('雷震子 (Bomb)', '直接炸毁卡槽中最后2张卡牌', 'BOMB', 40, 30),
-('太极牌 (Joker)', '作为任意图案卡牌与前两张直接凑对消除', 'JOKER', 60, 10),
-('双倍符 (Double)', '结算时获得双倍积分卡', 'DOUBLE_POINTS', 25, 50);
+('乾坤符', '撤销上一步操作', 'UNDO', 20, 100),
+('缩地咒', '从卡槽移出前三张卡牌', 'MOVEOUT', 30, 80),
+('流沙契', '重新打乱桌面剩余卡牌', 'SHUFFLE', 20, 99),
+('还魂丹', '消除失败时免除惩罚复活', 'REVIVE', 50, 20),
+('天眼符', '自动高亮出一组可消卡牌', 'HINT', 15, 150),
+('雷震子', '直接炸毁卡槽中最后2张卡牌', 'BOMB', 40, 30),
+('太极牌', '作为任意图案卡牌与前两张直接凑对消除', 'JOKER', 60, 10),
+('双倍符', '结算时获得双倍积分卡', 'DOUBLE_POINTS', 25, 50);
 
 INSERT INTO config (key, value) VALUES 
 ('level_2_unlock_points', '50'),

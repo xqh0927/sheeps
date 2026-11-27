@@ -9,15 +9,10 @@ import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.GameViewEffect
 import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.game.state.SoundType
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
-
-/** 卡牌飞入卡槽的动画时长，与 GameAnimations.FlyTweenSpec (350ms) 保持一致 */
-private const val FLY_ANIMATION_DELAY_MS = 360L
 
 /**
  * 游戏核心逻辑委派类
@@ -25,21 +20,14 @@ private const val FLY_ANIMATION_DELAY_MS = 360L
  */
 class GameLogicDelegate @Inject constructor() {
 
-    /**
-     * 处理卡牌点击逻辑
-     * （闯关模式）线程边界：主流程在调用方主线程执行；被遮挡/封印时的「抖动反馈」通过 `scope.launch { delay(500) }` 在 [viewModelScope] 内延时复位 `shakingTileIds`，VM 销毁时该协程随 scope 取消，无泄漏风险。门控未解锁的封印牌在此拦截，避免产生无效 Undo 步骤。
-     */
-    /**
-     * 处理卡牌点击事件（挂起函数）。
-     * 主流程在调用方主线程执行，移除 thread switching 上下文切换以实现极致零延迟点击响应。
-     */
-    suspend fun handleClickTile(
+    /** 棋盘点击和落槽匹配在同一次输入中完成，飞行动画由 UI 独立播放。 */
+    fun handleClickTile(
         tile: Tile,
         state: GameViewState,
         onAddHistory: () -> Unit,
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
-        processSlotMatch: suspend () -> Unit
+        processSlotMatch: () -> Unit
     ) {
         if (state.gameStatus != GameStatus.PLAYING) return
 
@@ -94,7 +82,6 @@ class GameLogicDelegate @Inject constructor() {
                 )
             }
             setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-            delay(FLY_ANIMATION_DELAY_MS)
             processSlotMatch()
         } else {
             // 从棋盘点击
@@ -122,7 +109,6 @@ class GameLogicDelegate @Inject constructor() {
                         )
                     }
                     setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                    delay(FLY_ANIMATION_DELAY_MS)
                     processSlotMatch()
                 } else {
                     // 未完全解封，播放解封音效并更新层数
@@ -150,7 +136,6 @@ class GameLogicDelegate @Inject constructor() {
                     )
                 }
                 setEffect(GameViewEffect.PlaySound(SoundType.CLICK))
-                delay(FLY_ANIMATION_DELAY_MS)
                 processSlotMatch()
             }
         }
@@ -158,12 +143,12 @@ class GameLogicDelegate @Inject constructor() {
 
     /**
      * 执行槽位匹配及输赢判定
-     * （挂起函数，闯关模式核心）负责循环消除三同花、封印门控计数与跨阈值解锁（sealed-unlock-mechanism-design.md §6）、软锁兜底自动解锁，以及 WON/LOST/PLAYING 状态判定。纯不可变状态更新，规避引用泄漏。
+     * 负责循环消除三同花、封印门控计数与跨阈值解锁（sealed-unlock-mechanism-design.md §6）、软锁兜底自动解锁，以及 WON/LOST/PLAYING 状态判定。纯不可变状态更新，规避引用泄漏。
      *
      * @return 本次所获得的得分增量值
      * （非双倍 100 / 双倍 200 每张）
      */
-    suspend fun processSlotMatchAndCheckEndGame(
+    fun processSlotMatchAndCheckEndGame(
         state: GameViewState,
         board: List<Tile>,
         slot: List<Tile>,
@@ -180,7 +165,7 @@ class GameLogicDelegate @Inject constructor() {
 
         // 进行匹配消除检查，循环直到没有可以消除的为止
         var matched = true
-        var totalRemoved = 0
+        val matchedTypes = mutableListOf<Int>()
         while (matched) {
             matched = false
             val counts = finalSlot.groupBy { it.type }
@@ -194,7 +179,7 @@ class GameLogicDelegate @Inject constructor() {
                             true
                         } else false
                     }
-                    totalRemoved += removedCount
+                    matchedTypes.add(type)
                     scoreAdd += if (isDoublePoints) 200 else 100
                     matched = true
                     break
@@ -202,16 +187,12 @@ class GameLogicDelegate @Inject constructor() {
             }
         }
 
-        if (matched) {
-            setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
-        }
-
         // ===== 封印门控：计数累加 + 跨阈值解锁（sealed-unlock-mechanism-design.md §6）=====
         val prevClear = state.sealedClearCount
         val prevUnlockedSize = state.sealedUnlockedIds.size
         val gateThreshold = state.sealedUnlockThreshold
         val sealOrder = state.sealedOrder
-        val newClear = prevClear + totalRemoved
+        val newClear = prevClear + matchedTypes.size * 3
         val newUnlocked = state.sealedUnlockedIds.toMutableSet()
         
         // 门控机制解锁：每当玩家消除 1 组（3 张）正常卡牌（累计消除数达到 3），
@@ -294,6 +275,7 @@ class GameLogicDelegate @Inject constructor() {
             )
         }
 
+        matchedTypes.forEach { type -> setEffect(GameViewEffect.TileMatch(type)) }
         if (unlockedNow > 0) {
             setEffect(GameViewEffect.PlaySound(SoundType.UNSEAL))
             setEffect(GameViewEffect.ShowToast("封印解锁！已解锁 $unlockedNow 张封印牌"))

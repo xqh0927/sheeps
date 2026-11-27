@@ -153,12 +153,9 @@ data class SendCodeRequest(
     val phone: String
 )
 
-/** 发送验证码响应（调试模式下 [code] 直接返回验证码）。 */
+/** 服务商受理结果。验证码仅通过短信交付。 */
 @Serializable
-data class SendCodeResponse(
-    val success: Boolean,
-    val code: String
-)
+data class SendCodeResponse(val success: Boolean)
 
 /**
  * 手机号 + 验证码登录请求。
@@ -338,7 +335,19 @@ data class ScoreRequest(
     /** 0=闯关/PvP，1=无尽生存；默认 0 保持向后兼容 */
     val game_mode: Int = 0,
     val items_used: Int = 0,
-    val is_win: Int = 1
+    val is_win: Int = 1,
+    val run_id: String? = null,
+    val completed_at: Long? = null,
+    val abandoned: Boolean = false
+)
+
+@Serializable
+data class StageStartRequest(
+    val user_id: String,
+    val run_id: String,
+    val level_id: Int,
+    val layout_version: String,
+    val started_at: Long
 )
 
 /** 排行榜单条记录（用户名 / 头像 / 成绩 / 达成时间）。 */
@@ -364,7 +373,8 @@ data class LeaderboardResponse(
 @Serializable
 data class GenericResponse(
     val success: Boolean,
-    val avatarUrl: String? = null
+    val avatarUrl: String? = null,
+    val run_id: String? = null
 )
 
 /** 刷新 Token 响应（返回新的双 Token，失败含 [error]）。 */
@@ -433,3 +443,5 @@ data class Top3Entry(
     val username: String,
     val points: Int
 )
+@Serializable
+data class DeletionRequestStatus(val requested_at: Long?)

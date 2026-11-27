@@ -38,14 +38,13 @@ fun UserInfoScreen(
     onBack: () -> Unit,
     onChangeAvatar: () -> Unit,
     onUpdateNickname: (String) -> Unit,
-    onSendCode: (String) -> Unit,
     onChangePassword: (String, String) -> Unit
 ) {
     var nickname by rememberSaveable { mutableStateOf(false) }
     var password by rememberSaveable { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     if (nickname) NicknameEditDialog(state.username, { nickname = false }) { nickname = false; onUpdateNickname(it) }
-    if (password) ChangePasswordDialog(state.phone, { password = false }, onSendCode) { code, value ->
+    if (password) ChangePasswordDialog(state.phone, { password = false }) { code, value ->
         password = false
         onChangePassword(code, value)
     }

@@ -1,7 +1,10 @@
 // 页面 B 组：关卡管理（实体 = Level，整数主键 level_id）
 // 列表/创建/更新/删除分别映射 api/admin 的 listLevels / createLevel / updateLevel / deleteLevel
+import { useState } from 'react';
+import { Box, Tab, Tabs } from '@mui/material';
 import CrudPage, { FieldDef, ColumnDef } from '../components/CrudPage';
 import { listLevels, createLevel, updateLevel, deleteLevel } from '../api/admin';
+import LevelHealth from './LevelHealth';
 
 // 表格列定义：level_id 与 difficulty 可排序；layout_data 为 JSON 字符串，列表超长截断预览
 const columns: ColumnDef[] = [
@@ -29,24 +32,32 @@ const fields: FieldDef[] = [
   { name: 'layout_data', label: '布局数据（JSON 字符串）', type: 'textarea', required: true },
 ];
 
-/**
- * 关卡管理页。
- * 通过 CrudPage 泛型组件承载列表、排序、增删改查表单，
- * 业务仅声明列与字段，所有数据流（loading/error/分页/提交）由 CrudPage 统一管理。
- */
 export default function Levels() {
+  const [tab, setTab] = useState<'list' | 'health'>('list');
   return (
-    <CrudPage
-      title="关卡管理"
-      idField="level_id"
-      columns={columns}
-      fields={fields}
-      fetcher={listLevels}
-      creator={createLevel}
-      updater={updateLevel}
-      deleter={deleteLevel}
-      getDeleteConfirmText={(row: any) => `确定要删除「关卡#${row.level_id}」吗？此操作不可撤销。`}
-      sortable
-    />
+    <>
+      <Tabs value={tab} onChange={(_, value) => setTab(value)} aria-label="关卡管理视图"
+        sx={{ mb: 2.5, borderBottom: 1, borderColor: 'divider' }}>
+        <Tab id="level-list-tab" value="list" label="关卡列表" aria-controls="level-list-panel" />
+        <Tab id="level-health-tab" value="health" label="关卡体检" aria-controls="level-health-panel" />
+      </Tabs>
+      <Box role="tabpanel" id="level-list-panel" aria-labelledby="level-list-tab" hidden={tab !== 'list'}>
+        <CrudPage
+          title="关卡管理"
+          idField="level_id"
+          columns={columns}
+          fields={fields}
+          fetcher={listLevels}
+          creator={createLevel}
+          updater={updateLevel}
+          deleter={deleteLevel}
+          getDeleteConfirmText={(row: any) => `确定要删除「关卡#${row.level_id}」吗？此操作不可撤销。`}
+          sortable
+        />
+      </Box>
+      <Box role="tabpanel" id="level-health-panel" aria-labelledby="level-health-tab" hidden={tab !== 'health'}>
+        {tab === 'health' && <LevelHealth />}
+      </Box>
+    </>
   );
 }

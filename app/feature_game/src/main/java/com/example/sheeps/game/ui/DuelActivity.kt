@@ -1,5 +1,10 @@
 package com.example.sheeps.game.ui
 
+import com.example.sheeps.game.audio.GameAudio
+import com.example.sheeps.game.audio.bindGameAudio
+import com.example.sheeps.data.preference.UserPreferences
+import javax.inject.Inject
+import com.example.sheeps.game.audio.hasMusicBoard
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -38,6 +43,9 @@ import dagger.hilt.android.AndroidEntryPoint
 @Route(path = RouterPath.Game.DUEL)
 @AndroidEntryPoint
 class DuelActivity : BaseActivity() {
+
+    @Inject lateinit var prefs: UserPreferences
+    private lateinit var gameAudio: GameAudio
 
     private val viewModel: DuelViewModel by viewModels()
 
@@ -93,12 +101,13 @@ class DuelActivity : BaseActivity() {
      * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消，无泄漏。
      */
     override fun initData() {
+        gameAudio = bindGameAudio(prefs, viewModel.viewState) { it.hasMusicBoard() }
         // 在生命周期范围内收集 ViewModel 发出的副作用
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
+                is DuelViewEffect.TileMatch -> gameAudio.playMatch(effect.tileType, effect.emittedAtNanos)
                 is DuelViewEffect.ShowToast -> Toaster.show(effect.message)
-                is DuelViewEffect.PlaySound -> { /* Play sound */
-                }
+                is DuelViewEffect.PlaySound -> Unit
 
                 is DuelViewEffect.Vibrate -> { /* Vibrate */
                 }

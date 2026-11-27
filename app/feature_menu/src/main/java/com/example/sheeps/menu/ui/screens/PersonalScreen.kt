@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +16,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.menu.state.MenuViewState
+import com.example.sheeps.menu.state.PersonalSection
 import com.example.sheeps.menu.ui.components.*
 import com.example.sheeps.menu.ui.dialogs.ExchangeHistoryDialog
 import com.example.sheeps.menu.ui.dialogs.PointHistoryDialog
@@ -28,16 +30,19 @@ fun PersonalScreen(
     onLoginClick: () -> Unit,
     onLogoutClick: () -> Unit,
     onSignInClick: () -> Unit,
+    onRetry: (PersonalSection) -> Unit,
     onClaimTask: (String) -> Unit,
     onApplySkin: (String) -> Unit,
     onGoToPlay: () -> Unit
 ) {
     val context = LocalContext.current
-    var showPointHistory by rememberSaveable { mutableStateOf(false) }
-    var showExchangeHistory by rememberSaveable { mutableStateOf(false) }
+    var showPointHistory by rememberSaveable(state.phone, state.isLoggedIn) { mutableStateOf(false) }
+    var showExchangeHistory by rememberSaveable(state.phone, state.isLoggedIn) { mutableStateOf(false) }
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    if (showPointHistory) PointHistoryDialog(state.pointsHistory, state.shopItems) { showPointHistory = false }
-    if (showExchangeHistory) ExchangeHistoryDialog(state.exchangeHistory, state.shopItems) { showExchangeHistory = false }
+    if (state.isLoggedIn && showPointHistory) PointHistoryDialog(state.pointsHistory, state.shopItems,
+        state.personalStatus[PersonalSection.Points], { onRetry(PersonalSection.Points) }, onLoginClick) { showPointHistory = false }
+    if (state.isLoggedIn && showExchangeHistory) ExchangeHistoryDialog(state.exchangeHistory, state.shopItems,
+        state.personalStatus[PersonalSection.Exchanges], { onRetry(PersonalSection.Exchanges) }, onLoginClick) { showExchangeHistory = false }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalMenuBottomInset.current + 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -47,14 +52,26 @@ fun PersonalScreen(
                 TheRouter.build(RouterPath.Menu.USER_INFO).navigation(context)
             }
         }
+        item {
+            ActionButtonsSection(
+                { if (state.isLoggedIn) showPointHistory = true else onLoginClick() },
+                { if (state.isLoggedIn) showExchangeHistory = true else onLoginClick() }
+            )
+        }
         if (state.isLoggedIn) {
             item {
                 CatalogSwitch(listOf(stringResource(R.string.tasks_title), stringResource(R.string.backpack_title)), selected) { selected = it }
             }
             item {
                 AnimatedContent(selected, label = "playerSection") { section ->
-                    if (section == 0) DailyTasksCard(state, onClaimTask)
+                    if (section == 0) DailyTasksCard(state, onClaimTask, { onRetry(PersonalSection.Tasks) }, onLoginClick)
                     else BackpackCard(state, state.shopItems, onApplySkin, onGoToPlay)
+                }
+            }
+        } else {
+            item {
+                Surface(shape = RoundedCornerShape(20.dp)) {
+                    CatalogLink(Icons.Default.Assignment, stringResource(R.string.tasks_title), onLoginClick)
                 }
             }
         }
@@ -66,7 +83,11 @@ fun PersonalScreen(
             }
         }
         if (state.isLoggedIn) {
-            item { ActionButtonsSection(state, { showPointHistory = true }, { showExchangeHistory = true }, onLogoutClick) }
+            item {
+                TextButton(onLogoutClick, Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                    Text(stringResource(R.string.btn_logout), color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }

@@ -1,6 +1,13 @@
 package com.example.sheeps.menu.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -63,9 +70,7 @@ fun ShopItemCard(
     userPoints: Int,
     onExchange: (Int) -> Unit,
     onApplySkin: (String) -> Unit,
-    onLoginRequired: (() -> Unit)? = null,
-    firstInGroup: Boolean = true,
-    lastInGroup: Boolean = true
+    onLoginRequired: (() -> Unit)? = null
 ) {
     val colors = MaterialTheme.colorScheme
     val skin = item.item_type.startsWith("SKIN_")
@@ -75,61 +80,45 @@ fun ShopItemCard(
     val name = getShopItemName(item)
     val description = getShopItemDesc(item)
     var exchangeOpen by rememberSaveable(item.id, onLoginRequired == null) { mutableStateOf(false) }
-    val action: @Composable () -> Unit = {
-        val label = when {
-            applied -> R.string.skin_applied
-            unlocked -> R.string.skin_apply
-            else -> R.string.btn_exchange
+    val selectItem = {
+        when {
+            onLoginRequired != null -> onLoginRequired()
+            unlocked -> onApplySkin(skinKey)
+            else -> exchangeOpen = true
         }
-        FilledTonalButton(
-            onClick = {
-                when {
-                    onLoginRequired != null -> onLoginRequired()
-                    unlocked -> onApplySkin(skinKey)
-                    else -> exchangeOpen = true
-                }
-            },
-            enabled = !applied, shape = CircleShape,
-            colors = ButtonDefaults.filledTonalButtonColors(containerColor = colors.primaryContainer,
-                contentColor = colors.onPrimaryContainer),
-            contentPadding = PaddingValues(horizontal = 17.dp, vertical = 6.dp)
-        ) { Text(stringResource(label), fontWeight = FontWeight.Bold) }
     }
 
-    val top = if (skin || firstInGroup) 20.dp else 0.dp
-    val bottom = if (skin || lastInGroup) 20.dp else 0.dp
-    Surface(color = colors.surface, shape = RoundedCornerShape(top, top, bottom, bottom)) {
-        Column(Modifier.fillMaxWidth()) {
-            if (skin) {
+    if (skin) {
+        Surface(color = colors.surface, shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.fillMaxWidth()) {
                 SkinFan(skinKey, Modifier.fillMaxWidth().height(124.dp).background(
                     Brush.linearGradient(listOf(colors.primary.copy(alpha = .16f), colors.secondary.copy(alpha = .06f)))), item.tiles)
-            }
-            Row(Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                if (!skin) {
-                    Box(Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)).background(colors.primary.copy(alpha = .07f)),
-                        contentAlignment = Alignment.Center) {
-                        ItemIcon(item.item_type, item.image_url, size = 52.dp)
-                    }
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(name, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
                     if (description.isNotBlank()) {
                         Text(description, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                     }
                     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(if (unlocked) stringResource(R.string.skin_unlocked) else stringResource(R.string.points_suffix, item.points_price),
-                                fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge, color = colors.onSurface)
-                            if (!skin) Text(stringResource(R.string.backpack_stock, backpackCount),
-                                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                        Text(if (unlocked) stringResource(R.string.skin_unlocked) else stringResource(R.string.points_suffix, item.points_price),
+                            modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.labelLarge, color = colors.onSurface)
+                        val label = when {
+                            applied -> R.string.skin_applied
+                            unlocked -> R.string.skin_apply
+                            else -> R.string.btn_exchange
                         }
-                        action()
+                        FilledTonalButton(onClick = selectItem, enabled = !applied, shape = CircleShape,
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = colors.primaryContainer,
+                                contentColor = colors.onPrimaryContainer),
+                            contentPadding = PaddingValues(horizontal = 17.dp, vertical = 6.dp)
+                        ) { Text(stringResource(label), fontWeight = FontWeight.Bold) }
                     }
                 }
             }
-            if (!skin && !lastInGroup) CatalogDivider(91.dp)
         }
+    } else {
+        PropCard(item, name, description, backpackCount, selectItem)
     }
 
     if (exchangeOpen && onLoginRequired == null) {
@@ -137,6 +126,47 @@ fun ShopItemCard(
             exchangeOpen = false
             onExchange(it)
         })
+    }
+}
+
+@Composable
+private fun PropCard(item: ShopItem, name: String, description: String, owned: Int, onSelect: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val tint = when (item.item_type) {
+        "MOVEOUT", "DOUBLE_POINTS" -> Color(0xFFC9902C)
+        "SHUFFLE", "JOKER" -> Color(0xFF9371C2)
+        "REVIVE", "HINT" -> Color(0xFF40967C)
+        "BOMB" -> Color(0xFFCB7453)
+        else -> colors.primary
+    }
+    val actionLabel = stringResource(R.string.btn_exchange)
+    Surface(color = colors.surface, shape = RoundedCornerShape(18.dp)) {
+        Column(Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = actionLabel, onClick = onSelect)) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 94.dp).background(
+                Brush.linearGradient(listOf(lerp(colors.surface, tint, .24f), lerp(colors.surface, tint, .09f))))) {
+                ItemIcon(item.item_type, item.image_url, size = 70.dp,
+                    modifier = Modifier.align(Alignment.Center).offset(y = 5.dp).clearAndSetSemantics {})
+                Text(stringResource(R.string.backpack_stock, owned),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .background(colors.surface.copy(alpha = .88f), CircleShape).padding(horizontal = 7.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+            }
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(name, color = colors.onSurface, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(3.dp))
+                Text(description, color = colors.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
+                    minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(9.dp))
+                HorizontalDivider(color = colors.outlineVariant.copy(alpha = .55f))
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.points_suffix, item.points_price), Modifier.weight(1f),
+                        color = colors.onSurface, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    Text(actionLabel, color = colors.primary, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelMedium)
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.primary, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
     }
 }
 
@@ -151,7 +181,9 @@ private fun ExchangeDialog(item: ShopItem, skin: Boolean, points: Int, onDismiss
     CatalogSheet(getShopItemName(item), onDismiss) {
         Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(if (skin) MenuR.string.catalog_shop_exchange_skin_desc else MenuR.string.catalog_shop_exchange_item_desc))
+            val description = getShopItemDesc(item)
+            Text(if (!skin && description.isNotBlank()) description else stringResource(
+                if (skin) MenuR.string.catalog_shop_exchange_skin_desc else MenuR.string.catalog_shop_exchange_item_desc))
             if (!skin) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically) {

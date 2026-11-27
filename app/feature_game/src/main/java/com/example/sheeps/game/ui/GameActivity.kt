@@ -2,6 +2,11 @@ package com.example.sheeps.game.ui
 
 
 import android.os.Build
+import com.example.sheeps.game.audio.GameAudio
+import com.example.sheeps.game.audio.bindGameAudio
+import com.example.sheeps.data.preference.UserPreferences
+import javax.inject.Inject
+import com.example.sheeps.game.audio.hasMusicBoard
 import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -40,6 +45,9 @@ import com.therouter.router.Route
 @dagger.hilt.android.AndroidEntryPoint
 class GameActivity : BaseActivity() {
 
+    @Inject lateinit var prefs: UserPreferences
+    private lateinit var gameAudio: GameAudio
+
     private val viewModel: GameViewModel by viewModels()
 
     /**
@@ -52,7 +60,7 @@ class GameActivity : BaseActivity() {
     override fun initView(savedInstanceState: Bundle?) {
         // 老版本保存的 Activity 没有开局回执，恢复时其原始携带参数可能已经扣过库存。
         val carryJson = if (savedInstanceState == null) intent.getStringExtra("carryItemsJson") else null
-        viewModel.openLevel(intent.getIntExtra("levelId", 1), carryJson)
+        viewModel.openLevel(intent.getIntExtra("levelId", 1), carryJson, intent.getStringExtra("resumeRunId"))
 
         setContent {
             SheepsTheme {
@@ -137,9 +145,11 @@ class GameActivity : BaseActivity() {
      * 振动通过 getSystemService 局部获取 Vibrator，不持有静态引用，无泄漏。
      */
     override fun initData() {
+        gameAudio = bindGameAudio(prefs, viewModel.viewState) { it.hasMusicBoard() }
         // 在生命周期范围内收集 ViewModel 发出的副作用
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
+                is com.example.sheeps.game.state.GameViewEffect.TileMatch -> gameAudio.playMatch(effect.tileType, effect.emittedAtNanos)
                 is com.example.sheeps.game.state.GameViewEffect.LevelLoadFailed -> {
                     Toaster.show(effect.message)
                     finish()
@@ -148,9 +158,7 @@ class GameActivity : BaseActivity() {
                     Toaster.show(effect.message)
                 }
 
-                is com.example.sheeps.game.state.GameViewEffect.PlaySound -> {
-                    // 预留：此处触发全局音效播放
-                }
+                is com.example.sheeps.game.state.GameViewEffect.PlaySound -> Unit
 
                 is com.example.sheeps.game.state.GameViewEffect.Vibrate -> {
                     try {
@@ -175,13 +183,14 @@ class GameActivity : BaseActivity() {
         }
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        viewModel.saveRemainingCarry()
-        super.onSaveInstanceState(outState)
+    override fun onPause() {
+        viewModel.pausePlay()
+        super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        viewModel.resumePlay()
         viewModel.sendIntent(GameViewIntent.InitUser)
     }
 

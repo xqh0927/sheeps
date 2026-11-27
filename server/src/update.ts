@@ -13,7 +13,7 @@
  * @module update
  */
 import { Env, GitHubRelease, GitHubReleaseAsset, AppUpdatePayload, ApkStatus } from './types';
-import { getI18nBatch, resolveI18n } from './i18n';
+import { publishedTextSql } from './i18n';
 
 // Github 接口及缓存策略
 const GITHUB_RELEASES_API = 'https://api.github.com/repos/xqh0927/sheeps-releases/releases/latest';
@@ -28,10 +28,7 @@ export async function checkApkExists(url: string): Promise<boolean> {
   const now = Date.now();
   const cached = apkExistenceCache.get(url);
   // 命中缓存则直接返回
-  if (cached) {
-    const ttl = cached.exists ? 24 * 60 * 60 * 1000 : 60 * 1000;
-    if (now - cached.checkedAt < ttl) return cached.exists;
-  }
+  if (cached?.exists && now - cached.checkedAt < 24 * 60 * 60 * 1000) return true;
 
   try {
     // 仅请求 Header，不下载文件主体；signal 设 3 秒超时，超时/网络错误在下方 catch 中降级为"不存在"
@@ -41,10 +38,9 @@ export async function checkApkExists(url: string): Promise<boolean> {
       signal: AbortSignal.timeout(3000)
     });
     const exists = response.status === 200;
-    apkExistenceCache.set(url, { exists, checkedAt: now });
+    if (exists) apkExistenceCache.set(url, { exists, checkedAt: now });
     return exists;
   } catch {
-    apkExistenceCache.set(url, { exists: false, checkedAt: now });
     return false;
   }
 }
@@ -58,13 +54,12 @@ export async function checkApkExists(url: string): Promise<boolean> {
  *  - update_log 经 i18n 读取（缺值回退基列宽列）。
  */
 export async function getDatabaseAppUpdate(env: Env, currentCode: number, lang: string): Promise<AppUpdatePayload> {
-  const i18nMap = await getI18nBatch(env, 'app_version', lang);
   const versions = await env.DB.prepare(
-    `SELECT version_code, version_name, apk_url, download_url, update_log, status, is_force_update
+    `SELECT version_code, version_name, apk_url, download_url, ${publishedTextSql('app_version', 'update_log')}, status, is_force_update
      FROM app_version
-     WHERE version_code > ? AND status = 1
+     WHERE version_code > ?2 AND status = 1
      ORDER BY version_code DESC LIMIT 5`
-  ).bind(currentCode).all<any>();
+  ).bind(lang, currentCode).all<any>();
 
   if (versions.results && versions.results.length > 0) {
     // 并行探测所有候选版本的 APK 直链存活性（最多 5 个，结果顺序与 candidates 对齐，显著缩短探测耗时）
@@ -81,12 +76,11 @@ export async function getDatabaseAppUpdate(env: Env, currentCode: number, lang: 
       if (existence[i]) {
         const release = candidates[i];
         const downloadUrl = release.download_url || release.apk_url;
-        const updateLog = resolveI18n(i18nMap, `app_version.${release.version_code}.update_log`, release.update_log);
         return {
           has_update: true,
           version_name: release.version_name,
           apk_url: downloadUrl,
-          update_log: updateLog ?? '',
+          update_log: release.update_log ?? '',
           force_update: release.is_force_update === 1
         };
       }
@@ -180,4 +174,4 @@ export function mapGitHubReleaseToUpdate(release: GitHubRelease, currentCode: nu
  */
 export function clearApkCache() {
   apkExistenceCache.clear();
-}
+}

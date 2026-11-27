@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -91,6 +91,8 @@ export default function Users() {
   const [keyword, setKeyword] = useState('');
   // 角色筛选条件（'' 表示全部）
   const [roleFilter, setRoleFilter] = useState('');
+  const [pendingOnly, setPendingOnly] = useState(false);
+  const latestLoad = useRef(0);
   // 列表加载态
   const [loading, setLoading] = useState(true);
 
@@ -132,14 +134,16 @@ export default function Users() {
   // useCallback 缓存，供 useEffect 与主检索动作复用，避免无效重建
   const load = useCallback(() => {
     setLoading(true);
-    listUsers(page + 1, pageSize, keyword.trim(), roleFilter)
+    const generation = ++latestLoad.current;
+    listUsers(page + 1, pageSize, keyword.trim(), roleFilter, pendingOnly)
       .then((d) => {
+        if (generation !== latestLoad.current) return;
         setRows(d.list);
         setTotal(d.total);
       })
-      .catch((e) => show(extractError(e), 'error'))
-      .finally(() => setLoading(false));
-  }, [page, pageSize, keyword, roleFilter, show]);
+      .catch((e) => { if (generation === latestLoad.current) show(extractError(e), 'error'); })
+      .finally(() => { if (generation === latestLoad.current) setLoading(false); });
+  }, [page, pageSize, keyword, roleFilter, pendingOnly, show]);
 
   // 页面挂载及依赖变化时重新加载列表
   useEffect(() => {
@@ -206,12 +210,17 @@ export default function Users() {
     if (!removeTarget) return;
     setBusy(true);
     try {
-      await deleteUser(removeTarget.id);
-      show('用户已移除', 'success');
+      const result = await deleteUser(removeTarget.id, removeTarget.deletion_requested_at);
+      if (result.avatar_cleanup_pending) show('账号已注销，头像清理将自动重试', 'warning');
+      else show(removeTarget.deletion_requested_at ? '注销申请已处理' : '用户已移除', 'success');
       setRemoveTarget(null);
       load();
     } catch (e) {
       show(extractError(e), 'error');
+      if (removeTarget.deletion_requested_at) {
+        setRemoveTarget(null);
+        load();
+      }
     } finally {
       setBusy(false);
     }
@@ -318,6 +327,10 @@ export default function Users() {
             onKeyDown={(e) => e.key === 'Enter' && (setPage(0), load())}
             InputProps={{ endAdornment: <Search fontSize="small" /> }}
           />
+          <FormControlLabel
+            control={<Switch checked={pendingOnly} onChange={(_, checked) => { setPendingOnly(checked); setPage(0); }} />}
+            label="只看注销申请"
+          />
           {isSuper && (
             <Button
               variant="contained"
@@ -340,6 +353,7 @@ export default function Users() {
                 <TableCell>积分</TableCell>
                 <TableCell>角色</TableCell>
                 <TableCell>状态</TableCell>
+                <TableCell>注销申请</TableCell>
                 <TableCell>注册时间</TableCell>
                 {canWrite && <TableCell align="right">操作</TableCell>}
               </TableRow>
@@ -347,13 +361,13 @@ export default function Users() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={canWrite ? 7 : 6} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={canWrite ? 8 : 7} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canWrite ? 7 : 6} align="center" sx={{ py: 5 }} color="text.secondary">
+                  <TableCell colSpan={canWrite ? 8 : 7} align="center" sx={{ py: 5 }} color="text.secondary">
                     暂无数据
                   </TableCell>
                 </TableRow>
@@ -397,6 +411,12 @@ export default function Users() {
                         <Chip size="small" label="正常" color="success" />
                       )}
                     </TableCell>
+                    <TableCell>{r.deletion_requested_at ? (
+                      <Stack alignItems="flex-start" spacing={0.5}>
+                        <Chip size="small" label="待处理" color="warning" />
+                        <Typography variant="caption">{new Date(r.deletion_requested_at).toLocaleString()}</Typography>
+                      </Stack>
+                    ) : '—'}</TableCell>
                     <TableCell>{r.created_at ? new Date(r.created_at).toLocaleString() : '-'}</TableCell>
                     {canWrite && <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       <IconButton size="small" onClick={() => { setPointsTarget(r); setPointsAmount(''); setPointsReason(''); }} title="调整积分">
@@ -416,14 +436,13 @@ export default function Users() {
                       >
                         {r.is_banned === 1 ? <CheckCircle fontSize="small" /> : <Block fontSize="small" />}
                       </IconButton>
-                      {isSuper && r.role === 'user' && <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => setRemoveTarget(r)}
-                        title="移除用户"
-                      >
-                        <DeleteForever fontSize="small" />
-                      </IconButton>}
+                      {isSuper && r.role === 'user' && (r.deletion_requested_at ? (
+                        <Button size="small" color="error" onClick={() => setRemoveTarget(r)}>处理注销申请</Button>
+                      ) : (
+                        <IconButton size="small" color="error" onClick={() => setRemoveTarget(r)} title="移除用户">
+                          <DeleteForever fontSize="small" />
+                        </IconButton>
+                      ))}
                     </TableCell>}
                   </TableRow>
                 ))
@@ -551,15 +570,18 @@ export default function Users() {
 
       {/* 移除用户二次确认弹窗 */}
       <Dialog open={!!removeTarget} onClose={() => setRemoveTarget(null)}>
-        <DialogTitle>移除用户 · {removeTarget?.phone}</DialogTitle>
+        <DialogTitle>{removeTarget?.deletion_requested_at ? '处理注销申请' : '移除用户'} · {removeTarget?.phone || removeTarget?.username}</DialogTitle>
         <DialogContent sx={{ minWidth: 360 }}>
+          {removeTarget?.deletion_requested_at && (
+            <Typography sx={{ mb: 1 }}>申请时间 {new Date(removeTarget.deletion_requested_at).toLocaleString()}</Typography>
+          )}
           <Typography color="error" sx={{ fontWeight: 600 }}>
-            此操作将永久删除该用户及其全部数据（积分、背包、关卡进度、签到、兑换记录、排行榜等），且不可恢复！
+            此操作将永久删除账号及其积分、背包、关卡进度、签到、兑换记录和排行榜成绩。删除后无法恢复。
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRemoveTarget(null)} disabled={busy}>取消</Button>
-          <Button variant="contained" color="error" disabled={busy} onClick={handleRemove}>确认移除</Button>
+          <Button variant="contained" color="error" disabled={busy} onClick={handleRemove}>{removeTarget?.deletion_requested_at ? '确认注销账号' : '确认移除'}</Button>
         </DialogActions>
       </Dialog>
 

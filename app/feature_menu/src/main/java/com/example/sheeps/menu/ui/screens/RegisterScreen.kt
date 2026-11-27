@@ -10,13 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.sheeps.ui.R
-import kotlinx.coroutines.delay
 
 @Composable
 fun RegisterScreen(
     isLoading: Boolean = false,
     onBack: () -> Unit,
-    onSendCode: (String) -> Unit,
     onRegister: (String, String, String) -> Unit,
     onRegisterSuccess: () -> Unit
 ) {
@@ -25,30 +23,16 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
-    var countdown by rememberSaveable { mutableStateOf(0) }
 
-    val errInvalidPhone = stringResource(id = R.string.err_invalid_phone)
     val pwdErrLength = stringResource(id = R.string.pwd_err_length)
     val pwdErrNoAlphaDigit = stringResource(id = R.string.pwd_err_no_alpha_digit)
     val pwdErrNotMatch = stringResource(id = R.string.pwd_err_not_match)
     val pwdErrCodeLength = stringResource(id = R.string.pwd_err_code_length)
 
-    // 验证码倒计时协程：绑定组合生命周期，组合销毁即取消；delay(1000) 为主线程挂起，不阻塞 UI 线程。
-    LaunchedEffect(countdown) {
-        if (countdown > 0) {
-            delay(1000)
-            countdown--
-        }
-    }
 
     AccountForm(stringResource(R.string.register_title), onBack, isLoading) {
         AccountField(phone, stringResource(R.string.label_phone), { phone = it; errorMsg = null }, KeyboardType.Phone)
-        VerificationRow(code, { code = it; errorMsg = null }, countdown) {
-            if (phone.length == 11) {
-                onSendCode(phone)
-                countdown = 60
-            } else errorMsg = errInvalidPhone
-        }
+        VerificationRow(code, { code = it; errorMsg = null }, phone)
         AccountField(password, stringResource(R.string.label_password), { password = it; errorMsg = null }, KeyboardType.Password)
         AccountField(confirmPassword, stringResource(R.string.hint_confirm_password),
             { confirmPassword = it; errorMsg = null }, KeyboardType.Password)

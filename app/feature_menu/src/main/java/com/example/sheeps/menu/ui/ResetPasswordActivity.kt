@@ -6,12 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.data.model.ResetPasswordRequest
-import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.menu.ui.screens.ResetPasswordScreen
 import com.example.sheeps.ui.R
@@ -43,12 +41,10 @@ class ResetPasswordActivity : BaseActivity() {
             SheepsTheme {
                 BackHandler { finish() }
                 var isLoading by remember { mutableStateOf(false) }
-                val scope = rememberCoroutineScope()
 
                 ResetPasswordScreen(
                     isLoading = isLoading,
                     onBack = { finish() },
-                    onSendCode = { phone -> handleSendCode(phone, scope) },
                     onReset = { phone, code, newPassword ->
                         handleReset(phone, code, newPassword) { isLoading = it }
                     },
@@ -65,24 +61,6 @@ class ResetPasswordActivity : BaseActivity() {
 
     // -------- 业务逻辑 --------
 
-    private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
-        if (phone.length != 11) {
-            Toaster.show(getString(R.string.err_invalid_phone))
-            return
-        }
-        scope.launch {
-            try {
-                val response = apiService.sendCode(SendCodeRequest(phone))
-                if (response.success) {
-                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
-                } else {
-                    Toaster.show(getString(R.string.toast_send_code_failed))
-                }
-            } catch (e: Exception) {
-                Toaster.show(getString(R.string.toast_send_code_network_error))
-            }
-        }
-    }
 
     private fun handleReset(
         phone: String,

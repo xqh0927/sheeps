@@ -18,6 +18,8 @@ import com.example.sheeps.core.utils.getShopItemName
 import com.example.sheeps.data.model.ExchangeRecord
 import com.example.sheeps.data.model.PointRecord
 import com.example.sheeps.data.model.ShopItem
+import com.example.sheeps.menu.state.PersonalLoadState
+import com.example.sheeps.menu.ui.components.PersonalSectionFeedback
 import com.example.sheeps.menu.ui.components.CatalogDivider
 import com.example.sheeps.menu.ui.components.CatalogSheet
 import com.example.sheeps.ui.R
@@ -25,11 +27,12 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
-fun PointHistoryDialog(history: List<PointRecord>, shopItems: List<ShopItem>, onDismiss: () -> Unit) {
+fun PointHistoryDialog(history: List<PointRecord>, shopItems: List<ShopItem>, status: PersonalLoadState?,
+    onRetry: () -> Unit, onLogin: () -> Unit, onDismiss: () -> Unit) {
     val namesByType = rememberCatalogNames(shopItems)
     LedgerDialog(R.string.points_history_title, onDismiss) {
-        if (history.isEmpty()) Text(stringResource(R.string.no_points_history))
-        else LazyColumn(Modifier.fillMaxWidth()) {
+        PersonalSectionFeedback(status, history.isEmpty(), R.string.no_points_history, onRetry, onLogin)
+        if (history.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth()) {
             items(history) { record ->
                 LedgerLine(getLocalizedSource(record.source, namesByType), record.created_at,
                     (if (record.type == "IN") "+" else "−") + record.amount)
@@ -42,13 +45,16 @@ fun PointHistoryDialog(history: List<PointRecord>, shopItems: List<ShopItem>, on
 fun ExchangeHistoryDialog(
     history: List<ExchangeRecord>,
     shopItems: List<ShopItem>,
+    status: PersonalLoadState?,
+    onRetry: () -> Unit,
+    onLogin: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val namesByType = rememberCatalogNames(shopItems)
     val itemsById = remember(shopItems) { shopItems.associateBy { it.id } }
     LedgerDialog(R.string.exchange_history_title, onDismiss) {
-        if (history.isEmpty()) Text(stringResource(R.string.no_exchange_history))
-        else LazyColumn(Modifier.fillMaxWidth()) {
+        PersonalSectionFeedback(status, history.isEmpty(), R.string.no_exchange_history, onRetry, onLogin)
+        if (history.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth()) {
             items(history) { record ->
                 val item = itemsById[record.shop_item_id]
                 val name = if (item != null && item.name.isNotBlank() &&

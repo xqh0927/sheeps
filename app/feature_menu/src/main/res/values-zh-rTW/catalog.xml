@@ -28,4 +28,10 @@
     <string name="catalog_shop_exchange_item_desc">選擇要兌換的數量。</string>
     <string name="catalog_shop_exchange_skin_desc">使用金幣解鎖這款卡牌外觀。</string>
     <string name="catalog_carry_stock_label">庫存 %1$d</string>
+    <string name="personal_load_failed">暫時無法載入</string>
+    <string name="personal_retry">重試</string>
+    <string name="personal_session_expired">登入已過期</string>
+    <string name="personal_sign_in">重新登入</string>
+    <string name="settings_game_music">遊戲音樂</string>
+    <string name="settings_match_sound">消除音效</string>
 </resources>

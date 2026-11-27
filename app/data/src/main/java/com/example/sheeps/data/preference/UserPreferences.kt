@@ -101,6 +101,7 @@ class UserPreferences @Inject constructor(
         }.getOrNull()
     }
 
+    @Synchronized
     fun setToken(token: String?) {
         securePrefs.edit().putString("jwt_token", token).apply()
     }
@@ -109,8 +110,17 @@ class UserPreferences @Inject constructor(
         return securePrefs.getString("refresh_token", null)
     }
 
+    @Synchronized
     fun setRefreshToken(token: String?) {
         securePrefs.edit().putString("refresh_token", token).apply()
+    }
+
+    /** A refresh finishing after logout or a new login must not restore the previous session. */
+    @Synchronized
+    fun replaceTokens(expectedAccess: String, expectedRefresh: String, access: String, refresh: String): Boolean {
+        if (getToken() != expectedAccess || getRefreshToken() != expectedRefresh) return false
+        securePrefs.edit().putString("jwt_token", access).putString("refresh_token", refresh).apply()
+        return true
     }
 
     fun getPhone(): String? {
@@ -148,6 +158,7 @@ class UserPreferences @Inject constructor(
         return getToken() != null
     }
 
+    @Synchronized
     fun logout() {
         securePrefs.edit().remove("jwt_token").remove("refresh_token").remove("user_phone").apply()
         kv.removeValueForKey("user_points")
@@ -158,6 +169,18 @@ class UserPreferences @Inject constructor(
         kv.removeValueForKey("sign_streak")
         kv.removeValueForKey("highest_level_cleared")
         kv.removeValueForKey("avatar_url")
+    }
+
+    fun isGameMusicEnabled(): Boolean = kv.decodeBool("game_music_enabled", true)
+
+    fun setGameMusicEnabled(enabled: Boolean) {
+        kv.encode("game_music_enabled", enabled)
+    }
+
+    fun isMatchSoundEnabled(): Boolean = kv.decodeBool("match_sound_enabled", true)
+
+    fun setMatchSoundEnabled(enabled: Boolean) {
+        kv.encode("match_sound_enabled", enabled)
     }
 
     fun getCurrentSkin(): String {

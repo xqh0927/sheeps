@@ -232,7 +232,7 @@
     <string name="prepare_title_locked">關卡鎖定</string>
     <string name="prepare_title_unlocked">挑戰準備 (第 %1$d 關)</string>
     <string name="prepare_blind_warning">⚠️ 盲盒關卡！部分卡牌圖案隱藏，放入槽位後才顯現。</string>
-    <string name="prepare_sealed_warning">🔒 封印關卡！部分卡牌被封印（1~3層），點擊逐層解封；完全解封時會觸發「碎冰」，相鄰封印牌自動減1層。</string>
+    <string name="prepare_sealed_warning">🔒 封印關卡！每消除三張相同花色的牌，就會解鎖一張封印牌。</string>
     <string name="update_discovered">發現新版本 %1$s</string>
     <string name="update_log_title">更新內容：</string>
     <string name="update_default_log">優化遊戲體驗，修復已知問題。</string>
@@ -357,7 +357,9 @@
     <string name="toast_unlock_failed_cloud">解鎖失敗，雲端同步拒絕</string>
     <string name="toast_unlock_offline">連接不暢，已扣減積分本地解鎖，後續有網自動同步</string>
     <string name="toast_phone_invalid">請輸入正確的11位手機號</string>
-    <string name="toast_send_code_success">驗證碼已發送！測試碼為：%1$s</string>
+    <string name="toast_send_code_success">驗證碼已傳送，請查看簡訊。</string>
+    <string name="sms_service_unavailable">簡訊服務暫時無法使用，請稍後再試。</string>
+    <string name="sms_rate_limited">傳送過於頻繁，請稍後再試。</string>
     <string name="toast_send_code_failed">驗證碼發送失敗</string>
     <string name="toast_send_code_network_error">網路錯誤，發送失敗</string>
     <string name="toast_phone_code_invalid">請輸入正確的手機號和6位驗證碼</string>

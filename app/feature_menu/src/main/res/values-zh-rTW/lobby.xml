@@ -9,4 +9,7 @@
     <string name="lobby_picked">已選 %1$d / 5 種</string>
     <string name="lobby_opponent">對手</string>
     <string name="lobby_you">我方</string>
+    <string name="stage_resume">繼續遊戲</string>
+    <string name="stage_unfinished">未完成的挑戰</string>
+    <string name="stage_replaces_save">開始新挑戰後，將取代第 %1$d 關的存檔。</string>
 </resources>

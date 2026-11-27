@@ -13,17 +13,42 @@
  */
 
 import { Env } from '../types';
-import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus, cacheControl } from '../helpers';
+import { getCorsHeaders, getAuthenticatedUser, getCachedConfig, getGameModeStatus, cacheControl, jsonError } from '../helpers';
 import { generateSolvableLevel } from '../level';
+import { readLevelTilesByLevels } from '../lib/level-tiles';
 import { sha256 } from '../crypto';
 import { refreshWinTasks } from './task';
 
 /**
  * 关卡布局内存缓存（进程级，Worker 重启即失效）。
- * key 形如 `v4_{levelId}_{seed}`，仅缓存确定性种子生成的布局；
+ * 首关共用固定布局键，其余关卡使用 `v4_{levelId}_{seed}`，仅缓存确定性种子生成的布局；
  * 作为 KV 之前的快速命中层，未命中时从 KV 回填。
  */
 const CACHE_STAGE_CONFIG = new Map<number | string, string>();
+const validRunId = (id: unknown): id is string => typeof id === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(id);
+
+/** Both halves of a run use the same account/guest checks and initial guest unlocks. */
+async function resolveStagePlayer(request: Request, env: Env, claimedId: string, hasRunId: boolean) {
+    const authUser = await getAuthenticatedUser(request, env);
+    if (request.headers.get('Authorization') && !authUser) return jsonError('Unauthorized', 401, env);
+    if (hasRunId && !authUser && (typeof claimedId !== 'string' || !/^uuid-[a-f0-9-]{36}$/i.test(claimedId))) {
+        return jsonError('Unauthorized', 401, env);
+    }
+    if (hasRunId && authUser && authUser.userId !== claimedId) return jsonError('Account changed', 409, env);
+
+    const userId = authUser?.userId ?? claimedId;
+    const mutations: D1PreparedStatement[] = [];
+    if (!authUser && !await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(userId).first()) {
+        const now = Date.now();
+        mutations.push(env.DB.prepare('INSERT OR IGNORE INTO users (id, username, role, points, created_at) VALUES (?, ?, ?, ?, ?)')
+            .bind(userId, `玩家_${userId.slice(-4)}`, 'user', 0, now));
+        for (const level of [1, 2, 3]) {
+            mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)')
+                .bind(userId, level, now));
+        }
+    }
+    return { userId, mutations };
+}
 
 /**
  * 处理所有与游戏业务相关的 HTTP 路由请求
@@ -54,13 +79,20 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const levelId = parseInt(levelIdStr, 10);
         if (isNaN(levelId)) return new Response(JSON.stringify({ error: 'Invalid level ID' }), { status: 400, headers: corsHeaders });
 
+        // An operator may publish or withdraw a board after this seed has already been generated.
+        const cacheHeaders = { 'Cache-Control': 'no-store', 'X-Stage-Source': 'generated', 'X-Stage-Version': 'generated-v5' };
+        const published = (await readLevelTilesByLevels(env, [levelId])).get(levelId);
+        if (published?.length) {
+            const layout = JSON.stringify(published);
+            return new Response(layout, { headers: {
+                ...corsHeaders, ...cacheHeaders, 'X-Stage-Source': 'published', 'X-Stage-Version': await sha256(layout),
+            } });
+        }
+
         const seedStr = url.searchParams.get('seed');
         // 若客户端未传种子，则在后端随机生成一个，保证离线与在线的关卡同源随机性
         const seed = seedStr ? parseInt(seedStr, 10) : Math.floor(Math.random() * 1000000) + 1;
-        // 仅对带确定性 seed 的请求启用 public CDN 缓存（所有用户结果一致，正确）；
-        // 无 seed 的随机布局返回 no-store，避免 CDN 把同一随机布局推给所有玩家，破坏游戏正确性
-        const cacheHeaders = seedStr ? cacheControl(300) : { 'Cache-Control': 'no-store' };
-        const cacheKey = `v4_${levelId}_${seed}`;
+        const cacheKey = levelId === 1 ? 'v5_1' : `v4_${levelId}_${seed}`;
 
         // 仅在传了确定性种子时读缓存，随机种子每次都不一样无需缓存
         if (seedStr) {
@@ -150,6 +182,22 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         return new Response(JSON.stringify({ success: true, current_points: newPoints }), { headers: corsHeaders });
     }
 
+    if (path === '/api/level/attempt' && request.method === 'POST') {
+        const body: any = await request.json();
+        if (!validRunId(body?.run_id) || !Number.isSafeInteger(body.level_id) || body.level_id <= 0 ||
+            typeof body.layout_version !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(body.layout_version) ||
+            !Number.isSafeInteger(body.started_at) || body.started_at <= 0) {
+            return jsonError('Invalid stage attempt', 400, env);
+        }
+        const player = await resolveStagePlayer(request, env, body.user_id, true);
+        if (player instanceof Response) return player;
+        player.mutations.push(env.DB.prepare(
+            'INSERT INTO stage_attempts (user_id, run_id, level_id, layout_version, started_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, run_id) DO NOTHING'
+        ).bind(player.userId, body.run_id, body.level_id, body.layout_version, body.started_at));
+        await env.DB.batch(player.mutations);
+        return new Response(JSON.stringify({ success: true, run_id: body.run_id }), { headers: corsHeaders });
+    }
+
     /**
      * POST /api/score/submit — 提交通关成绩（含防作弊签名校验）
      *
@@ -162,7 +210,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
      *
      * 响应: { success }
      */
-    if (path === '/api/score/submit' && request.method === 'POST') {
+    const requireScoreReceipt = path === '/api/score/submit-once';
+    if ((requireScoreReceipt || path === '/api/score/submit') && request.method === 'POST') {
         const body: any = await request.json();
         if (!body.sign) return new Response(JSON.stringify({ error: 'Missing parameters' }), { status: 400, headers: corsHeaders });
 
@@ -175,23 +224,29 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const expectedSign = await sha256(`${body.user_id}_${body.level_id}_${body.clear_time_ms}_folklore`);
         if (body.sign !== expectedSign) return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 403, headers: corsHeaders });
 
-        const authUser = await getAuthenticatedUser(request, env);
-        const resolvedUserId = authUser ? authUser.userId : body.user_id;
-
-        // 以北京时间(UTC+8)日期作为"今日"基准，用于每日任务/签到归属，避免跨时区跨日问题
-        const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
-        const userExists = await env.DB.prepare('SELECT 1 FROM users WHERE id = ?').bind(resolvedUserId).first();
-        const mutations = [];
-
-        // 如果用户在主表不存在（可能是游客网络异常直接结算），在此自动补全用户及解锁前 3 关
-        if (!userExists) {
-            mutations.push(env.DB.prepare('INSERT INTO users (id, username, role, points, created_at) VALUES (?, ?, ?, ?, ?)').bind(resolvedUserId, `玩家_${resolvedUserId.slice(-4)}`, 'user', 0, Date.now()));
-            for (const lvl of [1, 2, 3]) mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, lvl, Date.now()));
+        const now = Date.now();
+        const runId = body.run_id;
+        if ((requireScoreReceipt || runId !== undefined) && !validRunId(runId)) {
+            return jsonError('Invalid run ID', 400, env);
         }
+        const player = await resolveStagePlayer(request, env, body.user_id, Boolean(runId));
+        if (player instanceof Response) return player;
+        const { userId: resolvedUserId, mutations } = player;
+        const achievedAt = runId && Number.isSafeInteger(body.completed_at) && body.completed_at > 0
+            ? Math.min(now, body.completed_at) : now;
+        const taskDate = new Date(achievedAt + 8 * 3600000).toISOString().split('T')[0];
 
-        // 自动解锁下一关
+        // Each transaction gets its own attempt ID. Retries find the old receipt and cannot write a second score.
+        const attempt = runId ? crypto.randomUUID() : null;
+        const gate = attempt ? ' WHERE EXISTS (SELECT 1 FROM stage_score_receipts WHERE attempt_id = ?)' : '';
+        const gateArgs = attempt ? [attempt] : [];
+        if (runId) {
+            mutations.push(env.DB.prepare('INSERT OR IGNORE INTO stage_score_receipts (user_id, run_id, attempt_id) VALUES (?, ?, ?)')
+                .bind(resolvedUserId, runId, attempt));
+        }
         if (gameMode === 0 && (body.is_win === undefined || Number(body.is_win) === 1)) {
-            mutations.push(env.DB.prepare('INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, ?, ?)').bind(resolvedUserId, body.level_id + 1, Date.now()));
+            mutations.push(env.DB.prepare(`INSERT OR IGNORE INTO level_unlock (user_id, level_id, unlocked_at) SELECT ?, ?, ?${gate}`)
+                .bind(resolvedUserId, body.level_id + 1, achievedAt, ...gateArgs));
         }
 
         const itemsUsed = Number(body.items_used) || 0;
@@ -199,14 +254,21 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
 
         // 将成绩录入排行榜表（包含 is_win 和 items_used）
         mutations.push(
-            env.DB.prepare('INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, items_used, is_win, achieved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-                .bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, gameMode, itemsUsed, isWin, Date.now())
+            env.DB.prepare(`INSERT INTO leaderboard (user_id, level_id, score, clear_time_ms, game_mode, items_used, is_win, achieved_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?${gate}`)
+                .bind(resolvedUserId, body.level_id, body.score, body.clear_time_ms, gameMode, itemsUsed, isWin, achievedAt, ...gateArgs)
         );
 
-        if (gameMode === 0 && isWin === 1) mutations.push(refreshWinTasks(env, resolvedUserId, chinaToday));
+        if (runId && gameMode === 0) {
+            // Link the immediately preceding score insert inside this transaction. A replay skips both writes.
+            mutations.push(env.DB.prepare(`INSERT INTO stage_run_scores (user_id, run_id, abandoned, score_id)
+                SELECT ?, ?, ?, last_insert_rowid()${gate}`)
+                .bind(resolvedUserId, runId, isWin === 0 && body.abandoned === true ? 1 : 0, ...gateArgs));
+        }
+
+        if (gameMode === 0 && isWin === 1) mutations.push(refreshWinTasks(env, resolvedUserId, taskDate));
         await env.DB.batch(mutations);
 
-        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+        return new Response(JSON.stringify({ success: true, run_id: runId }), { headers: corsHeaders });
     }
 
     /**
@@ -229,10 +291,10 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         const rewards = rewardsStr.split(',').map(Number);
         
         // 批量查询：当天签到情况、昨天连续签到天数、当前用户积分
-        const [checkSignResult, lastSignResult, userResult] = await env.DB.batch([
+        const [checkSignResult, lastSignResult, taskResult] = await env.DB.batch([
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
             env.DB.prepare('SELECT streak FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaYesterday),
-            env.DB.prepare('SELECT points FROM users WHERE id = ?').bind(authUser.userId)
+            env.DB.prepare("SELECT points_reward FROM task WHERE id = 'SIGN_IN_ONCE'")
         ]);
 
         if (checkSignResult.results[0]) return new Response(JSON.stringify({ error: 'Already signed in today' }), { status: 400, headers: corsHeaders });
@@ -242,25 +304,35 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         // 连签 7 天循环奖励规则
         const rewardPoints = rewards[Math.min(newStreak, 7) - 1] || 20;
 
-        const newPoints = ((userResult.results[0] as { points: number } | undefined)?.points || 0) + rewardPoints;
-
-        // 签到事务原子入库：积分更新、签到记录、积分流水、签到任务标记全部在同一次 D1 batch 提交，
-        // 任一失败整体回滚，保证「积分增加」与「签到记录」不会只成功一半
-        // P0-1 修复：签到成功后自动领取 SIGN_IN_ONCE 的 10 积分
-        const signInOnceReward = 10;
-        const totalNewPoints = newPoints + signInOnceReward;
-
-        await env.DB.batch([
-            env.DB.prepare('UPDATE users SET points = ? WHERE id = ?').bind(totalNewPoints, authUser.userId),
-            env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)').bind(authUser.userId, chinaToday, newStreak, rewardPoints, Date.now()),
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', rewardPoints, 'SIGN_IN', newPoints, Date.now()),
-            // 签到任务积分自动领取
-            env.DB.prepare('INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'IN', signInOnceReward, 'SIGN_IN_ONCE', totalNewPoints, Date.now()),
-            // 更新每日签到任务状态为已完成且已领取
-            env.DB.prepare('INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded) VALUES (?, ?, ?, ?, ?, ?)').bind(authUser.userId, 'SIGN_IN_ONCE', chinaToday, 1, 1, 1)
-        ]);
-
-        return new Response(JSON.stringify({ success: true, streak: newStreak, reward_points: rewardPoints + signInOnceReward, current_points: totalNewPoints }), { headers: corsHeaders });
+        const task = taskResult.results[0] as {points_reward:number} | undefined;
+        const taskReward = task?.points_reward ?? 0;
+        const total = rewardPoints + taskReward;
+        const user = authUser.userId;
+        const now = Date.now();
+        const ledger = (amount: number, source: string, laterCredit: number) =>
+            env.DB.prepare(`INSERT INTO point_record (user_id, type, amount, source, remaining_points, created_at)
+                SELECT id, 'IN', ?, ?, points - ?, ? FROM users WHERE id = ?`).bind(amount, source, laterCredit, now, user);
+        const writes = [
+            env.DB.prepare('INSERT INTO sign_record (user_id, sign_date, streak, points_rewarded, created_at) VALUES (?, ?, ?, ?, ?)')
+                .bind(user, chinaToday, newStreak, rewardPoints, now),
+            env.DB.prepare('UPDATE users SET points = points + ? WHERE id = ? RETURNING points').bind(total, user),
+            ledger(rewardPoints, 'SIGN_IN', taskReward)
+        ];
+        if (task) {
+            writes.push(ledger(taskReward, 'SIGN_IN_ONCE', 0),
+                env.DB.prepare(`INSERT OR REPLACE INTO user_task (user_id, task_id, task_date, progress, is_completed, is_rewarded)
+                    VALUES (?, 'SIGN_IN_ONCE', ?, 1, 1, 1)`).bind(user, chinaToday));
+        }
+        try {
+            const result = await env.DB.batch(writes);
+            const balance = (result[1].results[0] as {points:number}).points;
+            return new Response(JSON.stringify({success:true, streak:newStreak, reward_points:total, current_points:balance}), {headers:corsHeaders});
+        } catch (error) {
+            if (await env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(user, chinaToday).first()) {
+                return new Response(JSON.stringify({error:'Already signed in today'}), {status:400, headers:corsHeaders});
+            }
+            throw error;
+        }
     }
 
     /**
@@ -311,7 +383,8 @@ export async function handleGameRoutes(request: Request, env: Env, path: string,
         if (type === 'daily') timeFilter = todayStart;
         else if (type === 'weekly') timeFilter = todayStart - ((new Date(now + 8 * 3600000).getDay() + 6) % 7) * 24 * 3600000;
 
-        const whereClause = 'l.level_id = ? AND l.game_mode = ? AND l.achieved_at >= ?';
+        const whereClause = 'l.level_id = ? AND l.game_mode = ? AND l.achieved_at >= ?' +
+            (gameMode === 0 ? ' AND l.is_win = 1' : '');
 
         // 查询总数（用于分页）
         let totalSql: string;

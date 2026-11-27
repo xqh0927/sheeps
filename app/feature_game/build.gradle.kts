@@ -38,6 +38,7 @@ kapt {
 }
 
 dependencies {
+    testImplementation(libs.retrofit)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

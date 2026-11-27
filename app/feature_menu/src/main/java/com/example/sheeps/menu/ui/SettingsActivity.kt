@@ -8,6 +8,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.sheeps.data.repository.UserRepository
+import com.example.sheeps.menu.ui.dialogs.AccountDeletionDialog
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.lib_base.router.RouterPath
@@ -38,6 +40,9 @@ class SettingsActivity : BaseActivity() {
     lateinit var prefs: UserPreferences
 
     @Inject
+    lateinit var users: UserRepository
+
+    @Inject
     lateinit var kv: MMKV
 
     override fun initView(savedInstanceState: Bundle?) {
@@ -45,6 +50,8 @@ class SettingsActivity : BaseActivity() {
             SheepsTheme {
                 BackHandler { finish() }
                 var showGameGuide by remember { mutableStateOf(false) }
+                var gameMusicEnabled by remember { mutableStateOf(prefs.isGameMusicEnabled()) }
+                var matchSoundEnabled by remember { mutableStateOf(prefs.isMatchSoundEnabled()) }
 
                 // 构建简化版 MenuViewState（仅提供 SettingsScreen 所需字段）
                 // 线程边界：remember 在组合内创建，随组合重建/销毁；不跨 Configuration 长期持有。
@@ -57,9 +64,32 @@ class SettingsActivity : BaseActivity() {
                     GameGuideDialog(onDismiss = { showGameGuide = false })
                 }
 
+                var accountToken by remember { mutableStateOf<String?>(null) }
+                accountToken?.let { token ->
+                    AccountDeletionDialog(token, users, onDismiss = { accountToken = null }, onLogin = {
+                        accountToken = null
+                        TheRouter.build(RouterPath.Auth.LOGIN).navigation(this)
+                    })
+                }
+
                 SettingsScreen(
+                    onAccountSecurity = {
+                        val token = prefs.getToken()
+                        if (token == null) TheRouter.build(RouterPath.Auth.LOGIN).navigation(this)
+                        else accountToken = token
+                    },
                     state = settingsState,
                     onBack = { finish() },
+                    gameMusicEnabled = gameMusicEnabled,
+                    onGameMusicChange = { enabled ->
+                        prefs.setGameMusicEnabled(enabled)
+                        gameMusicEnabled = enabled
+                    },
+                    matchSoundEnabled = matchSoundEnabled,
+                    onMatchSoundChange = { enabled ->
+                        prefs.setMatchSoundEnabled(enabled)
+                        matchSoundEnabled = enabled
+                    },
                     onChangeLanguage = { lang ->
                         prefs.setLanguage(lang)
                         // 标记语言已变更，MenuActivity 返回时通过 onResume 感知

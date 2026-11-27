@@ -28,4 +28,10 @@
     <string name="catalog_shop_exchange_item_desc">选择要兑换的数量。</string>
     <string name="catalog_shop_exchange_skin_desc">使用金币解锁这款卡牌皮肤。</string>
     <string name="catalog_carry_stock_label">库存 %1$d</string>
+    <string name="personal_load_failed">暂时无法加载</string>
+    <string name="personal_retry">重试</string>
+    <string name="personal_session_expired">登录已过期</string>
+    <string name="personal_sign_in">重新登录</string>
+    <string name="settings_game_music">游戏音乐</string>
+    <string name="settings_match_sound">消除音效</string>
 </resources>

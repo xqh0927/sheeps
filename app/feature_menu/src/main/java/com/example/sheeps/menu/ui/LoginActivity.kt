@@ -13,7 +13,6 @@ import com.example.sheeps.data.local.UserProfileEntity
 import com.example.sheeps.data.local.UserProgressEntity
 import com.example.sheeps.data.model.LoginRequest
 import com.example.sheeps.data.model.PasswordLoginRequest
-import com.example.sheeps.data.model.SendCodeRequest
 import com.example.sheeps.data.network.ApiService
 import com.example.sheeps.data.preference.UserPreferences
 import com.example.sheeps.data.repository.SyncRepository
@@ -65,13 +64,12 @@ class LoginActivity : BaseActivity() {
                 BackHandler { finish() }
                 var isLoading by remember { mutableStateOf(false) }
                 // 线程边界：rememberCoroutineScope 提供的 scope 与当前 Composable 组合生命周期一致；
-                // 下面的 onSendCode/onLogin 等回调在用户手势（主线程）触发，内部 launch 的网络请求自动切到 IO。
+                // 下面的 onLogin 等回调在用户手势（主线程）触发，内部 launch 的网络请求自动切到 IO。
                 val scope = rememberCoroutineScope()
 
                 LoginScreen(
                     isLoading = isLoading,
                     onBack = { finish() },
-                    onSendCode = { phone -> handleSendCode(phone, scope) },
                     onLogin = { phone, code ->
                         handleLoginWithCode(phone, code, scope) {
                             isLoading = it
@@ -95,24 +93,6 @@ class LoginActivity : BaseActivity() {
 
     // -------- 业务逻辑（从 MenuViewModel / AuthDelegate 提取）--------
 
-    private fun handleSendCode(phone: String, scope: kotlinx.coroutines.CoroutineScope) {
-        if (phone.length != 11) {
-            Toaster.show(getString(R.string.err_invalid_phone))
-            return
-        }
-        scope.launch {
-            try {
-                val response = apiService.sendCode(SendCodeRequest(phone))
-                if (response.success) {
-                    Toaster.show(getString(R.string.toast_send_code_success, response.code))
-                } else {
-                    Toaster.show(getString(R.string.toast_send_code_failed))
-                }
-            } catch (e: Exception) {
-                Toaster.show(getString(R.string.toast_send_code_network_error))
-            }
-        }
-    }
 
     private fun handleLoginWithCode(
         phone: String,

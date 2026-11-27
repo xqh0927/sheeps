@@ -46,8 +46,18 @@ class UserRepository @Inject constructor(
      * 统一入口：经 [safeApiCall] 包装，并挂载 401 自动刷新（最多 1 次）。
      * 刷新成功（返回 [ApiResult.Success]）才会重试 [block]。
      */
-    private suspend fun <T> call(block: suspend () -> T): ApiResult<T> =
-        safeApiCall(block) { code -> code == 401 && tokenRefresher.refreshToken() is ApiResult.Success }
+    private suspend fun <T> call(block: suspend () -> T): ApiResult<T> {
+        val access = prefs.getToken()
+        return safeApiCall(block) { code -> code == 401 && tokenRefresher.refreshToken(access) is ApiResult.Success }
+    }
+
+    suspend fun deletionStatus(token: String) = tokenRefresher.authenticated(token, apiService::deletionStatus)
+    suspend fun requestDeletion(token: String) = tokenRefresher.authenticated(token, apiService::requestDeletion)
+    suspend fun withdrawDeletion(token: String) = tokenRefresher.authenticated(token, apiService::withdrawDeletion)
+
+    suspend fun dailyTasks(token: String) = tokenRefresher.authenticated(token, apiService::getDailyTasks)
+    suspend fun pointsHistory(token: String) = tokenRefresher.authenticated(token, apiService::getPointsHistory)
+    suspend fun exchangeHistory(token: String) = tokenRefresher.authenticated(token, apiService::getExchangeHistory)
 
     suspend fun sendCode(phone: String): ApiResult<SendCodeResponse> = call {
         apiService.sendCode(SendCodeRequest(phone))

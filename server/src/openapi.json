@@ -19,11 +19,11 @@
     "/api/auth/send-code": {
       "post": {
         "tags": ["auth"],
-        "summary": "发送短信/邮箱验证码",
+        "summary": "发送短信验证码",
         "requestBody": {
           "content": {
             "application/json": {
-              "example": { "phone": "13800000000", "type": "login" }
+              "example": { "phone": "13800000000" }
             }
           }
         },
@@ -31,9 +31,17 @@
           "200": {
             "description": "成功",
             "content": { "application/json": { "example": { "success": true } } }
-          }
+          },
+          "429": { "description": "发送过于频繁，请稍后重试" },
+          "502": { "description": "短信网关未确认接单" },
+          "503": { "description": "短信服务尚未配置" }
         }
       }
+    },
+    "/api/user/deletion-request": {
+      "get": { "tags": ["user"], "summary": "查询本人的注销申请", "responses": { "200": { "description": "requested_at 为申请时间（毫秒），无申请时为 null" }, "401": { "description": "请先登录" } } },
+      "post": { "tags": ["user"], "summary": "提交本人注销申请（重复提交保留原申请时间）", "responses": { "200": { "description": "申请已登记" }, "401": { "description": "请先登录" } } },
+      "delete": { "tags": ["user"], "summary": "撤回本人待处理的注销申请", "responses": { "200": { "description": "无待处理申请" }, "401": { "description": "请先登录" } } }
     },
     "/api/auth/login": {
       "post": {
@@ -323,6 +331,20 @@
         }
       }
     },
+    "/api/level/attempt": {
+      "post": {
+        "tags": ["game"],
+        "summary": "幂等记录闯关开局",
+        "description": "账号身份或 uuid- 游客身份必须与该局结算一致。started_at 为玩家实际开局的 Unix 毫秒。重复同一 run_id 保留首次上报内容。",
+        "requestBody": { "required": true, "content": { "application/json": { "example": {
+          "user_id": "player-id", "run_id": "example-run-id", "level_id": 42, "layout_version": "generated-v5", "started_at": 1795000000000
+        } } } },
+        "responses": {
+          "200": { "description": "已确认开局", "content": { "application/json": { "example": { "success": true, "run_id": "example-run-id" } } } },
+          "400": { "description": "开局参数无效" }, "401": { "description": "无效身份" }, "409": { "description": "账号与开局归属不一致" }
+        }
+      }
+    },
     "/api/level/unlock": {
       "post": {
         "tags": ["game"],
@@ -338,12 +360,32 @@
     "/api/score/submit": {
       "post": {
         "tags": ["game"],
-        "summary": "提交通关成绩",
-        "requestBody": {
-          "content": { "application/json": { "example": { "levelId": 3, "score": 1200, "stars": 3 } } }
-        },
+        "summary": "兼容旧客户端的单次成绩提交",
+        "requestBody": { "required": true, "content": { "application/json": { "example": {
+          "user_id": "player-id", "level_id": 1, "score": 1200, "clear_time_ms": 18000, "sign": "<signature>"
+        } } } },
+        "responses": { "200": { "description": "成功", "content": { "application/json": { "example": { "success": true } } } } }
+      }
+    },
+    "/api/score/submit-once": {
+      "post": {
+        "tags": ["game"],
+        "summary": "按开局 ID 幂等提交成绩",
+        "description": "同一玩家重传同一局时复用 run_id。收到与请求相同的 run_id 才能清除本地记录。旧版 Worker 返回 404 时保留记录，等待服务升级。",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": {
+          "type": "object", "required": ["user_id", "level_id", "score", "clear_time_ms", "sign", "run_id"],
+          "properties": {
+            "user_id": {"type":"string"}, "level_id":{"type":"integer"}, "score":{"type":"integer"},
+            "clear_time_ms":{"type":"integer"}, "sign":{"type":"string"}, "run_id":{"type":"string","pattern":"^[a-zA-Z0-9-]{1,64}$"},
+            "completed_at":{"type":"integer","format":"int64","description":"本局结算时刻，Unix 毫秒"},
+            "game_mode":{"type":"integer"}, "items_used":{"type":"integer"}, "is_win":{"type":"integer"},
+            "abandoned":{"type":"boolean","description":"主动弃局或从局内重开，仅未获胜时生效"}
+          }
+        } } } },
         "responses": {
-          "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "bestScore": 1200 } } } }
+          "200": {"description":"已记录或已确认相同开局", "content":{"application/json":{"example":{"success":true,"run_id":"example-run-id"}}}},
+          "400": {"description":"缺少参数或开局 ID 无效"}, "401": {"description":"登录已失效"},
+          "403": {"description":"成绩签名无效"}, "409": {"description":"账号与成绩归属不一致"}
         }
       }
     },
@@ -425,6 +467,25 @@
         "summary": "刷新管理员访问令牌",
         "responses": {
           "200": { "description": "成功", "content": { "application/json": { "example": { "success": true, "token": "<admin-jwt>" } } } }
+        }
+      }
+    },
+    "/api/admin/levels/health": {
+      "get": {
+        "tags": ["admin"],
+        "summary": "按关号、布局版本分页查看闯关体检",
+        "description": "仅汇总版本已知的局，包括生成关卡。版本为 unknown 的开局可用于判断同关重试。首次通关率取同人同关同版本的首次开局，以已结算首局为分母。已结算样本包含主动弃局。重试率以真实失败局为分母，判断玩家在失败后是否再开同一关；主动弃局不计入失败。道具使用率以已结算局为分母。比例范围 0–1，分母为零返回 null。",
+        "parameters": [
+          { "name": "level_id", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+          { "name": "layout_version", "in": "query", "schema": { "type": "string", "maxLength": 128 } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } }
+        ],
+        "responses": {
+          "200": { "description": "指标及样本数", "content": { "application/json": { "example": {
+            "success": true, "list": [{"level_id": 42, "layout_version": "generated-v5", "attempts": 8, "settled_attempts": 6, "failed_attempts": 4, "first_settled_attempts": 5, "first_wins": 1, "retried_failures": 3, "item_attempts": 3, "first_win_rate": 0.2, "retry_rate": 0.75, "item_use_rate": 0.5}], "total": 1, "page": 1, "pageSize": 20
+          } } } },
+          "401": { "description": "需要管理员凭证" }
         }
       }
     },

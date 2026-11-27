@@ -8,8 +8,6 @@ import com.example.sheeps.game.state.GameViewState
 import com.example.sheeps.game.state.GameHistoryState
 import com.example.sheeps.game.state.GameStatus
 import com.example.sheeps.game.state.SoundType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -201,7 +199,7 @@ class GameToolDelegate @Inject constructor() {
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
         onToolUsed: () -> Unit,
-        processSlotMatch: suspend () -> Unit
+        processSlotMatch: () -> Unit
     ) {
         if (state.bombCount <= 0) return
 
@@ -221,23 +219,22 @@ class GameToolDelegate @Inject constructor() {
         setEffect(GameViewEffect.Vibrate)
         setEffect(GameViewEffect.ShowToast(getLocalizedString("雷震子炸裂！直接销毁卡槽最后两张牌！", "Bomb exploded! Destroyed the last two cards!", "雷震子炸裂！直接銷毀卡槽最後兩張牌！", "爆弾爆発！最後の2枚のカードが破壊されました！", "폭탄 폭발! 마지막 카드 2장이 제거되었습니다!")))
         
-        // 炸弹后需要重新触发匹配逻辑检查（虽然这里是销毁，但也可能触发生命周期）
+        processSlotMatch()
     }
 
     /**
      * 处理万能牌（太极牌）操作
-     * 线程边界：主流程在主线程；最终通过 scope.launch { processSlotMatch() } 在 viewModelScope 内触发成绩提交与胜负同步，VM 销毁时协程自动取消。
+     * 消除和胜负判定在同一次输入处理中完成。
      * 玩法：优先从置物架/棋盘凑齐与卡槽 2 张同型牌组成消除，再补入卡槽触发匹配。
      */
     fun handleUseJoker(
-        scope: CoroutineScope,
         state: GameViewState,
         getLocalizedString: (String, String, String, String, String) -> String,
         updateState: (GameViewState.() -> GameViewState) -> Unit,
         setEffect: (GameViewEffect) -> Unit,
         onToolUsed: () -> Unit,
         onAddHistory: () -> Unit,
-        processSlotMatch: suspend () -> Unit
+        processSlotMatch: () -> Unit
     ) {
         if (state.jokerCount <= 0) return
 
@@ -310,7 +307,7 @@ class GameToolDelegate @Inject constructor() {
             )
         }
 
-        setEffect(GameViewEffect.PlaySound(SoundType.MATCH))
+        setEffect(GameViewEffect.TileMatch(targetType))
         setEffect(GameViewEffect.ShowToast(getLocalizedString(
             "太极牌显灵！与卡槽卡牌凑成消除！",
             "Joker activated! Completed match and eliminated!",
@@ -319,9 +316,7 @@ class GameToolDelegate @Inject constructor() {
             "조커 활성화! 일치하도록 변환되어 제거되었습니다!"
         )))
 
-        // 5. 启动协程触发成绩提交、胜负状态同步
-        scope.launch {
-            processSlotMatch()
-        }
+        // 同步胜负判定与成绩。
+        processSlotMatch()
     }
 }

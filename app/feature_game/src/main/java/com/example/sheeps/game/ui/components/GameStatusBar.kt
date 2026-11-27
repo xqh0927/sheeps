@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.example.sheeps.data.model.TileState
 import com.example.sheeps.game.state.GameStatus
+import com.example.sheeps.game.state.elapsedAt
 import com.example.sheeps.game.state.GameViewState
 import androidx.compose.ui.res.stringResource
 import com.example.sheeps.ui.R
@@ -30,18 +31,15 @@ fun GameStatusBar(state: GameViewState) {
     // 计时器：基于关卡起始时间戳本地自增，每秒仅重绘状态栏自身，不再依赖全局 elapsedMs 实时流（已解耦到 UI 本地计时）。
     // 仅在 PLAYING 时自增；胜利/失败后定格为当前已用时间（与原有“结算后冻结”表现一致），复活回到 PLAYING 后继续计时。
     var displayMs by remember { mutableStateOf(0L) }
-    LaunchedEffect(state.levelStartTimestamp, state.gameStatus) {
+    LaunchedEffect(state.activeSinceNanos, state.levelStartTimestamp, state.gameStatus, state.elapsedMs) {
         val startTs = state.levelStartTimestamp
-        if (startTs <= 0L) {
-            displayMs = 0L
-            return@LaunchedEffect
-        }
-        if (state.gameStatus != GameStatus.PLAYING) {
-            displayMs = System.currentTimeMillis() - startTs
+        if ((state.activeSinceNanos == null && startTs <= 0L) || state.gameStatus != GameStatus.PLAYING) {
+            displayMs = state.elapsedMs
             return@LaunchedEffect
         }
         while (isActive) {
-            displayMs = System.currentTimeMillis() - startTs
+            displayMs = if (state.activeSinceNanos != null) state.elapsedAt(System.nanoTime())
+                else (System.currentTimeMillis() - startTs).coerceAtLeast(0L)
             delay(1000)
         }
     }

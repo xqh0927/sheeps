@@ -97,14 +97,20 @@ class DuelViewModel @Inject constructor(
     private fun handleInit(gameId: String, playerId: String, levelId: Int, seed: Int) {
         currentLevelId = levelId
         currentGameSeed = seed
-        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, totalTileCount = 0, opponentEliminatedCount = 0, currentSkin = prefs.getCurrentSkin()) }
+        updateState { copy(gameId = gameId, playerId = playerId, isLoading = true, gameStatus = GameStatus.INIT, totalTileCount = 0, opponentEliminatedCount = 0, currentSkin = prefs.getCurrentSkin()) }
         // ⚠️ 内存隐患：建立 WebSocket 连接；若后续未通过 handleLeave → wsManager.disconnect() 关闭，
         // 连接会残留（见类文档 onCleared 兜底建议）。
         wsManager.connect(gameId, playerId)
 
         viewModelScope.launch {
             // ===== 对决模式关卡数据加载逻辑（网络优先 + 离线兜底） =====
-            when (val result = gameRepository.getLevel(levelId, seed)) {
+            val result = gameRepository.getLevel(levelId, seed)
+            // The peer may have finished before this player's board request returned.
+            if (currentState.gameStatus == GameStatus.WON || currentState.gameStatus == GameStatus.LOST) {
+                updateState { copy(isLoading = false) }
+                return@launch
+            }
+            when (result) {
                 is ApiResult.Success -> {
                     // 1. 网络优先：向服务器 API 请求对决中双方一致的关卡布局
                     val rawTiles = result.data.map { it.copy(state = TileState.NORMAL) }
@@ -154,12 +160,13 @@ class DuelViewModel @Inject constructor(
      * 匹配成功后向服务端下发 ELIMINATE 指令并据连击触发 ATTACK；胜利时下发 SYSTEM_EVENT(WIN)。
      */
     private suspend fun processSlotMatch(board: List<Tile>, slot: List<Tile>, movedOut: List<Tile>) {
+        if (currentState.gameStatus != GameStatus.PLAYING) return
         actionDelegate.processSlotMatch(currentState, board, slot, movedOut, ::updateState, ::setEffect,
             onMatchSuccess = { eliminatedIds ->
                 sendEliminateCommand(eliminatedIds)
                 if (currentState.combo > 0 && currentState.combo % 3 == 0) sendAttackCommand()
             },
-            onVictory = { sendSystemEvent("WIN") }
+            onFinished = { result -> sendSystemEvent(if (result == GameStatus.WON) "WIN" else "LOST") }
         )
     }
 
@@ -196,8 +203,10 @@ class DuelViewModel @Inject constructor(
      */
     private fun handleLeave() {
         viewModelScope.launch {
-            sendSystemEvent("OPPONENT_QUIT")
-            delay(500)
+            if (currentState.gameStatus != GameStatus.WON && currentState.gameStatus != GameStatus.LOST) {
+                sendSystemEvent("OPPONENT_QUIT")
+                delay(500)
+            }
             wsManager.disconnect()
             setEffect(DuelViewEffect.ExitGame)
         }

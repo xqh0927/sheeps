@@ -3,11 +3,14 @@ package com.example.sheeps.menu.ui.screens
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +27,6 @@ import com.example.sheeps.menu.ui.components.LocalMenuBottomInset
 import com.example.sheeps.menu.ui.components.CatalogSwitch
 import com.example.sheeps.menu.ui.components.CoinCanvas
 import com.example.sheeps.menu.ui.components.ShopItemCard
-import com.example.sheeps.menu.ui.components.SkinFan
 import com.example.sheeps.ui.R
 
 @Composable
@@ -35,8 +37,8 @@ fun ShopScreen(
     onChangeSkin: (String) -> Unit
 ) {
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    val itemScroll = rememberLazyListState()
-    val skinScroll = rememberLazyListState()
+    val itemScroll = rememberLazyGridState()
+    val skinScroll = rememberLazyGridState()
     val colors = MaterialTheme.colorScheme
     val equipment = remember(state.shopItems) { state.shopItems.filterNot { it.item_type.startsWith("SKIN_") } }
     val series = remember(state.shopItems) {
@@ -60,31 +62,37 @@ fun ShopScreen(
 
         CatalogSwitch(listOf(stringResource(R.string.shop_item_magic), stringResource(R.string.shop_item_skin)), selected) { selected = it }
         Crossfade(targetState = selected, modifier = Modifier.fillMaxSize(), label = "catalogSection") { page ->
-            LazyColumn(state = if (page == 0) itemScroll else skinScroll, contentPadding = PaddingValues(top = 16.dp, bottom = LocalMenuBottomInset.current + 18.dp)) {
+            val propPage = page == 0
+            val minCardWidth = 144.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+            LazyVerticalGrid(
+                columns = if (propPage) GridCells.Adaptive(minCardWidth) else GridCells.Fixed(1),
+                state = if (propPage) itemScroll else skinScroll,
+                contentPadding = PaddingValues(top = 14.dp, bottom = LocalMenuBottomInset.current + 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(if (propPage) 12.dp else 0.dp)
+            ) {
                 if (!state.isLoggedIn) {
-                    item {
-                        Surface(modifier = Modifier.padding(bottom = 18.dp), shape = RoundedCornerShape(22.dp), color = colors.surface) {
-                            Row(Modifier.fillMaxWidth().padding(16.dp),
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), color = colors.surface) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(stringResource(R.string.shop_login_prompt), color = colors.onSurface,
-                                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Button(onLoginClick) { Text(stringResource(R.string.shop_btn_login_sync)) }
-                                }
-                                SkinFan(state.currentSkin, Modifier.width(104.dp).height(100.dp))
+                                Text(stringResource(R.string.shop_login_prompt), Modifier.weight(1f),
+                                    color = colors.onSurface, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(Modifier.width(8.dp))
+                                FilledTonalButton(onLoginClick) { Text(stringResource(R.string.shop_btn_login_sync)) }
                             }
                         }
                     }
                 }
                 if (state.shopItems.isEmpty() && state.isShopLoading) {
-                    item { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                    item(span = { GridItemSpan(maxLineSpan) }) { Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                 } else if ((page == 0 && equipment.isEmpty()) || (page == 1 && series.isEmpty())) {
-                    item { Text(stringResource(MenuR.string.catalog_empty), color = colors.onSurfaceVariant, modifier = Modifier.padding(12.dp)) }
-                } else if (page == 0) {
-                    itemsIndexed(equipment, key = { _, item -> item.id }) { index, item ->
+                    item(span = { GridItemSpan(maxLineSpan) }) { Text(stringResource(MenuR.string.catalog_empty), color = colors.onSurfaceVariant, modifier = Modifier.padding(12.dp)) }
+                } else if (propPage) {
+                    gridItems(equipment, key = { it.id }) { item ->
                         ShopItemCard(item, owned[item.item_type] ?: 0, state.currentSkin, state.points,
                             onExchange = { onExchangeClick(item.id, it) }, onApplySkin = onChangeSkin,
-                            onLoginRequired = loginGate, firstInGroup = index == 0, lastInGroup = index == equipment.lastIndex)
+                            onLoginRequired = loginGate)
                     }
                 } else {
                     series.forEach { (group, skins) ->

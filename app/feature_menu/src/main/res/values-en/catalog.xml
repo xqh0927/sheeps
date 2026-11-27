@@ -28,4 +28,10 @@
     <string name="catalog_shop_exchange_item_desc">Choose how many you want to exchange.</string>
     <string name="catalog_shop_exchange_skin_desc">Spend coins to unlock this tile skin.</string>
     <string name="catalog_carry_stock_label">Available %1$d</string>
+    <string name="personal_load_failed">Could not load</string>
+    <string name="personal_retry">Retry</string>
+    <string name="personal_session_expired">Your session has expired</string>
+    <string name="personal_sign_in">Sign in again</string>
+    <string name="settings_game_music">Game music</string>
+    <string name="settings_match_sound">Tile match sound</string>
 </resources>

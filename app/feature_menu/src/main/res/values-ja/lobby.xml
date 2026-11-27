@@ -9,4 +9,7 @@
     <string name="lobby_picked">%1$d / 5 種類</string>
     <string name="lobby_opponent">対戦相手</string>
     <string name="lobby_you">自分</string>
+    <string name="stage_resume">続きから遊ぶ</string>
+    <string name="stage_unfinished">プレイ中のステージ</string>
+    <string name="stage_replaces_save">新しく始めると、ステージ %1$d のセーブデータが置き換わります。</string>
 </resources>

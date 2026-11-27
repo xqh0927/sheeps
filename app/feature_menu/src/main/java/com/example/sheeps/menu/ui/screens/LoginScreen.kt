@@ -30,11 +30,10 @@ import androidx.compose.ui.unit.dp
 import com.example.sheeps.lib_network.AppConfig
 import com.example.sheeps.ui.R
 import com.hjq.toast.Toaster
-import kotlinx.coroutines.delay
 
 @Composable
 fun LoginScreen(
-    isLoading: Boolean = false, onBack: () -> Unit, onSendCode: (String) -> Unit,
+    isLoading: Boolean = false, onBack: () -> Unit,
     onLogin: (String, String) -> Unit, onPasswordLogin: (String, String) -> Unit,
     onNavigateToRegister: () -> Unit, onNavigateToResetPassword: () -> Unit
 ) {
@@ -43,9 +42,7 @@ fun LoginScreen(
     var phone by rememberSaveable { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var countdown by rememberSaveable { mutableIntStateOf(0) }
     var agreed by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(countdown) { if (countdown > 0) { delay(1000); countdown-- } }
 
     AccountForm(stringResource(R.string.btn_login), onBack, isLoading) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -69,10 +66,7 @@ fun LoginScreen(
             if (enterPassword) {
                 AccountField(password, stringResource(R.string.label_password), { password = it }, KeyboardType.Password)
             } else {
-                VerificationRow(code, { code = it }, countdown) {
-                    if (phone.length == 11) { onSendCode(phone); countdown = 60 }
-                    else Toaster.show(context.getString(R.string.hint_phone))
-                }
+                VerificationRow(code, { code = it }, phone)
             }
         }
         LoginConsent(agreed) { agreed = it }

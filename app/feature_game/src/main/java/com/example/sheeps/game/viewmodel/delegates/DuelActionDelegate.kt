@@ -100,14 +100,14 @@ class DuelActionDelegate @Inject constructor() {
         updateState: (DuelViewState.() -> DuelViewState) -> Unit,
         setEffect: (DuelViewEffect) -> Unit,
         onMatchSuccess: (List<String>) -> Unit,
-        onVictory: () -> Unit
+        onFinished: (GameStatus) -> Unit
     ) {
         val finalBoard = calculateBlockedStates(board)
         val finalSlot = slot.toMutableList()
         finalSlot.sortBy { it.type }
 
         val counts = finalSlot.groupBy { it.type }
-        var matched = false
+        var matchedType: Int? = null
         var eliminatedIds = emptyList<String>()
         
         for ((type, items) in counts) {
@@ -127,13 +127,13 @@ class DuelActionDelegate @Inject constructor() {
                         currentEnergy = (currentEnergy + 1).coerceAtMost(10)
                     ) 
                 }
-                matched = true
+                matchedType = type
                 break
             }
         }
 
-        if (matched) {
-            setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
+        if (matchedType != null) {
+            setEffect(DuelViewEffect.TileMatch(matchedType))
             onMatchSuccess(eliminatedIds)
         } else {
             // 新增了牌但未消除，重置连击。
@@ -147,7 +147,6 @@ class DuelActionDelegate @Inject constructor() {
         val newStatus = when {
             remainingTotal == 0 -> {
                 setEffect(DuelViewEffect.PlaySound(SoundType.WIN))
-                onVictory()
                 GameStatus.WON
             }
             finalSlot.size >= state.maxSlotSize -> {
@@ -176,6 +175,7 @@ class DuelActionDelegate @Inject constructor() {
                 winnerId = if (newStatus == GameStatus.WON) playerId else winnerId
             )
         }
+        if (newStatus == GameStatus.WON || newStatus == GameStatus.LOST) onFinished(newStatus)
     }
 
     /**
@@ -215,7 +215,6 @@ class DuelActionDelegate @Inject constructor() {
         updateState { copy(currentEnergy = currentEnergy - cost, usedSpells = usedSpells + spellType) }
         onCastSuccess(cost)
         
-        setEffect(DuelViewEffect.PlaySound(SoundType.MATCH))
         setEffect(DuelViewEffect.ShowToast(getLocalizedString("施法成功！", "Spell casted!", "施法成功！", "スキル発動！", "주문 성공!")))
     }
 }

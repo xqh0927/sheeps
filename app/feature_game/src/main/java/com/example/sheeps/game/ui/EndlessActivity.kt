@@ -1,6 +1,11 @@
 package com.example.sheeps.game.ui
 
 
+import com.example.sheeps.game.audio.GameAudio
+import com.example.sheeps.game.audio.bindGameAudio
+import com.example.sheeps.data.preference.UserPreferences
+import javax.inject.Inject
+import com.example.sheeps.game.audio.hasMusicBoard
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -39,6 +44,9 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class EndlessActivity : BaseActivity() {
 
+    @Inject lateinit var prefs: UserPreferences
+    private lateinit var gameAudio: GameAudio
+
     private val viewModel: EndlessViewModel by viewModels()
 
     /**
@@ -75,12 +83,13 @@ class EndlessActivity : BaseActivity() {
      * ⚠️ 资源释放：收集协程绑定于 lifecycleScope，随 Activity 销毁自动取消，无泄漏。
      */
     override fun initData() {
+        gameAudio = bindGameAudio(prefs, viewModel.viewState) { it.hasMusicBoard() }
         // 在生命周期范围内收集 ViewModel 发出的副作用
         viewModel.viewEffect.collectWithLifecycle(this) { effect ->
             when (effect) {
+                is EndlessViewEffect.TileMatch -> gameAudio.playMatch(effect.tileType, effect.emittedAtNanos)
                 is EndlessViewEffect.ShowToast -> Toaster.show(effect.message)
-                is EndlessViewEffect.PlaySound -> { /* 播放音效（接入音效模块后实现） */
-                }
+                is EndlessViewEffect.PlaySound -> Unit
 
                 is EndlessViewEffect.Vibrate -> { /* 设备振动（接入后实现） */
                 }

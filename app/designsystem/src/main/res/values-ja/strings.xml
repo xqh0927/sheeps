@@ -243,7 +243,7 @@
     <string name="prepare_title_locked">未開放</string>
     <string name="prepare_title_unlocked">ステージ準備 (ステージ %1$d)</string>
     <string name="prepare_blind_warning">⚠️ ブラインドステージ！一部のカードはスロットに入れるまで隠されています。</string>
-    <string name="prepare_sealed_warning">🔒 封印ステージ！一部のカードは封印されています（1~3層）。タップして層ごとに解封；完全解封で「シャッター」が発動し、隣接する封印カードの層数が1減ります。</string>
+    <string name="prepare_sealed_warning">🔒 封印ステージ！同じ絵柄を3枚そろえると、封印された牌が1枚解放されます。</string>
     <string name="update_discovered">新しいバージョン %1$s が見つかりました</string>
     <string name="update_log_title">アップデート内容：</string>
     <string name="update_default_log">プレイ感の向上および不具合の修正。</string>
@@ -353,7 +353,9 @@
     <string name="toast_unlock_failed_cloud">アンロック失敗。クラウド同期が拒否されました</string>
     <string name="toast_unlock_offline">接続エラー。ローカルでアンロックしました。再接続時に同期されます</string>
     <string name="toast_phone_invalid">正しい11桁の電話番号を入力してください</string>
-    <string name="toast_send_code_success">認証コードが送信されました！テストコード：%1$s</string>
+    <string name="toast_send_code_success">認証コードを送信しました。SMS をご確認ください。</string>
+    <string name="sms_service_unavailable">現在 SMS サービスを利用できません。しばらくしてからお試しください。</string>
+    <string name="sms_rate_limited">送信回数が多すぎます。しばらくしてからお試しください。</string>
     <string name="toast_send_code_failed">認証コードの送信に失敗しました</string>
     <string name="toast_send_code_network_error">ネットワークエラー。送信に失敗しました</string>
     <string name="toast_phone_code_invalid">正しい電話番号と6桁の認証コードを入力してください</string>

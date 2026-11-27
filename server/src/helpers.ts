@@ -90,7 +90,8 @@ export async function getAuthenticatedUser(request: Request, env: Env): Promise<
   if (!payload || payload.type !== 'access') {
     return null;
   }
-  return payload;
+  const account = await env.DB.prepare('SELECT 1 FROM users WHERE id=?').bind(payload.userId).first();
+  return account ? payload : null;
 }
 
 /**

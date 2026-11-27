@@ -6,6 +6,14 @@ import org.junit.Test
 
 class LevelRunsTest {
     @Test
+    fun preparedRunIsReusedOnceAndRestartGetsAFreshBoard() {
+        val prepared = java.util.UUID.randomUUID().toString()
+        val runs = LevelRuns(SavedStateHandle(mapOf("preparedRunId" to prepared)))
+        assertEquals(prepared, runs.open(3, null)!!.id)
+        assertNotEquals(prepared, runs.start(3, null).id)
+    }
+
+    @Test
     fun rotationKeepsBoardAndProcessRestoreReopensOnlyTheCurrentRun() {
         val saved = SavedStateHandle()
         val retained = LevelRuns(saved)

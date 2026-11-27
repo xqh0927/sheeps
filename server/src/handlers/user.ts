@@ -1,4 +1,5 @@
 import { Env } from '../types';
+import { avatarPrefix, enqueueAvatarCleanup, ownsAvatar, removeOwnedAvatars } from '../lib/account-avatars';
 import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
 
 /**
@@ -12,6 +13,27 @@ import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
  */
 export async function handleUserRoutes(request: Request, env: Env, path: string): Promise<Response | null> {
     const corsHeaders = getCorsHeaders();
+
+    if (path === '/api/user/deletion-request' && ['GET', 'POST', 'DELETE'].includes(request.method)) {
+        const user = await getAuthenticatedUser(request, env);
+        if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+        const statements = [];
+        if (request.method === 'POST') {
+            statements.push(env.DB.prepare(`
+                INSERT OR IGNORE INTO account_deletion_requests(user_id, requested_at)
+                SELECT id, ? FROM users WHERE id = ?
+            `).bind(Date.now(), user.userId));
+        } else if (request.method === 'DELETE') {
+            statements.push(env.DB.prepare('DELETE FROM account_deletion_requests WHERE user_id=?').bind(user.userId));
+        }
+        statements.push(env.DB.prepare(`
+            SELECT r.requested_at FROM users u LEFT JOIN account_deletion_requests r ON r.user_id = u.id WHERE u.id = ?
+        `).bind(user.userId));
+        const response = await env.DB.batch(statements);
+        const row = response[response.length - 1].results[0];
+        const headers = { ...corsHeaders, 'Cache-Control': 'no-store' };
+        return row ? Response.json(row, { headers }) : Response.json({ error: 'Unauthorized' }, { status: 401, headers });
+    }
 
     /**
      * POST /api/user/sync — 端云数据增量同步
@@ -230,15 +252,9 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
             return new Response(JSON.stringify({ error: 'Invalid image type (allowed: png, jpeg, webp)' }), { status: 400, headers: corsHeaders });
         }
 
-        // 删除该用户的旧头像文件（避免 R2 存储泄漏）
-        const oldObjects = await env.AVATAR_BUCKET.list({ prefix: `avatars/${authUser.userId}_` });
-        for (const oldObj of oldObjects.objects) {
-            await env.AVATAR_BUCKET.delete(oldObj.key);
-        }
-
-        // 上传到 R2
         const timestamp = Date.now();
-        const key = `avatars/${authUser.userId}_${timestamp}.png`;
+        await removeOwnedAvatars(env, authUser.userId, timestamp);
+        const key = avatarPrefix(authUser.userId) + timestamp + '.png';
         await env.AVATAR_BUCKET.put(key, file.stream(), {
             httpMetadata: { contentType: file.type || 'image/jpeg' },
             customMetadata: { userId: authUser.userId, uploadedAt: String(timestamp) }
@@ -248,8 +264,16 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const r2PublicUrl = env.R2_PUBLIC_URL || new URL(request.url).origin;
         const avatarUrl = `${r2PublicUrl}/${key}`;
         // DB：将 R2 公网直链写入 users.avatar_url 列，profile 等接口直接读取，省去经 Worker 代理取图
-        await env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?')
-            .bind(avatarUrl, authUser.userId).run();
+        const [saved] = await env.DB.batch([
+            env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(avatarUrl, authUser.userId),
+            // If deletion won the race with the R2 upload, durably record the late object for cleanup.
+            enqueueAvatarCleanup(env, 'SELECT ? AS id WHERE NOT EXISTS (SELECT 1 FROM users WHERE id=?)',
+                [authUser.userId, authUser.userId], timestamp),
+        ]);
+        if (!saved.meta.changes) {
+            await env.AVATAR_BUCKET.delete(key).catch(() => {});
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        }
 
         // 响应中返回完整公网 URL（Android 端直接用于 Coil 加载）
         return new Response(JSON.stringify({ success: true, avatarUrl }), { headers: corsHeaders });
@@ -281,13 +305,14 @@ export async function handleAvatarProxy(request: Request, env: Env, path: string
     }
 
     // 查找 R2 中该用户的所有头像文件
-    const objects = await env.AVATAR_BUCKET.list({ prefix: `avatars/${userId}_` });
-    if (objects.objects.length === 0) {
+    const objects = await env.AVATAR_BUCKET.list({ prefix: avatarPrefix(userId) });
+    const owned = objects.objects.filter(object => ownsAvatar(userId, object));
+    if (owned.length === 0) {
         return new Response(JSON.stringify({ error: 'Avatar not found' }), { status: 404, headers: corsHeaders });
     }
 
     // 取最新的一个（按上传时间排序）
-    const latestObject = objects.objects.sort((a, b) =>
+    const latestObject = owned.sort((a, b) =>
         (b.uploaded?.getTime() || 0) - (a.uploaded?.getTime() || 0)
     )[0];
 

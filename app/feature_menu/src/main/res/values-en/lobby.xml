@@ -9,4 +9,7 @@
     <string name="lobby_picked">%1$d / 5 types</string>
     <string name="lobby_opponent">Opponent</string>
     <string name="lobby_you">You</string>
+    <string name="stage_resume">Continue game</string>
+    <string name="stage_unfinished">Unfinished stage</string>
+    <string name="stage_replaces_save">Starting a new stage replaces your saved game on stage %1$d.</string>
 </resources>

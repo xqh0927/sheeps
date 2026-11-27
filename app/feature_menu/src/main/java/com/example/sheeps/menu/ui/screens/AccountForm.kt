@@ -12,7 +12,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import android.os.SystemClock
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.sheeps.menu.viewmodel.SmsCodeViewModel
+import com.hjq.toast.Toaster
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,13 +87,11 @@ internal fun AccountField(
 }
 
 @Composable
-internal fun VerificationRow(value: String, onChange: (String) -> Unit, countdown: Int, onRequest: () -> Unit) {
+internal fun VerificationRow(value: String, onChange: (String) -> Unit, phone: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         AccountField(value, stringResource(R.string.label_code), onChange, KeyboardType.Number, Modifier.weight(1f))
-        OutlinedButton(onRequest, enabled = countdown == 0, shape = CircleShape) {
-            Text(if (countdown > 0) "${countdown}s" else stringResource(R.string.btn_get_code))
-        }
+        VerificationCodeButton(phone)
     }
 }
 
@@ -97,5 +101,25 @@ internal fun AccountSubmit(label: String, enabled: Boolean, onClick: () -> Unit)
         shape = CircleShape) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
         Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+    }
+}
+
+@Composable
+internal fun VerificationCodeButton(phone: String, model: SmsCodeViewModel = viewModel()) {
+    val state by model.state.collectAsState()
+    val deadline = state.deadlines[phone]
+    var seconds by remember(phone, deadline) { mutableIntStateOf(state.secondsLeft(phone, SystemClock.elapsedRealtime())) }
+    LaunchedEffect(phone, deadline) {
+        while (seconds > 0) {
+            delay(1000)
+            seconds = state.secondsLeft(phone, SystemClock.elapsedRealtime())
+        }
+    }
+    val context = LocalContext.current
+    LaunchedEffect(model, context) {
+        model.messages.collect { Toaster.show(context.getString(it)) }
+    }
+    OutlinedButton(onClick = { model.send(phone) }, enabled = !state.sending && seconds == 0, shape = CircleShape) {
+        Text(if (seconds > 0) "${seconds}s" else stringResource(R.string.btn_get_code))
     }
 }
