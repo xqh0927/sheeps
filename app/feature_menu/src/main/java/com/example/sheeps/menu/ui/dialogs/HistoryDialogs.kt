@@ -78,7 +78,10 @@ private fun rememberCatalogNames(items: List<ShopItem>) = remember(items) {
 
 @Composable
 private fun LedgerDialog(title: Int, onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    CatalogSheet(stringResource(title), onDismiss) { content() }
+    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * 0.55f
+    CatalogSheet(stringResource(title), onDismiss, contentModifier = Modifier.heightIn(max = maxHeight)) {
+        content()
+    }
 }
 
 @Composable

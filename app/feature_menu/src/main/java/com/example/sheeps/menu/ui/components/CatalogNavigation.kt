@@ -91,13 +91,18 @@ internal fun CatalogLink(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CatalogSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+internal fun CatalogSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    contentModifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     ModalBottomSheet(onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), containerColor = colors.surface,
         contentColor = colors.onSurface, dragHandle = null) {
-        Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 16.dp)) {
+        Column(contentModifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 16.dp)) {
             Spacer(Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
                 .size(36.dp, 5.dp).background(colors.outlineVariant, CircleShape))
             Row(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp),
