@@ -349,7 +349,7 @@ export default function Users() {
           </TextField>
           <TextField
             size="small"
-            placeholder="手机号/昵称搜索"
+            placeholder="邮箱/手机号/昵称搜索"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (setPage(0), load())}
@@ -376,6 +376,7 @@ export default function Users() {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>邮箱</TableCell>
                 <TableCell>手机号</TableCell>
                 <TableCell>昵称</TableCell>
                 <TableCell>积分</TableCell>
@@ -389,20 +390,21 @@ export default function Users() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={canWrite ? 8 : 7} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={canWrite ? 9 : 8} align="center" sx={{ py: 5 }}>
                     <CircularProgress size={28} />
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={canWrite ? 8 : 7} align="center" sx={{ py: 5 }} color="text.secondary">
+                  <TableCell colSpan={canWrite ? 9 : 8} align="center" sx={{ py: 5 }} color="text.secondary">
                     暂无数据
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell>{r.phone}</TableCell>
+                    <TableCell>{r.email || '—'}</TableCell>
+                    <TableCell>{r.phone || '—'}</TableCell>
                     <TableCell>{r.username}</TableCell>
                     <TableCell>{r.points}</TableCell>
                     <TableCell>
@@ -456,7 +458,7 @@ export default function Users() {
                       <IconButton size="small" onClick={() => handleOpenAssets(r)} title="道具与皮肤">
                         <ShoppingBag fontSize="small" />
                       </IconButton>
-                      {isSuper && r.phone && r.id && (
+                      {isSuper && (r.phone || r.email) && r.id && (
                         <IconButton size="small" title="重置为默认密码" aria-label="重置为默认密码"
                           onClick={() => setResetTarget(r)}>
                           <LockReset fontSize="small" />
@@ -498,7 +500,7 @@ export default function Users() {
       <Dialog open={!!resetTarget} onClose={() => { if (!busy) setResetTarget(null); }} aria-labelledby="reset-password-title">
         <DialogTitle id="reset-password-title">重置为默认密码？</DialogTitle>
         <DialogContent>
-          <Typography>{resetTarget?.username} · {resetTarget?.phone} · {resetTarget && ROLE_LABEL[resetTarget.role]}</Typography>
+          <Typography>{resetTarget?.username} · {resetTarget?.email || resetTarget?.phone} · {resetTarget && ROLE_LABEL[resetTarget.role]}</Typography>
           <Typography sx={{ mt: 1 }}>该账号下次密码登录时需使用系统默认密码。</Typography>
         </DialogContent>
         <DialogActions>

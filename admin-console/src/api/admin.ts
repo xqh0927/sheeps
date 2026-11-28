@@ -10,7 +10,8 @@ export interface PageResult<T> {
 
 export interface AdminUserRow {
   id: string;
-  phone: string;
+  phone: string | null;
+  email?: string | null;
   username: string;
   points: number;
   role: string;

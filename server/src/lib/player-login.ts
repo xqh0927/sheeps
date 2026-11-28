@@ -2,11 +2,11 @@ import { Env } from '../types';
 import { generateJWT } from '../crypto';
 import { getCorsHeaders } from '../helpers';
 
-export function newPlayer(db: D1Database, id: string, phone: string, passwordHash: string | null) {
+export function newPlayer(db: D1Database, id: string, email: string, passwordHash: string | null) {
     const now = Date.now();
     return [
-        db.prepare('INSERT INTO users (id, phone, username, role, points, password_hash, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)')
-            .bind(id, phone, '国风玩家_' + phone.slice(-4), 'user', passwordHash, now),
+        db.prepare('INSERT INTO users (id, email, username, role, points, password_hash, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)')
+            .bind(id, email, '国风玩家_' + id.slice(0, 6), 'user', passwordHash, now),
         db.prepare('INSERT INTO level_unlock (user_id, level_id, unlocked_at) VALUES (?, 1, ?)').bind(id, now),
         ...['UNDO', 'SHUFFLE', 'MOVEOUT', 'REVIVE'].map(item =>
             db.prepare('INSERT INTO user_items (user_id, item_type, count) VALUES (?, ?, 1)').bind(id, item))
@@ -40,7 +40,7 @@ function transferGuest(db: D1Database, guest: string, target: string) {
             progress=MAX(user_task.progress,excluded.progress), is_completed=MAX(user_task.is_completed,excluded.is_completed),
             is_rewarded=MAX(user_task.is_rewarded,excluded.is_rewarded)`).bind(target, guest),
         remove('sign_record'), remove('user_task'), remove('level_unlock'), remove('user_items'),
-        db.prepare('DELETE FROM users WHERE id=? AND phone IS NULL').bind(guest)
+        db.prepare('DELETE FROM users WHERE id=? AND phone IS NULL AND email IS NULL').bind(guest)
     ];
 }
 
@@ -49,19 +49,19 @@ export async function finishPlayerLogin(env: Env, id: string, guest: string | un
     // A device identifier can only denote an unregistered player. All transfers use current
     // rows in the same transaction, including when two login requests consume the same guest.
     if (guest && /^uuid-[a-f0-9-]{36}$/i.test(guest) && guest !== id &&
-        await db.prepare('SELECT 1 FROM users WHERE id=? AND phone IS NULL').bind(guest).first()) {
+        await db.prepare('SELECT 1 FROM users WHERE id=? AND phone IS NULL AND email IS NULL').bind(guest).first()) {
         initial.push(...transferGuest(db, guest, id));
     }
     const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
     const results = await db.batch<Record<string, string | number | null>>([...initial,
-        db.prepare('SELECT id,phone,username,avatar_url AS avatar,points,(password_hash IS NOT NULL) AS has_password FROM users WHERE id=?').bind(id),
+        db.prepare('SELECT id,phone,email,username,avatar_url AS avatar,points,(password_hash IS NOT NULL) AS has_password FROM users WHERE id=?').bind(id),
         db.prepare('SELECT level_id FROM level_unlock WHERE user_id=? ORDER BY level_id').bind(id),
         db.prepare('SELECT item_type,count FROM user_items WHERE user_id=?').bind(id),
         db.prepare(`SELECT sign_date,streak FROM sign_record WHERE user_id=? AND sign_date BETWEEN date(?,'-1 day') AND ? ORDER BY sign_date DESC LIMIT 1`).bind(id, today, today)
     ]);
     const [account, levels, items, signs] = results.slice(initial.length);
     const {has_password, ...user} = account.results[0];
-    const claims = {userId: id, phone: user.phone};
+    const claims = {userId: id, email: user.email, phone: user.phone};
     const [token, refreshToken] = await Promise.all([
         generateJWT({...claims, type: 'access', exp: Date.now() + 7200000}),
         generateJWT({...claims, type: 'refresh', exp: Date.now() + 30 * 86400000})

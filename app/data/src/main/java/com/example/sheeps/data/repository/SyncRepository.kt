@@ -101,6 +101,8 @@ class SyncRepository @Inject constructor(
                 // 1. 同步覆盖本地 SharedPreferences (MMKV) 用户状态数据
                 userPreferences.setPoints(response.user.points)
                 userPreferences.setUsername(response.user.username)
+                userPreferences.setPhone(response.user.phone)
+                userPreferences.setEmail(response.user.email)
                 userPreferences.setTodaySigned(response.today_signed)
                 userPreferences.setSignStreak(response.sign_streak)
                 userPreferences.setHighestLevelCleared(response.highest_level_cleared)

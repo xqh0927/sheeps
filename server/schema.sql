@@ -7,6 +7,7 @@ DROP TABLE IF EXISTS exchange_record;
 DROP TABLE IF EXISTS shop_items;
 DROP TABLE IF EXISTS user_items;
 DROP TABLE IF EXISTS level_unlock;
+DROP TABLE IF EXISTS email_verification_codes;
 DROP TABLE IF EXISTS login_token;
 DROP TABLE IF EXISTS notice;
 DROP TABLE IF EXISTS config;
@@ -32,6 +33,7 @@ DROP TABLE IF EXISTS admin_audit_changes;
 CREATE TABLE users (
     id TEXT PRIMARY KEY,
     phone TEXT UNIQUE,
+    email TEXT UNIQUE,
     username TEXT NOT NULL,
     points INTEGER DEFAULT 0,
     password_hash TEXT,
@@ -56,6 +58,12 @@ CREATE TABLE IF NOT EXISTS account_avatar_cleanup (
 
 CREATE TABLE login_token (
     phone TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE email_verification_codes (
+    email TEXT PRIMARY KEY,
     code TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );

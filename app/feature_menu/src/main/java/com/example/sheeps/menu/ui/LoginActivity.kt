@@ -19,6 +19,7 @@ import com.example.sheeps.data.repository.SyncRepository
 import com.example.sheeps.lib_base.base.BaseActivity
 import com.example.sheeps.lib_base.router.RouterPath
 import com.example.sheeps.menu.ui.screens.LoginScreen
+import com.example.sheeps.menu.viewmodel.isValidEmailInput
 import com.example.sheeps.ui.R
 import com.example.sheeps.ui.theme.SheepsTheme
 import com.hjq.toast.Toaster
@@ -95,20 +96,20 @@ class LoginActivity : BaseActivity() {
 
 
     private fun handleLoginWithCode(
-        phone: String,
+        email: String,
         code: String,
         scope: kotlinx.coroutines.CoroutineScope,
         setLoading: (Boolean) -> Unit
     ) {
-        if (phone.length != 11 || code.length != 6) {
-            Toaster.show(getString(R.string.toast_phone_code_invalid))
+        if (!isValidEmailInput(email) || code.length != 6) {
+            Toaster.show(getString(R.string.toast_email_code_invalid))
             return
         }
         setLoading(true)
         scope.launch {
             try {
                 val response = apiService.login(
-                    LoginRequest(phone, code, device_uuid = prefs.getUserId())
+                    LoginRequest(email.trim(), code, device_uuid = prefs.getUserId())
                 )
                 if (response.success) {
                     val localPoints = prefs.getPoints()
@@ -178,6 +179,7 @@ class LoginActivity : BaseActivity() {
                 prefs.setToken(response.token)
                 prefs.setRefreshToken(response.refreshToken)
                 prefs.setPhone(response.user.phone)
+                prefs.setEmail(response.user.email)
                 prefs.setUsername(response.user.username)
                 prefs.setPoints(response.user.points)
                 prefs.setTodaySigned(response.today_signed)

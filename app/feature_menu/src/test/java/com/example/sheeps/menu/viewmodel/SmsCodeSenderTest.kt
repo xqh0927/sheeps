@@ -19,7 +19,7 @@ import org.junit.Test
 class SmsCodeSenderTest {
     private val repo = mockk<UserRepository>()
     private val sender = SmsCodeSender(repo)
-    private val phone = "13800000000"
+    private val email = "player@example.com"
     private var now = 1000L
 
     @Before fun clock() {
@@ -36,52 +36,53 @@ class SmsCodeSenderTest {
     }
 
     @Test fun unavailableProviderDeliveryFailureAndNetworkFailureAllowImmediateRetry() = runTest {
-        for ((status, message) in listOf(503 to R.string.sms_service_unavailable, 502 to R.string.toast_send_code_failed,
+        for ((status, message) in listOf(503 to R.string.email_service_unavailable, 502 to R.string.toast_send_code_failed,
             -1 to R.string.toast_send_code_network_error)) {
-            coEvery { repo.sendCode(phone) } returns ApiResult.Error(status, "failure")
-            assertEquals(message, sender.send(phone))
-            assertEquals(0, sender.state.value.secondsLeft(phone, now))
+            coEvery { repo.sendCode(email) } returns ApiResult.Error(status, "failure")
+            assertEquals(message, sender.send(email))
+            assertEquals(0, sender.state.value.secondsLeft(email, now))
             assertFalse(sender.state.value.sending)
         }
-        coVerify(exactly = 3) { repo.sendCode(phone) }
+        coVerify(exactly = 3) { repo.sendCode(email) }
     }
 
-    @Test fun acceptedAndRateLimitedRequestsStartPerPhoneCooldownAndRejectDuplicateTaps() = runTest {
+    @Test fun acceptedAndRateLimitedRequestsStartPerEmailCooldownAndRejectDuplicateTaps() = runTest {
         val accepted = CompletableDeferred<ApiResult<SendCodeResponse>>()
-        coEvery { repo.sendCode(phone) } coAnswers { accepted.await() }
-        val first = async(start = CoroutineStart.UNDISPATCHED) { sender.send(phone) }
+        coEvery { repo.sendCode(email) } coAnswers { accepted.await() }
+        val first = async(start = CoroutineStart.UNDISPATCHED) { sender.send("  Player@Example.COM ") }
         assertTrue(sender.state.value.sending)
-        assertNull(sender.send(phone))
-        assertEquals(0, sender.state.value.secondsLeft(phone, now))
+        assertNull(sender.send(email))
+        assertEquals(0, sender.state.value.secondsLeft(email, now))
         accepted.complete(ApiResult.Success(SendCodeResponse(true)))
         assertEquals(R.string.toast_send_code_success, first.await())
-        assertEquals(60, sender.state.value.secondsLeft(phone, now))
-        assertEquals(0, sender.state.value.secondsLeft("13900000000", now))
+        assertEquals(60, sender.state.value.secondsLeft(email, now))
+        assertEquals(60, sender.state.value.secondsLeft("PLAYER@EXAMPLE.COM", now))
+        assertEquals(0, sender.state.value.secondsLeft("other@example.com", now))
         now += 59999
-        assertEquals(1, sender.state.value.secondsLeft(phone, now))
-        assertNull(sender.send(phone))
-        coVerify(exactly = 1) { repo.sendCode(phone) }
+        assertEquals(1, sender.state.value.secondsLeft(email, now))
+        assertNull(sender.send(email))
+        coVerify(exactly = 1) { repo.sendCode(email) }
         now++
-        coEvery { repo.sendCode(phone) } returns ApiResult.Error(429, "limited")
-        assertEquals(R.string.sms_rate_limited, sender.send(phone))
-        assertEquals(60, sender.state.value.secondsLeft(phone, now))
+        coEvery { repo.sendCode(email) } returns ApiResult.Error(429, "limited")
+        assertEquals(R.string.sms_rate_limited, sender.send(email))
+        assertEquals(60, sender.state.value.secondsLeft(email, now))
     }
 
     @Test fun menuDelegateReportsAcceptanceWithoutAnyVerificationCode() = runTest {
-        coEvery { repo.sendCode(phone) } returns ApiResult.Success(SendCodeResponse(true))
+        coEvery { repo.sendCode(email) } returns ApiResult.Success(SendCodeResponse(true))
         val delegate = AuthDelegate(repo, mockk(), mockk(), sender)
         val shown = CompletableDeferred<MenuViewEffect>()
-        delegate.handleSendSmsCode(this, phone) { shown.complete(it) }
+        delegate.handleSendSmsCode(this, email) { shown.complete(it) }
         assertEquals(MenuViewEffect.ShowToast(resId = R.string.toast_send_code_success), shown.await())
     }
 
     @Test fun invalidInputAndCancelledRequestsReleaseTheSendButton() = runTest {
-        assertEquals(R.string.err_invalid_phone, sender.send("123"))
+        assertEquals(R.string.err_invalid_email, sender.send("13800000000"))
         coVerify(exactly = 0) { repo.sendCode(any()) }
-        coEvery { repo.sendCode(phone) } coAnswers { awaitCancellation() }
-        val request = launch(start = CoroutineStart.UNDISPATCHED) { sender.send(phone) }
+        coEvery { repo.sendCode(email) } coAnswers { awaitCancellation() }
+        val request = launch(start = CoroutineStart.UNDISPATCHED) { sender.send(email) }
         request.cancelAndJoin()
         assertFalse(sender.state.value.sending)
-        assertEquals(0, sender.state.value.secondsLeft(phone, now))
+        assertEquals(0, sender.state.value.secondsLeft(email, now))
     }
 }

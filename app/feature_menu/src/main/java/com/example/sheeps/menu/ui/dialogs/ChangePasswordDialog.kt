@@ -17,7 +17,7 @@ import com.example.sheeps.menu.ui.screens.VerificationCodeButton
 
 @Composable
 fun ChangePasswordDialog(
-    currentPhone: String,
+    currentEmail: String,
     onDismiss: () -> Unit,
     onChangePassword: (String, String) -> Unit
 ) {
@@ -25,46 +25,57 @@ fun ChangePasswordDialog(
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<Int?>(null) }
+    val hasEmail = currentEmail.isNotBlank()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.dialog_title_change_password), fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.current_account_prefix, currentPhone), style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(
-                    value = code, onValueChange = { code = it; error = null }, modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.hint_code)) }, singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    trailingIcon = {
-                        VerificationCodeButton(currentPhone)
-                    }
-                )
-                OutlinedTextField(
-                    value = password, onValueChange = { password = it; error = null }, modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.hint_new_password)) }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                )
-                OutlinedTextField(
-                    value = confirmation, onValueChange = { confirmation = it; error = null }, modifier = Modifier.fillMaxWidth(),
-                    label = { Text(stringResource(R.string.hint_confirm_password)) }, singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                )
-                Text(stringResource(error ?: R.string.pwd_hint),
-                    color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall)
+                if (!hasEmail) {
+                    Text(
+                        stringResource(R.string.bind_email_before_change_pwd),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(stringResource(R.string.current_account_prefix, currentEmail), style = MaterialTheme.typography.bodyMedium)
+                    OutlinedTextField(
+                        value = code, onValueChange = { code = it; error = null }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.hint_code)) }, singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        trailingIcon = {
+                            VerificationCodeButton(currentEmail)
+                        }
+                    )
+                    OutlinedTextField(
+                        value = password, onValueChange = { password = it; error = null }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.hint_new_password)) }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    OutlinedTextField(
+                        value = confirmation, onValueChange = { confirmation = it; error = null }, modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.hint_confirm_password)) }, singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    )
+                    Text(stringResource(error ?: R.string.pwd_hint),
+                        color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall)
+                }
             }
         },
         confirmButton = {
-            Button(onClick = {
-                error = when {
-                    password.length !in 6..20 -> R.string.pwd_err_length
-                    !password.any(Char::isLetter) || !password.any(Char::isDigit) -> R.string.pwd_err_no_alpha_digit
-                    password != confirmation -> R.string.pwd_err_not_match
-                    code.length != 6 -> R.string.pwd_err_code_length
-                    else -> null
-                }
-                if (error == null) onChangePassword(code, password)
-            }) { Text(stringResource(R.string.btn_confirm)) }
+            if (hasEmail) {
+                Button(onClick = {
+                    error = when {
+                        password.length !in 6..20 -> R.string.pwd_err_length
+                        !password.any(Char::isLetter) || !password.any(Char::isDigit) -> R.string.pwd_err_no_alpha_digit
+                        password != confirmation -> R.string.pwd_err_not_match
+                        code.length != 6 -> R.string.pwd_err_code_length
+                        else -> null
+                    }
+                    if (error == null) onChangePassword(code, password)
+                }) { Text(stringResource(R.string.btn_confirm)) }
+            }
         },
         dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.btn_cancel)) } }
     )

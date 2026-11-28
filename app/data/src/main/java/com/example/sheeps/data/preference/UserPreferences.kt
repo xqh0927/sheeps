@@ -131,6 +131,14 @@ class UserPreferences @Inject constructor(
         securePrefs.edit().putString("user_phone", phone).apply()
     }
 
+    fun getEmail(): String? {
+        return securePrefs.getString("user_email", null)
+    }
+
+    fun setEmail(email: String?) {
+        securePrefs.edit().putString("user_email", email).apply()
+    }
+
     fun getPoints(): Int {
         return kv.decodeInt("user_points", 0)
     }
@@ -160,7 +168,7 @@ class UserPreferences @Inject constructor(
 
     @Synchronized
     fun logout() {
-        securePrefs.edit().remove("jwt_token").remove("refresh_token").remove("user_phone").apply()
+        securePrefs.edit().remove("jwt_token").remove("refresh_token").remove("user_phone").remove("user_email").apply()
         kv.removeValueForKey("user_points")
         kv.encode("unlocked_level", 1)
         kv.removeValueForKey("username")

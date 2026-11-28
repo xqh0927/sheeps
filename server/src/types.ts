@@ -4,9 +4,11 @@
  */
 export interface Env {
   ACCOUNT_RESET_DEFAULT_PASSWORD?: string; // Worker Secret used only for administrator-initiated resets.
-  SMS_DELIVERY_URL?: string;
-  SMS_DELIVERY_TOKEN?: string;
-  SMS_DELIVERY?: Fetcher;    // Private service binding to the configured SMS gateway.
+  BIRD_API_KEY?: string;       // Bird 平台 API Key（Worker Secret 注入）
+  BIRD_API_BASE?: string;      // 可选，Bird 区域根地址（默认 https://us1.platform.bird.com，欧洲区填 https://eu1.platform.bird.com）
+  EMAIL_SENDER?: string;       // 发件人邮箱（须在 Bird 后台完成域名验证，如 noreply@xqh.cc.cd）
+  EMAIL_SENDER_NAME?: string;  // 发件人显示名称（默认：秘境消消乐）
+  EMAIL_DAILY_LIMIT?: string;  // 可选，全站每日发信总上限（默认 50，保护月度免费额度）
   DB: D1Database;          // D1 关系型数据库实例
   SHEEPS_CACHE: KVNamespace; // KV 键值对缓存实例
   AVATAR_BUCKET: R2Bucket;   // R2 对象存储 bucket（用户头像）

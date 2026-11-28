@@ -23,8 +23,10 @@ data class MenuViewState(
     val username: String = "",
     /** 用户头像 URL（由 R2 存储代理返回） */
     val avatarUrl: String = "",
-    /** 用户绑定的手机号（UID） */
+    /** 用户绑定的手机号 */
     val phone: String = "",
+    /** 用户绑定的邮箱 */
+    val email: String = "",
     /** 当前账户可用积分余额 */
     val points: Int = 0,
     /** 用户已解锁的最高关卡 ID */

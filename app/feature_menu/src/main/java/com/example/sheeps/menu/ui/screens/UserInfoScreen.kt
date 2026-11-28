@@ -24,6 +24,8 @@ import com.example.sheeps.menu.state.MenuViewState
 import com.example.sheeps.menu.ui.components.CatalogDivider
 import com.example.sheeps.menu.ui.components.CatalogLink
 import com.example.sheeps.menu.ui.components.PlayerPortrait
+import com.example.sheeps.menu.ui.dialogs.BindEmailDialog
+import com.example.sheeps.menu.ui.dialogs.BindPhoneDialog
 import com.example.sheeps.menu.ui.dialogs.ChangePasswordDialog
 import com.example.sheeps.menu.ui.dialogs.NicknameEditDialog
 import com.example.sheeps.menu.R as MenuR
@@ -38,13 +40,25 @@ fun UserInfoScreen(
     onBack: () -> Unit,
     onChangeAvatar: () -> Unit,
     onUpdateNickname: (String) -> Unit,
+    onBindEmail: (String, String) -> Unit,
+    onBindPhone: (String) -> Unit,
     onChangePassword: (String, String) -> Unit
 ) {
     var nickname by rememberSaveable { mutableStateOf(false) }
+    var bindEmail by rememberSaveable { mutableStateOf(false) }
+    var bindPhone by rememberSaveable { mutableStateOf(false) }
     var password by rememberSaveable { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     if (nickname) NicknameEditDialog(state.username, { nickname = false }) { nickname = false; onUpdateNickname(it) }
-    if (password) ChangePasswordDialog(state.phone, { password = false }) { code, value ->
+    if (bindEmail) BindEmailDialog(state.email, { bindEmail = false }) { email, code ->
+        bindEmail = false
+        onBindEmail(email, code)
+    }
+    if (bindPhone) BindPhoneDialog(state.phone, { bindPhone = false }) { phone ->
+        bindPhone = false
+        onBindPhone(phone)
+    }
+    if (password) ChangePasswordDialog(state.email, { password = false }) { code, value ->
         password = false
         onChangePassword(code, value)
     }
@@ -82,10 +96,22 @@ fun UserInfoScreen(
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
                             }
                             CatalogDivider(16.dp)
-                            Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = 16.dp, vertical = 10.dp),
+                            Row(Modifier.fillMaxWidth().clickable(enabled = !isLoading) { bindEmail = true }.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text(stringResource(R.string.label_email), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                Text(state.email.ifBlank { stringResource(MenuR.string.catalog_label_not_set) },
+                                    modifier = Modifier.weight(1f), textAlign = TextAlign.End, style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.onSurfaceVariant)
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                            }
+                            CatalogDivider(16.dp)
+                            Row(Modifier.fillMaxWidth().clickable(enabled = !isLoading) { bindPhone = true }.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Text(stringResource(R.string.label_phone), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                                Text(state.phone, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                                Text(state.phone.ifBlank { stringResource(MenuR.string.catalog_label_not_set) },
+                                    modifier = Modifier.weight(1f), textAlign = TextAlign.End, style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.onSurfaceVariant)
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
                             }
                         }
                     }

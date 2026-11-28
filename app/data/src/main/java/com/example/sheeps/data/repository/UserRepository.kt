@@ -59,8 +59,8 @@ class UserRepository @Inject constructor(
     suspend fun pointsHistory(token: String) = tokenRefresher.authenticated(token, apiService::getPointsHistory)
     suspend fun exchangeHistory(token: String) = tokenRefresher.authenticated(token, apiService::getExchangeHistory)
 
-    suspend fun sendCode(phone: String): ApiResult<SendCodeResponse> = call {
-        apiService.sendCode(SendCodeRequest(phone))
+    suspend fun sendCode(email: String): ApiResult<SendCodeResponse> = call {
+        apiService.sendCode(SendCodeRequest(email))
             .also { if (!it.success) throw BusinessException("验证码发送失败") }
     }
 

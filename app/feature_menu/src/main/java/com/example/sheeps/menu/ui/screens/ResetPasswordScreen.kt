@@ -18,7 +18,7 @@ fun ResetPasswordScreen(
     onReset: (String, String, String) -> Unit,
     onResetSuccess: () -> Unit
 ) {
-    var phone by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -30,8 +30,8 @@ fun ResetPasswordScreen(
 
 
     AccountForm(stringResource(R.string.reset_password_title), onBack, isLoading) {
-        AccountField(phone, stringResource(R.string.label_phone), { phone = it; errorMsg = null }, KeyboardType.Phone)
-        VerificationRow(code, { code = it; errorMsg = null }, phone)
+        AccountField(email, stringResource(R.string.label_email), { email = it; errorMsg = null }, KeyboardType.Email)
+        VerificationRow(code, { code = it; errorMsg = null }, email)
         AccountField(newPassword, stringResource(R.string.label_new_password), { newPassword = it; errorMsg = null }, KeyboardType.Password)
         Text(stringResource(R.string.pwd_hint), color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall)
@@ -44,7 +44,7 @@ fun ResetPasswordScreen(
                 else -> null
             }
             if (errorMsg == null) {
-                onReset(phone, code, newPassword)
+                onReset(email.trim(), code.trim(), newPassword)
                 onResetSuccess()
             }
         }

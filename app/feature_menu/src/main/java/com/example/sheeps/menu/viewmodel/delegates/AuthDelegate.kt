@@ -14,6 +14,7 @@ import com.example.sheeps.menu.state.MenuViewEffect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import com.example.sheeps.menu.viewmodel.SmsCodeSender
+import com.example.sheeps.menu.viewmodel.isValidEmailInput
 import javax.inject.Inject
 
 /**
@@ -66,20 +67,20 @@ class AuthDelegate @Inject constructor(
      */
     fun handleLoginWithCode(
         scope: CoroutineScope,
-        phone: String,
+        email: String,
         code: String,
         onSuccess: (LoginResponse) -> Unit,
         onConflict: (LoginResponse, Int, Int, Int, Int) -> Unit,
         setLoading: (Boolean) -> Unit,
         setEffect: (MenuViewEffect) -> Unit
     ) {
-        if (phone.length != 11 || code.length != 6) {
-            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_phone_code_invalid))
+        if (!isValidEmailInput(email) || code.length != 6) {
+            setEffect(MenuViewEffect.ShowToast(resId = R.string.toast_email_code_invalid))
             return
         }
         setLoading(true)
         scope.launch {
-            when (val result = userRepository.login(LoginRequest(phone, code, device_uuid = prefs.getUserId()))) {
+            when (val result = userRepository.login(LoginRequest(email.trim(), code, device_uuid = prefs.getUserId()))) {
                 is ApiResult.Success -> {
                     val response = result.data
                     val localPoints = prefs.getPoints()
@@ -129,6 +130,7 @@ class AuthDelegate @Inject constructor(
                 prefs.setToken(response.token)
                 prefs.setRefreshToken(response.refreshToken)
                 prefs.setPhone(response.user.phone)
+                prefs.setEmail(response.user.email)
 
                 if (useLocal) {
                     resolveWithLocal(response)

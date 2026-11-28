@@ -319,11 +319,11 @@ Gradle 模块（见 [settings.gradle.kts](app/settings.gradle.kts)）：`:app`�
 ### 认证 auth
 | 方法 | 路径 | 功能描述 | 鉴权 |
 | :--- | :--- | :--- | :--- |
-| POST | `/api/auth/send-code` | 发送短信验证码（写入 `login_token`，5 分钟有效） | 公开 |
-| POST | `/api/auth/login` | 验证码登录/注册（自动开户 + 赠初始道具 + 游客合并） | 公开 |
-| POST | `/api/auth/login-password` | 密码登录 | 公开 |
-| POST | `/api/auth/register` | 密码注册（6-20 位，PBKDF2 哈希） | 公开 |
-| POST | `/api/auth/reset-password` | 验证码重置密码 | 公开 |
+| POST | `/api/auth/send-code` | 发送邮箱验证码（Bird Email API，写入 `email_verification_codes`，5 分钟有效） | 公开 |
+| POST | `/api/auth/login` | 邮箱验证码登录/注册（自动开户 + 赠初始道具 + 游客合并） | 公开 |
+| POST | `/api/auth/login-password` | 密码登录（支持邮箱或手机号 + 密码） | 公开 |
+| POST | `/api/auth/register` | 邮箱验证码 + 密码注册（6-20 位，PBKDF2 哈希） | 公开 |
+| POST | `/api/auth/reset-password` | 邮箱验证码重置密码 | 公开 |
 | GET | `/api/auth/check-password` | 检查当前用户是否已设密码 | 用户Token |
 | POST | `/api/auth/set-password` | 设置密码（奖励 50 积分） | 用户Token |
 | POST | `/api/auth/refresh` | 用 RefreshToken 静默续期双 Token | RefreshToken |
@@ -343,6 +343,8 @@ Gradle 模块（见 [settings.gradle.kts](app/settings.gradle.kts)）：`:app`�
 | GET | `/api/user/points-history` | 积分收支明细（近 50 条） | 用户Token |
 | GET | `/api/user/exchange-history` | 道具兑换历史（近 50 条） | 用户Token |
 | POST | `/api/user/rename` | 修改昵称 | 用户Token |
+| POST | `/api/user/bind-email` | 绑定或更换邮箱（需邮箱验证码确认） | 用户Token |
+| POST | `/api/user/bind-phone` | 绑定或更换手机号（仅格式与唯一性校验，不发短信） | 用户Token |
 | POST | `/api/user/avatar` | 上传头像（multipart，R2，≤512KB） | 用户Token |
 | GET / POST / DELETE | `/api/user/deletion-request` | 查询/提交/撤销账号注销申请 | 用户Token |
 | GET | `/api/avatar/:userId` | 头像代理读取（R2 直出二进制） | 公开 |
@@ -452,7 +454,7 @@ Gradle 模块（见 [settings.gradle.kts](app/settings.gradle.kts)）：`:app`�
 | `r2_buckets` | binding `AVATAR_BUCKET`，bucket 名 `sheeps-apk`（头像/APK 共用桶，前缀区分） |
 | `vars.R2_PUBLIC_URL` | `https://file.xqh.cc.cd`（R2 公开访问根域名） |
 | `triggers.crons` | `["17 * * * *"]`（每小时第 17 分触发 `scheduled`，清理待删除账号的 R2 头像） |
-| **Worker Secrets / 绑定**（不在文件中，需 `wrangler secret put` 或绑定配置） | `JWT_SECRET`（JWT HMAC 密钥）、`AES_KEY_HEX`（AES-256-GCM 密钥）、`ADMIN_WEB_ORIGIN`（管理后台精确 CORS 源，缺省回退 `*`）、`SMS_DELIVERY` / `SMS_DELIVERY_URL` + `SMS_DELIVERY_TOKEN`（短信验证码投递网关） |
+| **Worker Secrets / 绑定**（不在文件中，需 `wrangler secret put` 或绑定配置） | `JWT_SECRET`（JWT HMAC 密钥）、`AES_KEY_HEX`（AES-256-GCM 密钥）、`ADMIN_WEB_ORIGIN`（管理后台精确 CORS 源，缺省回退 `*`）、`BIRD_API_KEY`（Bird API Key）、`BIRD_API_BASE`（可选，默认 `https://us1.platform.bird.com`，欧洲区填 `https://eu1.platform.bird.com`）、`EMAIL_SENDER`（发件人邮箱，如 `noreply@xqh.cc.cd`）、`EMAIL_SENDER_NAME`（发件人名称，默认 `秘境消消乐`） |
 | **CI Secrets**（GitHub Actions） | `R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`CF_ACCOUNT_ID`（S3 兼容 API 上传 APK）、`MY_PAT`（gh release 令牌） |
 
 ### 管理后台 `.env` / `.env.production`

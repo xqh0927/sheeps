@@ -102,3 +102,31 @@ test('stage health migration preserves old scores without assigning them a layou
     db.close();
   }
 });
+
+test('email auth migration adds email column and verification table while preserving legacy phone users', () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        phone TEXT UNIQUE,
+        username TEXT NOT NULL,
+        points INTEGER DEFAULT 0,
+        password_hash TEXT,
+        avatar_url TEXT,
+        created_at INTEGER NOT NULL,
+        role TEXT DEFAULT 'user',
+        is_banned INTEGER DEFAULT 0
+      );
+      INSERT INTO users(id, phone, username, created_at) VALUES ('u1', '13800000001', 'Legacy', 100);
+    `);
+    const migrate = readFileSync(path.resolve(__dirname, '../migrations/0015_email_auth.sql'), 'utf8');
+    db.exec(migrate);
+    db.prepare('UPDATE users SET email = ? WHERE id = ?').run('legacy@example.com', 'u1');
+    db.prepare('INSERT INTO email_verification_codes(email, code, created_at) VALUES (?, ?, ?)').run('legacy@example.com', '123456', 200);
+    assert.equal(db.prepare('SELECT email FROM users WHERE id = ?').get('u1').email, 'legacy@example.com');
+    assert.equal(db.prepare('SELECT code FROM email_verification_codes WHERE email = ?').get('legacy@example.com').code, '123456');
+  } finally {
+    db.close();
+  }
+});

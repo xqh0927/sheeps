@@ -18,7 +18,7 @@ fun RegisterScreen(
     onRegister: (String, String, String) -> Unit,
     onRegisterSuccess: () -> Unit
 ) {
-    var phone by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
@@ -31,8 +31,8 @@ fun RegisterScreen(
 
 
     AccountForm(stringResource(R.string.register_title), onBack, isLoading) {
-        AccountField(phone, stringResource(R.string.label_phone), { phone = it; errorMsg = null }, KeyboardType.Phone)
-        VerificationRow(code, { code = it; errorMsg = null }, phone)
+        AccountField(email, stringResource(R.string.label_email), { email = it; errorMsg = null }, KeyboardType.Email)
+        VerificationRow(code, { code = it; errorMsg = null }, email)
         AccountField(password, stringResource(R.string.label_password), { password = it; errorMsg = null }, KeyboardType.Password)
         AccountField(confirmPassword, stringResource(R.string.hint_confirm_password),
             { confirmPassword = it; errorMsg = null }, KeyboardType.Password)
@@ -48,7 +48,7 @@ fun RegisterScreen(
                 else -> null
             }
             if (errorMsg == null) {
-                onRegister(phone, password, code)
+                onRegister(email.trim(), password, code.trim())
                 onRegisterSuccess()
             }
         }

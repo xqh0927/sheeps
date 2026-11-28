@@ -158,8 +158,8 @@ async function listUsers(request: Request, env: Env, admin: AdminPayload, url: U
   const wheres: string[] = [];
   const binds: any[] = [];
   if (keyword) {
-    wheres.push('(phone LIKE ? OR username LIKE ?)');
-    binds.push(`%${keyword}%`, `%${keyword}%`);
+    wheres.push('(u.phone LIKE ? OR u.email LIKE ? OR u.username LIKE ?)');
+    binds.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
   }
   if (role) {
     wheres.push('role = ?');
@@ -172,7 +172,7 @@ async function listUsers(request: Request, env: Env, admin: AdminPayload, url: U
   const order = pendingOnly ? 'r.requested_at ASC, u.id' : 'u.created_at DESC, u.id';
   const [count, rows] = await env.DB.batch([
     env.DB.prepare(`SELECT COUNT(*) AS c ${from}`).bind(...binds),
-    env.DB.prepare(`SELECT u.id, u.phone, u.username, u.points, u.role, u.is_banned, u.avatar_url, u.created_at,
+    env.DB.prepare(`SELECT u.id, u.phone, u.email, u.username, u.points, u.role, u.is_banned, u.avatar_url, u.created_at,
       r.requested_at AS deletion_requested_at ${from} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...binds, pageSize, offset),
   ]);
   return new Response(
@@ -278,6 +278,7 @@ async function deleteUser(request: Request, env: Env, admin: AdminPayload, id: s
       .map(table => remove(`DELETE FROM ${table} WHERE backup_id IN (SELECT id FROM backup_save_log WHERE ${owned})`)),
     remove(`DELETE FROM backup_save_log WHERE ${owned}`),
     remove(`DELETE FROM login_token WHERE phone IN (SELECT phone FROM users WHERE id IN (${eligible}))`),
+    remove(`DELETE FROM email_verification_codes WHERE email IN (SELECT email FROM users WHERE id IN (${eligible}))`),
     remove(`DELETE FROM users WHERE id IN (${eligible})`),
   ];
   const results = await env.DB.batch(changes);
@@ -571,7 +572,7 @@ async function resetAccountPassword(request: Request, env: Env, admin: AdminPayl
   // Check live authority in the write itself: the actor might be demoted during password hashing.
   const [updated] = await env.DB.batch([
     env.DB.prepare(`UPDATE users SET password_hash = ?
-      WHERE id = ? AND phone IS NOT NULL AND phone != ''
+      WHERE id = ? AND ((phone IS NOT NULL AND phone != '') OR (email IS NOT NULL AND email != ''))
         AND EXISTS (SELECT 1 FROM users WHERE id = ? AND role = 'super' AND is_banned = 0)`)
       .bind(hash, targetId, admin.userId),
     env.DB.prepare(`INSERT INTO admin_audit_log
@@ -1209,9 +1210,9 @@ async function searchUsers(request: Request, env: Env, url: URL): Promise<Respon
     return new Response(JSON.stringify({ success: true, list: [] }), { headers: getCorsHeaders(env) });
   }
   const rows = await env.DB.prepare(
-    'SELECT id, username, phone FROM users WHERE phone LIKE ? OR username LIKE ? ORDER BY created_at DESC LIMIT 20'
+    'SELECT id, username, phone, email FROM users WHERE phone LIKE ? OR email LIKE ? OR username LIKE ? ORDER BY created_at DESC LIMIT 20'
   )
-    .bind(`%${keyword}%`, `%${keyword}%`)
+    .bind(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`)
     .all();
   return new Response(JSON.stringify({ success: true, list: rows.results }), { headers: getCorsHeaders(env) });
 }

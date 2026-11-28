@@ -13,8 +13,9 @@ const chinaDate = ago => new Date(Date.now() + 8 * 3600000 - ago * day).toISOStr
 before(async () => {
   const script = buildSync({entryPoints:[join(__dirname,'../src/index.ts')],bundle:true,format:'esm',write:false}).outputFiles[0].text;
   runtime = new Miniflare({compatibilityDate:'2026-06-27', workers:[
-    {name:'api',modules:true,script,d1Databases:['DB'],kvNamespaces:['SHEEPS_CACHE'],serviceBindings:{SMS_DELIVERY:'sms'}},
-    {name:'sms',modules:true,script:'export default {fetch() { return Response.json({accepted:true}); }}'}
+    {name:'api',modules:true,script,d1Databases:['DB'],kvNamespaces:['SHEEPS_CACHE'],bindings:{
+      BIRD_API_KEY:'bk_us1_boundary_test',EMAIL_SENDER:'noreply@xqh.cc.cd',EMAIL_SENDER_NAME:'Sheeps'
+    }}
   ]});
   db = await runtime.getD1Database('DB','api');
   await db.batch(splitSql(readFileSync(join(__dirname,'../schema.sql'),'utf8')).map(s=>db.prepare(s)));
@@ -30,34 +31,29 @@ async function ok(...args) {
   assert.equal(r.status, 200, JSON.stringify(r.data));
   return r.data;
 }
-async function code(phone) {
-  await db.prepare('INSERT OR REPLACE INTO login_token VALUES (?,?,?)').bind(phone,'543210',Date.now()).run();
+async function code(email) {
+  await db.prepare('INSERT OR REPLACE INTO email_verification_codes VALUES (?,?,?)').bind(email,'543210',Date.now()).run();
   return '543210';
 }
-const phoneNumber = () => '1990000'+String(++seq).padStart(4,'0');
-async function register(phone=phoneNumber(), guest) {
-  return ok('/api/auth/register',{phone,password:'local-test-123',code:await code(phone),device_uuid:guest});
+const emailAddress = () => 'player'+String(++seq).padStart(4,'0')+'@example.test';
+async function register(email=emailAddress(), guest) {
+  return ok('/api/auth/register',{email,password:'local-test-123',code:await code(email),device_uuid:guest});
 }
 const profile = account=>ok('/api/user/profile',null,account.token);
-test('workerd delivers a verification request to the configured service', async () => {
-  const phone = phoneNumber();
-  assert.equal((await ok('/api/auth/send-code',{phone})).success,true);
-  assert.match((await db.prepare('SELECT code FROM login_token WHERE phone=?').bind(phone).first()).code,/^\d{6}$/);
-});
 for (const method of ['register','login-password','login']) {
   test(method+' preserves guest wins, legacy scores, starts and retry receipts', async () => {
-    const guest = 'uuid-'+randomUUID(), run = randomUUID(), time = 30000, phone = phoneNumber();
+    const guest = 'uuid-'+randomUUID(), run = randomUUID(), time = 30000, email = emailAddress();
     const body = {user_id:guest,level_id:1,clear_time_ms:time,score:60,is_win:1,run_id:run,completed_at:Date.now(),
       sign:await sha256([guest,1,time,'folklore'].join('_'))};
     await ok('/api/level/attempt',{user_id:guest,level_id:1,run_id:run,layout_version:'generated-v5',started_at:Date.now()-time});
     await ok('/api/score/submit-once',body);
     await ok('/api/score/submit',{...body,run_id:undefined});
     let account;
-    if (method==='register') account=await register(phone,guest);
-    else if (method==='login') account=await ok('/api/auth/login',{phone,device_uuid:guest,code:await code(phone)});
+    if (method==='register') account=await register(email,guest);
+    else if (method==='login') account=await ok('/api/auth/login',{email,device_uuid:guest,code:await code(email)});
     else {
-      await register(phone);
-      account=await ok('/api/auth/login-password',{phone,password:'local-test-123',device_uuid:guest});
+      await register(email);
+      account=await ok('/api/auth/login-password',{account:email,password:'local-test-123',device_uuid:guest});
     }
     const id=account.user.id;
     assert.equal((await profile(account)).highest_level_cleared,1);
@@ -99,11 +95,11 @@ test('permanent skins are charged once across distinct orders and cannot be boug
   assert.equal((await ok('/api/user/exchange-history',null,account.token)).length,1);
 });
 test('streak reward wraps on day eight and all login surfaces reset after a missed day', async () => {
-  const phone=phoneNumber(), account=await register(phone), id=account.user.id;
+  const email=emailAddress(), account=await register(email), id=account.user.id;
   await db.prepare('INSERT INTO sign_record VALUES(?,?,?,?,?)').bind(id,chinaDate(2),6,50,Date.now()-2*day).run();
   assert.equal((await profile(account)).sign_streak,0);
-  assert.equal((await ok('/api/auth/login-password',{phone,password:'local-test-123'})).sign_streak,0);
-  assert.equal((await ok('/api/auth/login',{phone,code:await code(phone)})).sign_streak,0);
+  assert.equal((await ok('/api/auth/login-password',{account:email,password:'local-test-123'})).sign_streak,0);
+  assert.equal((await ok('/api/auth/login',{email,code:await code(email)})).sign_streak,0);
   await db.prepare('INSERT INTO sign_record VALUES(?,?,?,?,?)').bind(id,chinaDate(1),7,100,Date.now()-day).run();
   assert.equal((await profile(account)).sign_streak,7);
   const signed=await ok('/api/sign/today',{},account.token);
@@ -133,8 +129,8 @@ test('zero-score players listed in the daily popup have matching personal ranks,
 });
 
 test('two logins merge existing guest balances, inventory and backups once', async () => {
-  const phone = phoneNumber();
-  const account = await register(phone);
+  const email = emailAddress();
+  const account = await register(email);
   const guest = 'uuid-' + randomUUID();
   const target = account.user.id;
   await db.prepare('INSERT INTO users(id,username,points,created_at) VALUES(?,?,?,?)')
@@ -143,7 +139,7 @@ test('two logins merge existing guest balances, inventory and backups once', asy
   const backup = await db.prepare('INSERT INTO backup_save_log(user_id,points,created_at) VALUES(?,?,?)')
     .bind(guest,70,Date.now()).run();
   await db.prepare('INSERT INTO backup_save_items VALUES(?,?,?)').bind(backup.meta.last_row_id,'UNDO',2).run();
-  const login = () => ok('/api/auth/login-password', {phone,password:'local-test-123',device_uuid:guest});
+  const login = () => ok('/api/auth/login-password', {account:email,password:'local-test-123',device_uuid:guest});
   const results = await Promise.all([login(),login()]);
   assert.deepEqual(results.map(r=>r.user.points),[70,70]);
   assert.deepEqual(results.map(r=>r.items.find(i=>i.item_type==='UNDO').count),[3,3]);

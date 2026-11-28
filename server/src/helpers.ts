@@ -77,7 +77,7 @@ export function jsonError(message: string, status: number, env?: Env): Response 
  * 保留原有玩家鉴权逻辑，不被后台改造破坏。
  * @returns 验证通过返回用户身份信息，否则返回 null
  */
-export async function getAuthenticatedUser(request: Request, env: Env): Promise<{ userId: string; phone: string } | null> {
+export async function getAuthenticatedUser(request: Request, env: Env): Promise<{ userId: string; phone?: string | null; email?: string | null } | null> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null; // 未携带 Token 或格式错误
@@ -180,6 +180,60 @@ const ERROR_TRANSLATIONS: Record<string, Record<string, string>> = {
     'ja': '電話番号を入力してください',
     'ko': '전화번호를 입력하십시오'
   },
+  '请填写邮箱': {
+    'en': 'Please enter email address',
+    'tw': '請填寫電子郵箱',
+    'ja': 'メールアドレスを入力してください',
+    'ko': '이메일 주소를 입력하십시오'
+  },
+  '邮箱格式错误': {
+    'en': 'Invalid email format',
+    'tw': '郵箱格式錯誤',
+    'ja': 'メールアドレスの形式が正しくありません',
+    'ko': '이메일 형식이 올바르지 않습니다'
+  },
+  '手机号格式错误': {
+    'en': 'Invalid phone number format',
+    'tw': '手機號格式錯誤',
+    'ja': '電話番号の形式が正しくありません',
+    'ko': '전화번호 형식이 올바르지 않습니다'
+  },
+  '邮件服务暂不可用': {
+    'en': 'Email service is temporarily unavailable',
+    'tw': '郵件服務暫不可用',
+    'ja': 'メールサービスは一時的に利用できません',
+    'ko': '이메일 서비스를 일시적으로 이용할 수 없습니다'
+  },
+  '请填写邮箱和验证码': {
+    'en': 'Please enter email and verification code',
+    'tw': '請填寫郵箱和驗證碼',
+    'ja': 'メールアドレスと認証コードを入力してください',
+    'ko': '이메일과 인증번호를 입력하십시오'
+  },
+  '请填写账号和密码': {
+    'en': 'Please enter account and password',
+    'tw': '請填寫帳號和密碼',
+    'ja': 'アカウントとパスワードを入力してください',
+    'ko': '계정과 비밀번호를 입력하십시오'
+  },
+  '该邮箱已注册': {
+    'en': 'Email already registered',
+    'tw': '該郵箱已註冊',
+    'ja': 'このメールアドレスは既に登録されています',
+    'ko': '이미 등록된 이메일입니다'
+  },
+  '该邮箱已被其他账号绑定': {
+    'en': 'Email is already bound to another account',
+    'tw': '該郵箱已被其他帳號綁定',
+    'ja': 'このメールアドレスは他のアカウントに紐付けられています',
+    'ko': '이 이메일은 이미 다른 계정에 연결되어 있습니다'
+  },
+  '该手机号已被其他账号绑定': {
+    'en': 'Phone number is already bound to another account',
+    'tw': '該手機號已被其他帳號綁定',
+    'ja': 'この電話番号は他のアカウントに紐付けられています',
+    'ko': '이 전화번호는 이미 다른 계정에 연결되어 있습니다'
+  },
   '请填写手机号和验证码': {
     'en': 'Please enter phone number and verification code',
     'tw': '請填寫手機號和驗證碼',
@@ -191,6 +245,18 @@ const ERROR_TRANSLATIONS: Record<string, Record<string, string>> = {
     'tw': '驗證碼錯誤',
     'ja': '認証コードが正しくありません',
     'ko': '인증번호가 잘못되었습니다'
+  },
+  '验证码错误次数过多，请重新获取': {
+    'en': 'Too many invalid attempts, please request a new code',
+    'tw': '驗證碼錯誤次數過多，請重新獲取',
+    'ja': '認証コードの入力ミスが多すぎます。再取得してください',
+    'ko': '인증번호 입력 오류가 너무 많습니다. 다시 요청해 주세요'
+  },
+  '密码错误次数过多，请 15 分钟后再试': {
+    'en': 'Too many failed password attempts, please try again in 15 minutes',
+    'tw': '密碼錯誤次數過多，請 15 分鐘後再試',
+    'ja': 'パスワードの入力ミスが多すぎます。15分後に再試行してください',
+    'ko': '비밀번호 입력 오류가 너무 많습니다. 15분 후 다시 시도해 주세요'
   },
   '验证码已过期': {
     'en': 'Verification code expired',

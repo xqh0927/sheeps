@@ -1,5 +1,6 @@
 import { Env } from '../types';
 import { avatarPrefix, enqueueAvatarCleanup, ownsAvatar, removeOwnedAvatars } from '../lib/account-avatars';
+import { consumeEmailCode, isValidPhone, normalizeEmail, verifyEmailCodeRecord } from '../lib/email-delivery';
 import { getCorsHeaders, getAuthenticatedUser } from '../helpers';
 
 /**
@@ -121,7 +122,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
 
         // 第三步：返回用户最新同步完的最终权威云端数据，供端侧刷新本地 Room 状态
         const [updatedUserResult, updatedLevelsResult, updatedItemsResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, email, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId)
         ]);
@@ -144,7 +145,7 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         const chinaToday = new Date(Date.now() + 8 * 3600000).toISOString().split('T')[0];
         // DB：单 batch 聚合查询用户资料、关卡解锁、道具背包、今日签到、历史连续天数、最高通关关卡（leaderboard 表），供前端渲染个人中心
         const [userResult, levelsResult, itemsResult, signedTodayResult, lastSignResult, highestClearedResult] = await env.DB.batch([
-            env.DB.prepare('SELECT id, phone, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
+            env.DB.prepare('SELECT id, phone, email, username, avatar_url AS avatar, points FROM users WHERE id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT level_id FROM level_unlock WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT item_type, count FROM user_items WHERE user_id = ?').bind(authUser.userId),
             env.DB.prepare('SELECT 1 FROM sign_record WHERE user_id = ? AND sign_date = ?').bind(authUser.userId, chinaToday),
@@ -210,6 +211,70 @@ export async function handleUserRoutes(request: Request, env: Env, path: string)
         if (!body.new_username) return new Response(JSON.stringify({ error: 'Missing new_username' }), { status: 400, headers: corsHeaders });
         await env.DB.prepare('UPDATE users SET username = ? WHERE id = ?').bind(body.new_username, authUser.userId).run();
         return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/user/bind-email — 绑定或更换邮箱（需邮箱验证码确认）
+     */
+    if (path === '/api/user/bind-email' && request.method === 'POST') {
+        const authUser = await getAuthenticatedUser(request, env);
+        if (!authUser) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+
+        const body: { email?: string; code?: string } = await request.json();
+        if (!body.email || !body.code) {
+            return Response.json({ error: '请填写邮箱和验证码' }, { status: 400, headers: corsHeaders });
+        }
+
+        const email = normalizeEmail(body.email);
+        if (!email) {
+            return Response.json({ error: '邮箱格式错误' }, { status: 400, headers: corsHeaders });
+        }
+
+        const codeRecord = await env.DB.prepare('SELECT code, created_at FROM email_verification_codes WHERE email = ?')
+            .bind(email).first<{ code: string; created_at: number }>();
+        const verified = await verifyEmailCodeRecord(env, email, body.code, codeRecord);
+        if (!verified.ok) {
+            return Response.json({ error: verified.error }, { status: 400, headers: corsHeaders });
+        }
+
+        const conflict = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?')
+            .bind(email, authUser.userId).first<{ id: string }>();
+        if (conflict) {
+            return Response.json({ error: '该邮箱已被其他账号绑定' }, { status: 409, headers: corsHeaders });
+        }
+
+        if (!await consumeEmailCode(env, email, body.code, verified.issuedAt)) {
+            return Response.json({ error: '验证码已失效，请重新获取' }, { status: 400, headers: corsHeaders });
+        }
+
+        await env.DB.prepare('UPDATE users SET email = ? WHERE id = ?').bind(email, authUser.userId).run();
+        return Response.json({ success: true, email }, { headers: corsHeaders });
+    }
+
+    /**
+     * POST /api/user/bind-phone — 绑定或更换手机号（仅格式与唯一性校验，不发短信）
+     */
+    if (path === '/api/user/bind-phone' && request.method === 'POST') {
+        const authUser = await getAuthenticatedUser(request, env);
+        if (!authUser) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
+
+        const body: { phone?: string } = await request.json();
+        const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+        if (!phone) {
+            return Response.json({ error: '请填写手机号' }, { status: 400, headers: corsHeaders });
+        }
+        if (!isValidPhone(phone)) {
+            return Response.json({ error: '手机号格式错误' }, { status: 400, headers: corsHeaders });
+        }
+
+        const conflict = await env.DB.prepare('SELECT id FROM users WHERE phone = ? AND id != ?')
+            .bind(phone, authUser.userId).first<{ id: string }>();
+        if (conflict) {
+            return Response.json({ error: '该手机号已被其他账号绑定' }, { status: 409, headers: corsHeaders });
+        }
+
+        await env.DB.prepare('UPDATE users SET phone = ? WHERE id = ?').bind(phone, authUser.userId).run();
+        return Response.json({ success: true, phone }, { headers: corsHeaders });
     }
 
     /**

@@ -46,6 +46,7 @@ data class Tile(
 data class UserInfo(
     val id: String,
     val phone: String? = null,
+    val email: String? = null,
     val username: String,
     val avatar: String? = null,
     val points: Int
@@ -147,24 +148,24 @@ data class Notice(
     val created_at: Long
 )
 
-/** 发送验证码请求（手机号）。 */
+/** 发送验证码请求（邮箱）。 */
 @Serializable
 data class SendCodeRequest(
-    val phone: String
+    val email: String
 )
 
-/** 服务商受理结果。验证码仅通过短信交付。 */
+/** 服务商受理结果。验证码仅通过邮件交付。 */
 @Serializable
 data class SendCodeResponse(val success: Boolean)
 
 /**
- * 手机号 + 验证码登录请求。
+ * 邮箱 + 验证码登录请求。
  *
  * @param device_uuid 设备唯一标识（可空），用于游客数据合并
  */
 @Serializable
 data class LoginRequest(
-    val phone: String,
+    val email: String,
     val code: String,
     val device_uuid: String? = null
 )
@@ -278,29 +279,56 @@ data class UserProfileResponse(
     val avatarUrl: String? = null
 )
 
-/** 手机号 + 密码 + 验证码注册请求。 */
+/** 邮箱 + 密码 + 验证码注册请求。 */
 @Serializable
 data class RegisterAuthRequest(
-    val phone: String,
+    val email: String,
     val password: String,
     val code: String,
     val device_uuid: String? = null
 )
 
-/** 手机号 + 密码登录请求。 */
+/** 账号（邮箱或手机号） + 密码登录请求。 */
 @Serializable
 data class PasswordLoginRequest(
-    val phone: String,
+    val account: String,
     val password: String,
     val device_uuid: String? = null
 )
 
-/** 重置密码请求（手机号 + 验证码 + 新密码）。 */
+/** 重置密码请求（邮箱 + 验证码 + 新密码）。 */
 @Serializable
 data class ResetPasswordRequest(
-    val phone: String,
+    val email: String,
     val code: String,
     val newPassword: String
+)
+
+/** 绑定/更换邮箱请求（邮箱 + 验证码）。 */
+@Serializable
+data class BindEmailRequest(
+    val email: String,
+    val code: String
+)
+
+/** 绑定/更换邮箱响应。 */
+@Serializable
+data class BindEmailResponse(
+    val success: Boolean,
+    val email: String? = null
+)
+
+/** 绑定/更换手机号请求（不发短信，仅做格式与唯一性校验）。 */
+@Serializable
+data class BindPhoneRequest(
+    val phone: String
+)
+
+/** 绑定/更换手机号响应。 */
+@Serializable
+data class BindPhoneResponse(
+    val success: Boolean,
+    val phone: String? = null
 )
 
 /** 设置密码请求（登录后设置）。 */

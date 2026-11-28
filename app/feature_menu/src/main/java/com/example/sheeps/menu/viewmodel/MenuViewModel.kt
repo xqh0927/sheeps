@@ -130,6 +130,7 @@ class MenuViewModel @Inject constructor(
             copy(
                 isLoggedIn = prefs.isLoggedIn(),
                 phone = prefs.getPhone() ?: "",
+                email = prefs.getEmail() ?: "",
                 username = prefs.getUsername(),
                 points = prefs.getPoints(),
                 language = prefs.getLanguage(),
@@ -290,6 +291,7 @@ class MenuViewModel @Inject constructor(
                 isShopLoading = shopItems.isEmpty(),
                 isLoggedIn = token != null, username = if (token != null) prefs.getUsername() else "",
                 phone = if (token != null) prefs.getPhone().orEmpty() else "",
+                email = if (token != null) prefs.getEmail().orEmpty() else "",
                 points = if (token != null) prefs.getPoints() else 0,
                 todaySigned = token != null && prefs.getTodaySigned(),
                 signStreak = if (token != null) prefs.getSignStreak() else 0,
@@ -579,6 +581,7 @@ class MenuViewModel @Inject constructor(
                 prefs.setToken(response.token)
                 prefs.setRefreshToken(response.refreshToken)
                 prefs.setPhone(response.user.phone)
+                prefs.setEmail(response.user.email)
                 prefs.setUsername(response.user.username)
                 prefs.setPoints(response.user.points)
                 prefs.setTodaySigned(response.today_signed)

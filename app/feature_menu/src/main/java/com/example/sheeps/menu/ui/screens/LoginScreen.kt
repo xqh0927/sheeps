@@ -39,7 +39,7 @@ fun LoginScreen(
 ) {
     val context = LocalContext.current
     var passwordMode by rememberSaveable { mutableStateOf(false) }
-    var phone by rememberSaveable { mutableStateOf("") }
+    var account by rememberSaveable { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var agreed by rememberSaveable { mutableStateOf(false) }
@@ -59,19 +59,24 @@ fun LoginScreen(
                 }
             }
         }
-        AccountField(phone, stringResource(R.string.label_phone), { phone = it }, KeyboardType.Phone)
+        AccountField(
+            value = account,
+            label = stringResource(if (passwordMode) R.string.label_account else R.string.label_email),
+            onChange = { account = it },
+            type = KeyboardType.Email
+        )
         AnimatedContent(passwordMode, transitionSpec = {
             (slideInVertically(tween(210)) { it / 4 } + fadeIn(tween(180))) togetherWith fadeOut(tween(100))
         }, label = "credentialField") { enterPassword ->
             if (enterPassword) {
                 AccountField(password, stringResource(R.string.label_password), { password = it }, KeyboardType.Password)
             } else {
-                VerificationRow(code, { code = it }, phone)
+                VerificationRow(code, { code = it }, account)
             }
         }
         LoginConsent(agreed) { agreed = it }
         AccountSubmit(stringResource(R.string.dialog_login_btn), agreed && !isLoading) {
-            if (passwordMode) onPasswordLogin(phone, password) else onLogin(phone, code)
+            if (passwordMode) onPasswordLogin(account.trim(), password) else onLogin(account.trim(), code.trim())
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = onNavigateToRegister) { Text(stringResource(R.string.register_title)) }

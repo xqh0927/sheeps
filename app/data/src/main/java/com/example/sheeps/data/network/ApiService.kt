@@ -1,6 +1,10 @@
 package com.example.sheeps.data.network
 
 import com.example.sheeps.data.model.AppUpdateResponse
+import com.example.sheeps.data.model.BindEmailRequest
+import com.example.sheeps.data.model.BindEmailResponse
+import com.example.sheeps.data.model.BindPhoneRequest
+import com.example.sheeps.data.model.BindPhoneResponse
 import com.example.sheeps.data.model.CheckPasswordResponse
 import com.example.sheeps.data.model.DailyTask
 import com.example.sheeps.data.model.DailyPopupResponse
@@ -170,6 +174,20 @@ interface ApiService {
      */
     @POST("/api/auth/reset-password")
     suspend fun resetPassword(@Body request: ResetPasswordRequest): GenericResponse
+
+    /** 绑定或更换邮箱（需邮箱验证码确认）。 */
+    @POST("/api/user/bind-email")
+    suspend fun bindEmail(
+        @Header("Authorization") auth: String,
+        @Body request: BindEmailRequest
+    ): BindEmailResponse
+
+    /** 绑定或更换手机号（仅校验格式与唯一性，不发短信）。 */
+    @POST("/api/user/bind-phone")
+    suspend fun bindPhone(
+        @Header("Authorization") auth: String,
+        @Body request: BindPhoneRequest
+    ): BindPhoneResponse
 
     /**
      * 检查是否已设置密码

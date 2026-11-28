@@ -87,11 +87,11 @@ internal fun AccountField(
 }
 
 @Composable
-internal fun VerificationRow(value: String, onChange: (String) -> Unit, phone: String) {
+internal fun VerificationRow(value: String, onChange: (String) -> Unit, email: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         AccountField(value, stringResource(R.string.label_code), onChange, KeyboardType.Number, Modifier.weight(1f))
-        VerificationCodeButton(phone)
+        VerificationCodeButton(email)
     }
 }
 
@@ -105,21 +105,22 @@ internal fun AccountSubmit(label: String, enabled: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-internal fun VerificationCodeButton(phone: String, model: SmsCodeViewModel = viewModel()) {
+internal fun VerificationCodeButton(email: String, model: SmsCodeViewModel = viewModel()) {
     val state by model.state.collectAsState()
-    val deadline = state.deadlines[phone]
-    var seconds by remember(phone, deadline) { mutableIntStateOf(state.secondsLeft(phone, SystemClock.elapsedRealtime())) }
-    LaunchedEffect(phone, deadline) {
+    val normalized = email.trim().lowercase()
+    val deadline = state.deadlines[normalized]
+    var seconds by remember(normalized, deadline) { mutableIntStateOf(state.secondsLeft(normalized, SystemClock.elapsedRealtime())) }
+    LaunchedEffect(normalized, deadline) {
         while (seconds > 0) {
             delay(1000)
-            seconds = state.secondsLeft(phone, SystemClock.elapsedRealtime())
+            seconds = state.secondsLeft(normalized, SystemClock.elapsedRealtime())
         }
     }
     val context = LocalContext.current
     LaunchedEffect(model, context) {
         model.messages.collect { Toaster.show(context.getString(it)) }
     }
-    OutlinedButton(onClick = { model.send(phone) }, enabled = !state.sending && seconds == 0, shape = CircleShape) {
+    OutlinedButton(onClick = { model.send(email) }, enabled = !state.sending && seconds == 0, shape = CircleShape) {
         Text(if (seconds > 0) "${seconds}s" else stringResource(R.string.btn_get_code))
     }
 }
